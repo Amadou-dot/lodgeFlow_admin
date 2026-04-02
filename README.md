@@ -66,7 +66,11 @@ pnpm install
 3. Add to `.env.local`:
 ```env
 MONGODB_URI=mongodb+srv://username:password@cluster.xxxxx.mongodb.net/lodgeflow
+SEED_SECRET=replace-with-a-long-random-secret
 ```
+
+`SEED_SECRET` is required for `/api/cron/seed`. Call the route with
+`Authorization: Bearer <SEED_SECRET>`.
 
 **Local MongoDB**
 1. Install [MongoDB Community Server](https://www.mongodb.com/try/download/community)
