@@ -294,12 +294,26 @@ CLERK_SECRET_KEY=sk_...
 ```
 
 ### Auth Bypass for Testing
-Set `NEXT_PUBLIC_TESTING=true` in `.env.local` to bypass all auth in non-production environments. This disables three layers:
-1. **Middleware** (`proxy.ts`) — skips Clerk session check and sign-in redirect
-2. **AuthGuard** (`components/AuthGuard.tsx`) — skips client-side redirect
-3. **API routes** (`lib/api-utils.ts` `requireApiAuth()`) — returns `userId: 'test-user'`
+Auth bypass for local development is split across two flags so that the
+**security-critical** server layers can never be disabled by a client-inlined
+(`NEXT_PUBLIC_*`) variable, and can never activate in production.
 
-All three check: `process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_TESTING === 'true'`. Requires dev server restart after changing the env var.
+**Server enforcement (security boundary)** — set the server-only
+`TESTING_AUTH_BYPASS=true` in `.env.local`. Gated by `isAuthBypassEnabled()`
+(`lib/auth-helpers.ts`), which returns `false` in production regardless of any
+flag. This disables:
+1. **Middleware** (`proxy.ts`) — skips Clerk session check and sign-in redirect
+2. **API routes** (`lib/api-utils.ts` `requireApiAuth()`) — returns `userId: 'test-user'`
+3. **Settings reset** (`app/api/settings/route.ts` `POST`) — skips the extra admin check
+
+**Client UX only (not a security boundary)** — set `NEXT_PUBLIC_TESTING=true` so
+`components/AuthGuard.tsx` renders the dashboard without a configured Clerk
+provider. This flag grants no access to protected data; the server gates above
+still apply.
+
+For a fully bypassed local session, set **both**. Never set `TESTING_AUTH_BYPASS`
+in any deployed (staging/production) environment. Requires a dev server restart
+after changing either var.
 
 ### Date Handling
 - Bookings use ISO date strings in API responses
