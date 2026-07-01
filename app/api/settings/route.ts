@@ -1,5 +1,5 @@
 import { requireApiAuth } from '@/lib/api-utils';
-import { AUTHORIZED_ROLES } from '@/lib/auth-helpers';
+import { hasAuthorizedRole } from '@/lib/auth-helpers';
 import { settingsData } from '@/lib/data/seed-data';
 import connectDB from '@/lib/mongodb';
 import { isMongooseValidationError } from '@/types/errors';
@@ -139,8 +139,8 @@ export async function POST() {
       process.env.NEXT_PUBLIC_TESTING === 'true'
     )
   ) {
-    const { has } = await auth();
-    if (!has?.({ role: AUTHORIZED_ROLES.ADMIN })) {
+    const { has, orgId } = await auth();
+    if (!hasAuthorizedRole(has, orgId)) {
       return NextResponse.json(
         { success: false, error: 'Forbidden: Admin role required' },
         { status: 403 }

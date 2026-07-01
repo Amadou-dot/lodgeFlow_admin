@@ -27,15 +27,15 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Protect all other routes - require authentication
-  const { has, redirectToSignIn, sessionClaims } = await auth();
+  const { has, orgId, redirectToSignIn, sessionClaims } = await auth();
 
   // Check if user is authenticated
   if (!sessionClaims) {
     return redirectToSignIn();
   }
 
-  // Only allow admin role to access the application
-  if (!hasAuthorizedRole(has)) {
+  // Only allow admins of the allowed organization to access the application
+  if (!hasAuthorizedRole(has, orgId)) {
     const unauthorizedUrl = new URL('/unauthorized', req.url);
     return NextResponse.redirect(unauthorizedUrl);
   }

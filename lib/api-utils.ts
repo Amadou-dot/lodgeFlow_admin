@@ -130,7 +130,7 @@ export async function requireApiAuth(): Promise<ApiAuthResult> {
   }
 
   try {
-    const { userId, has } = await auth();
+    const { userId, has, orgId } = await auth();
 
     if (!userId) {
       return {
@@ -139,7 +139,7 @@ export async function requireApiAuth(): Promise<ApiAuthResult> {
       };
     }
 
-    if (!hasAuthorizedRole(has)) {
+    if (!hasAuthorizedRole(has, orgId)) {
       return {
         authenticated: false,
         error: createErrorResponse(

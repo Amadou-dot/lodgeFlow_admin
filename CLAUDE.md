@@ -117,8 +117,10 @@ lib/                  # Core libraries & configuration
 import { hasAuthorizedRole } from '@/lib/auth-helpers';
 import { auth } from '@clerk/nextjs/server';
 
-const { has } = await auth();
-if (!hasAuthorizedRole(has)) {
+// hasAuthorizedRole requires the active org to be the allowed admin org
+// (ADMIN_ORG_ID, overridable via NEXT_PUBLIC_CLERK_ADMIN_ORG_ID)
+const { has, orgId } = await auth();
+if (!hasAuthorizedRole(has, orgId)) {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 

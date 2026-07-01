@@ -27,7 +27,7 @@ function TestModeGuard({ children }: AuthGuardProps) {
 }
 
 function ClerkAuthGuard({ children }: AuthGuardProps) {
-  const { isLoaded, isSignedIn, has } = useAuth();
+  const { isLoaded, isSignedIn, has, orgId } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -40,12 +40,12 @@ function ClerkAuthGuard({ children }: AuthGuardProps) {
       return;
     }
 
-    // Check user role - only allow admin
-    if (!hasAuthorizedRole(has)) {
+    // Check user role - only allow admins of the allowed organization
+    if (!hasAuthorizedRole(has, orgId)) {
       router.replace('/unauthorized');
       return;
     }
-  }, [isLoaded, isSignedIn, has, router]);
+  }, [isLoaded, isSignedIn, has, orgId, router]);
 
   // Show loading state while auth is loading
   if (!isLoaded) {
@@ -72,7 +72,7 @@ function ClerkAuthGuard({ children }: AuthGuardProps) {
   }
 
   // Check role before rendering
-  if (!hasAuthorizedRole(has)) {
+  if (!hasAuthorizedRole(has, orgId)) {
     return (
       <div className='flex items-center justify-center min-h-screen'>
         <div className='text-center'>
