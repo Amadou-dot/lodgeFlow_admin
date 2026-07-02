@@ -5,6 +5,7 @@ import {
   RATE_LIMIT_CONFIGS,
 } from '@/lib/rate-limit';
 import { WelcomeEmail } from '@/components/EmailTemplates';
+import { validateEmail } from '@/utils/utilityFunctions';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -26,6 +27,10 @@ export async function POST(request: Request) {
 
   const { firstName, email } = await request.json();
   try {
+    if (!validateEmail(email)) {
+      return Response.json({ error: 'Invalid email address' }, { status: 400 });
+    }
+
     const { data, error } = await resend.emails.send({
       from: 'LodgeFlow <onboarding@resend.dev>',
       to: email,

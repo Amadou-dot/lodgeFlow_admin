@@ -1,4 +1,4 @@
-import { requireApiAuth } from '@/lib/api-utils';
+import { requireApiAuth, sanitizeUpdatePayload } from '@/lib/api-utils';
 import connectToDatabase from '@/lib/mongodb';
 import { Experience } from '@/models/Experience';
 import { NextResponse } from 'next/server';
@@ -40,9 +40,14 @@ export async function PUT(request: Request, { params }: ParamProps) {
   try {
     await connectToDatabase();
     const data = await request.json();
-    const experience = await Experience.findByIdAndUpdate(id, data, {
-      new: true,
-    });
+    const experience = await Experience.findByIdAndUpdate(
+      id,
+      sanitizeUpdatePayload(data),
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
     if (!experience) {
       return NextResponse.json(
         { error: 'Experience not found' },

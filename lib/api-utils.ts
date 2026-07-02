@@ -177,6 +177,34 @@ export function escapeRegex(str: string): string {
 }
 
 /**
+ * Sanitize a client-supplied update payload before passing it to
+ * findByIdAndUpdate / findOneAndUpdate. Strips MongoDB operator keys
+ * ($set, $inc, ...), dotted paths, and immutable fields so a request
+ * body can't smuggle update operators past schema validation.
+ */
+export function sanitizeUpdatePayload(
+  payload: Record<string, unknown>
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (key.startsWith('$') || key.includes('.')) continue;
+    if (key === '_id' || key === '__v') continue;
+    sanitized[key] = value;
+  }
+
+  return sanitized;
+}
+
+/**
+ * Parse an integer query param, falling back when missing or malformed
+ */
+export function parseIntParam(value: string | null, fallback: number): number {
+  const parsed = parseInt(value ?? '', 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+/**
  * Handle common API errors with appropriate status codes
  */
 export function handleApiError(error: unknown): NextResponse<ApiErrorResponse> {
@@ -307,14 +335,12 @@ export function parsePagination(searchParams: URLSearchParams): {
   limit: number;
   skip: number;
 } {
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+  const page = Math.max(1, parseIntParam(searchParams.get('page'), 1));
   const limit = Math.min(
     API_CONFIG.MAX_PAGE_SIZE,
     Math.max(
       1,
-      parseInt(
-        searchParams.get('limit') || String(API_CONFIG.DEFAULT_PAGE_SIZE)
-      )
+      parseIntParam(searchParams.get('limit'), API_CONFIG.DEFAULT_PAGE_SIZE)
     )
   );
   const skip = (page - 1) * limit;
