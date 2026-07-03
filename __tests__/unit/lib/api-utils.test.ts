@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 import {
@@ -12,6 +13,7 @@ import {
   buildPaginationMeta,
   createPaginatedResponse,
   createValidationErrorResponse,
+  requireApiAuth,
   HTTP_STATUS,
   API_CONFIG,
 } from '@/lib/api-utils';
@@ -421,6 +423,70 @@ describe('api-utils', () => {
       expect(body.pagination.totalItems).toBe(50);
       expect(body.pagination.currentPage).toBe(1);
       expect(body.pagination.limit).toBe(10);
+    });
+  });
+
+  describe('requireApiAuth', () => {
+    const mockAuth = auth as unknown as jest.Mock;
+    const originalTesting = process.env.NEXT_PUBLIC_TESTING;
+
+    afterEach(() => {
+      process.env.NEXT_PUBLIC_TESTING = originalTesting;
+      mockAuth.mockReset();
+    });
+
+    it('bypasses auth when NEXT_PUBLIC_TESTING=true outside production', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'true';
+
+      const result = await requireApiAuth();
+
+      expect(result).toEqual({ authenticated: true, userId: 'test-user' });
+      expect(mockAuth).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when there is no user', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockResolvedValue({ userId: null, has: undefined });
+
+      const result = await requireApiAuth();
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error?.status).toBe(HTTP_STATUS.UNAUTHORIZED);
+    });
+
+    it('returns 403 when the user lacks an authorized role', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockResolvedValue({
+        userId: 'user_123',
+        has: ({ role }: { role: string }) => role === 'org:customer',
+      });
+
+      const result = await requireApiAuth();
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error?.status).toBe(HTTP_STATUS.FORBIDDEN);
+    });
+
+    it('returns the userId for authorized admins', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockResolvedValue({
+        userId: 'user_admin',
+        has: ({ role }: { role: string }) => role === 'org:admin',
+      });
+
+      const result = await requireApiAuth();
+
+      expect(result).toEqual({ authenticated: true, userId: 'user_admin' });
+    });
+
+    it('returns 401 when the auth check throws', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockRejectedValue(new Error('clerk unavailable'));
+
+      const result = await requireApiAuth();
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error?.status).toBe(HTTP_STATUS.UNAUTHORIZED);
     });
   });
 });

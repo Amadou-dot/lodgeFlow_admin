@@ -18,7 +18,9 @@ export const createExperienceSchema = z
     category: z.string().min(1, 'Category is required').max(50),
     image: z.string().min(1, 'Image is required').max(2048),
     includes: z.array(z.string()).min(1, 'At least one inclusion is required'),
-    available: z.array(z.string()).min(1, 'At least one availability option is required'),
+    available: z
+      .array(z.string())
+      .min(1, 'At least one availability option is required'),
     ctaText: z.string().min(1, 'Call to action text is required').max(100),
     longDescription: z.string().max(5000).optional(),
     gallery: z.array(z.string()).optional(),
