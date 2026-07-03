@@ -15,15 +15,16 @@ const baseConfig = {
     'hooks/**/*.{ts,tsx}',
     'lib/**/*.{ts,tsx}',
     'models/**/*.{ts,tsx}',
+    'utils/**/*.{ts,tsx}',
+    'types/**/*.{ts,tsx}',
     '!**/*.d.ts',
     '!**/node_modules/**',
   ],
 };
 
-// Node project — API routes, models, lib utilities (uses MongoDB Memory Server)
-const nodeProject = {
+// Shared settings for the two node-environment projects
+const nodeBase = {
   ...baseConfig,
-  displayName: 'node',
   testEnvironment: 'node',
   moduleNameMapper: {
     ...baseConfig.moduleNameMapper,
@@ -38,20 +39,31 @@ const nodeProject = {
       },
     ],
   },
-  setupFilesAfterEnv: ['<rootDir>/__tests__/setup/jest.setup.node.ts'],
-  globalSetup: '<rootDir>/__tests__/setup/globalSetup.ts',
-  globalTeardown: '<rootDir>/__tests__/setup/globalTeardown.ts',
-  testMatch: [
-    '<rootDir>/__tests__/unit/**/*.test.ts',
-    '<rootDir>/__tests__/integration/**/*.test.ts',
-  ],
   transformIgnorePatterns: [
     'node_modules/(?!(.pnpm|@clerk|@heroui|@faker-js)/)',
   ],
+};
+
+// Unit project — pure functions, no database. Fast: no MongoDB Memory Server.
+const nodeUnitProject = {
+  ...nodeBase,
+  displayName: 'unit',
+  testMatch: ['<rootDir>/__tests__/unit/**/*.test.ts'],
+  testTimeout: 10000,
+};
+
+// Integration project — API routes, models, scripts against MongoDB Memory Server
+const nodeIntegrationProject = {
+  ...nodeBase,
+  displayName: 'integration',
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup/jest.setup.node.ts'],
+  globalSetup: '<rootDir>/__tests__/setup/globalSetup.ts',
+  globalTeardown: '<rootDir>/__tests__/setup/globalTeardown.ts',
+  testMatch: ['<rootDir>/__tests__/integration/**/*.test.ts'],
   testTimeout: 30000,
 };
 
-// JSDOM project — components, hooks, validations, existing mock-based API tests
+// JSDOM project — components, hooks, validations, mock-based API tests
 const jsdomConfig = {
   ...baseConfig,
   displayName: 'jsdom',
@@ -63,6 +75,7 @@ const jsdomConfig = {
     '<rootDir>/__tests__/hooks/**/*.test.ts',
     '<rootDir>/__tests__/hooks/**/*.test.tsx',
     '<rootDir>/__tests__/components/**/*.test.tsx',
+    '<rootDir>/__tests__/utils/**/*.test.ts',
     '<rootDir>/__tests__/*.test.ts',
     '<rootDir>/__tests__/*.test.tsx',
   ],
@@ -73,22 +86,20 @@ const jsdomConfig = {
     '<rootDir>/__tests__/setup/',
     '<rootDir>/__tests__/unit/',
     '<rootDir>/__tests__/integration/',
-    '<rootDir>/__tests__/AddExperienceForm.test.tsx',
-    '<rootDir>/__tests__/AddExperienceForm.simple.test.tsx',
-    '<rootDir>/__tests__/PrintBooking.test.tsx',
-    '<rootDir>/__tests__/error.test.tsx',
   ],
   testTimeout: 15000,
 };
 
 // next/jest createJestConfig returns an async function
-// We resolve the jsdom config and combine with the node project
+// We resolve the jsdom config and combine with the node projects
 module.exports = async () => {
   const resolveJsdomConfig = createJestConfig(jsdomConfig);
   const resolvedJsdom = await resolveJsdomConfig();
 
   return {
+    // Integration suites share a single MongoDB Memory Server instance, so
+    // they must not run in parallel with each other.
     maxWorkers: 1,
-    projects: [nodeProject, resolvedJsdom],
+    projects: [nodeUnitProject, nodeIntegrationProject, resolvedJsdom],
   };
 };

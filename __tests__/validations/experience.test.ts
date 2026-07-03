@@ -40,20 +40,32 @@ describe('Experience Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('applies defaults', () => {
-      const result = createExperienceSchema.safeParse({
-        ...validExperience,
-        includes: undefined,
-        available: undefined,
-      });
+    it('applies defaults for isPopular and reviewCount', () => {
+      const result = createExperienceSchema.safeParse(validExperience);
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.includes).toEqual([]);
-        expect(result.data.available).toEqual([]);
         expect(result.data.isPopular).toBe(false);
         expect(result.data.reviewCount).toBe(0);
       }
+    });
+
+    it('requires non-empty includes and available arrays', () => {
+      expect(
+        createExperienceSchema.safeParse({ ...validExperience, includes: [] })
+          .success
+      ).toBe(false);
+      expect(
+        createExperienceSchema.safeParse({ ...validExperience, available: [] })
+          .success
+      ).toBe(false);
+      expect(
+        createExperienceSchema.safeParse({
+          ...validExperience,
+          includes: undefined,
+          available: undefined,
+        }).success
+      ).toBe(false);
     });
 
     it('rejects unknown legacy keys', () => {

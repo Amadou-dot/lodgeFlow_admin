@@ -100,3 +100,7 @@ jest.mock('@clerk/nextjs', () => ({
 jest.mock('@heroui/toast', () => ({
   addToast: jest.fn(),
 }));
+
+// Mock framer-motion — its real animation loop recurses under jsdom until
+// the test process runs out of memory (any HeroUI component triggers it).
+jest.mock('framer-motion', () => require('./framer-motion.mock'));

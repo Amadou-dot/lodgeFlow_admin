@@ -122,7 +122,8 @@ describe('GET /api/cron/seed authorization', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       success: true,
-      message: 'Database seeded (no Clerk users found, skipped booking creation)',
+      message:
+        'Database seeded (no Clerk users found, skipped booking creation)',
       results: {
         cabins: 1,
         experiences: experienceData.length,

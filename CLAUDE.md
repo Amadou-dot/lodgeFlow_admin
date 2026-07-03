@@ -33,7 +33,10 @@ pnpm check:types      # TypeScript type checking via script
 
 ### Testing
 ```bash
-pnpm test             # Run Jest tests
+pnpm test             # Run all Jest projects (unit, integration, jsdom)
+pnpm test:fast        # Unit + jsdom only (no MongoDB binary required)
+pnpm test:unit        # Pure-function unit tests only
+pnpm test:integration # MongoDB Memory Server integration tests only
 pnpm test:watch       # Run tests in watch mode
 pnpm test:coverage    # Generate coverage report
 ```
@@ -310,47 +313,58 @@ All three check: `process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBL
 
 ### Overview
 - Tests in `__tests__/` directory using Jest + React Testing Library
-- **Dual-project config**: `node` project (integration/unit with MongoDB Memory Server) and `jsdom` project (hooks, validations, components, mock-based API tests)
+- **Three-project config** (`jest.config.js`):
+  - `unit` — node env, pure functions, no database (fast, runs in <1s)
+  - `integration` — node env, real MongoDB via Memory Server (downloads a mongod binary on first run, needs network)
+  - `jsdom` — hooks, validations, components, mock-based API tests
 - Run `pnpm test` before committing, `pnpm test:coverage` for coverage report
+- `pnpm test:fast` runs unit + jsdom only (no MongoDB binary needed) — use this in sandboxed/offline environments
+- `pnpm test:unit` / `pnpm test:integration` select a single node project
 
 ### Test Structure
 ```
 __tests__/
-├── setup/                    # Test infrastructure
-│   ├── globalSetup.ts        # MongoDB Memory Server startup
-│   ├── globalTeardown.ts     # MongoDB Memory Server cleanup
-│   ├── jest.setup.node.ts    # Node env: DB connection, auth mocks
-│   ├── jest.setup.jsdom.ts   # Browser env: router, SWR, Clerk mocks
-│   ├── factories.ts          # Faker-based test data factories
-│   ├── auth-helpers.ts       # Auth mocking utilities
-│   └── mongodb.setup.ts      # DB cleanup helpers
-├── unit/lib/                 # Pure function tests (auth, api-utils, etc.)
-├── integration/              # Real MongoDB via Memory Server
-│   ├── models/               # Mongoose schema validation, CRUD, indexes
-│   └── api/                  # API route handlers with real DB
-├── validations/              # Zod schema tests (no DB)
-├── hooks/                    # SWR/TanStack Query hook tests
-├── api/                      # Mock-based API route tests (jsdom)
-├── components/               # Component render tests
-└── __mocks__/                # Module mocks (framer-motion)
+├── setup/                     # Test infrastructure
+│   ├── globalSetup.ts         # MongoDB Memory Server startup (integration only)
+│   ├── globalTeardown.ts      # MongoDB Memory Server cleanup
+│   ├── jest.setup.node.ts     # Node env: DB connection, auth mocks
+│   ├── jest.setup.jsdom.ts    # Browser env: router, SWR, Clerk, framer-motion mocks
+│   ├── framer-motion.mock.js  # Renders motion.* as plain tags (see below)
+│   ├── factories.ts           # Faker-based test data factories
+│   ├── auth-helpers.ts        # Auth mocking utilities
+│   └── mongodb.setup.ts       # DB cleanup helpers
+├── unit/                      # Pure function tests, no DB (unit project)
+│   ├── lib/                   # auth, api-utils, clerk-users, logger
+│   ├── utils/                 # utilityFunctions, bookingUtils
+│   └── types/                 # error type guards
+├── integration/               # Real MongoDB via Memory Server
+│   ├── models/                # Mongoose schema validation, CRUD, indexes
+│   └── api/                   # API route handlers with real DB
+├── validations/               # Zod schema tests (no DB)
+├── hooks/                     # SWR/TanStack Query hook tests
+├── api/                       # Mock-based API route tests (jsdom)
+└── components/                # Component render tests
 ```
 
 ### Key Testing Patterns
 
 **SWR hooks**: Mock `useSWR` to capture the key (URL) and verify query parameter building.
 
-**TanStack Query hooks**: Mock `useQuery`/`useMutation` to capture config, then test `queryFn`/`mutationFn` directly with mocked `global.fetch`. Test `onSuccess` callbacks for cache invalidation and toast notifications.
+**TanStack Query hooks**: Mock `useQuery`/`useMutation` to capture config, then test `queryFn`/`mutationFn` directly with mocked `global.fetch`. Test `onSuccess` callbacks for cache invalidation and toast notifications (see `__tests__/hooks/useBookings.mutations.test.ts`).
+
+**Components**: framer-motion is mocked globally in `jest.setup.jsdom.ts` — its real animation loop recurses under jsdom until the process runs out of memory. Any HeroUI component (Accordion, Button, Modal, …) renders fine with the mock in place. HeroUI Selects render a hidden native `<select>` plus a visible trigger that share the same aria-label, so use `getAllByLabelText` for them.
 
 **Integration tests**: Use MongoDB Memory Server for real Mongoose operations. Auth is auto-mocked in `jest.setup.node.ts`.
 
 **Factories**: Use `createCabinInput()`, `createBookingInput()`, `createDiningInput()`, `createExperienceInput()`, `createSettingsInput()`, `createMockClerkUser()` from `__tests__/setup/factories.ts`.
 
 ### Writing New Tests
-1. **Hook tests** → `__tests__/hooks/` (jsdom project)
-2. **Model tests** → `__tests__/integration/models/` (node project)
-3. **API route tests** → `__tests__/integration/api/` (node, real DB) or `__tests__/api/` (jsdom, mocked)
-4. **Validation tests** → `__tests__/validations/` (jsdom project)
-5. **Component tests** → `__tests__/components/` (jsdom project)
+1. **Pure function tests** → `__tests__/unit/` (unit project, no DB)
+2. **Hook tests** → `__tests__/hooks/` (jsdom project)
+3. **Model tests** → `__tests__/integration/models/` (integration project)
+4. **API route tests** → `__tests__/integration/api/` (integration, real DB) or `__tests__/api/` (jsdom, mocked)
+5. **Validation tests** → `__tests__/validations/` (jsdom project)
+6. **Component tests** → `__tests__/components/` (jsdom project)
 
 ## Development Workflow
 

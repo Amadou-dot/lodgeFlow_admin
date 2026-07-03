@@ -585,7 +585,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (updateData.totalPrice !== undefined || updateData.depositAmount !== undefined) {
+    if (
+      updateData.totalPrice !== undefined ||
+      updateData.depositAmount !== undefined
+    ) {
       const effectiveTotalPrice =
         updateData.totalPrice ?? existingBooking.totalPrice;
       const effectiveDepositAmount =
