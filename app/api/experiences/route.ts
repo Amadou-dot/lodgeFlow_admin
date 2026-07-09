@@ -38,9 +38,18 @@ export async function GET(request: NextRequest) {
       query.difficulty = difficulty;
     }
 
-    // Build sort
+    // Build sort (whitelist sortable fields — sortBy is user input)
+    const SORTABLE_FIELDS = new Set([
+      'name',
+      'price',
+      'duration',
+      'difficulty',
+      'category',
+      'isPopular',
+      'createdAt',
+    ]);
     const sort: Record<string, 1 | -1> = {};
-    if (sortBy) {
+    if (sortBy && SORTABLE_FIELDS.has(sortBy)) {
       sort[sortBy] = sortOrder;
     }
 

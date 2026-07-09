@@ -1,11 +1,12 @@
 import {
   createValidationErrorResponse,
   escapeRegex,
+  parsePagination,
   requireApiAuth,
 } from '@/lib/api-utils';
 import { differenceInCalendarDays } from 'date-fns';
 import mongoose from 'mongoose';
-import { getClerkUsersBatch } from '@/lib/clerk-users';
+import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import connectDB from '@/lib/mongodb';
@@ -61,8 +62,7 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const { page, limit, skip } = parsePagination(searchParams);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const sortBy = searchParams.get('sortBy') || 'checkInDate';
@@ -74,68 +74,84 @@ export async function GET(request: NextRequest) {
       query.status = status;
     }
 
-    // Build sort object
+    // Build sort object (whitelist sortable fields — sortBy is user input)
+    const SORTABLE_FIELDS = new Set([
+      'checkInDate',
+      'checkOutDate',
+      'totalPrice',
+      'createdAt',
+      'status',
+      'numNights',
+      'numGuests',
+    ]);
+    const sortField = sortBy === 'created_at' ? 'createdAt' : sortBy;
     const sort: MongoSortOrder = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sort[SORTABLE_FIELDS.has(sortField) ? sortField : 'checkInDate'] =
+      sortOrder === 'desc' ? -1 : 1;
 
-    // If there's a search term, use optimized database queries
+    // If there's a search term, resolve matching cabins and customers first,
+    // then run a fully database-side paginated query. This keeps the search
+    // bounded — the previous approach loaded every booking into memory and
+    // fetched every customer from Clerk before paginating.
     if (search) {
       const safeSearch = escapeRegex(search);
 
-      // Phase 1: Find matching cabin IDs from database
+      // Phase 1a: Find matching cabin IDs from database
       const matchingCabins = await Cabin.find({
         name: { $regex: safeSearch, $options: 'i' },
       }).select('_id');
       const cabinIds = matchingCabins.map(c => c._id);
 
-      // Build query to find bookings matching cabin name
-      const searchQuery: BookingQueryFilter = { ...query };
-
-      if (cabinIds.length > 0) {
-        searchQuery.$or = [{ cabin: { $in: cabinIds } }];
+      // Phase 1b: Find matching customer IDs via Clerk search (name/email).
+      // Bounded to the first 100 matches to keep the query cheap.
+      let customerIds: string[] = [];
+      try {
+        const { data: matchingCustomers } = await searchClerkUsers(search, 100);
+        customerIds = matchingCustomers.map(c => c.id);
+      } catch (clerkError) {
+        logger.error('Clerk customer search failed', clerkError);
       }
 
-      // Get bookings matching the search criteria
-      const matchingBookings = await Booking.find(searchQuery)
-        .populate('cabin', 'name image capacity price discount')
-        .sort(sort);
+      if (cabinIds.length === 0 && customerIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: {
+            currentPage: page,
+            totalPages: 0,
+            totalBookings: 0,
+            limit,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        });
+      }
 
-      // Populate with Clerk customer data
+      // Phase 2: Query bookings matching either, with DB-side pagination
+      const searchQuery: BookingQueryFilter = { ...query };
+      searchQuery.$or = [
+        ...(cabinIds.length > 0 ? [{ cabin: { $in: cabinIds } }] : []),
+        ...(customerIds.length > 0 ? [{ customer: { $in: customerIds } }] : []),
+      ];
+
+      const [matchingBookings, totalBookings] = await Promise.all([
+        Booking.find(searchQuery)
+          .populate('cabin', 'name image capacity price discount')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit),
+        Booking.countDocuments(searchQuery),
+      ]);
+
+      // Populate with Clerk customer data (current page only)
       const { bookings: populatedBookings, _clerkWarning } =
         await populateBookingsWithClerkCustomers(matchingBookings);
 
-      // Additional client-side filtering for customer name/email
-      // (since Clerk data isn't in our DB, we still need some filtering)
-      const searchLower = search.toLowerCase();
-      const filteredBookings = populatedBookings.filter(booking => {
-        const cabin = booking.cabin;
-        const customer = booking.customer || booking.guest;
-
-        if (!cabin || !customer) return false;
-
-        // Check cabin name (already filtered by DB, but double-check)
-        if (cabin.name?.toLowerCase().includes(searchLower)) return true;
-
-        // Check customer name/email (Clerk data)
-        if (
-          customer.name?.toLowerCase().includes(searchLower) ||
-          customer.email?.toLowerCase().includes(searchLower)
-        ) {
-          return true;
-        }
-
-        return false;
-      });
-
-      // Apply pagination to filtered results
-      const totalBookings = filteredBookings.length;
       const totalPages = Math.ceil(totalBookings / limit);
-      const skip = (page - 1) * limit;
-      const paginatedBookings = filteredBookings.slice(skip, skip + limit);
 
       return NextResponse.json({
         success: true,
-        data: paginatedBookings,
+        data: populatedBookings,
         pagination: {
           currentPage: page,
           totalPages,
@@ -148,8 +164,6 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // No search term - use database pagination for better performance
-      const skip = (page - 1) * limit;
-
       const bookings = await Booking.find(query)
         .populate('cabin', 'name image capacity price discount')
         .sort(sort)
@@ -267,6 +281,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Pets are not allowed' },
         { status: 400 }
+      );
+    }
+
+    // Prevent double-bookings: reject if the cabin is already booked
+    // for an overlapping date range
+    const overlapping = await Booking.findOverlapping(
+      validationResult.data.cabin,
+      checkInDate,
+      checkOutDate
+    );
+    if (overlapping.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'The selected dates overlap with an existing booking for this cabin',
+        },
+        { status: 409 }
       );
     }
 

@@ -10,6 +10,8 @@ import {
   formatZodErrors,
   createRateLimitResponse,
   parsePagination,
+  parseIntParam,
+  sanitizeUpdatePayload,
   buildPaginationMeta,
   createPaginatedResponse,
   createValidationErrorResponse,
@@ -358,14 +360,64 @@ describe('api-utils', () => {
       expect(result.limit).toBe(API_CONFIG.MAX_PAGE_SIZE);
     });
 
-    it('returns NaN-derived values for non-numeric inputs', () => {
-      // Note: parseInt('abc') returns NaN, and Math.max(1, NaN) returns NaN
-      // This is a known edge case — callers should sanitize inputs
+    it('falls back to defaults for non-numeric inputs', () => {
       const params = new URLSearchParams({ page: 'abc', limit: 'xyz' });
       const result = parsePagination(params);
 
-      expect(result.page).toBeNaN();
-      expect(result.limit).toBeNaN();
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(API_CONFIG.DEFAULT_PAGE_SIZE);
+      expect(result.skip).toBe(0);
+    });
+  });
+
+  describe('sanitizeUpdatePayload', () => {
+    it('passes through plain fields', () => {
+      const result = sanitizeUpdatePayload({ name: 'Cabin A', price: 100 });
+
+      expect(result).toEqual({ name: 'Cabin A', price: 100 });
+    });
+
+    it('strips MongoDB operator keys', () => {
+      const result = sanitizeUpdatePayload({
+        name: 'Cabin A',
+        $inc: { price: -50 },
+        $unset: { discount: '' },
+      });
+
+      expect(result).toEqual({ name: 'Cabin A' });
+    });
+
+    it('strips dotted path keys', () => {
+      const result = sanitizeUpdatePayload({
+        name: 'Cabin A',
+        'settings.secret': true,
+      });
+
+      expect(result).toEqual({ name: 'Cabin A' });
+    });
+
+    it('strips immutable fields', () => {
+      const result = sanitizeUpdatePayload({
+        _id: 'someid',
+        __v: 3,
+        name: 'Cabin A',
+      });
+
+      expect(result).toEqual({ name: 'Cabin A' });
+    });
+  });
+
+  describe('parseIntParam', () => {
+    it('parses valid integers', () => {
+      expect(parseIntParam('42', 1)).toBe(42);
+    });
+
+    it('falls back for null', () => {
+      expect(parseIntParam(null, 7)).toBe(7);
+    });
+
+    it('falls back for non-numeric strings', () => {
+      expect(parseIntParam('abc', 7)).toBe(7);
     });
   });
 

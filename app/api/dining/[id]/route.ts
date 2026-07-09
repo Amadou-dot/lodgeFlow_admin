@@ -1,4 +1,4 @@
-import { requireApiAuth } from '@/lib/api-utils';
+import { requireApiAuth, sanitizeUpdatePayload } from '@/lib/api-utils';
 import { connectDB, Dining } from '@/models';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -64,10 +64,14 @@ export async function PUT(
       }
     }
 
-    const dining = await Dining.findByIdAndUpdate(id, body, {
-      new: true,
-      runValidators: true,
-    });
+    const dining = await Dining.findByIdAndUpdate(
+      id,
+      sanitizeUpdatePayload(body),
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!dining) {
       return NextResponse.json(
