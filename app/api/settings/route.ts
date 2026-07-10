@@ -1,5 +1,5 @@
 import { requireApiAuth } from '@/lib/api-utils';
-import { AUTHORIZED_ROLES } from '@/lib/auth-helpers';
+import { AUTHORIZED_ROLES, isAuthBypassEnabled } from '@/lib/auth-helpers';
 import { settingsData } from '@/lib/data/seed-data';
 import connectDB from '@/lib/mongodb';
 import { isMongooseValidationError } from '@/types/errors';
@@ -133,12 +133,7 @@ export async function POST() {
   if (!authResult.authenticated) return authResult.error;
 
   // Resetting settings is a destructive operation — require admin role
-  if (
-    !(
-      process.env.NODE_ENV !== 'production' &&
-      process.env.NEXT_PUBLIC_TESTING === 'true'
-    )
-  ) {
+  if (!isAuthBypassEnabled()) {
     const { has } = await auth();
     if (!has?.({ role: AUTHORIZED_ROLES.ADMIN })) {
       return NextResponse.json(

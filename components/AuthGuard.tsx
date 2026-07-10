@@ -10,6 +10,12 @@ interface AuthGuardProps {
   children: React.ReactNode;
 }
 
+// COSMETIC ONLY — this client-side flag skips the Clerk redirect so the UI
+// renders without a configured Clerk provider during local development. It is
+// NOT a security boundary: enforcement happens server-side in the middleware
+// (`proxy.ts`) and API routes (`requireApiAuth`), both gated on the server-only
+// `TESTING_AUTH_BYPASS` via `isAuthBypassEnabled()`. Setting this public flag in
+// a deployed environment cannot grant access to any protected data.
 const isTestMode =
   process.env.NODE_ENV !== 'production' &&
   process.env.NEXT_PUBLIC_TESTING === 'true';

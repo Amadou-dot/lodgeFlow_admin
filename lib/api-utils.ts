@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-import { hasAuthorizedRole } from './auth-helpers';
+import { hasAuthorizedRole, isAuthBypassEnabled } from './auth-helpers';
 import { logger } from './logger';
 
 /**
@@ -118,11 +118,8 @@ export interface ApiAuthResult {
  * ```
  */
 export async function requireApiAuth(): Promise<ApiAuthResult> {
-  // Bypass auth in non-production environments when TESTING=true
-  if (
-    process.env.NODE_ENV !== 'production' &&
-    process.env.NEXT_PUBLIC_TESTING === 'true'
-  ) {
+  // Bypass auth for local development/testing only (fails closed in prod).
+  if (isAuthBypassEnabled()) {
     return {
       authenticated: true,
       userId: 'test-user',
