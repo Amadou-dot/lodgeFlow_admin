@@ -1,4 +1,4 @@
-import { requireApiAuth } from '@/lib/api-utils';
+import { requireApiAuth, sanitizeUpdatePayload } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest, NextResponse } from 'next/server';
@@ -84,10 +84,14 @@ export async function PUT(
       );
     }
 
-    const cabin = await Cabin.findByIdAndUpdate(id, body, {
-      new: true,
-      runValidators: true,
-    });
+    const cabin = await Cabin.findByIdAndUpdate(
+      id,
+      sanitizeUpdatePayload(body),
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!cabin) {
       return NextResponse.json(

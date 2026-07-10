@@ -4,6 +4,7 @@ import {
   escapeRegex,
   HTTP_STATUS,
   requireApiAuth,
+  sanitizeUpdatePayload,
 } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import type { CabinQueryFilter, MongoSortOrder } from '@/types/api';
@@ -89,9 +90,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build sort object
+    // Build sort object (whitelist sortable fields — sortBy is user input)
+    const SORTABLE_FIELDS = new Set([
+      'name',
+      'price',
+      'capacity',
+      'discount',
+      'status',
+      'createdAt',
+    ]);
     const sort: MongoSortOrder = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sort[SORTABLE_FIELDS.has(sortBy) ? sortBy : 'name'] =
+      sortOrder === 'desc' ? -1 : 1;
 
     const cabins = await Cabin.find(query).sort(sort);
 
@@ -163,10 +173,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const cabin = await Cabin.findByIdAndUpdate(_id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    const cabin = await Cabin.findByIdAndUpdate(
+      _id,
+      sanitizeUpdatePayload(updateData),
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!cabin) {
       return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);

@@ -275,7 +275,7 @@ describe('/api/experiences/[id]', () => {
       expect(MockExperience.findByIdAndUpdate).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
         { name: 'Updated Adventure' },
-        { new: true }
+        { new: true, runValidators: true }
       );
       expect(response.status).toBe(200);
       expect(data).toEqual(updatedData);

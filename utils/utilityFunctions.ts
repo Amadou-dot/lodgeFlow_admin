@@ -69,12 +69,13 @@ export async function isImageUrl(url: string | undefined): Promise<boolean> {
         method: 'HEAD',
         signal: controller.signal,
       });
-      clearTimeout(timeout);
       const contentType = res.headers.get('content-type') || '';
       return contentType.startsWith('image/');
     } catch (err) {
       // If fetch was aborted or failed, treat as not an image
       return false;
+    } finally {
+      clearTimeout(timeout);
     }
   } catch {
     return false;

@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 import {
@@ -9,9 +10,12 @@ import {
   formatZodErrors,
   createRateLimitResponse,
   parsePagination,
+  parseIntParam,
+  sanitizeUpdatePayload,
   buildPaginationMeta,
   createPaginatedResponse,
   createValidationErrorResponse,
+  requireApiAuth,
   HTTP_STATUS,
   API_CONFIG,
 } from '@/lib/api-utils';
@@ -356,14 +360,64 @@ describe('api-utils', () => {
       expect(result.limit).toBe(API_CONFIG.MAX_PAGE_SIZE);
     });
 
-    it('returns NaN-derived values for non-numeric inputs', () => {
-      // Note: parseInt('abc') returns NaN, and Math.max(1, NaN) returns NaN
-      // This is a known edge case — callers should sanitize inputs
+    it('falls back to defaults for non-numeric inputs', () => {
       const params = new URLSearchParams({ page: 'abc', limit: 'xyz' });
       const result = parsePagination(params);
 
-      expect(result.page).toBeNaN();
-      expect(result.limit).toBeNaN();
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(API_CONFIG.DEFAULT_PAGE_SIZE);
+      expect(result.skip).toBe(0);
+    });
+  });
+
+  describe('sanitizeUpdatePayload', () => {
+    it('passes through plain fields', () => {
+      const result = sanitizeUpdatePayload({ name: 'Cabin A', price: 100 });
+
+      expect(result).toEqual({ name: 'Cabin A', price: 100 });
+    });
+
+    it('strips MongoDB operator keys', () => {
+      const result = sanitizeUpdatePayload({
+        name: 'Cabin A',
+        $inc: { price: -50 },
+        $unset: { discount: '' },
+      });
+
+      expect(result).toEqual({ name: 'Cabin A' });
+    });
+
+    it('strips dotted path keys', () => {
+      const result = sanitizeUpdatePayload({
+        name: 'Cabin A',
+        'settings.secret': true,
+      });
+
+      expect(result).toEqual({ name: 'Cabin A' });
+    });
+
+    it('strips immutable fields', () => {
+      const result = sanitizeUpdatePayload({
+        _id: 'someid',
+        __v: 3,
+        name: 'Cabin A',
+      });
+
+      expect(result).toEqual({ name: 'Cabin A' });
+    });
+  });
+
+  describe('parseIntParam', () => {
+    it('parses valid integers', () => {
+      expect(parseIntParam('42', 1)).toBe(42);
+    });
+
+    it('falls back for null', () => {
+      expect(parseIntParam(null, 7)).toBe(7);
+    });
+
+    it('falls back for non-numeric strings', () => {
+      expect(parseIntParam('abc', 7)).toBe(7);
     });
   });
 
@@ -421,6 +475,70 @@ describe('api-utils', () => {
       expect(body.pagination.totalItems).toBe(50);
       expect(body.pagination.currentPage).toBe(1);
       expect(body.pagination.limit).toBe(10);
+    });
+  });
+
+  describe('requireApiAuth', () => {
+    const mockAuth = auth as unknown as jest.Mock;
+    const originalTesting = process.env.NEXT_PUBLIC_TESTING;
+
+    afterEach(() => {
+      process.env.NEXT_PUBLIC_TESTING = originalTesting;
+      mockAuth.mockReset();
+    });
+
+    it('bypasses auth when NEXT_PUBLIC_TESTING=true outside production', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'true';
+
+      const result = await requireApiAuth();
+
+      expect(result).toEqual({ authenticated: true, userId: 'test-user' });
+      expect(mockAuth).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when there is no user', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockResolvedValue({ userId: null, has: undefined });
+
+      const result = await requireApiAuth();
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error?.status).toBe(HTTP_STATUS.UNAUTHORIZED);
+    });
+
+    it('returns 403 when the user lacks an authorized role', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockResolvedValue({
+        userId: 'user_123',
+        has: ({ role }: { role: string }) => role === 'org:customer',
+      });
+
+      const result = await requireApiAuth();
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error?.status).toBe(HTTP_STATUS.FORBIDDEN);
+    });
+
+    it('returns the userId for authorized admins', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockResolvedValue({
+        userId: 'user_admin',
+        has: ({ role }: { role: string }) => role === 'org:admin',
+      });
+
+      const result = await requireApiAuth();
+
+      expect(result).toEqual({ authenticated: true, userId: 'user_admin' });
+    });
+
+    it('returns 401 when the auth check throws', async () => {
+      process.env.NEXT_PUBLIC_TESTING = 'false';
+      mockAuth.mockRejectedValue(new Error('clerk unavailable'));
+
+      const result = await requireApiAuth();
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error?.status).toBe(HTTP_STATUS.UNAUTHORIZED);
     });
   });
 });

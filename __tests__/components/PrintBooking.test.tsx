@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import BookingPDFTemplate from '../components/BookingDetails/BookingPDFTemplate';
-import QuickActionsCard from '../components/BookingDetails/QuickActionsCard';
-import type { PopulatedBooking } from '../types';
+import BookingPDFTemplate from '@/components/BookingDetails/BookingPDFTemplate';
+import QuickActionsCard from '@/components/BookingDetails/QuickActionsCard';
+import type { PopulatedBooking } from '@/types';
 
 // Mock the hooks
-jest.mock('../hooks/usePrintBooking', () => ({
+jest.mock('@/hooks/usePrintBooking', () => ({
   usePrintBooking: () => ({
     isPrinting: false,
     isGeneratingPDF: false,
@@ -16,7 +16,7 @@ jest.mock('../hooks/usePrintBooking', () => ({
   }),
 }));
 
-jest.mock('../hooks/useBookings', () => ({
+jest.mock('@/hooks/useBookings', () => ({
   useBookingByEmail: () => ({
     data: null,
     isLoading: false,
@@ -26,14 +26,14 @@ jest.mock('../hooks/useBookings', () => ({
   }),
 }));
 
-jest.mock('../hooks/useCabins', () => ({
+jest.mock('@/hooks/useCabins', () => ({
   useCabin: () => ({
     data: null,
     isLoading: false,
   }),
 }));
 
-jest.mock('../hooks/useSendEmail', () => ({
+jest.mock('@/hooks/useSendEmail', () => ({
   useSendConfirmationEmail: () => ({
     sendConfirmationEmail: jest.fn(),
   }),
@@ -153,7 +153,14 @@ describe('Print Functionality', () => {
 
       // Check that essential booking information is displayed
       expect(screen.getByText('Booking Details')).toBeInTheDocument();
-      expect(screen.getByText('#90123456')).toBeInTheDocument(); // Last 8 chars of booking ID
+      // Booking ID renders as "#" + last 8 chars of the ID, uppercased,
+      // split across two text nodes inside one span
+      expect(
+        screen.getByText(
+          (_, element) =>
+            element?.tagName === 'SPAN' && element.textContent === '#78901234'
+        )
+      ).toBeInTheDocument();
       expect(screen.getByText('John Doe')).toBeInTheDocument();
       expect(screen.getByText('john.doe@example.com')).toBeInTheDocument();
       expect(screen.getByText('Mountain View Cabin')).toBeInTheDocument();
@@ -178,8 +185,9 @@ describe('Print Functionality', () => {
       );
 
       expect(screen.getByText('Breakfast:')).toBeInTheDocument();
-      expect(screen.getByText('$25.00')).toBeInTheDocument();
       expect(screen.getByText('Parking:')).toBeInTheDocument();
+      // Breakfast and parking both cost $25.00 in the mock booking
+      expect(screen.getAllByText('$25.00')).toHaveLength(2);
     });
 
     it('applies the correct ID for printing', () => {

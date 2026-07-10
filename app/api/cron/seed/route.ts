@@ -61,10 +61,7 @@ export async function GET(request: Request) {
     }
 
     if (
-      !isAuthorizedSeedRequest(
-        seedSecret,
-        request.headers.get('authorization')
-      )
+      !isAuthorizedSeedRequest(seedSecret, request.headers.get('authorization'))
     ) {
       return NextResponse.json(
         {

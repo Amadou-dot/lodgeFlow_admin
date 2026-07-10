@@ -53,3 +53,4 @@ bun.lockb
 local/*
 
 .playwright-mcp/*
+.env*

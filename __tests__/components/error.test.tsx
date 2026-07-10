@@ -2,9 +2,18 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Error from '@/app/error';
 
-// Mock window.location.href
-delete (window as any).location;
-window.location = { href: '' } as any;
+const mockPush = jest.fn();
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+  }),
+}));
 
 describe('Error Component', () => {
   const mockReset = jest.fn();
@@ -45,7 +54,7 @@ describe('Error Component', () => {
     const goHomeButton = screen.getByText('Go Home');
     fireEvent.click(goHomeButton);
 
-    expect(window.location.href).toBe('/');
+    expect(mockPush).toHaveBeenCalledWith('/');
   });
 
   it('logs error to console', () => {
@@ -100,11 +109,10 @@ describe('Error Component', () => {
     expect(screen.getByText(/Error ID:/)).toBeInTheDocument();
   });
 
-  it('renders all icon components', () => {
-    render(<Error error={mockError} reset={mockReset} />);
+  it('renders the alert and button icons', () => {
+    const { container } = render(<Error error={mockError} reset={mockReset} />);
 
-    // Check that SVG icons are rendered
-    const svgElements = screen.getAllByRole('img', { hidden: true });
-    expect(svgElements.length).toBeGreaterThan(0);
+    // lucide-react icons render as SVGs without an accessible role
+    expect(container.querySelectorAll('svg').length).toBeGreaterThanOrEqual(3);
   });
 });

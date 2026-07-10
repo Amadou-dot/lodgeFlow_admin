@@ -4,6 +4,7 @@ import {
   escapeRegex,
   HTTP_STATUS,
   requireApiAuth,
+  sanitizeUpdatePayload,
 } from '@/lib/api-utils';
 import { connectDB, Dining } from '@/models';
 import type { DiningQueryFilter, MongoSortOrder } from '@/types/api';
@@ -60,9 +61,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build sort object
+    // Build sort object (whitelist sortable fields — sortBy is user input)
+    const SORTABLE_FIELDS = new Set([
+      'name',
+      'price',
+      'type',
+      'mealType',
+      'category',
+      'maxPeople',
+      'createdAt',
+    ]);
     const sort: MongoSortOrder = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    sort[SORTABLE_FIELDS.has(sortBy) ? sortBy : 'name'] =
+      sortOrder === 'asc' ? 1 : -1;
 
     const dining = await Dining.find(filter).sort(sort);
 
@@ -168,10 +179,14 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const dining = await Dining.findByIdAndUpdate(_id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    const dining = await Dining.findByIdAndUpdate(
+      _id,
+      sanitizeUpdatePayload(updateData),
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
 
     if (!dining) {
       return createErrorResponse(

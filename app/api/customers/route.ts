@@ -1,6 +1,7 @@
 import {
   createRateLimitResponse,
   createValidationErrorResponse,
+  parsePagination,
   requireApiAuth,
 } from '@/lib/api-utils';
 import {
@@ -28,14 +29,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const { page, limit, skip: offset } = parsePagination(searchParams);
     const search = searchParams.get('search');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
-
-    // Calculate pagination
-    const offset = (page - 1) * limit;
 
     // Map sortBy to valid Clerk fields
     let clerkSortBy = 'created_at';

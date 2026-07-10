@@ -40,7 +40,7 @@ describe('Experience Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('applies defaults for optional fields', () => {
+    it('applies defaults for isPopular and reviewCount', () => {
       const result = createExperienceSchema.safeParse(validExperience);
 
       expect(result.success).toBe(true);
@@ -50,15 +50,21 @@ describe('Experience Validation Schemas', () => {
       }
     });
 
-    it('requires at least one inclusion and availability option', () => {
+    it('requires non-empty includes and available arrays', () => {
       expect(
         createExperienceSchema.safeParse({ ...validExperience, includes: [] })
           .success
       ).toBe(false);
-
       expect(
         createExperienceSchema.safeParse({ ...validExperience, available: [] })
           .success
+      ).toBe(false);
+      expect(
+        createExperienceSchema.safeParse({
+          ...validExperience,
+          includes: undefined,
+          available: undefined,
+        }).success
       ).toBe(false);
     });
 
