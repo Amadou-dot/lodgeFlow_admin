@@ -1,0 +1,11 @@
+allowBuilds:
+  '@clerk/shared': true
+  '@heroui/shared-utils': true
+  core-js: true
+  esbuild: true
+  mongodb-memory-server: true
+  sharp: true
+  unrs-resolver: true
+
+overrides:
+  postcss: ^8.5.10
