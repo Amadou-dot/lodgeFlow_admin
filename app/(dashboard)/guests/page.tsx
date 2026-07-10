@@ -64,8 +64,6 @@ function GuestsContent() {
 
   const sortOptions: FilterOption[] = [
     { key: 'name', label: 'Name', value: 'name' },
-    { key: 'totalSpent', label: 'Spending', value: 'totalSpent' },
-    { key: 'totalBookings', label: 'Bookings', value: 'totalBookings' },
   ];
 
   const handleSearch = (value: string) => {
