@@ -480,15 +480,15 @@ describe('api-utils', () => {
 
   describe('requireApiAuth', () => {
     const mockAuth = auth as unknown as jest.Mock;
-    const originalTesting = process.env.NEXT_PUBLIC_TESTING;
+    const originalBypass = process.env.TESTING_AUTH_BYPASS;
 
     afterEach(() => {
-      process.env.NEXT_PUBLIC_TESTING = originalTesting;
+      process.env.TESTING_AUTH_BYPASS = originalBypass;
       mockAuth.mockReset();
     });
 
-    it('bypasses auth when NEXT_PUBLIC_TESTING=true outside production', async () => {
-      process.env.NEXT_PUBLIC_TESTING = 'true';
+    it('bypasses auth when TESTING_AUTH_BYPASS=true outside production', async () => {
+      process.env.TESTING_AUTH_BYPASS = 'true';
 
       const result = await requireApiAuth();
 
@@ -497,7 +497,7 @@ describe('api-utils', () => {
     });
 
     it('returns 401 when there is no user', async () => {
-      process.env.NEXT_PUBLIC_TESTING = 'false';
+      delete process.env.TESTING_AUTH_BYPASS;
       mockAuth.mockResolvedValue({ userId: null, has: undefined });
 
       const result = await requireApiAuth();
@@ -507,7 +507,7 @@ describe('api-utils', () => {
     });
 
     it('returns 403 when the user lacks an authorized role', async () => {
-      process.env.NEXT_PUBLIC_TESTING = 'false';
+      delete process.env.TESTING_AUTH_BYPASS;
       mockAuth.mockResolvedValue({
         userId: 'user_123',
         has: ({ role }: { role: string }) => role === 'org:customer',
@@ -520,7 +520,7 @@ describe('api-utils', () => {
     });
 
     it('returns the userId for authorized admins', async () => {
-      process.env.NEXT_PUBLIC_TESTING = 'false';
+      delete process.env.TESTING_AUTH_BYPASS;
       mockAuth.mockResolvedValue({
         userId: 'user_admin',
         has: ({ role }: { role: string }) => role === 'org:admin',
@@ -532,7 +532,7 @@ describe('api-utils', () => {
     });
 
     it('returns 401 when the auth check throws', async () => {
-      process.env.NEXT_PUBLIC_TESTING = 'false';
+      delete process.env.TESTING_AUTH_BYPASS;
       mockAuth.mockRejectedValue(new Error('clerk unavailable'));
 
       const result = await requireApiAuth();
