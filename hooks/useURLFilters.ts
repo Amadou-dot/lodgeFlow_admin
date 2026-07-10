@@ -212,7 +212,7 @@ export const guestsFilterConfig: URLFilterConfig = {
   sortBy: {
     type: 'string',
     defaultValue: 'name',
-    validValues: ['name', 'totalSpent', 'totalBookings', 'created_at'],
+    validValues: ['name', 'created_at'],
   },
   sortOrder: {
     type: 'string',

@@ -112,15 +112,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Sort by stats fields in-memory (not available in Clerk)
-    if (sortBy === 'totalSpent' || sortBy === 'totalBookings') {
-      enrichedData.sort((a, b) => {
-        const aVal = a[sortBy];
-        const bVal = b[sortBy];
-        return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
-      });
-    }
-
     return NextResponse.json({
       success: true,
       data: enrichedData,
