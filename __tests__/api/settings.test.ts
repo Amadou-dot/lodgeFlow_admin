@@ -153,6 +153,28 @@ describe('/api/settings', () => {
       expect(data.success).toBe(true);
     });
 
+    it('should reject invalid settings payload with structured errors', async () => {
+      const settingsWithSave = {
+        ...mockSettingsData,
+        save: mockSave.mockResolvedValue(mockSettingsData),
+      };
+      (mockSettings.findOne as jest.Mock).mockResolvedValue(settingsWithSave);
+
+      const request = new NextRequest('http://localhost/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ depositPercentage: 200 }),
+      });
+
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toBeDefined();
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
     it('should create new settings if none exist on update', async () => {
       (mockSettings.findOne as jest.Mock).mockResolvedValue(null);
       (mockSettings.create as jest.Mock).mockResolvedValue(mockSettingsData);

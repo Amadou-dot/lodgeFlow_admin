@@ -1,7 +1,16 @@
-import { requireApiAuth } from '@/lib/api-utils';
+import {
+  createErrorResponse,
+  createValidationErrorResponse,
+  requireApiAuth,
+} from '@/lib/api-utils';
 import { AUTHORIZED_ROLES, isAuthBypassEnabled } from '@/lib/auth-helpers';
 import { settingsData } from '@/lib/data/seed-data';
 import connectDB from '@/lib/mongodb';
+import {
+  getBookingLengthRangeError,
+  stripSettingsMongoMetadata,
+  updateSettingsSchema,
+} from '@/lib/validations/settings';
 import { isMongooseValidationError } from '@/types/errors';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
@@ -87,16 +96,45 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    const validationResult = updateSettingsSchema.safeParse(
+      typeof body === 'object' && body !== null
+        ? stripSettingsMongoMetadata(body as Record<string, unknown>)
+        : body
+    );
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
+    }
+
     // Get current settings or create new if none exist
     let settings = await Settings.findOne();
 
+    const effectiveMinBookingLength =
+      validationResult.data.minBookingLength ?? settings?.minBookingLength;
+    const effectiveMaxBookingLength =
+      validationResult.data.maxBookingLength ?? settings?.maxBookingLength;
+
+    if (
+      effectiveMinBookingLength !== undefined &&
+      effectiveMaxBookingLength !== undefined
+    ) {
+      const rangeError = getBookingLengthRangeError(
+        effectiveMinBookingLength,
+        effectiveMaxBookingLength
+      );
+      if (rangeError) {
+        return createErrorResponse('Validation failed', 400, {
+          maxBookingLength: [rangeError],
+        });
+      }
+    }
+
     if (settings) {
       // Update existing settings
-      Object.assign(settings, body);
+      Object.assign(settings, validationResult.data);
       await settings.save();
     } else {
       // Create new settings
-      settings = await Settings.create(body);
+      settings = await Settings.create(validationResult.data);
     }
 
     return NextResponse.json({
