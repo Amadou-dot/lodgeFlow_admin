@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LodgeFlow is a modern hotel management dashboard built with Next.js 15, featuring comprehensive cabin management, booking system, customer profiles, and business analytics. The application uses MongoDB for business data and Clerk for authentication.
+LodgeFlow is a modern hotel management dashboard built with Next.js 16, featuring comprehensive cabin management, booking system, customer profiles, and business analytics. The application uses MongoDB for business data and Clerk for authentication.
 
 **Tech Stack:**
-- Frontend: Next.js 15 (App Router), HeroUI v2, Tailwind CSS, TypeScript
+- Frontend: Next.js 16 (App Router), HeroUI v2, Tailwind CSS v4, TypeScript
 - Backend: MongoDB with Mongoose ODM
 - Auth: Clerk (role-based: admin, customer)
+- Validation: Zod v4 (`lib/validations/`)
 - Data Fetching: SWR for client-side, TanStack Query for mutations
+- Email: Resend (booking confirmation & welcome emails)
 - Charts: Recharts
 
 ## Essential Commands
@@ -29,6 +31,7 @@ pnpm format           # Format all files with Prettier
 pnpm format:check     # Check formatting without changes
 pnpm ci:check         # Run all checks (format, lint, test)
 pnpm check:types      # TypeScript type checking via script
+pnpm pre-commit       # lint-staged (runs via Husky on commit)
 ```
 
 ### Testing
@@ -60,9 +63,43 @@ pnpm clerk:users      # Create new Clerk test users
 
 ### Utilities
 ```bash
-pnpm verify:bookings       # Verify booking user IDs
-pnpm summary              # Display data summary
+pnpm verify:bookings           # Verify booking user IDs
+pnpm summary                 # Display data summary
+pnpm backfill:booking-metadata  # Backfill booking payment/refund metadata
 ```
+
+## Agent Workflow (Issues, PRs & CI)
+
+**These rules are mandatory for all agents.** Do not skip them.
+
+### Before creating an issue
+
+1. **Read `docs/issues_template.md` in full** — it is the source of truth for issue structure in this repo.
+2. Pick the correct flavor:
+   - **Bug** — broken behavior with steps to reproduce
+   - **Gap / launch blocker** — infrastructure exists but isn't wired up
+   - **Feature / scope** — net-new functionality
+3. Follow the template skeleton for that flavor. Required discipline across all flavors: **Problem first → Scope second → Acceptance criteria third**.
+4. Use concrete file paths and code references in `## Problem`. Backtick every identifier.
+5. Write acceptance criteria as verifiable checkboxes, including test coverage when applicable.
+
+### Before opening a pull request
+
+1. **Read `docs/pull_requests_template.md` in full** — it is the source of truth for PR structure in this repo.
+2. **Run `pnpm ci:check` and confirm it passes** (format, lint, and all tests). This is a hard gate — **do not open a PR with failing tests, lint errors, or format violations.**
+3. Structure the PR body per the template:
+   - Header: `Closes #N.` (with dependency chains when applicable)
+   - `## Summary` — terse bullets, one per discrete change, inline code for paths/identifiers
+   - `## Test plan` — checkboxes with **actual commands run** and **inline results** (e.g. `` `pnpm test` — 142 passing ``)
+   - Optional sections (`## Details`, `## Why`, `## Notes`, `## Out of scope`, `## Follow-up`) only when they earn their place
+4. Cross-reference `CLAUDE.md` patterns when the change touches established invariants.
+5. If `pnpm ci:check` fails, **fix the failures first**. If you cannot fix them, or you are unsure how to proceed (ambiguous scope, pre-existing failures, flaky tests, missing env/secrets), **stop and ask the user how to proceed** — do not open the PR and hope CI sorts it out.
+
+### When uncertain
+
+- Do not guess. Do not open issues or PRs with placeholder sections.
+- Do not open a PR to "get feedback" on broken tests.
+- Ask the user explicitly: what failed, what you tried, and what decision you need.
 
 ## Architecture
 
@@ -70,60 +107,67 @@ pnpm summary              # Display data summary
 
 ```
 app/
-├── (auth)/              # Auth routes (sign-in, sign-up)
+├── (auth)/              # Auth routes (sign-in, sign-up, unauthorized)
 ├── (dashboard)/         # Protected dashboard routes
-│   ├── bookings/       # Booking management pages
+│   ├── bookings/       # Booking management (list, detail, edit, analytics)
 │   ├── cabins/         # Cabin management
 │   ├── dining/         # Restaurant/menu management
 │   ├── experiences/    # Activities/tours management
 │   ├── guests/         # Customer profiles
 │   └── settings/       # Business configuration
 ├── api/                # API route handlers
-│   ├── bookings/
-│   ├── cabins/
-│   ├── customers/
-│   ├── dashboard/
-│   ├── dining/
-│   ├── experiences/
-│   ├── settings/
-│   └── send/          # Email sending endpoints
-└── providers.tsx      # Global providers (HeroUI, Theme, Query)
+│   ├── bookings/       # CRUD, stats, analytics, by-email
+│   ├── cabins/         # CRUD, stats, availability, bulk
+│   ├── customers/      # CRUD, lock
+│   ├── dashboard/      # Dashboard aggregates
+│   ├── dining/         # CRUD, stats
+│   ├── experiences/    # CRUD, stats
+│   ├── sales/          # Revenue time-series
+│   ├── settings/       # Singleton settings (GET/PUT/POST reset)
+│   ├── cron/seed/      # Bearer-token-protected re-seed endpoint
+│   └── send/           # Email sending (confirm, welcome)
+└── providers.tsx       # Global providers (HeroUI, Theme, Query)
 
-components/            # Reusable UI components
-hooks/                # Custom React hooks (SWR-based)
-models/               # Mongoose schemas (MongoDB)
-types/                # TypeScript type definitions
-utils/                # Shared utility functions
+components/             # Reusable UI components
+hooks/                  # Custom React hooks (SWR-based)
+models/                 # Mongoose schemas (MongoDB)
+types/                  # TypeScript type definitions
+utils/                  # Shared utility functions
   ├── utilityFunctions.ts  # formatCurrency, getLoyaltyTier, calcNumNights, etc.
   ├── bookingUtils.ts      # getStatusColor, formatBookingDates, getStatusLabel
   └── toastUtils.ts        # displayToast helper for hooks
-lib/                  # Core libraries & configuration
-  ├── mongodb.ts      # DB connection with caching
-  ├── config.ts       # App-wide constants (SWR_CONFIG, DB_CONFIG, CURRENCY, LOYALTY_TIERS)
-  ├── api-utils.ts    # API helpers (auth, responses, pagination, rate limiting)
-  ├── auth-helpers.ts # Role-based access helpers
-  └── clerk-users.ts  # Clerk API utilities
+lib/                    # Core libraries & configuration
+  ├── mongodb.ts        # DB connection with caching
+  ├── config.ts         # App-wide constants (SWR_CONFIG, DB_CONFIG, CURRENCY, enums)
+  ├── api-utils.ts      # API helpers (auth, responses, pagination, Zod errors)
+  ├── auth-helpers.ts   # Role-based access helpers
+  ├── clerk-users.ts    # Clerk API utilities
+  ├── logger.ts         # Structured logging (suppressed in test env)
+  ├── rate-limit.ts     # In-memory rate limiter for mutation/email endpoints
+  ├── validations/      # Zod schemas per domain (booking, cabin, customer, etc.)
+  └── data/seed-data.ts # Default seed payloads (settings, etc.)
+proxy.ts                # Clerk middleware (Next.js 16 — auth gate for all routes)
 ```
 
 ### Authentication Architecture
 
 **Clerk-Based Auth** (Clerk manages users, MongoDB stores business data):
 - Users are stored in Clerk with roles: `org:admin`, `org:customer`
+- Only `org:admin` may access the admin dashboard (enforced in `proxy.ts` and API routes)
 - Bookings reference Clerk user IDs (string) instead of MongoDB ObjectIds
 - Customer statistics are calculated on-demand using Clerk user data
 - Protected routes use `AuthGuard` component (client-side)
-- API routes check auth using `@/lib/auth-helpers`
+- API routes check auth using `requireApiAuth()` from `@/lib/api-utils`
+
+**Public routes** (no Clerk session required): `/sign-in`, `/sign-up`, `/unauthorized`, `/`, `/api/cron/seed`, `/api/webhooks/*`
 
 **Key Auth Patterns:**
 ```typescript
 // Check authorization in API routes
-import { hasAuthorizedRole } from '@/lib/auth-helpers';
-import { auth } from '@clerk/nextjs/server';
+import { requireApiAuth } from '@/lib/api-utils';
 
-const { has } = await auth();
-if (!hasAuthorizedRole(has)) {
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-}
+const authResult = await requireApiAuth();
+if (!authResult.authenticated) return authResult.error;
 
 // Get Clerk user data
 import { getClerkUser } from '@/lib/clerk-users';
@@ -148,20 +192,45 @@ const user = await getClerkUser(clerkUserId);
 ```
 
 **Key Data Fetching Hooks:**
-- `useBookings()` - Fetch bookings with filters/pagination (SWR)
-- `useCabins()` - Fetch cabins with filters (SWR)
-- `useCustomers()` - Fetch Clerk users with customer stats (SWR)
-- `useSettings()` - Fetch app settings (SWR)
+- `useBookings()` / `useBookingStats()` / `useBookingAnalytics()` — bookings (SWR)
+- `useCabins()` / `useCabinStats()` — cabins (SWR)
+- `useCustomers()` / `useInfiniteCustomers()` — Clerk users with customer stats (SWR)
+- `useDining()` / `useDiningStats()` — dining items (SWR)
+- `useExperiences()` / `useExperienceStats()` — experiences (SWR)
+- `useSettings()` — app settings (SWR)
+- `useData()` — dashboard overview aggregates (SWR)
+- `useSendEmail()` / `usePrintBooking()` — mutations & PDF generation
 - Mutations use TanStack Query's `useMutation`
+
+### Request Validation (Zod)
+
+Schemas live in `lib/validations/` and share enum constants from `lib/config.ts` (`BOOKING_STATUSES`, `PAYMENT_METHODS`, `REFUND_STATUSES`, `VALID_TRANSITIONS`).
+
+**Currently wired in API routes:** bookings (create/update/patch), customers (create), settings (PUT).
+
+**Schemas exist but not yet wired to routes:** cabin, dining, experience (covered by `__tests__/validations/`).
+
+**Pattern:**
+```typescript
+import { createValidationErrorResponse } from '@/lib/api-utils';
+import { createBookingSchema } from '@/lib/validations';
+
+const validationResult = createBookingSchema.safeParse(body);
+if (!validationResult.success) {
+  return createValidationErrorResponse(validationResult.error);
+}
+const data = validationResult.data;
+```
 
 ### MongoDB Models & Relationships
 
 **Core Collections:**
-- `Booking` - References `Cabin` (ObjectId) and stores `customer` as Clerk user ID (string)
-- `Cabin` - Accommodation inventory with amenities, pricing, capacity
-- `Dining` - Restaurant items with categories, pricing, images
-- `Experience` - Activities/tours with difficulty, duration, participants
-- `Settings` - Business rules, pricing policies (singleton - DO NOT modify directly)
+- `Booking` — References `Cabin` (ObjectId), stores `customer` as Clerk user ID (string). Includes payment/refund metadata (`stripePaymentIntentId`, `stripeSessionId`, `refundStatus`, `paidAt`, etc.) aligned with the customer portal.
+- `Cabin` — Accommodation inventory with amenities, pricing, capacity
+- `Dining` — Restaurant items with categories, pricing, images
+- `Experience` — Activities/tours with difficulty, duration, participants
+- `Settings` — Business rules, pricing policies (singleton — DO NOT modify directly)
+- `ProcessedStripeEvent` — Idempotency store for Stripe webhook events (TTL index, 30-day expiry)
 
 **Important Indexes:**
 - Bookings: Compound indexes on `{ cabin, checkInDate, checkOutDate }`, `{ customer, createdAt }`
@@ -171,20 +240,34 @@ const user = await getClerkUser(clerkUserId);
 - Mongoose schemas include validation rules and pre-save middleware
 - `Booking` schema auto-calculates `numNights` and `remainingAmount`
 - Static method `Booking.findOverlapping()` prevents double-bookings
+- Booking status transitions enforced via `VALID_TRANSITIONS` in `lib/config.ts`
 
 ### Configuration & Constants
 
 **Centralized Config** (`lib/config.ts`):
-- `SWR_CONFIG` - Deduping intervals, revalidation rules
-- `DB_CONFIG` - Connection pool, timeouts
-- `CURRENCY` - Default currency settings
-- `LOYALTY_TIERS` - Customer tier thresholds
+- `SWR_CONFIG` — Deduping intervals, revalidation rules
+- `DB_CONFIG` — Connection pool, timeouts
+- `CURRENCY` — Default currency settings
+- `LOYALTY_TIERS` — Customer tier thresholds
+- `BOOKING_STATUSES`, `REFUND_STATUSES`, `PAYMENT_METHODS` — Single source of truth for TypeScript, Zod, and Mongoose
 
 **API Utilities** (`lib/api-utils.ts`):
-- `API_CONFIG` - Pagination defaults (DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
-- `requireApiAuth()` - Authentication for API routes
-- `createSuccessResponse()` / `createErrorResponse()` - Standardized responses
-- `parsePagination()` / `buildPaginationMeta()` - Pagination helpers
+- `API_CONFIG` — Pagination defaults (DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+- `requireApiAuth()` — Authentication for API routes
+- `createSuccessResponse()` / `createErrorResponse()` — Standardized responses
+- `createValidationErrorResponse()` / `formatZodErrors()` — Zod error formatting
+- `createRateLimitResponse()` — 429 responses with `Retry-After` header
+- `parsePagination()` / `buildPaginationMeta()` — Pagination helpers
+- `sanitizeUpdatePayload()` — Strip disallowed fields from PATCH/PUT bodies
+
+**Rate Limiting** (`lib/rate-limit.ts`):
+- In-memory limiter suitable for single-instance / dev deployments
+- Preset configs: `MUTATION`, `EMAIL`, `CUSTOMER_CREATE`, `BOOKING_CREATE`, `AUTH`
+- Applied on email send and customer-create endpoints; use `checkRateLimit()` + `createRateLimitKey()` for new sensitive routes
+
+**Logging** (`lib/logger.ts`):
+- Use `logger.info/warn/error/debug()` instead of raw `console.*` in server code
+- Automatically suppressed when `NODE_ENV === 'test'`
 
 ### State Management
 
@@ -196,7 +279,7 @@ const user = await getClerkUser(clerkUserId);
 
 ### Styling Approach
 
-- **Tailwind CSS** for utility classes
+- **Tailwind CSS v4** for utility classes (`@tailwindcss/postcss`)
 - **HeroUI v2** component library (customized theme)
 - **CSS-in-JS:** tailwind-variants for component variants
 - Dark mode via `next-themes` with HeroUI integration
@@ -286,14 +369,26 @@ if (overlapping.length > 0) {
 }
 ```
 
+Settings is the single source of truth for booking business rules (min/max nights, deposit %, etc.). Booking API validation reads from the Settings document at request time.
+
 ### Clerk Rate Limiting
 API has concurrent call limits. Clerk user batch fetching uses `CLERK_API_CONCURRENT_LIMIT` env var (defaults to 3) in `lib/clerk-users.ts`.
 
 ### Environment Variables Required
+See `.env.example` for the full list. Minimum for local development:
 ```bash
 MONGODB_URI=mongodb+srv://...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
+RESEND_API_KEY=re_...          # Email sending (/api/send/*)
+SEED_SECRET=...                # Bearer token for /api/cron/seed
+```
+
+Optional:
+```bash
+CLERK_API_CONCURRENT_LIMIT=3   # Clerk batch fetch concurrency (default: 3)
+TESTING_AUTH_BYPASS=true       # Server-only auth bypass (dev only)
+NEXT_PUBLIC_TESTING=true       # Client UX bypass for AuthGuard (dev only)
 ```
 
 ### Auth Bypass for Testing
@@ -334,6 +429,7 @@ after changing either var.
 - Run `pnpm test` before committing, `pnpm test:coverage` for coverage report
 - `pnpm test:fast` runs unit + jsdom only (no MongoDB binary needed) — use this in sandboxed/offline environments
 - `pnpm test:unit` / `pnpm test:integration` select a single node project
+- CI runs `pnpm ci:check` on every push/PR to `main` (`.github/workflows/ci.yml`)
 
 ### Test Structure
 ```
@@ -353,7 +449,8 @@ __tests__/
 │   └── types/                 # error type guards
 ├── integration/               # Real MongoDB via Memory Server
 │   ├── models/                # Mongoose schema validation, CRUD, indexes
-│   └── api/                   # API route handlers with real DB
+│   ├── api/                   # API route handlers with real DB
+│   └── scripts/               # Migration/backfill script tests
 ├── validations/               # Zod schema tests (no DB)
 ├── hooks/                     # SWR/TanStack Query hook tests
 ├── api/                       # Mock-based API route tests (jsdom)
@@ -387,30 +484,34 @@ __tests__/
    - Use custom hooks for data fetching
    - Follow HeroUI component patterns
    - Ensure type safety with TypeScript strict mode
+   - Add Zod schemas in `lib/validations/` for new mutation endpoints
 
 2. **Database Changes:**
    - Update Mongoose model schema
    - Add indexes for query performance
    - Test with seed data (`pnpm seed`)
-   - Consider migration scripts for existing data
+   - Consider migration scripts for existing data (`scripts/backfill-*.ts`)
 
 3. **API Development:**
    - Follow consistent response format
    - Include proper error handling
-   - Validate input data
+   - Validate input with Zod schemas + `createValidationErrorResponse()`
    - Use auth helpers for access control
    - Add pagination for list endpoints
+   - Apply rate limiting on sensitive mutation/email endpoints
 
-4. **Before Committing:**
-   - Run `pnpm ci:check` to verify format, lint, and tests
+4. **Before Committing / Opening a PR:**
+   - Follow **Agent Workflow (Issues, PRs & CI)** above — read the issue/PR templates and run `pnpm ci:check` before any PR
    - Test locally with `pnpm dev`
    - Verify database operations with seed data
    - Check TypeScript types compile
+   - Update this file (`CLAUDE.md`) if the change invalidates documented patterns
 
 ## Additional Documentation
 
-- `CLERK_SETUP.md` - Clerk authentication configuration
-- `SEEDING_GUIDE.md` - Database seeding and data extraction
-- `ROLE_BASED_ACCESS_CONTROL.md` - RBAC implementation details
-- `PRINTING_FUNCTIONALITY.md` - PDF generation features
-- `DATABASE_SETUP.md` - MongoDB configuration
+- `README.md` — Quick start, env setup, project overview
+- `docs/api.md` — Full API endpoint reference (auth, rate limits, request/response shapes)
+- `docs/issues_template.md` — **Required reading before creating issues** (bug / gap / feature skeletons)
+- `docs/pull_requests_template.md` — **Required reading before opening PRs** (summary, test plan, conventions)
+- `__tests__/API_TESTING.md` — API test coverage notes
+- `.env.example` — All environment variables with descriptions
