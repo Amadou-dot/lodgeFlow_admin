@@ -8,3 +8,4 @@ export * from './cabin';
 export * from './customer';
 export * from './dining';
 export * from './experience';
+export * from './settings';
