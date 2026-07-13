@@ -47,7 +47,9 @@ describe('Settings Validation Schemas', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(
-          result.error.issues.some(issue => issue.path.includes('maxBookingLength'))
+          result.error.issues.some(issue =>
+            issue.path.includes('maxBookingLength')
+          )
         ).toBe(true);
       }
     });

@@ -69,9 +69,7 @@ describe('Settings API Routes', () => {
     it('returns 400 with structured errors for out-of-range values', async () => {
       await createDefaultSettings();
 
-      const response = await PUT(
-        createRequest({ depositPercentage: 150 })
-      );
+      const response = await PUT(createRequest({ depositPercentage: 150 }));
       const data = await response.json();
 
       expect(response.status).toBe(400);
