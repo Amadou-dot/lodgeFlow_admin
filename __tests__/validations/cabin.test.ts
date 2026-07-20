@@ -8,6 +8,7 @@ describe('Cabin Validation Schemas', () => {
         'A beautiful cabin with stunning lake views and modern amenities.',
       capacity: 4,
       price: 200,
+      image: 'https://example.com/cabin.jpg',
     };
 
     it('accepts valid cabin data', () => {
@@ -20,7 +21,10 @@ describe('Cabin Validation Schemas', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.discount).toBe(0);
-        expect(result.data.isAvailable).toBe(true);
+        expect(result.data.status).toBe('active');
+        expect(result.data.amenities).toEqual([]);
+        expect(result.data.images).toEqual([]);
+        expect(result.data.extraGuestFee).toBe(0);
       }
     });
 
@@ -50,14 +54,14 @@ describe('Cabin Validation Schemas', () => {
       }
     });
 
-    it('rejects description over 2000 characters', () => {
-      const cabin = { ...validCabin, description: 'A'.repeat(2001) };
+    it('rejects description over 1000 characters (matches Cabin model maxlength)', () => {
+      const cabin = { ...validCabin, description: 'A'.repeat(1001) };
       const result = createCabinSchema.safeParse(cabin);
       expect(result.success).toBe(false);
     });
 
-    it('accepts description at boundary (10 chars)', () => {
-      const cabin = { ...validCabin, description: 'A'.repeat(10) };
+    it('accepts description at boundary (1000 chars)', () => {
+      const cabin = { ...validCabin, description: 'A'.repeat(1000) };
       const result = createCabinSchema.safeParse(cabin);
       expect(result.success).toBe(true);
     });
@@ -127,10 +131,10 @@ describe('Cabin Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('accepts valid image URL', () => {
-      const cabin = { ...validCabin, image: 'https://example.com/cabin.jpg' };
+    it('requires an image URL', () => {
+      const { image: _image, ...cabin } = validCabin;
       const result = createCabinSchema.safeParse(cabin);
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
 
     it('rejects invalid image URL', () => {
@@ -154,6 +158,81 @@ describe('Cabin Validation Schemas', () => {
       if (result.success) {
         expect(result.data.amenities).toEqual([]);
       }
+    });
+
+    it('accepts a gallery of image URLs', () => {
+      const cabin = {
+        ...validCabin,
+        images: ['https://example.com/1.jpg', 'https://example.com/2.jpg'],
+      };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects an invalid gallery image URL', () => {
+      const cabin = { ...validCabin, images: ['not-a-url'] };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts valid status values', () => {
+      (['active', 'maintenance', 'inactive'] as const).forEach(status => {
+        const result = createCabinSchema.safeParse({ ...validCabin, status });
+        expect(result.success).toBe(true);
+      });
+    });
+
+    it('rejects invalid status value', () => {
+      const cabin = { ...validCabin, status: 'closed' };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts bedrooms, bathrooms, and size', () => {
+      const cabin = { ...validCabin, bedrooms: 2, bathrooms: 1, size: 800 };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects bedrooms less than 1', () => {
+      const cabin = { ...validCabin, bedrooms: 0 };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts minNights', () => {
+      const cabin = { ...validCabin, minNights: 2 };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects minNights less than 1', () => {
+      const cabin = { ...validCabin, minNights: 0 };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts extraGuestFee and defaults to 0', () => {
+      const withFee = createCabinSchema.safeParse({
+        ...validCabin,
+        extraGuestFee: 25,
+      });
+      expect(withFee.success).toBe(true);
+      if (withFee.success) {
+        expect(withFee.data.extraGuestFee).toBe(25);
+      }
+
+      const withoutFee = createCabinSchema.safeParse(validCabin);
+      expect(withoutFee.success).toBe(true);
+      if (withoutFee.success) {
+        expect(withoutFee.data.extraGuestFee).toBe(0);
+      }
+    });
+
+    it('rejects negative extraGuestFee', () => {
+      const cabin = { ...validCabin, extraGuestFee: -5 };
+      const result = createCabinSchema.safeParse(cabin);
+      expect(result.success).toBe(false);
     });
   });
 
@@ -215,12 +294,62 @@ describe('Cabin Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('accepts isAvailable update', () => {
+    it('rejects description over 1000 characters on update (matches create limit)', () => {
       const result = updateCabinSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
-        isAvailable: false,
+        description: 'A'.repeat(1001),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts status update', () => {
+      const result = updateCabinSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        status: 'maintenance',
       });
       expect(result.success).toBe(true);
+    });
+
+    it('rejects invalid status update', () => {
+      const result = updateCabinSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        status: 'closed',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts minNights and extraGuestFee updates', () => {
+      const result = updateCabinSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        minNights: 3,
+        extraGuestFee: 15,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts images gallery update', () => {
+      const result = updateCabinSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        images: ['https://example.com/new.jpg'],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('does not fill in defaults for fields absent from the update payload', () => {
+      const result = updateCabinSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        name: 'Renamed Cabin',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // A partial update must not silently reset discount/status/amenities/
+        // images/extraGuestFee back to their create-time defaults.
+        expect('discount' in result.data).toBe(false);
+        expect('status' in result.data).toBe(false);
+        expect('amenities' in result.data).toBe(false);
+        expect('images' in result.data).toBe(false);
+        expect('extraGuestFee' in result.data).toBe(false);
+      }
     });
   });
 });

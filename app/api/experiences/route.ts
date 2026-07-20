@@ -1,5 +1,10 @@
-import { escapeRegex, requireApiAuth } from '@/lib/api-utils';
+import {
+  createValidationErrorResponse,
+  escapeRegex,
+  requireApiAuth,
+} from '@/lib/api-utils';
 import connectToDatabase from '@/lib/mongodb';
+import { createExperienceSchema } from '@/lib/validations';
 import { Experience } from '@/models/Experience';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -74,7 +79,13 @@ export async function POST(request: Request) {
   try {
     await connectToDatabase();
     const data = await request.json();
-    const experience = new Experience(data);
+
+    const validationResult = createExperienceSchema.safeParse(data);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
+    }
+
+    const experience = new Experience(validationResult.data);
     await experience.save();
     return NextResponse.json(
       { success: true, data: experience },

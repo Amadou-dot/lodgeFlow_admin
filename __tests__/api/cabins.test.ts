@@ -23,6 +23,7 @@ const mockCabinModel = {
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
+  create: jest.fn(),
 };
 
 jest.mock('@/models/Cabin', () => ({
@@ -170,16 +171,18 @@ describe('/api/cabins', () => {
   });
 
   describe('POST /api/cabins', () => {
+    const validCabinPayload = {
+      name: 'Test Cabin',
+      description: 'A test cabin description here.',
+      capacity: 4,
+      price: 100,
+      image: 'https://example.com/cabin.jpg',
+    };
+
     it('should reject discount greater than price', async () => {
       const request = new NextRequest('http://localhost/api/cabins', {
         method: 'POST',
-        body: JSON.stringify({
-          name: 'Test Cabin',
-          description: 'A test cabin description here.',
-          capacity: 4,
-          price: 100,
-          discount: 150,
-        }),
+        body: JSON.stringify({ ...validCabinPayload, discount: 150 }),
       });
 
       const response = await POST(request);
@@ -187,7 +190,46 @@ describe('/api/cabins', () => {
 
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
-      expect(data.error).toContain('Discount');
+      expect(data.error).toBe('Validation failed');
+      expect(data.details.discount[0]).toContain('Discount');
+    });
+
+    it('should reject a missing required field', async () => {
+      const { image: _image, ...payload } = validCabinPayload;
+      const request = new NextRequest('http://localhost/api/cabins', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.details.image).toBeDefined();
+    });
+
+    it('should create a cabin with valid data', async () => {
+      const createdCabin = { ...mockCabinData, ...validCabinPayload };
+      mockCabinModel.create.mockResolvedValue(createdCabin);
+
+      const request = new NextRequest('http://localhost/api/cabins', {
+        method: 'POST',
+        body: JSON.stringify(validCabinPayload),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(mockCabinModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Test Cabin',
+          status: 'active',
+          discount: 0,
+        })
+      );
+      expect(response.status).toBe(201);
+      expect(data.success).toBe(true);
     });
   });
 

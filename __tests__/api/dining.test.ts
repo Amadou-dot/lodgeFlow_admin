@@ -189,19 +189,24 @@ describe('/api/dining', () => {
   });
 
   describe('POST /api/dining', () => {
+    const validDiningPayload = {
+      name: 'Test Item',
+      description: 'A test dining item description.',
+      type: 'menu',
+      mealType: 'breakfast',
+      category: 'regular',
+      price: 25,
+      servingTime: { start: '07:00', end: '10:30' },
+      maxPeople: 50,
+      image: 'https://example.com/test.jpg',
+    };
+
     it('should reject invalid serving time format', async () => {
       const request = new NextRequest('http://localhost/api/dining', {
         method: 'POST',
         body: JSON.stringify({
-          name: 'Test Item',
-          description: 'A test dining item description.',
-          type: 'menu',
-          mealType: 'breakfast',
-          category: 'regular',
-          price: 25,
+          ...validDiningPayload,
           servingTime: { start: '7:00 AM', end: '10:30 AM' },
-          maxPeople: 50,
-          image: 'https://example.com/test.jpg',
         }),
       });
 
@@ -210,6 +215,38 @@ describe('/api/dining', () => {
 
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
+    });
+
+    it('should reject an invalid type/mealType/category combination', async () => {
+      const request = new NextRequest('http://localhost/api/dining', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validDiningPayload,
+          type: 'breakfast',
+          mealType: 'vegetarian',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.details.type).toBeDefined();
+      expect(data.details.mealType).toBeDefined();
+    });
+
+    it('should create a dining item with valid data', async () => {
+      const request = new NextRequest('http://localhost/api/dining', {
+        method: 'POST',
+        body: JSON.stringify(validDiningPayload),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(data.success).toBe(true);
     });
   });
 

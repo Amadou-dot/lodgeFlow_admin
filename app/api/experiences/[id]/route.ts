@@ -1,5 +1,6 @@
-import { requireApiAuth, sanitizeUpdatePayload } from '@/lib/api-utils';
+import { createValidationErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectToDatabase from '@/lib/mongodb';
+import { updateExperienceSchema } from '@/lib/validations';
 import { Experience } from '@/models/Experience';
 import { NextResponse } from 'next/server';
 
@@ -40,9 +41,15 @@ export async function PUT(request: Request, { params }: ParamProps) {
   try {
     await connectToDatabase();
     const data = await request.json();
+
+    const validationResult = updateExperienceSchema.safeParse(data);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
+    }
+
     const experience = await Experience.findByIdAndUpdate(
       id,
-      sanitizeUpdatePayload(data),
+      validationResult.data,
       {
         new: true,
         runValidators: true,

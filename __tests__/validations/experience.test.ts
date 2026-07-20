@@ -145,5 +145,18 @@ describe('Experience Validation Schemas', () => {
 
       expect(result.success).toBe(false);
     });
+
+    it('does not fill in defaults for fields absent from the update payload', () => {
+      const result = updateExperienceSchema.safeParse({
+        name: 'Renamed Tour',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // A partial update must not silently reset isPopular/reviewCount
+        // back to their create-time defaults.
+        expect('isPopular' in result.data).toBe(false);
+        expect('reviewCount' in result.data).toBe(false);
+      }
+    });
   });
 });

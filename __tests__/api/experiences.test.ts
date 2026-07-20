@@ -142,6 +142,7 @@ describe('/api/experiences', () => {
         available: ['2024-06-01', '2024-06-15'],
         ctaText: 'Book Now',
         isPopular: true,
+        reviewCount: 0,
       });
       expect(mockSave).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(201);
@@ -150,6 +151,19 @@ describe('/api/experiences', () => {
         name: mockExperienceData.name,
         price: mockExperienceData.price,
       });
+    });
+
+    it('should reject an incomplete payload with a validation error', async () => {
+      const request = new NextRequest('http://localhost/api/experiences', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Test Experience' }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
     });
 
     it('should handle creation errors', async () => {
@@ -162,7 +176,18 @@ describe('/api/experiences', () => {
 
       const request = new NextRequest('http://localhost/api/experiences', {
         method: 'POST',
-        body: JSON.stringify({ name: 'Test Experience' }),
+        body: JSON.stringify({
+          name: 'Mountain Hiking Adventure',
+          price: 299,
+          duration: '4 hours',
+          difficulty: 'Moderate',
+          category: 'Adventure',
+          description: 'Experience the thrill of mountain hiking',
+          image: '/images/hiking.jpg',
+          includes: ['Guide', 'Equipment', 'Snacks'],
+          available: ['2024-06-01', '2024-06-15'],
+          ctaText: 'Book Now',
+        }),
       });
 
       const response = await POST(request);

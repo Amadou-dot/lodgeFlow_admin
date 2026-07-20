@@ -1,11 +1,12 @@
 import {
   createErrorResponse,
   createSuccessResponse,
+  createValidationErrorResponse,
   escapeRegex,
   HTTP_STATUS,
   requireApiAuth,
-  sanitizeUpdatePayload,
 } from '@/lib/api-utils';
+import { createDiningSchema, updateDiningSchema } from '@/lib/validations';
 import { connectDB, Dining } from '@/models';
 import type { DiningQueryFilter, MongoSortOrder } from '@/types/api';
 import { NextRequest } from 'next/server';
@@ -97,40 +98,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Validate required fields
-    const requiredFields = [
-      'name',
-      'description',
-      'type',
-      'mealType',
-      'price',
-      'servingTime',
-      'maxPeople',
-      'category',
-      'image',
-    ];
-    const missingFields = requiredFields.filter(field => !body[field]);
-
-    if (missingFields.length > 0) {
-      return createErrorResponse(
-        `Missing required fields: ${missingFields.join(', ')}`,
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const validationResult = createDiningSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
     }
 
-    // Validate serving time format
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (
-      !timeRegex.test(body.servingTime.start) ||
-      !timeRegex.test(body.servingTime.end)
-    ) {
-      return createErrorResponse(
-        'Invalid time format. Use HH:MM format.',
-        HTTP_STATUS.BAD_REQUEST
-      );
-    }
-
-    const dining = new Dining(body);
+    const dining = new Dining(validationResult.data);
     await dining.save();
 
     return createSuccessResponse(
@@ -156,37 +129,18 @@ export async function PUT(request: NextRequest) {
     await connectDB();
 
     const body = await request.json();
-    const { _id, ...updateData } = body;
 
-    if (!_id) {
-      return createErrorResponse(
-        'Dining item ID is required',
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const validationResult = updateDiningSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
     }
 
-    // Validate serving time format if provided
-    if (updateData.servingTime) {
-      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-      if (
-        !timeRegex.test(updateData.servingTime.start) ||
-        !timeRegex.test(updateData.servingTime.end)
-      ) {
-        return createErrorResponse(
-          'Invalid time format. Use HH:MM format.',
-          HTTP_STATUS.BAD_REQUEST
-        );
-      }
-    }
+    const { _id, ...updateData } = validationResult.data;
 
-    const dining = await Dining.findByIdAndUpdate(
-      _id,
-      sanitizeUpdatePayload(updateData),
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const dining = await Dining.findByIdAndUpdate(_id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!dining) {
       return createErrorResponse(
