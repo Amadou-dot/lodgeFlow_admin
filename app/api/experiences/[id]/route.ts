@@ -1,8 +1,15 @@
-import { createValidationErrorResponse, requireApiAuth } from '@/lib/api-utils';
+import {
+  createErrorResponse,
+  createSuccessResponse,
+  createValidationErrorResponse,
+  HTTP_STATUS,
+  requireApiAuth,
+} from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
 import connectToDatabase from '@/lib/mongodb';
 import { updateExperienceSchema } from '@/lib/validations';
 import { Experience } from '@/models/Experience';
-import { NextResponse } from 'next/server';
+import { isMongooseValidationError } from '@/types/errors';
 
 type ParamProps = {
   params: Promise<{ id: string }>;
@@ -18,16 +25,18 @@ export async function GET(_request: Request, { params }: ParamProps) {
     await connectToDatabase();
     const experience = await Experience.findById(id);
     if (!experience) {
-      return NextResponse.json(
-        { error: 'Experience not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
     }
-    return NextResponse.json(experience);
+
+    return createSuccessResponse(experience);
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch experience' },
-      { status: 500 }
+    logger.error(
+      'Error fetching experience',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to fetch experience',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
@@ -42,30 +51,41 @@ export async function PUT(request: Request, { params }: ParamProps) {
     await connectToDatabase();
     const data = await request.json();
 
-    const validationResult = updateExperienceSchema.safeParse(data);
+    const validationResult = updateExperienceSchema.safeParse({
+      ...data,
+      _id: id,
+    });
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
 
-    const experience = await Experience.findByIdAndUpdate(
-      id,
-      validationResult.data,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const { _id: _validatedId, ...updateData } = validationResult.data;
+
+    const experience = await Experience.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
     if (!experience) {
-      return NextResponse.json(
-        { error: 'Experience not found' },
-        { status: 404 }
+      return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
+    }
+
+    return createSuccessResponse(experience);
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
       );
     }
-    return NextResponse.json(experience);
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update experience' },
-      { status: 500 }
+
+    logger.error(
+      'Error updating experience',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to update experience',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
@@ -80,16 +100,18 @@ export async function DELETE(_request: Request, { params }: ParamProps) {
     await connectToDatabase();
     const experience = await Experience.findByIdAndDelete(id);
     if (!experience) {
-      return NextResponse.json(
-        { error: 'Experience not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
     }
-    return NextResponse.json({ message: 'Experience deleted' });
+
+    return createSuccessResponse(null, 'Experience deleted successfully');
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to delete experience' },
-      { status: 500 }
+    logger.error(
+      'Error deleting experience',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to delete experience',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }

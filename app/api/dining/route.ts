@@ -6,9 +6,11 @@ import {
   HTTP_STATUS,
   requireApiAuth,
 } from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
 import { createDiningSchema, updateDiningSchema } from '@/lib/validations';
 import { connectDB, Dining } from '@/models';
 import type { DiningQueryFilter, MongoSortOrder } from '@/types/api';
+import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -80,7 +82,10 @@ export async function GET(request: NextRequest) {
 
     return createSuccessResponse(dining);
   } catch (error) {
-    console.error('Error fetching dining:', error);
+    logger.error(
+      'Error fetching dining',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to fetch dining items',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -111,8 +116,19 @@ export async function POST(request: NextRequest) {
       'Dining item created successfully',
       HTTP_STATUS.CREATED
     );
-  } catch (error) {
-    console.error('Error creating dining item:', error);
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
+      );
+    }
+
+    logger.error(
+      'Error creating dining item',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to create dining item',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -150,8 +166,19 @@ export async function PUT(request: NextRequest) {
     }
 
     return createSuccessResponse(dining, 'Dining item updated successfully');
-  } catch (error) {
-    console.error('Error updating dining item:', error);
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
+      );
+    }
+
+    logger.error(
+      'Error updating dining item',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to update dining item',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -188,7 +215,10 @@ export async function DELETE(request: NextRequest) {
 
     return createSuccessResponse(null, 'Dining item deleted successfully');
   } catch (error) {
-    console.error('Error deleting dining item:', error);
+    logger.error(
+      'Error deleting dining item',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to delete dining item',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

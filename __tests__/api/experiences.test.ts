@@ -241,7 +241,7 @@ describe('/api/experiences/[id]', () => {
         '507f1f77bcf86cd799439011'
       );
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockExperienceData);
+      expect(data).toEqual({ success: true, data: mockExperienceData });
     });
 
     it('should return 404 when experience not found', async () => {
@@ -256,7 +256,7 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(404);
-      expect(data).toEqual({ error: 'Experience not found' });
+      expect(data).toEqual({ success: false, error: 'Experience not found' });
     });
 
     it('should handle database errors', async () => {
@@ -273,7 +273,10 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to fetch experience' });
+      expect(data).toEqual({
+        success: false,
+        error: 'Failed to fetch experience',
+      });
     });
   });
 
@@ -303,7 +306,39 @@ describe('/api/experiences/[id]', () => {
         { new: true, runValidators: true }
       );
       expect(response.status).toBe(200);
-      expect(data).toEqual(updatedData);
+      expect(data).toEqual({ success: true, data: updatedData });
+    });
+
+    it('should accept a full round-tripped payload including _id', async () => {
+      const updatedData = { ...mockExperienceData, name: 'Updated Adventure' };
+      MockExperience.findByIdAndUpdate = jest
+        .fn()
+        .mockResolvedValue(updatedData);
+
+      const request = new NextRequest(
+        'http://localhost/api/experiences/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...mockExperienceData,
+            name: 'Updated Adventure',
+          }),
+        }
+      );
+      const params = Promise.resolve({ id: '507f1f77bcf86cd799439011' });
+
+      const response = await PUT(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ success: true, data: updatedData });
+      // _id/createdAt/updatedAt from the round-tripped object must not reach
+      // findByIdAndUpdate as part of the update payload.
+      const [, updatePayload] =
+        MockExperience.findByIdAndUpdate.mock.calls.at(-1)!;
+      expect(updatePayload).not.toHaveProperty('_id');
+      expect(updatePayload).not.toHaveProperty('createdAt');
+      expect(updatePayload).not.toHaveProperty('updatedAt');
     });
 
     it('should return 404 when updating non-existent experience', async () => {
@@ -322,7 +357,7 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(404);
-      expect(data).toEqual({ error: 'Experience not found' });
+      expect(data).toEqual({ success: false, error: 'Experience not found' });
     });
 
     it('should handle update errors', async () => {
@@ -343,7 +378,10 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to update experience' });
+      expect(data).toEqual({
+        success: false,
+        error: 'Failed to update experience',
+      });
     });
 
     it('should handle invalid JSON in PUT request', async () => {
@@ -360,7 +398,10 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to update experience' });
+      expect(data).toEqual({
+        success: false,
+        error: 'Failed to update experience',
+      });
     });
   });
 
@@ -386,7 +427,11 @@ describe('/api/experiences/[id]', () => {
         '507f1f77bcf86cd799439011'
       );
       expect(response.status).toBe(200);
-      expect(data).toEqual({ message: 'Experience deleted' });
+      expect(data).toEqual({
+        success: true,
+        data: null,
+        message: 'Experience deleted successfully',
+      });
     });
 
     it('should return 404 when deleting non-existent experience', async () => {
@@ -404,7 +449,7 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(404);
-      expect(data).toEqual({ error: 'Experience not found' });
+      expect(data).toEqual({ success: false, error: 'Experience not found' });
     });
 
     it('should handle deletion errors', async () => {
@@ -424,7 +469,10 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to delete experience' });
+      expect(data).toEqual({
+        success: false,
+        error: 'Failed to delete experience',
+      });
     });
   });
 });

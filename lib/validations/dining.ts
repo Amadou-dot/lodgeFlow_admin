@@ -1,3 +1,10 @@
+import {
+  BEVERAGE_CATEGORIES,
+  DIETARY_OPTIONS,
+  DINING_CATEGORIES,
+  DINING_TYPES,
+  MEAL_TYPES,
+} from '@/lib/config';
 import { z } from 'zod';
 
 /**
@@ -16,40 +23,22 @@ const servingTimeSchema = z.object({
 /**
  * Dining type enum — matches the Dining Mongoose model
  */
-export const diningTypeSchema = z.enum(['menu', 'experience']);
+export const diningTypeSchema = z.enum(DINING_TYPES);
 
 /**
  * Meal type enum — matches the Dining Mongoose model
  */
-export const mealTypeSchema = z.enum([
-  'breakfast',
-  'lunch',
-  'dinner',
-  'all-day',
-]);
+export const mealTypeSchema = z.enum(MEAL_TYPES);
 
 /**
  * Category enum — matches the Dining Mongoose model
  */
-export const diningCategorySchema = z.enum([
-  'regular',
-  'craft-beer',
-  'wine',
-  'spirits',
-  'non-alcoholic',
-]);
+export const diningCategorySchema = z.enum(DINING_CATEGORIES);
 
 /**
  * Dietary option enum — matches the Dining Mongoose model
  */
-export const dietaryOptionSchema = z.enum([
-  'vegetarian',
-  'vegan',
-  'gluten-free',
-  'dairy-free',
-  'keto',
-  'paleo',
-]);
+export const dietaryOptionSchema = z.enum(DIETARY_OPTIONS);
 
 /**
  * Beverage sub-schema — matches the Dining Mongoose model's beverages array
@@ -59,7 +48,7 @@ const beverageSchema = z.object({
   description: z.string().optional(),
   price: z.number().min(0).optional(),
   alcoholContent: z.number().min(0).optional(),
-  category: z.enum(['craft-beer', 'wine', 'spirits', 'non-alcoholic']),
+  category: z.enum(BEVERAGE_CATEGORIES),
 });
 
 /**

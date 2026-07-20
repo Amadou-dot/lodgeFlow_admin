@@ -1,7 +1,15 @@
-import { createValidationErrorResponse, requireApiAuth } from '@/lib/api-utils';
+import {
+  createErrorResponse,
+  createSuccessResponse,
+  createValidationErrorResponse,
+  HTTP_STATUS,
+  requireApiAuth,
+} from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
 import { updateDiningSchema } from '@/lib/validations';
 import { connectDB, Dining } from '@/models';
-import { NextRequest, NextResponse } from 'next/server';
+import { isMongooseValidationError } from '@/types/errors';
+import { NextRequest } from 'next/server';
 
 export async function GET(
   _req: NextRequest,
@@ -18,21 +26,21 @@ export async function GET(
     const dining = await Dining.findById(id);
 
     if (!dining) {
-      return NextResponse.json(
-        { success: false, error: 'Dining item not found' },
-        { status: 404 }
+      return createErrorResponse(
+        'Dining item not found',
+        HTTP_STATUS.NOT_FOUND
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: dining,
-    });
+    return createSuccessResponse(dining);
   } catch (error) {
-    console.error('Error fetching dining item:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch dining item' },
-      { status: 500 }
+    logger.error(
+      'Error fetching dining item',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to fetch dining item',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
@@ -64,22 +72,29 @@ export async function PUT(
     });
 
     if (!dining) {
-      return NextResponse.json(
-        { success: false, error: 'Dining item not found' },
-        { status: 404 }
+      return createErrorResponse(
+        'Dining item not found',
+        HTTP_STATUS.NOT_FOUND
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: dining,
-      message: 'Dining item updated successfully',
-    });
-  } catch (error) {
-    console.error('Error updating dining item:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update dining item' },
-      { status: 500 }
+    return createSuccessResponse(dining, 'Dining item updated successfully');
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
+      );
+    }
+
+    logger.error(
+      'Error updating dining item',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to update dining item',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
@@ -99,21 +114,21 @@ export async function DELETE(
     const dining = await Dining.findByIdAndDelete(id);
 
     if (!dining) {
-      return NextResponse.json(
-        { success: false, error: 'Dining item not found' },
-        { status: 404 }
+      return createErrorResponse(
+        'Dining item not found',
+        HTTP_STATUS.NOT_FOUND
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Dining item deleted successfully',
-    });
+    return createSuccessResponse(null, 'Dining item deleted successfully');
   } catch (error) {
-    console.error('Error deleting dining item:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete dining item' },
-      { status: 500 }
+    logger.error(
+      'Error deleting dining item',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to delete dining item',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }

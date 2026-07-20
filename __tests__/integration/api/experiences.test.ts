@@ -104,7 +104,7 @@ describe('Experiences API Routes', () => {
       expect(body.success).toBe(false);
     });
 
-    it('rejects unknown legacy keys', async () => {
+    it('silently strips unknown legacy keys', async () => {
       const request = createRequest('http://localhost:3000/api/experiences', {
         method: 'POST',
         body: { ...validExperiencePayload(), included: ['Legacy key'] },
@@ -113,8 +113,9 @@ describe('Experiences API Routes', () => {
       const response = await POST(request);
       const body = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(body.success).toBe(false);
+      expect(response.status).toBe(201);
+      expect(body.success).toBe(true);
+      expect(body.data).not.toHaveProperty('included');
     });
   });
 
@@ -131,7 +132,8 @@ describe('Experiences API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
-      expect(body.name).toBe('Mountain Hiking Tour');
+      expect(body.success).toBe(true);
+      expect(body.data.name).toBe('Mountain Hiking Tour');
     });
   });
 
@@ -151,9 +153,34 @@ describe('Experiences API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
-      expect(body.price).toBe(100);
-      expect(body.isPopular).toBe(true);
-      expect(body.reviewCount).toBe(12);
+      expect(body.success).toBe(true);
+      expect(body.data.price).toBe(100);
+      expect(body.data.isPopular).toBe(true);
+      expect(body.data.reviewCount).toBe(12);
+    });
+
+    it('accepts a full round-tripped payload including _id, createdAt, updatedAt', async () => {
+      const experience = await Experience.create(validExperiencePayload());
+
+      const request = createRequest(
+        `http://localhost:3000/api/experiences/${experience._id}`,
+        {
+          method: 'PUT',
+          body: {
+            ...experience.toObject(),
+            _id: experience._id.toString(),
+            name: 'Updated via round trip',
+          },
+        }
+      );
+      const response = await updateById(request, {
+        params: Promise.resolve({ id: experience._id.toString() }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.data.name).toBe('Updated via round trip');
     });
 
     it('rejects an invalid difficulty value on update', async () => {

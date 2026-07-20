@@ -444,5 +444,19 @@ describe('Dining Validation Schemas', () => {
         expect('reviewCount' in result.data).toBe(false);
       }
     });
+
+    it('strips $-operator and dotted keys from a valid update payload', () => {
+      const result = updateDiningSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        name: 'Renamed Item',
+        $set: { price: 1 },
+        'tags.0': 'hacked',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect('$set' in result.data).toBe(false);
+        expect('tags.0' in result.data).toBe(false);
+      }
+    });
   });
 });

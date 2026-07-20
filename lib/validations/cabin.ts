@@ -1,9 +1,10 @@
+import { CABIN_STATUSES } from '@/lib/config';
 import { z } from 'zod';
 
 /**
  * Status enum — matches the Cabin Mongoose model
  */
-const cabinStatusSchema = z.enum(['active', 'maintenance', 'inactive']);
+const cabinStatusSchema = z.enum(CABIN_STATUSES);
 
 /**
  * Description length bounds — kept as constants so create/update can't
@@ -86,6 +87,15 @@ export const updateCabinSchema = z
       path: ['discount'],
     }
   );
+
+/**
+ * A discount-only update (no `price` in the payload) can't be checked by the
+ * refine above, since it has no persisted price to compare against. Routes
+ * must call this against the cabin's stored price before persisting.
+ */
+export function isDiscountValid(discount: number, price: number): boolean {
+  return discount < price;
+}
 
 export type CreateCabinInput = z.infer<typeof createCabinSchema>;
 export type UpdateCabinInput = z.infer<typeof updateCabinSchema>;

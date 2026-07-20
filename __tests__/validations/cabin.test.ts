@@ -1,4 +1,8 @@
-import { createCabinSchema, updateCabinSchema } from '@/lib/validations/cabin';
+import {
+  createCabinSchema,
+  isDiscountValid,
+  updateCabinSchema,
+} from '@/lib/validations/cabin';
 
 describe('Cabin Validation Schemas', () => {
   describe('createCabinSchema', () => {
@@ -350,6 +354,31 @@ describe('Cabin Validation Schemas', () => {
         expect('images' in result.data).toBe(false);
         expect('extraGuestFee' in result.data).toBe(false);
       }
+    });
+
+    it('strips $-operator and dotted keys from a valid update payload', () => {
+      const result = updateCabinSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        price: 250,
+        $set: { price: 1 },
+        'amenities.0': 'hacked',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect('$set' in result.data).toBe(false);
+        expect('amenities.0' in result.data).toBe(false);
+      }
+    });
+  });
+
+  describe('isDiscountValid', () => {
+    it('returns true when discount is less than price', () => {
+      expect(isDiscountValid(50, 200)).toBe(true);
+    });
+
+    it('returns false when discount equals or exceeds price', () => {
+      expect(isDiscountValid(200, 200)).toBe(false);
+      expect(isDiscountValid(250, 200)).toBe(false);
     });
   });
 });
