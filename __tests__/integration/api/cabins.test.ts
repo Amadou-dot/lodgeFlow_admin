@@ -310,6 +310,22 @@ describe('Cabins API Routes', () => {
       expect(body.success).toBe(false);
     });
 
+    it('accepts a discount-only update within the stored price', async () => {
+      const cabin = await Cabin.create(validCabinPayload({ price: 100 }));
+
+      const request = createRequest(
+        `http://localhost:3000/api/cabins/${cabin._id}`,
+        { method: 'PUT', body: { discount: 50 } }
+      );
+      const response = await updateById(request, {
+        params: Promise.resolve({ id: cabin._id.toString() }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.discount).toBe(50);
+    });
+
     it('rejects a price-only update that drops below the stored discount', async () => {
       const cabin = await Cabin.create(
         validCabinPayload({ price: 100, discount: 80 })
@@ -326,6 +342,36 @@ describe('Cabins API Routes', () => {
 
       expect(response.status).toBe(400);
       expect(body.success).toBe(false);
+    });
+
+    it('accepts a price-only update that stays above the stored discount', async () => {
+      const cabin = await Cabin.create(
+        validCabinPayload({ price: 100, discount: 80 })
+      );
+
+      const request = createRequest(
+        `http://localhost:3000/api/cabins/${cabin._id}`,
+        { method: 'PUT', body: { price: 200 } }
+      );
+      const response = await updateById(request, {
+        params: Promise.resolve({ id: cabin._id.toString() }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.price).toBe(200);
+    });
+
+    it('returns 404 when updating a non-existent cabin', async () => {
+      const request = createRequest(
+        'http://localhost:3000/api/cabins/507f1f77bcf86cd799439011',
+        { method: 'PUT', body: { name: 'Ghost Cabin' } }
+      );
+      const response = await updateById(request, {
+        params: Promise.resolve({ id: '507f1f77bcf86cd799439011' }),
+      });
+
+      expect(response.status).toBe(404);
     });
   });
 });
