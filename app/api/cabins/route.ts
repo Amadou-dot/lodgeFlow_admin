@@ -180,14 +180,20 @@ export async function PUT(request: NextRequest) {
 
     const { _id, ...updateData } = validationResult.data;
 
-    // A discount-only update has no `price` in the payload for the schema's
-    // refine to check against — compare it against the stored price instead.
-    if (updateData.discount !== undefined && updateData.price === undefined) {
-      const existingCabin = await Cabin.findById(_id).select('price');
+    // An update touching only `discount` or only `price` has no counterpart
+    // in the payload for the schema's refine to check against — fetch the
+    // stored value of whichever field is missing and compare against that.
+    if (
+      (updateData.discount !== undefined) !==
+      (updateData.price !== undefined)
+    ) {
+      const existingCabin = await Cabin.findById(_id);
       if (!existingCabin) {
         return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);
       }
-      if (!isDiscountValid(updateData.discount, existingCabin.price)) {
+      const effectiveDiscount = updateData.discount ?? existingCabin.discount;
+      const effectivePrice = updateData.price ?? existingCabin.price;
+      if (!isDiscountValid(effectiveDiscount, effectivePrice)) {
         return createErrorResponse(
           'Validation failed',
           HTTP_STATUS.BAD_REQUEST,

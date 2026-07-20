@@ -143,6 +143,63 @@ describe('Cabin Model', () => {
     });
   });
 
+  describe('Discount Validation', () => {
+    it('rejects a discount >= price on create (document context)', async () => {
+      await expect(
+        Cabin.create(createCabinData({ price: 100, discount: 100 }))
+      ).rejects.toThrow(/Discount must be less than the cabin price/);
+    });
+
+    it('accepts a discount below price on create (document context)', async () => {
+      const cabin = await Cabin.create(
+        createCabinData({ price: 100, discount: 50 })
+      );
+      expect(cabin.discount).toBe(50);
+    });
+
+    it('rejects a findByIdAndUpdate with both price and discount when the combination is invalid (query context)', async () => {
+      const cabin = await Cabin.create(createCabinData({ price: 100 }));
+
+      await expect(
+        Cabin.findByIdAndUpdate(
+          cabin._id,
+          { price: 100, discount: 150 },
+          { runValidators: true }
+        )
+      ).rejects.toThrow(/Discount must be less than the cabin price/);
+    });
+
+    it('accepts a discount-only findByIdAndUpdate within the price sent in the same update (query context)', async () => {
+      const cabin = await Cabin.create(createCabinData({ price: 100 }));
+
+      const updated = await Cabin.findByIdAndUpdate(
+        cabin._id,
+        { price: 200, discount: 150 },
+        { new: true, runValidators: true }
+      );
+      expect(updated?.discount).toBe(150);
+    });
+
+    it('cannot see the stored price when only discount is in the update — the caller must pre-check it', async () => {
+      // Documents the query-context limitation described in models/Cabin.ts:
+      // `this` resolves to the Query, not the persisted document, so a
+      // discount-only update can't see the stored price here at all. The API
+      // routes (app/api/cabins/route.ts, app/api/cabins/[id]/route.ts)
+      // compensate by fetching the stored price and validating before
+      // calling findByIdAndUpdate. This update bypasses that route-level
+      // check by calling the model directly, so an invalid discount is not
+      // caught at this layer alone.
+      const cabin = await Cabin.create(createCabinData({ price: 100 }));
+
+      const updated = await Cabin.findByIdAndUpdate(
+        cabin._id,
+        { discount: 9999 },
+        { new: true, runValidators: true }
+      );
+      expect(updated?.discount).toBe(9999);
+    });
+  });
+
   describe('Virtuals', () => {
     it('calculates discountedPrice', async () => {
       const cabin = await Cabin.create(

@@ -248,6 +248,37 @@ describe('/api/dining', () => {
       expect(response.status).toBe(201);
       expect(data.success).toBe(true);
     });
+
+    it('maps a Mongoose ValidationError to a 400 response', async () => {
+      const validationError = Object.assign(
+        new Error('Dining validation failed'),
+        {
+          name: 'ValidationError',
+          errors: {
+            price: { message: 'Price must be positive' },
+          },
+        }
+      );
+      MockDining.mockImplementation(
+        () =>
+          ({
+            save: jest.fn().mockRejectedValue(validationError),
+          }) as any
+      );
+
+      const request = new NextRequest('http://localhost/api/dining', {
+        method: 'POST',
+        body: JSON.stringify(validDiningPayload),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(validationError.errors);
+    });
   });
 
   describe('PUT /api/dining', () => {

@@ -215,6 +215,48 @@ describe('/api/experiences', () => {
         error: 'Failed to create experience',
       });
     });
+
+    it('maps a Mongoose ValidationError to a 400 response', async () => {
+      const validationError = Object.assign(
+        new Error('Experience validation failed'),
+        {
+          name: 'ValidationError',
+          errors: {
+            price: { message: 'Price cannot be negative' },
+          },
+        }
+      );
+      MockExperience.mockImplementation(
+        () =>
+          ({
+            save: jest.fn().mockRejectedValue(validationError),
+          }) as any
+      );
+
+      const request = new NextRequest('http://localhost/api/experiences', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Mountain Hiking Adventure',
+          price: 299,
+          duration: '4 hours',
+          difficulty: 'Moderate',
+          category: 'Adventure',
+          description: 'Experience the thrill of mountain hiking',
+          image: '/images/hiking.jpg',
+          includes: ['Guide', 'Equipment', 'Snacks'],
+          available: ['2024-06-01', '2024-06-15'],
+          ctaText: 'Book Now',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('Validation failed');
+      expect(data.details).toEqual(validationError.errors);
+    });
   });
 });
 

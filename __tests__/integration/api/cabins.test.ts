@@ -204,6 +204,40 @@ describe('Cabins API Routes', () => {
       expect(response.status).toBe(200);
       expect(body.data.discount).toBe(50);
     });
+
+    it('rejects a price-only update that drops below the stored discount', async () => {
+      const cabin = await Cabin.create(
+        validCabinPayload({ price: 100, discount: 80 })
+      );
+
+      const request = createRequest('http://localhost:3000/api/cabins', {
+        method: 'PUT',
+        body: { _id: cabin._id.toString(), price: 50 },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+    });
+
+    it('accepts a price-only update that stays above the stored discount', async () => {
+      const cabin = await Cabin.create(
+        validCabinPayload({ price: 100, discount: 80 })
+      );
+
+      const request = createRequest('http://localhost:3000/api/cabins', {
+        method: 'PUT',
+        body: { _id: cabin._id.toString(), price: 200 },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.price).toBe(200);
+    });
   });
 
   describe('GET /api/cabins/[id]', () => {
@@ -266,6 +300,24 @@ describe('Cabins API Routes', () => {
       const request = createRequest(
         `http://localhost:3000/api/cabins/${cabin._id}`,
         { method: 'PUT', body: { discount: 150 } }
+      );
+      const response = await updateById(request, {
+        params: Promise.resolve({ id: cabin._id.toString() }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+    });
+
+    it('rejects a price-only update that drops below the stored discount', async () => {
+      const cabin = await Cabin.create(
+        validCabinPayload({ price: 100, discount: 80 })
+      );
+
+      const request = createRequest(
+        `http://localhost:3000/api/cabins/${cabin._id}`,
+        { method: 'PUT', body: { price: 50 } }
       );
       const response = await updateById(request, {
         params: Promise.resolve({ id: cabin._id.toString() }),
