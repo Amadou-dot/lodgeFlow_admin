@@ -3,20 +3,13 @@ import {
   updateDiningSchema,
   diningTypeSchema,
   mealTypeSchema,
+  diningCategorySchema,
 } from '@/lib/validations/dining';
 
 describe('Dining Validation Schemas', () => {
   describe('diningTypeSchema', () => {
-    it('accepts valid dining types', () => {
-      const validTypes = [
-        'breakfast',
-        'lunch',
-        'dinner',
-        'snack',
-        'beverage',
-        'dessert',
-      ];
-      validTypes.forEach(type => {
+    it('accepts valid dining types (matches Dining model)', () => {
+      ['menu', 'experience'].forEach(type => {
         expect(diningTypeSchema.safeParse(type).success).toBe(true);
       });
     });
@@ -28,22 +21,29 @@ describe('Dining Validation Schemas', () => {
   });
 
   describe('mealTypeSchema', () => {
-    it('accepts valid meal types', () => {
-      const validTypes = [
-        'vegetarian',
-        'vegan',
-        'gluten-free',
-        'dairy-free',
-        'nut-free',
-        'regular',
-      ];
-      validTypes.forEach(type => {
+    it('accepts valid meal types (matches Dining model)', () => {
+      ['breakfast', 'lunch', 'dinner', 'all-day'].forEach(type => {
         expect(mealTypeSchema.safeParse(type).success).toBe(true);
       });
     });
 
     it('rejects invalid meal types', () => {
-      const result = mealTypeSchema.safeParse('keto');
+      const result = mealTypeSchema.safeParse('vegetarian');
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('diningCategorySchema', () => {
+    it('accepts valid categories (matches Dining model)', () => {
+      ['regular', 'craft-beer', 'wine', 'spirits', 'non-alcoholic'].forEach(
+        category => {
+          expect(diningCategorySchema.safeParse(category).success).toBe(true);
+        }
+      );
+    });
+
+    it('rejects invalid categories', () => {
+      const result = diningCategorySchema.safeParse('appetizer');
       expect(result.success).toBe(false);
     });
   });
@@ -53,9 +53,9 @@ describe('Dining Validation Schemas', () => {
       name: 'Continental Breakfast',
       description:
         'A delicious continental breakfast with fresh pastries and coffee.',
-      type: 'breakfast',
-      mealType: 'regular',
-      category: 'Main',
+      type: 'menu',
+      mealType: 'breakfast',
+      category: 'regular',
       price: 25,
       servingTime: {
         start: '07:00',
@@ -76,6 +76,8 @@ describe('Dining Validation Schemas', () => {
       if (result.success) {
         expect(result.data.isAvailable).toBe(true);
         expect(result.data.isPopular).toBe(false);
+        expect(result.data.minPeople).toBe(1);
+        expect(result.data.reviewCount).toBe(0);
       }
     });
 
@@ -115,8 +117,8 @@ describe('Dining Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects empty category', () => {
-      const dining = { ...validDining, category: '' };
+    it('rejects invalid category', () => {
+      const dining = { ...validDining, category: 'invalid' };
       const result = createDiningSchema.safeParse(dining);
       expect(result.success).toBe(false);
     });
@@ -178,10 +180,37 @@ describe('Dining Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
+    it('accepts minPeople', () => {
+      const dining = { ...validDining, minPeople: 5 };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects minPeople less than 1', () => {
+      const dining = { ...validDining, minPeople: 0 };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(false);
+    });
+
     it('rejects invalid image URL', () => {
       const dining = { ...validDining, image: 'not-a-url' };
       const result = createDiningSchema.safeParse(dining);
       expect(result.success).toBe(false);
+    });
+
+    it('accepts a gallery of image URLs', () => {
+      const dining = {
+        ...validDining,
+        gallery: ['https://example.com/1.jpg', 'https://example.com/2.jpg'],
+      };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts subCategory', () => {
+      const dining = { ...validDining, subCategory: 'IPA' };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
     });
 
     it('accepts ingredients array', () => {
@@ -202,22 +231,97 @@ describe('Dining Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('accepts calories as positive integer', () => {
-      const dining = { ...validDining, calories: 500 };
+    it('accepts valid dietary options', () => {
+      const dining = {
+        ...validDining,
+        dietary: ['vegetarian', 'gluten-free'],
+      };
       const result = createDiningSchema.safeParse(dining);
       expect(result.success).toBe(true);
     });
 
-    it('accepts zero calories', () => {
-      const dining = { ...validDining, calories: 0 };
-      const result = createDiningSchema.safeParse(dining);
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects negative calories', () => {
-      const dining = { ...validDining, calories: -100 };
+    it('rejects invalid dietary option', () => {
+      const dining = { ...validDining, dietary: ['low-carb'] };
       const result = createDiningSchema.safeParse(dining);
       expect(result.success).toBe(false);
+    });
+
+    it('accepts a valid beverages array', () => {
+      const dining = {
+        ...validDining,
+        beverages: [
+          {
+            name: 'House IPA',
+            description: 'Hoppy and citrusy',
+            price: 8,
+            alcoholContent: 6.5,
+            category: 'craft-beer',
+          },
+        ],
+      };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects a beverage missing a required name', () => {
+      const dining = {
+        ...validDining,
+        beverages: [{ category: 'wine' }],
+      };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a beverage with an invalid category', () => {
+      const dining = {
+        ...validDining,
+        beverages: [{ name: 'Mystery Drink', category: 'invalid' }],
+      };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts includes, duration, and location (dining experience fields)', () => {
+      const dining = {
+        ...validDining,
+        type: 'experience',
+        includes: ['Guide', 'Tasting flight'],
+        duration: '2 hours',
+        location: 'Vineyard terrace',
+      };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts specialRequirements, seasonality, and tags', () => {
+      const dining = {
+        ...validDining,
+        specialRequirements: ['Reservation required'],
+        seasonality: 'Summer only',
+        tags: ['popular', 'outdoor'],
+      };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
+    });
+
+    it('validates rating range', () => {
+      expect(
+        createDiningSchema.safeParse({ ...validDining, rating: 4.5 }).success
+      ).toBe(true);
+      expect(
+        createDiningSchema.safeParse({ ...validDining, rating: 5.1 }).success
+      ).toBe(false);
+    });
+
+    it('validates reviewCount as non-negative integer', () => {
+      expect(
+        createDiningSchema.safeParse({ ...validDining, reviewCount: 12 })
+          .success
+      ).toBe(true);
+      expect(
+        createDiningSchema.safeParse({ ...validDining, reviewCount: -1 })
+          .success
+      ).toBe(false);
     });
 
     it('accepts isPopular true', () => {
@@ -226,6 +330,17 @@ describe('Dining Validation Schemas', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.isPopular).toBe(true);
+      }
+    });
+
+    it('does not accept a calories field that does not exist on the model', () => {
+      const dining = { ...validDining, calories: 500 };
+      const result = createDiningSchema.safeParse(dining);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data as Record<string, unknown>).calories
+        ).toBeUndefined();
       }
     });
   });
@@ -263,6 +378,14 @@ describe('Dining Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
+    it('validates category on update', () => {
+      const result = updateDiningSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        category: 'invalid',
+      });
+      expect(result.success).toBe(false);
+    });
+
     it('validates serving time format on update', () => {
       const result = updateDiningSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
@@ -296,6 +419,44 @@ describe('Dining Validation Schemas', () => {
         allergens: ['peanuts'],
       });
       expect(result.success).toBe(true);
+    });
+
+    it('accepts beverages update', () => {
+      const result = updateDiningSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        beverages: [{ name: 'Merlot', category: 'wine' }],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('does not fill in defaults for fields absent from the update payload', () => {
+      const result = updateDiningSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        name: 'Renamed Item',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // A partial update must not silently reset minPeople/isPopular/
+        // isAvailable/reviewCount back to their create-time defaults.
+        expect('minPeople' in result.data).toBe(false);
+        expect('isPopular' in result.data).toBe(false);
+        expect('isAvailable' in result.data).toBe(false);
+        expect('reviewCount' in result.data).toBe(false);
+      }
+    });
+
+    it('strips $-operator and dotted keys from a valid update payload', () => {
+      const result = updateDiningSchema.safeParse({
+        _id: '65a1b2c3d4e5f6a7b8c9d0e1',
+        name: 'Renamed Item',
+        $set: { price: 1 },
+        'tags.0': 'hacked',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect('$set' in result.data).toBe(false);
+        expect('tags.0' in result.data).toBe(false);
+      }
     });
   });
 });

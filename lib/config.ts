@@ -84,6 +84,53 @@ export const VALID_TRANSITIONS: Record<
 } as const;
 
 /**
+ * Cabin/Dining/Experience Enum Values — single source of truth for Zod and Mongoose
+ */
+export const CABIN_STATUSES = ['active', 'maintenance', 'inactive'] as const;
+
+export const DINING_TYPES = ['menu', 'experience'] as const;
+
+export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'all-day'] as const;
+
+export const DINING_CATEGORIES = [
+  'regular',
+  'craft-beer',
+  'wine',
+  'spirits',
+  'non-alcoholic',
+] as const;
+
+export const BEVERAGE_CATEGORIES = [
+  'craft-beer',
+  'wine',
+  'spirits',
+  'non-alcoholic',
+] as const;
+
+export const DIETARY_OPTIONS = [
+  'vegetarian',
+  'vegan',
+  'gluten-free',
+  'dairy-free',
+  'keto',
+  'paleo',
+] as const;
+
+export const EXPERIENCE_DIFFICULTIES = [
+  'Easy',
+  'Moderate',
+  'Challenging',
+] as const;
+
+export type CabinStatus = (typeof CABIN_STATUSES)[number];
+export type DiningType = (typeof DINING_TYPES)[number];
+export type MealType = (typeof MEAL_TYPES)[number];
+export type DiningCategory = (typeof DINING_CATEGORIES)[number];
+export type BeverageCategory = (typeof BEVERAGE_CATEGORIES)[number];
+export type DietaryOption = (typeof DIETARY_OPTIONS)[number];
+export type ExperienceDifficulty = (typeof EXPERIENCE_DIFFICULTIES)[number];
+
+/**
  * Loyalty Tier Thresholds
  */
 export const LOYALTY_TIERS = {

@@ -1,3 +1,10 @@
+import {
+  BEVERAGE_CATEGORIES,
+  DIETARY_OPTIONS,
+  DINING_CATEGORIES,
+  DINING_TYPES,
+  MEAL_TYPES,
+} from '@/lib/config';
 import { Schema, model, models } from 'mongoose';
 
 export interface IDining {
@@ -55,12 +62,12 @@ const diningSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ['menu', 'experience'],
+      enum: DINING_TYPES,
     },
     mealType: {
       type: String,
       required: true,
-      enum: ['breakfast', 'lunch', 'dinner', 'all-day'],
+      enum: MEAL_TYPES,
     },
     price: { type: Number, required: true },
     servingTime: {
@@ -72,7 +79,7 @@ const diningSchema = new Schema(
     category: {
       type: String,
       required: true,
-      enum: ['regular', 'craft-beer', 'wine', 'spirits', 'non-alcoholic'],
+      enum: DINING_CATEGORIES,
     },
     subCategory: { type: String },
     image: { type: String, required: true },
@@ -81,14 +88,7 @@ const diningSchema = new Schema(
     allergens: { type: [String], default: [] },
     dietary: {
       type: [String],
-      enum: [
-        'vegetarian',
-        'vegan',
-        'gluten-free',
-        'dairy-free',
-        'keto',
-        'paleo',
-      ],
+      enum: DIETARY_OPTIONS,
       default: [],
     },
     beverages: [
@@ -100,7 +100,7 @@ const diningSchema = new Schema(
         category: {
           type: String,
           required: true,
-          enum: ['craft-beer', 'wine', 'spirits', 'non-alcoholic'],
+          enum: BEVERAGE_CATEGORIES,
         },
       },
     ],

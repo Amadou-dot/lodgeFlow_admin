@@ -1,3 +1,4 @@
+import { CABIN_STATUSES } from '@/lib/config';
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ICabin extends Document {
@@ -53,8 +54,20 @@ const CabinSchema: Schema = new Schema(
       default: 0,
       min: [0, 'Discount must be positive'],
       validate: {
-        validator: function (this: ICabin, value: number) {
-          return value < this.price;
+        // On `.create()`/`.save()`, `this` is the document, so `this.price`
+        // is the persisted price. On `findByIdAndUpdate`, `this` is the
+        // Query instead — the persisted price isn't visible here unless the
+        // update payload also sets `price`. A discount-only update (no
+        // `price` in the payload) can't be checked here; the API routes
+        // validate that case against the stored price before persisting.
+        validator: function (this: unknown, value: number) {
+          const query = this as { getUpdate?: () => Record<string, unknown> };
+          const price =
+            (this as Partial<ICabin>).price ??
+            (query.getUpdate?.()?.$set as Partial<ICabin> | undefined)?.price ??
+            (query.getUpdate?.() as Partial<ICabin> | undefined)?.price;
+          if (price === undefined) return true;
+          return value < price;
         },
         message: 'Discount must be less than the cabin price',
       },
@@ -84,7 +97,7 @@ const CabinSchema: Schema = new Schema(
     ],
     status: {
       type: String,
-      enum: ['active', 'maintenance', 'inactive'],
+      enum: CABIN_STATUSES,
       default: 'active',
     },
     bedrooms: {

@@ -1,3 +1,4 @@
+import { EXPERIENCE_DIFFICULTIES } from '@/lib/config';
 import { Schema, model, models } from 'mongoose';
 
 export interface IExperience {
@@ -38,7 +39,7 @@ const experienceSchema = new Schema(
     difficulty: {
       type: String,
       required: true,
-      enum: ['Easy', 'Moderate', 'Challenging'],
+      enum: EXPERIENCE_DIFFICULTIES,
     },
     category: { type: String, required: true },
     description: { type: String, required: true },

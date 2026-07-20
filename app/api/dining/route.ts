@@ -1,13 +1,16 @@
 import {
   createErrorResponse,
   createSuccessResponse,
+  createValidationErrorResponse,
   escapeRegex,
   HTTP_STATUS,
   requireApiAuth,
-  sanitizeUpdatePayload,
 } from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
+import { createDiningSchema, updateDiningSchema } from '@/lib/validations';
 import { connectDB, Dining } from '@/models';
 import type { DiningQueryFilter, MongoSortOrder } from '@/types/api';
+import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -79,7 +82,10 @@ export async function GET(request: NextRequest) {
 
     return createSuccessResponse(dining);
   } catch (error) {
-    console.error('Error fetching dining:', error);
+    logger.error(
+      'Error fetching dining',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to fetch dining items',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -97,40 +103,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Validate required fields
-    const requiredFields = [
-      'name',
-      'description',
-      'type',
-      'mealType',
-      'price',
-      'servingTime',
-      'maxPeople',
-      'category',
-      'image',
-    ];
-    const missingFields = requiredFields.filter(field => !body[field]);
-
-    if (missingFields.length > 0) {
-      return createErrorResponse(
-        `Missing required fields: ${missingFields.join(', ')}`,
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const validationResult = createDiningSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
     }
 
-    // Validate serving time format
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (
-      !timeRegex.test(body.servingTime.start) ||
-      !timeRegex.test(body.servingTime.end)
-    ) {
-      return createErrorResponse(
-        'Invalid time format. Use HH:MM format.',
-        HTTP_STATUS.BAD_REQUEST
-      );
-    }
-
-    const dining = new Dining(body);
+    const dining = new Dining(validationResult.data);
     await dining.save();
 
     return createSuccessResponse(
@@ -138,8 +116,19 @@ export async function POST(request: NextRequest) {
       'Dining item created successfully',
       HTTP_STATUS.CREATED
     );
-  } catch (error) {
-    console.error('Error creating dining item:', error);
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
+      );
+    }
+
+    logger.error(
+      'Error creating dining item',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to create dining item',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -156,37 +145,18 @@ export async function PUT(request: NextRequest) {
     await connectDB();
 
     const body = await request.json();
-    const { _id, ...updateData } = body;
 
-    if (!_id) {
-      return createErrorResponse(
-        'Dining item ID is required',
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const validationResult = updateDiningSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
     }
 
-    // Validate serving time format if provided
-    if (updateData.servingTime) {
-      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-      if (
-        !timeRegex.test(updateData.servingTime.start) ||
-        !timeRegex.test(updateData.servingTime.end)
-      ) {
-        return createErrorResponse(
-          'Invalid time format. Use HH:MM format.',
-          HTTP_STATUS.BAD_REQUEST
-        );
-      }
-    }
+    const { _id, ...updateData } = validationResult.data;
 
-    const dining = await Dining.findByIdAndUpdate(
-      _id,
-      sanitizeUpdatePayload(updateData),
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const dining = await Dining.findByIdAndUpdate(_id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!dining) {
       return createErrorResponse(
@@ -196,8 +166,19 @@ export async function PUT(request: NextRequest) {
     }
 
     return createSuccessResponse(dining, 'Dining item updated successfully');
-  } catch (error) {
-    console.error('Error updating dining item:', error);
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
+      );
+    }
+
+    logger.error(
+      'Error updating dining item',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to update dining item',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -234,7 +215,10 @@ export async function DELETE(request: NextRequest) {
 
     return createSuccessResponse(null, 'Dining item deleted successfully');
   } catch (error) {
-    console.error('Error deleting dining item:', error);
+    logger.error(
+      'Error deleting dining item',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to delete dining item',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

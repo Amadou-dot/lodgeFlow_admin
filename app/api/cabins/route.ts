@@ -1,12 +1,18 @@
 import {
   createErrorResponse,
   createSuccessResponse,
+  createValidationErrorResponse,
   escapeRegex,
   HTTP_STATUS,
   requireApiAuth,
-  sanitizeUpdatePayload,
 } from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
 import connectDB from '@/lib/mongodb';
+import {
+  createCabinSchema,
+  isDiscountValid,
+  updateCabinSchema,
+} from '@/lib/validations';
 import type { CabinQueryFilter, MongoSortOrder } from '@/types/api';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
@@ -107,7 +113,10 @@ export async function GET(request: NextRequest) {
 
     return createSuccessResponse(cabins);
   } catch (error) {
-    console.error('Error fetching cabins:', error);
+    logger.error(
+      'Error fetching cabins',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to fetch cabins',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -125,20 +134,15 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Validate discount vs price
-    if (body.discount && body.discount >= body.price) {
-      return createErrorResponse(
-        'Discount cannot be greater than or equal to the price',
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const validationResult = createCabinSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
     }
 
-    const cabin = await Cabin.create(body);
+    const cabin = await Cabin.create(validationResult.data);
 
     return createSuccessResponse(cabin, undefined, HTTP_STATUS.CREATED);
   } catch (error: unknown) {
-    console.error('Error creating cabin:', error);
-
     // Handle validation errors
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
@@ -148,6 +152,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    logger.error(
+      'Error creating cabin',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to create cabin',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -164,23 +172,42 @@ export async function PUT(request: NextRequest) {
     await connectDB();
 
     const body = await request.json();
-    const { _id, ...updateData } = body;
 
-    if (!_id) {
-      return createErrorResponse(
-        'Cabin ID is required',
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const validationResult = updateCabinSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
     }
 
-    const cabin = await Cabin.findByIdAndUpdate(
-      _id,
-      sanitizeUpdatePayload(updateData),
-      {
-        new: true,
-        runValidators: true,
+    const { _id, ...updateData } = validationResult.data;
+
+    // An update touching only `discount` or only `price` has no counterpart
+    // in the payload for the schema's refine to check against — fetch the
+    // stored value of whichever field is missing and compare against that.
+    if (
+      (updateData.discount !== undefined) !==
+      (updateData.price !== undefined)
+    ) {
+      const existingCabin = await Cabin.findById(_id);
+      if (!existingCabin) {
+        return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);
       }
-    );
+      const effectiveDiscount = updateData.discount ?? existingCabin.discount;
+      const effectivePrice = updateData.price ?? existingCabin.price;
+      if (!isDiscountValid(effectiveDiscount, effectivePrice)) {
+        return createErrorResponse(
+          'Validation failed',
+          HTTP_STATUS.BAD_REQUEST,
+          {
+            discount: ['Discount cannot be greater than or equal to the price'],
+          }
+        );
+      }
+    }
+
+    const cabin = await Cabin.findByIdAndUpdate(_id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!cabin) {
       return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);
@@ -188,8 +215,6 @@ export async function PUT(request: NextRequest) {
 
     return createSuccessResponse(cabin);
   } catch (error: unknown) {
-    console.error('Error updating cabin:', error);
-
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
         'Validation failed',
@@ -198,6 +223,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    logger.error(
+      'Error updating cabin',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to update cabin',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
@@ -231,7 +260,10 @@ export async function DELETE(request: NextRequest) {
 
     return createSuccessResponse(null, 'Cabin deleted successfully');
   } catch (error) {
-    console.error('Error deleting cabin:', error);
+    logger.error(
+      'Error deleting cabin',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
       'Failed to delete cabin',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

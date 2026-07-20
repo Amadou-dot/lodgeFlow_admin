@@ -1,7 +1,17 @@
-import { escapeRegex, requireApiAuth } from '@/lib/api-utils';
+import {
+  createErrorResponse,
+  createSuccessResponse,
+  createValidationErrorResponse,
+  escapeRegex,
+  HTTP_STATUS,
+  requireApiAuth,
+} from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
 import connectToDatabase from '@/lib/mongodb';
+import { createExperienceSchema } from '@/lib/validations';
 import { Experience } from '@/models/Experience';
-import { NextRequest, NextResponse } from 'next/server';
+import { isMongooseValidationError } from '@/types/errors';
+import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   // Require authentication
@@ -54,14 +64,15 @@ export async function GET(request: NextRequest) {
     }
 
     const experiences = await Experience.find(query).sort(sort);
-    return NextResponse.json({
-      success: true,
-      data: experiences,
-    });
+    return createSuccessResponse(experiences);
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch experiences' },
-      { status: 500 }
+    logger.error(
+      'Error fetching experiences',
+      error instanceof Error ? error : undefined
+    );
+    return createErrorResponse(
+      'Failed to fetch experiences',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
@@ -74,16 +85,32 @@ export async function POST(request: Request) {
   try {
     await connectToDatabase();
     const data = await request.json();
-    const experience = new Experience(data);
+
+    const validationResult = createExperienceSchema.safeParse(data);
+    if (!validationResult.success) {
+      return createValidationErrorResponse(validationResult.error);
+    }
+
+    const experience = new Experience(validationResult.data);
     await experience.save();
-    return NextResponse.json(
-      { success: true, data: experience },
-      { status: 201 }
+
+    return createSuccessResponse(experience, undefined, HTTP_STATUS.CREATED);
+  } catch (error: unknown) {
+    if (isMongooseValidationError(error)) {
+      return createErrorResponse(
+        'Validation failed',
+        HTTP_STATUS.BAD_REQUEST,
+        error.errors
+      );
+    }
+
+    logger.error(
+      'Error creating experience',
+      error instanceof Error ? error : undefined
     );
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to create experience' },
-      { status: 500 }
+    return createErrorResponse(
+      'Failed to create experience',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
