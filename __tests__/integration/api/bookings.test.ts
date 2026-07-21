@@ -369,6 +369,54 @@ describe('Bookings API Routes', () => {
       expect(body.data.extrasPrice).toBe(expectedBreakfastPrice);
       expect(body.data.totalPrice).toBe(800 + expectedBreakfastPrice);
     });
+
+    it('computes pet, parking, early check-in, and late check-out fees from settings, ignoring tampered client amounts', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05', // 4 nights
+          numGuests: 2,
+          extras: {
+            hasPets: true,
+            petFee: 999999,
+            hasParking: true,
+            parkingFee: 999999,
+            hasEarlyCheckIn: true,
+            earlyCheckInFee: 999999,
+            hasLateCheckOut: true,
+            lateCheckOutFee: 999999,
+          },
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      // Default seeded settings: petFee 20/night, parkingFee 10/night
+      // (parking not included), earlyCheckInFee/lateCheckOutFee 50 flat.
+      const expectedPetFee = 20 * 4;
+      const expectedParkingFee = 10 * 4;
+      const expectedEarlyCheckInFee = 50;
+      const expectedLateCheckOutFee = 50;
+      const expectedExtrasPrice =
+        expectedPetFee +
+        expectedParkingFee +
+        expectedEarlyCheckInFee +
+        expectedLateCheckOutFee;
+
+      expect(response.status).toBe(201);
+      expect(body.data.extras.petFee).toBe(expectedPetFee);
+      expect(body.data.extras.parkingFee).toBe(expectedParkingFee);
+      expect(body.data.extras.earlyCheckInFee).toBe(expectedEarlyCheckInFee);
+      expect(body.data.extras.lateCheckOutFee).toBe(expectedLateCheckOutFee);
+      expect(body.data.extrasPrice).toBe(expectedExtrasPrice);
+      expect(body.data.totalPrice).toBe(800 + expectedExtrasPrice);
+    });
   });
 
   describe('PUT /api/bookings', () => {

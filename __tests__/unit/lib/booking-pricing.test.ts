@@ -36,7 +36,7 @@ describe('calculateBookingPricing', () => {
     expect(result.totalPrice).toBe(150 * 4);
   });
 
-  it('ignores a zero/negative discount and uses the full cabin price', () => {
+  it('ignores a zero discount and uses the full cabin price', () => {
     const result = calculateBookingPricing({
       cabin: { price: 200, discount: 0, extraGuestFee: 0 },
       settings: baseSettings,
@@ -46,6 +46,42 @@ describe('calculateBookingPricing', () => {
     });
 
     expect(result.cabinPrice).toBe(200);
+  });
+
+  it('ignores a negative discount and uses the full cabin price', () => {
+    const result = calculateBookingPricing({
+      cabin: { price: 200, discount: -10, extraGuestFee: 0 },
+      settings: baseSettings,
+      checkInDate: new Date('2027-08-01'),
+      checkOutDate: new Date('2027-08-05'),
+      numGuests: 2,
+    });
+
+    expect(result.cabinPrice).toBe(200);
+  });
+
+  it('throws when checkOutDate is not after checkInDate', () => {
+    expect(() =>
+      calculateBookingPricing({
+        cabin: baseCabin,
+        settings: baseSettings,
+        checkInDate: new Date('2027-08-05'),
+        checkOutDate: new Date('2027-08-05'),
+        numGuests: 2,
+      })
+    ).toThrow(/checkOutDate/);
+  });
+
+  it('throws when numGuests is less than 1', () => {
+    expect(() =>
+      calculateBookingPricing({
+        cabin: baseCabin,
+        settings: baseSettings,
+        checkInDate: new Date('2027-08-01'),
+        checkOutDate: new Date('2027-08-05'),
+        numGuests: 0,
+      })
+    ).toThrow(/numGuests/);
   });
 
   it('returns zero extras pricing and totalPrice equal to cabinPrice*nights when no extras are selected', () => {
@@ -147,6 +183,19 @@ describe('calculateBookingPricing', () => {
     });
 
     expect(result.extrasPrice).toBe(30 * 2 * 4);
+  });
+
+  it('charges no extra-guest fee for a single guest even when the cabin has one configured', () => {
+    const result = calculateBookingPricing({
+      cabin: { price: 200, discount: 0, extraGuestFee: 30 },
+      settings: baseSettings,
+      checkInDate: new Date('2027-08-01'),
+      checkOutDate: new Date('2027-08-05'),
+      numGuests: 1,
+      extras: {},
+    });
+
+    expect(result.extrasPrice).toBe(0);
   });
 
   it('sums cabinPrice*nights and all extras into totalPrice', () => {

@@ -67,6 +67,12 @@ export function calculateBookingPricing({
   extras,
 }: BookingPricingInput): BookingPricingResult {
   const numNights = differenceInCalendarDays(checkOutDate, checkInDate);
+  if (numNights < 1) {
+    throw new Error('checkOutDate must be at least one day after checkInDate');
+  }
+  if (numGuests < 1) {
+    throw new Error('numGuests must be at least 1');
+  }
 
   const cabinPrice =
     cabin.discount > 0 ? cabin.price - cabin.discount : cabin.price;
