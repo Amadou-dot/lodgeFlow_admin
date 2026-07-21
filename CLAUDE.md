@@ -231,6 +231,7 @@ const data = validationResult.data;
 - `Experience` — Activities/tours with difficulty, duration, participants
 - `Settings` — Business rules, pricing policies (singleton — DO NOT modify directly)
 - `ProcessedStripeEvent` — Idempotency store for Stripe webhook events (TTL index, 30-day expiry)
+- `CabinBookingLock` — Per-cabin mutex for booking create/update requests, preventing overlap-check TOCTOU races (unique index on `cabin`)
 
 **Important Indexes:**
 - Bookings: Compound indexes on `{ cabin, checkInDate, checkOutDate }`, `{ customer, createdAt }`
@@ -367,6 +368,29 @@ const overlapping = await Booking.findOverlapping(
 if (overlapping.length > 0) {
   // Handle conflict
 }
+```
+
+**`findOverlapping()` alone is not concurrency-safe** — it's a plain read
+with no lock, so two simultaneous requests can both pass the check before
+either write lands. `POST /api/bookings` and `PUT /api/bookings` (in
+`app/api/bookings/route.ts`) guard against this by wrapping the
+check-then-write critical section in `withCabinBookingLock()`
+(`lib/cabin-booking-lock.ts`), an application-level per-cabin mutex backed
+by an atomic upsert against a unique index on `CabinBookingLock.cabin` —
+not a MongoDB transaction, since two transactions inserting *different*
+documents don't produce a write conflict under Mongo's transaction
+semantics. Any new code path that creates or reschedules a booking must
+go through the same lock:
+
+```typescript
+import { withCabinBookingLock } from '@/lib/cabin-booking-lock';
+
+const result = await withCabinBookingLock(cabinId, async () => {
+  const overlapping = await Booking.findOverlapping(cabinId, checkInDate, checkOutDate);
+  if (overlapping.length > 0) return { ok: false as const };
+  const booking = await Booking.create({ ... });
+  return { ok: true as const, booking };
+});
 ```
 
 Settings is the single source of truth for booking business rules (min/max nights, deposit %, etc.). Booking API validation reads from the Settings document at request time.
