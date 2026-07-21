@@ -629,7 +629,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(1400); // cabin price 200 * 7 nights
     });
 
-    it('ignores a client-supplied totalPrice/cabinPrice/extrasPrice/numNights and keeps the existing values', async () => {
+    it('ignores a client-supplied totalPrice/cabinPrice/extrasPrice/numNights/remainingAmount and keeps the existing values', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
         numNights: 3,
@@ -647,6 +647,10 @@ describe('Bookings API Routes', () => {
           cabinPrice: 1,
           extrasPrice: 1,
           totalPrice: 1,
+          // A booking with totalPrice 600 / depositAmount 200 has a true
+          // remainingAmount of 400 — claiming 0 here would make it look
+          // fully paid with no actual payment recorded.
+          remainingAmount: 0,
         },
       });
 
@@ -658,8 +662,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.cabinPrice).toBe(600);
       expect(body.data.extrasPrice).toBe(0);
       expect(body.data.totalPrice).toBe(600);
-      // remainingAmount must not have been recalculated off the tampered price
-      expect(body.data.remainingAmount).toBe(400); // 600 - 200
+      expect(body.data.remainingAmount).toBe(400); // 600 - 200, not the tampered 0
     });
 
     it('recomputes totalPrice and remainingAmount from the cabin price when numGuests changes', async () => {

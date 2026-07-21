@@ -429,6 +429,7 @@ export async function PUT(request: NextRequest) {
     delete updateData.cabinPrice;
     delete updateData.extrasPrice;
     delete updateData.totalPrice;
+    delete updateData.remainingAmount;
 
     // Fetch the existing booking first so auto-timestamping can check prior state
     const existingBooking = await Booking.findById(_id);
