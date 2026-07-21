@@ -4,7 +4,6 @@ import {
   parsePagination,
   requireApiAuth,
 } from '@/lib/api-utils';
-import { differenceInCalendarDays } from 'date-fns';
 import mongoose from 'mongoose';
 import {
   BookingPricingError,
@@ -422,6 +421,14 @@ export async function PUT(request: NextRequest) {
 
     const { _id, ...updateData } = validationResult.data;
 
+    // Never trust client-supplied pricing fields on update — same trust
+    // boundary as POST (see calculateBookingPricing in lib/booking-pricing.ts
+    // and issue #122). These are only ever set below, recomputed from the
+    // cabin/settings documents when a pricing-relevant field actually changes.
+    delete updateData.cabinPrice;
+    delete updateData.extrasPrice;
+    delete updateData.totalPrice;
+
     // Fetch the existing booking first so auto-timestamping can check prior state
     const existingBooking = await Booking.findById(_id);
     if (!existingBooking) {
@@ -538,6 +545,7 @@ export async function PUT(request: NextRequest) {
       const checkIn = updateData.checkInDate || existingBooking.checkInDate;
       const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
       const numGuests = updateData.numGuests ?? existingBooking.numGuests;
+      const extras = updateData.extras ?? existingBooking.extras;
 
       // Fetch cabin for minNights check
       const cabinId = updateData.cabin || existingBooking.cabin;
@@ -548,10 +556,20 @@ export async function PUT(request: NextRequest) {
           { status: 404 }
         );
       }
-      const numNights = Math.ceil(
-        (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
-          (1000 * 60 * 60 * 24)
-      );
+
+      // Recompute every price-derived field from the trusted cabin/settings
+      // documents rather than trusting client-supplied cabinPrice, extrasPrice,
+      // totalPrice, and extras.*Fee values (see issue #122 — same trust
+      // boundary as POST).
+      const pricing = calculateBookingPricing({
+        cabin: cabinForValidation,
+        settings,
+        checkInDate: new Date(checkIn),
+        checkOutDate: new Date(checkOut),
+        numGuests,
+        extras,
+      });
+
       const effectiveMinNights = Math.max(
         settings.minBookingLength,
         cabinForValidation.minNights ?? 0
@@ -561,7 +579,7 @@ export async function PUT(request: NextRequest) {
         cabinForValidation.capacity
       );
 
-      if (numNights < effectiveMinNights) {
+      if (pricing.numNights < effectiveMinNights) {
         return NextResponse.json(
           {
             success: false,
@@ -570,7 +588,7 @@ export async function PUT(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (numNights > settings.maxBookingLength) {
+      if (pricing.numNights > settings.maxBookingLength) {
         return NextResponse.json(
           {
             success: false,
@@ -588,13 +606,18 @@ export async function PUT(request: NextRequest) {
           { status: 400 }
         );
       }
-      const extras = updateData.extras ?? existingBooking.extras;
-      if (extras?.hasPets && !settings.allowPets) {
+      if (pricing.extras.hasPets && !settings.allowPets) {
         return NextResponse.json(
           { success: false, error: 'Pets are not allowed' },
           { status: 400 }
         );
       }
+
+      updateData.numNights = pricing.numNights;
+      updateData.cabinPrice = pricing.cabinPrice;
+      updateData.extrasPrice = pricing.extrasPrice;
+      updateData.totalPrice = pricing.totalPrice;
+      updateData.extras = pricing.extras;
     }
 
     // Only check for date overlaps when dates or cabin actually changed
@@ -634,20 +657,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Manually recalculate fields that pre-save hooks would normally handle,
-    // since findByIdAndUpdate bypasses Mongoose pre-save middleware.
-    // Only recalculate when the relevant fields actually changed to avoid
-    // silent overwrites (e.g. differenceInCalendarDays vs Math.ceil across DST).
-    if (checkInChanged || checkOutChanged) {
-      const effectiveCheckIn =
-        updateData.checkInDate || existingBooking.checkInDate;
-      const effectiveCheckOut =
-        updateData.checkOutDate || existingBooking.checkOutDate;
-      updateData.numNights = differenceInCalendarDays(
-        new Date(effectiveCheckOut),
-        new Date(effectiveCheckIn)
-      );
-    }
+    // numNights/cabinPrice/extrasPrice/totalPrice are already recomputed above
+    // (in the shouldValidateBookingRules block) whenever dates, cabin,
+    // numGuests, or extras change — findByIdAndUpdate bypasses the Mongoose
+    // pre-save hook that would otherwise handle this.
 
     if (
       updateData.totalPrice !== undefined ||
@@ -689,6 +702,17 @@ export async function PUT(request: NextRequest) {
       ...(_clerkWarning ? { _clerkWarning } : {}),
     });
   } catch (error: unknown) {
+    // A same-calendar-day date change can pass the Zod refine (which only
+    // compares raw timestamps) but yield zero nights once
+    // calculateBookingPricing measures calendar days — surface that as a
+    // 400, not a generic server error.
+    if (error instanceof BookingPricingError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
+    }
+
     if (isMongooseValidationError(error)) {
       logger.warn(
         'Mongoose validation fired after Zod passed — possible schema drift (PUT)',

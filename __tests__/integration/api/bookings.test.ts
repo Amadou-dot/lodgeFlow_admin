@@ -626,11 +626,14 @@ describe('Bookings API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(body.data.numNights).toBe(7); // June 1 to June 8
+      expect(body.data.totalPrice).toBe(1400); // cabin price 200 * 7 nights
     });
 
-    it('recalculates remainingAmount when totalPrice changes', async () => {
+    it('ignores a client-supplied totalPrice/cabinPrice/extrasPrice and keeps the existing price', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
+        cabinPrice: 600,
+        extrasPrice: 0,
         totalPrice: 600,
         depositAmount: 200,
       });
@@ -639,7 +642,9 @@ describe('Bookings API Routes', () => {
         method: 'PUT',
         body: {
           _id: booking._id.toString(),
-          totalPrice: 1000,
+          cabinPrice: 1,
+          extrasPrice: 1,
+          totalPrice: 1,
         },
       });
 
@@ -647,7 +652,46 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
-      expect(body.data.remainingAmount).toBe(800); // 1000 - 200
+      expect(body.data.cabinPrice).toBe(600);
+      expect(body.data.extrasPrice).toBe(0);
+      expect(body.data.totalPrice).toBe(600);
+      // remainingAmount must not have been recalculated off the tampered price
+      expect(body.data.remainingAmount).toBe(400); // 600 - 200
+    });
+
+    it('recomputes totalPrice and remainingAmount from the cabin price when numGuests changes', async () => {
+      const cabin = await createTestCabin({
+        price: 200,
+        capacity: 4,
+        extraGuestFee: 20,
+      });
+      const booking = await createTestBooking(cabin._id, {
+        numGuests: 1,
+        cabinPrice: 200,
+        extrasPrice: 0,
+        totalPrice: 600, // 200 * 3 nights
+        depositAmount: 100,
+      });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          numGuests: 2,
+          // A tampered totalPrice sent alongside the legitimate change must
+          // still be ignored in favor of the server-computed value.
+          totalPrice: 1,
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      // extraGuestFee: (2 - 1) * 20 * 3 nights = 60
+      expect(body.data.extrasPrice).toBe(60);
+      expect(body.data.totalPrice).toBe(660); // 600 + 60
+      expect(body.data.remainingAmount).toBe(560); // 660 - 100
     });
   });
 
