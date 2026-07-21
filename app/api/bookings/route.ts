@@ -9,7 +9,11 @@ import {
   BookingPricingError,
   calculateBookingPricing,
 } from '@/lib/booking-pricing';
-import { withCabinBookingLock } from '@/lib/cabin-booking-lock';
+import {
+  CabinBookingLockTimeoutError,
+  withCabinBookingLock,
+  type LockedWriteResult,
+} from '@/lib/cabin-booking-lock';
 import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
@@ -303,7 +307,7 @@ export async function POST(request: NextRequest) {
     // in a per-cabin lock so two concurrent requests can't both pass the
     // check before either write lands (see issue #110 — findOverlapping is
     // a plain read with no lock, so check-then-write alone is not atomic).
-    const lockResult = await withCabinBookingLock(
+    const lockResult = await withCabinBookingLock<LockedWriteResult<IBooking>>(
       validationResult.data.cabin,
       async () => {
         const overlapping = await Booking.findOverlapping(
@@ -312,7 +316,7 @@ export async function POST(request: NextRequest) {
           checkOutDate
         );
         if (overlapping.length > 0) {
-          return { ok: false as const };
+          return { ok: false };
         }
 
         const created = await Booking.create({
@@ -323,7 +327,7 @@ export async function POST(request: NextRequest) {
           totalPrice: pricing.totalPrice,
           extras: pricing.extras,
         });
-        return { ok: true as const, booking: created };
+        return { ok: true, booking: created };
       }
     );
 
@@ -375,6 +379,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
+      );
+    }
+
+    // The cabin's booking lock stayed contended past the acquire budget —
+    // heavy concurrent activity on this cabin, not a server fault. Surface
+    // as a retryable 409 rather than a generic 500.
+    if (error instanceof CabinBookingLockTimeoutError) {
+      logger.warn('Booking lock contention timed out (POST)', {
+        message: error.message,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'This cabin is receiving a lot of booking activity right now — please try again in a moment.',
+        },
+        { status: 409 }
       );
     }
 
@@ -682,7 +703,9 @@ export async function PUT(request: NextRequest) {
       const checkIn = updateData.checkInDate || existingBooking.checkInDate;
       const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
 
-      const lockResult = await withCabinBookingLock(cabinId, async () => {
+      const lockResult = await withCabinBookingLock<
+        LockedWriteResult<IBooking | null>
+      >(cabinId, async () => {
         const overlapping = await Booking.findOverlapping(
           cabinId,
           checkIn,
@@ -690,13 +713,13 @@ export async function PUT(request: NextRequest) {
           new mongoose.Types.ObjectId(_id)
         );
         if (overlapping.length > 0) {
-          return { ok: false as const };
+          return { ok: false };
         }
 
         const updated = await Booking.findByIdAndUpdate(_id, updateData, {
           new: true,
         }).populate('cabin', 'name image capacity price discount');
-        return { ok: true as const, booking: updated };
+        return { ok: true, booking: updated };
       });
 
       if (!lockResult.ok) {
@@ -746,6 +769,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
+      );
+    }
+
+    // The cabin's booking lock stayed contended past the acquire budget —
+    // heavy concurrent activity on this cabin, not a server fault. Surface
+    // as a retryable 409 rather than a generic 500.
+    if (error instanceof CabinBookingLockTimeoutError) {
+      logger.warn('Booking lock contention timed out (PUT)', {
+        message: error.message,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'This cabin is receiving a lot of booking activity right now — please try again in a moment.',
+        },
+        { status: 409 }
       );
     }
 

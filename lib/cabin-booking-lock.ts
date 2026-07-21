@@ -1,17 +1,36 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 
+import { logger } from '@/lib/logger';
 import CabinBookingLock from '@/models/CabinBookingLock';
 
 // How long a lock is held before it's considered stale and can be
 // reclaimed by another request (e.g. the holder crashed mid-request).
 const LOCK_TTL_MS = 10_000;
-// How long to wait, in total, for a currently-held lock to free up
-// before giving up. Legitimate contention (two real concurrent booking
-// requests) resolves in well under a second; this budget only matters
-// when something is stuck.
+// How long to wait, in total, for a currently-held lock to free up before
+// giving up. Kept comfortably above LOCK_TTL_MS: a legitimate holder can
+// validly hold the lock for the full TTL, and a waiter that gives up
+// sooner than that would spuriously fail a request that was never stuck —
+// just queued behind a slow-but-valid critical section.
 const ACQUIRE_RETRY_DELAY_MS = 50;
-const ACQUIRE_MAX_ATTEMPTS = 60; // ~3s worst case
+const ACQUIRE_MAX_ATTEMPTS = 260; // 13s nominal, above the 10s TTL
+
+/**
+ * Thrown when a cabin's lock stays held (by a live or crashed holder)
+ * longer than the acquire budget. Callers should treat this as "the
+ * cabin is under heavy write contention right now" (a 409/retry signal),
+ * not a generic server error.
+ */
+export class CabinBookingLockTimeoutError extends Error {
+  constructor(cabinId: string) {
+    super(`Timed out waiting for booking lock on cabin ${cabinId}`);
+    this.name = 'CabinBookingLockTimeoutError';
+    Object.setPrototypeOf(this, CabinBookingLockTimeoutError.prototype);
+  }
+}
+
+/** Discriminated result of a locked write that may be rejected by an overlap check. */
+export type LockedWriteResult<T> = { ok: true; booking: T } | { ok: false };
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -46,14 +65,16 @@ export async function withCabinBookingLock<T>(
   for (let attempt = 0; attempt < ACQUIRE_MAX_ATTEMPTS; attempt++) {
     const now = new Date();
     try {
-      // Matches only when no lock exists yet for this cabin, or the
-      // existing lock has expired — otherwise this update matches
-      // nothing and Mongo attempts an upsert insert, which collides
-      // with the unique index on `cabin` and throws E11000.
+      // If no lock exists yet for this cabin, or the existing one has
+      // expired, this filter matches and the upsert succeeds (as an
+      // insert or an in-place update, respectively). If an active,
+      // non-expired lock already exists, the filter matches nothing, so
+      // Mongo attempts an upsert *insert* instead — which collides with
+      // the unique index on `cabin` and throws E11000.
       await CabinBookingLock.findOneAndUpdate(
         { cabin: cabinObjectId, expiresAt: { $lt: now } },
         { $set: { token, expiresAt: new Date(now.getTime() + LOCK_TTL_MS) } },
-        { upsert: true }
+        { upsert: true, runValidators: true }
       );
       acquired = true;
       break;
@@ -64,16 +85,36 @@ export async function withCabinBookingLock<T>(
   }
 
   if (!acquired) {
-    throw new Error(
-      `Timed out waiting for booking lock on cabin ${cabinObjectId.toString()}`
-    );
+    throw new CabinBookingLockTimeoutError(cabinObjectId.toString());
+  }
+
+  // Never let a release failure below mask fn()'s real outcome — a lock
+  // document a release couldn't delete simply self-heals via its TTL, but
+  // silently swapping a successful write (or a specific, meaningful
+  // error) for an unrelated release error is far worse than a stray
+  // lock document.
+  let settled: { ok: true; value: T } | { ok: false; error: unknown };
+  try {
+    settled = { ok: true, value: await fn() };
+  } catch (error) {
+    settled = { ok: false, error };
   }
 
   try {
-    return await fn();
-  } finally {
-    // Only release the lock if we still hold it (matches by token) —
-    // if our TTL expired and someone else stole it, don't delete theirs.
     await CabinBookingLock.deleteOne({ cabin: cabinObjectId, token });
+  } catch (releaseError) {
+    logger.warn(
+      'Failed to release cabin booking lock (will self-heal via TTL)',
+      {
+        cabin: cabinObjectId.toString(),
+        error:
+          releaseError instanceof Error
+            ? releaseError.message
+            : String(releaseError),
+      }
+    );
   }
+
+  if (settled.ok) return settled.value;
+  throw settled.error;
 }

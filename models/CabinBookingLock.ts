@@ -28,6 +28,13 @@ const CabinBookingLockSchema: Schema = new Schema(
   }
 );
 
+// Backstop cleanup for orphaned locks (e.g. a cabin that's later deleted
+// while its lock document lingers). The lock's own acquire logic already
+// reclaims expired locks on the next contended request for that cabin;
+// this just guarantees eventual cleanup even if no such request ever
+// comes, mirroring the ProcessedStripeEvent TTL pattern.
+CabinBookingLockSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 const CabinBookingLock =
   mongoose.models.CabinBookingLock ||
   mongoose.model<ICabinBookingLock>('CabinBookingLock', CabinBookingLockSchema);
