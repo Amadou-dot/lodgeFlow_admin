@@ -83,12 +83,15 @@ export function calculateBookingPricing({
   extras,
 }: BookingPricingInput): BookingPricingResult {
   const numNights = differenceInCalendarDays(checkOutDate, checkInDate);
-  if (numNights < 1) {
+  // NaN comparisons are always false, so an invalid date/guest count must be
+  // rejected explicitly — otherwise it silently passes the `< 1` guard below
+  // and propagates as a NaN price instead of a 400.
+  if (!Number.isFinite(numNights) || numNights < 1) {
     throw new BookingPricingError(
       'checkOutDate must be at least one day after checkInDate'
     );
   }
-  if (numGuests < 1) {
+  if (!Number.isFinite(numGuests) || numGuests < 1) {
     throw new BookingPricingError('numGuests must be at least 1');
   }
 

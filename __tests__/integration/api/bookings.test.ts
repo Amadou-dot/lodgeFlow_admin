@@ -693,6 +693,131 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(660); // 600 + 60
       expect(body.data.remainingAmount).toBe(560); // 660 - 100
     });
+
+    it('ignores tampered extras.*Fee values and computes fees from settings', async () => {
+      const cabin = await createTestCabin({ price: 200 });
+      const booking = await createTestBooking(cabin._id, {
+        checkInDate: new Date('2027-06-01'),
+        checkOutDate: new Date('2027-06-05'), // 4 nights
+        numNights: 4,
+        cabinPrice: 800,
+        extrasPrice: 0,
+        totalPrice: 800,
+      });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          extras: {
+            hasBreakfast: true,
+            breakfastPrice: 999999, // tampered — should be ignored
+            hasPets: true,
+            petFee: 999999,
+            hasParking: true,
+            parkingFee: 999999,
+          },
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      // Default seeded settings: breakfastPrice 15/guest/night, petFee
+      // 20/night, parkingFee 10/night (not included).
+      const expectedBreakfastPrice = 15 * 2 * 4; // numGuests(2) * 4 nights
+      const expectedPetFee = 20 * 4;
+      const expectedParkingFee = 10 * 4;
+      const expectedExtrasPrice =
+        expectedBreakfastPrice + expectedPetFee + expectedParkingFee;
+
+      expect(response.status).toBe(200);
+      expect(body.data.extras.breakfastPrice).toBe(expectedBreakfastPrice);
+      expect(body.data.extras.petFee).toBe(expectedPetFee);
+      expect(body.data.extras.parkingFee).toBe(expectedParkingFee);
+      expect(body.data.extrasPrice).toBe(expectedExtrasPrice);
+      expect(body.data.totalPrice).toBe(800 + expectedExtrasPrice);
+    });
+
+    it('recomputes cabinPrice and totalPrice from the new cabin when cabin changes', async () => {
+      const originalCabin = await createTestCabin({ price: 200 });
+      const newCabin = await createTestCabin({
+        name: 'Deluxe Cabin',
+        price: 350,
+      });
+      const booking = await createTestBooking(originalCabin._id, {
+        numNights: 3,
+        cabinPrice: 200,
+        extrasPrice: 0,
+        totalPrice: 600,
+      });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          cabin: newCabin._id.toString(),
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.cabinPrice).toBe(350);
+      expect(body.data.totalPrice).toBe(1050); // 350 * 3 nights
+    });
+
+    it('recomputes remainingAmount from the existing totalPrice when only depositAmount changes', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id, {
+        totalPrice: 600,
+        depositAmount: 0,
+      });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          depositAmount: 300,
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      // totalPrice must be untouched — only depositAmount changed
+      expect(body.data.totalPrice).toBe(600);
+      expect(body.data.remainingAmount).toBe(300); // 600 - 300
+    });
+
+    it('returns a 400 (not a 500) when only checkOutDate changes to the same calendar day as the existing checkInDate', async () => {
+      const cabin = await createTestCabin({ price: 200 });
+      const booking = await createTestBooking(cabin._id, {
+        checkInDate: new Date('2027-08-05T09:00:00.000Z'),
+        checkOutDate: new Date('2027-08-08T09:00:00.000Z'),
+        numNights: 3,
+      });
+
+      // Only checkOutDate is submitted, so updateBookingSchema's refine
+      // (which only compares checkInDate/checkOutDate when both are present)
+      // never fires — calculateBookingPricing must reject this itself.
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          checkOutDate: '2027-08-05T15:00:00.000Z',
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('checkOutDate');
+    });
   });
 
   describe('DELETE /api/bookings', () => {
