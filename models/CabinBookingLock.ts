@@ -30,9 +30,6 @@ const CabinBookingLockSchema: Schema = new Schema(
 
 const CabinBookingLock =
   mongoose.models.CabinBookingLock ||
-  mongoose.model<ICabinBookingLock>(
-    'CabinBookingLock',
-    CabinBookingLockSchema
-  );
+  mongoose.model<ICabinBookingLock>('CabinBookingLock', CabinBookingLockSchema);
 
 export default CabinBookingLock;
