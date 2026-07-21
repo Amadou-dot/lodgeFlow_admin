@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 
 import { GET, POST, PUT, DELETE } from '@/app/api/bookings/route';
+import * as cabinBookingLock from '@/lib/cabin-booking-lock';
 import Booking from '@/models/Booking';
 import Cabin from '@/models/Cabin';
 import Settings from '@/models/Settings';
@@ -441,6 +442,74 @@ describe('Bookings API Routes', () => {
       expect(body.success).toBe(false);
       expect(body.error).toContain('checkOutDate');
     });
+
+    it('under concurrent overlapping requests for the same cabin, exactly one succeeds and the other gets 409', async () => {
+      const cabin = await createTestCabin();
+
+      const buildRequest = () =>
+        createRequest('http://localhost:3000/api/bookings', {
+          method: 'POST',
+          body: {
+            cabin: cabin._id.toString(),
+            customer: 'user_test123',
+            checkInDate: '2027-09-01',
+            checkOutDate: '2027-09-05',
+            numGuests: 2,
+          },
+        });
+
+      const [responseA, responseB] = await Promise.all([
+        POST(buildRequest()),
+        POST(buildRequest()),
+      ]);
+      const [bodyA, bodyB] = await Promise.all([
+        responseA.json(),
+        responseB.json(),
+      ]);
+
+      const statuses = [responseA.status, responseB.status].sort();
+      expect(statuses).toEqual([201, 409]);
+
+      const succeeded = responseA.status === 201 ? bodyA : bodyB;
+      const failed = responseA.status === 409 ? bodyA : bodyB;
+      expect(succeeded.success).toBe(true);
+      expect(failed.success).toBe(false);
+      expect(failed.error).toContain('overlap');
+
+      const allBookings = await Booking.find({ cabin: cabin._id });
+      expect(allBookings).toHaveLength(1);
+    });
+
+    it('returns 409 (not 500) when the cabin booking lock times out', async () => {
+      const cabin = await createTestCabin();
+      const lockSpy = jest
+        .spyOn(cabinBookingLock, 'withCabinBookingLock')
+        .mockRejectedValueOnce(
+          new cabinBookingLock.CabinBookingLockTimeoutError(
+            cabin._id.toString()
+          )
+        );
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-09-01',
+          checkOutDate: '2027-09-05',
+          numGuests: 2,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('try again');
+
+      lockSpy.mockRestore();
+    });
   });
 
   describe('PUT /api/bookings', () => {
@@ -823,6 +892,84 @@ describe('Bookings API Routes', () => {
       expect(response.status).toBe(400);
       expect(body.success).toBe(false);
       expect(body.error).toContain('checkOutDate');
+    });
+
+    it('under concurrent updates that both move bookings into an overlapping range, exactly one succeeds and the other gets 409', async () => {
+      const cabin = await createTestCabin();
+      // Two existing bookings, far apart — no overlap yet.
+      const bookingA = await createTestBooking(cabin._id, {
+        checkInDate: new Date('2027-10-01'),
+        checkOutDate: new Date('2027-10-04'),
+      });
+      const bookingB = await createTestBooking(cabin._id, {
+        checkInDate: new Date('2027-11-01'),
+        checkOutDate: new Date('2027-11-04'),
+      });
+
+      // Both concurrently move into the same overlapping window.
+      const buildRequest = (id: string) =>
+        createRequest('http://localhost:3000/api/bookings', {
+          method: 'PUT',
+          body: {
+            _id: id,
+            checkInDate: '2027-12-01',
+            checkOutDate: '2027-12-05',
+          },
+        });
+
+      const [responseA, responseB] = await Promise.all([
+        PUT(buildRequest(bookingA._id.toString())),
+        PUT(buildRequest(bookingB._id.toString())),
+      ]);
+      const [bodyA, bodyB] = await Promise.all([
+        responseA.json(),
+        responseB.json(),
+      ]);
+
+      const statuses = [responseA.status, responseB.status].sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const succeeded = responseA.status === 200 ? bodyA : bodyB;
+      const failed = responseA.status === 409 ? bodyA : bodyB;
+      expect(succeeded.success).toBe(true);
+      expect(failed.success).toBe(false);
+      expect(failed.error).toContain('overlap');
+
+      const decemberBookings = await Booking.find({
+        cabin: cabin._id,
+        checkInDate: new Date('2027-12-01'),
+      });
+      expect(decemberBookings).toHaveLength(1);
+    });
+
+    it('returns 409 (not 500) when the cabin booking lock times out on a date change', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id);
+      const lockSpy = jest
+        .spyOn(cabinBookingLock, 'withCabinBookingLock')
+        .mockRejectedValueOnce(
+          new cabinBookingLock.CabinBookingLockTimeoutError(
+            cabin._id.toString()
+          )
+        );
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          checkInDate: '2027-12-01',
+          checkOutDate: '2027-12-05',
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('try again');
+
+      lockSpy.mockRestore();
     });
   });
 
