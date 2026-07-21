@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 
 import { GET, POST, PUT, DELETE } from '@/app/api/bookings/route';
+import * as cabinBookingLock from '@/lib/cabin-booking-lock';
 import Booking from '@/models/Booking';
 import Cabin from '@/models/Cabin';
 import Settings from '@/models/Settings';
@@ -478,6 +479,37 @@ describe('Bookings API Routes', () => {
       const allBookings = await Booking.find({ cabin: cabin._id });
       expect(allBookings).toHaveLength(1);
     });
+
+    it('returns 409 (not 500) when the cabin booking lock times out', async () => {
+      const cabin = await createTestCabin();
+      const lockSpy = jest
+        .spyOn(cabinBookingLock, 'withCabinBookingLock')
+        .mockRejectedValueOnce(
+          new cabinBookingLock.CabinBookingLockTimeoutError(
+            cabin._id.toString()
+          )
+        );
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-09-01',
+          checkOutDate: '2027-09-05',
+          numGuests: 2,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('try again');
+
+      lockSpy.mockRestore();
+    });
   });
 
   describe('PUT /api/bookings', () => {
@@ -908,6 +940,36 @@ describe('Bookings API Routes', () => {
         checkInDate: new Date('2027-12-01'),
       });
       expect(decemberBookings).toHaveLength(1);
+    });
+
+    it('returns 409 (not 500) when the cabin booking lock times out on a date change', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id);
+      const lockSpy = jest
+        .spyOn(cabinBookingLock, 'withCabinBookingLock')
+        .mockRejectedValueOnce(
+          new cabinBookingLock.CabinBookingLockTimeoutError(
+            cabin._id.toString()
+          )
+        );
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          checkInDate: '2027-12-01',
+          checkOutDate: '2027-12-05',
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('try again');
+
+      lockSpy.mockRestore();
     });
   });
 

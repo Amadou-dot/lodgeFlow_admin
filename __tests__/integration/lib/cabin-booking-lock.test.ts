@@ -153,4 +153,26 @@ describe('withCabinBookingLock', () => {
     expect(error.name).toBe('CabinBookingLockTimeoutError');
     expect(error.message).toContain(cabinId.toString());
   });
+
+  it('gives up and throws CabinBookingLockTimeoutError once the acquire budget is exhausted', async () => {
+    jest.useFakeTimers({ advanceTimers: true });
+    const permanentCollision = Object.assign(
+      new Error('E11000 duplicate key error'),
+      { code: 11000 }
+    );
+    const acquireSpy = jest
+      .spyOn(CabinBookingLock, 'findOneAndUpdate')
+      .mockRejectedValue(permanentCollision);
+
+    const assertion = expect(
+      withCabinBookingLock(cabinId, async () => 'unreachable')
+    ).rejects.toThrow(CabinBookingLockTimeoutError);
+
+    // Fast-forward through every retry sleep instead of waiting ~13s.
+    await jest.advanceTimersByTimeAsync(20_000);
+    await assertion;
+
+    acquireSpy.mockRestore();
+    jest.useRealTimers();
+  });
 });
