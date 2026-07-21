@@ -84,6 +84,14 @@ export const updateBookingSchema = z
     checkInDate: z.coerce.date().optional(),
     checkOutDate: z.coerce.date().optional(),
     numGuests: z.number().int().min(1).max(50).optional(),
+    // numNights, cabinPrice, extrasPrice, totalPrice, and remainingAmount
+    // (below) are accepted here for schema shape only — the API route
+    // recomputes numNights/cabinPrice/extrasPrice/totalPrice server-side from
+    // the cabin and settings documents whenever a pricing-relevant field
+    // (cabin, dates, numGuests, extras) changes, and remainingAmount from
+    // totalPrice/depositAmount whenever either changes. Client-supplied
+    // values for all of these are ignored outright (see
+    // calculateBookingPricing in lib/booking-pricing.ts and issue #122).
     numNights: z.number().int().min(1).optional(),
     status: bookingStatusSchema.optional(),
     cabinPrice: z.number().min(0).optional(),
