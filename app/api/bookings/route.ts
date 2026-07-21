@@ -6,6 +6,10 @@ import {
 } from '@/lib/api-utils';
 import { differenceInCalendarDays } from 'date-fns';
 import mongoose from 'mongoose';
+import {
+  BookingPricingError,
+  calculateBookingPricing,
+} from '@/lib/booking-pricing';
 import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
@@ -241,9 +245,19 @@ export async function POST(request: NextRequest) {
     const settings = await Settings.getSettings();
     const { checkInDate, checkOutDate, numGuests, extras } =
       validationResult.data;
-    const numNights = Math.ceil(
-      (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+
+    // Recompute every price-derived field from the trusted cabin/settings
+    // documents rather than trusting the client-supplied numNights,
+    // cabinPrice, extrasPrice, and totalPrice (see issue #109).
+    const pricing = calculateBookingPricing({
+      cabin,
+      settings,
+      checkInDate,
+      checkOutDate,
+      numGuests,
+      extras,
+    });
+    const { numNights } = pricing;
     const effectiveMinNights = Math.max(
       settings.minBookingLength,
       cabin.minNights ?? 0
@@ -302,7 +316,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const booking = await Booking.create(validationResult.data);
+    const booking = await Booking.create({
+      ...validationResult.data,
+      numNights: pricing.numNights,
+      cabinPrice: pricing.cabinPrice,
+      extrasPrice: pricing.extrasPrice,
+      totalPrice: pricing.totalPrice,
+      extras: pricing.extras,
+    });
 
     // Populate the response
     const populatedBooking = await Booking.findById(booking._id).populate(
@@ -331,6 +352,17 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: unknown) {
+    // A same-calendar-day booking can pass the Zod refine (which only
+    // compares raw timestamps) but yield zero nights once
+    // calculateBookingPricing measures calendar days — surface that as a
+    // 400, not a generic server error.
+    if (error instanceof BookingPricingError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
+    }
+
     // Handle validation errors
     if (isMongooseValidationError(error)) {
       logger.warn(

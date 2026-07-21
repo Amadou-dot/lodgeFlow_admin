@@ -287,6 +287,160 @@ describe('Bookings API Routes', () => {
       expect(response.status).toBe(400);
       expect(body.error).toContain('Number of guests cannot exceed 2');
     });
+
+    it('ignores client-supplied pricing fields and computes them from the cabin price', async () => {
+      // Cabin is $200/night with no discount; 4-night stay should price at $800.
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05',
+          numGuests: 2,
+          // Tampered pricing fields a malicious client might send.
+          numNights: 999,
+          cabinPrice: 1,
+          extrasPrice: 1,
+          totalPrice: 1,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.numNights).toBe(4);
+      expect(body.data.cabinPrice).toBe(200);
+      expect(body.data.extrasPrice).toBe(0);
+      expect(body.data.totalPrice).toBe(800);
+    });
+
+    it('applies the cabin discount when computing cabinPrice', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 50 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05',
+          numGuests: 2,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.cabinPrice).toBe(150);
+      expect(body.data.totalPrice).toBe(600); // 150 * 4 nights
+    });
+
+    it('computes extras pricing from settings, ignoring a client-supplied extras fee amount', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05', // 4 nights
+          numGuests: 2,
+          extras: {
+            hasBreakfast: true,
+            breakfastPrice: 999999, // tampered — should be ignored
+          },
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      // Default seeded settings.breakfastPrice is 15/guest/night.
+      const expectedBreakfastPrice = 15 * 2 * 4;
+
+      expect(response.status).toBe(201);
+      expect(body.data.extras.breakfastPrice).toBe(expectedBreakfastPrice);
+      expect(body.data.extrasPrice).toBe(expectedBreakfastPrice);
+      expect(body.data.totalPrice).toBe(800 + expectedBreakfastPrice);
+    });
+
+    it('computes pet, parking, early check-in, and late check-out fees from settings, ignoring tampered client amounts', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05', // 4 nights
+          numGuests: 2,
+          extras: {
+            hasPets: true,
+            petFee: 999999,
+            hasParking: true,
+            parkingFee: 999999,
+            hasEarlyCheckIn: true,
+            earlyCheckInFee: 999999,
+            hasLateCheckOut: true,
+            lateCheckOutFee: 999999,
+          },
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      // Default seeded settings: petFee 20/night, parkingFee 10/night
+      // (parking not included), earlyCheckInFee/lateCheckOutFee 50 flat.
+      const expectedPetFee = 20 * 4;
+      const expectedParkingFee = 10 * 4;
+      const expectedEarlyCheckInFee = 50;
+      const expectedLateCheckOutFee = 50;
+      const expectedExtrasPrice =
+        expectedPetFee +
+        expectedParkingFee +
+        expectedEarlyCheckInFee +
+        expectedLateCheckOutFee;
+
+      expect(response.status).toBe(201);
+      expect(body.data.extras.petFee).toBe(expectedPetFee);
+      expect(body.data.extras.parkingFee).toBe(expectedParkingFee);
+      expect(body.data.extras.earlyCheckInFee).toBe(expectedEarlyCheckInFee);
+      expect(body.data.extras.lateCheckOutFee).toBe(expectedLateCheckOutFee);
+      expect(body.data.extrasPrice).toBe(expectedExtrasPrice);
+      expect(body.data.totalPrice).toBe(800 + expectedExtrasPrice);
+    });
+
+    it('returns a 400 (not a 500) for a same-calendar-day stay that only differs by time of day', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      // Passes the Zod refine (checkOutDate > checkInDate as raw
+      // timestamps) but is zero nights once measured in calendar days.
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-05T09:00:00.000Z',
+          checkOutDate: '2027-08-05T15:00:00.000Z',
+          numGuests: 2,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('checkOutDate');
+    });
   });
 
   describe('PUT /api/bookings', () => {
