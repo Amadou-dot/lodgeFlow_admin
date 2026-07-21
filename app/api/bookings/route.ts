@@ -9,6 +9,7 @@ import {
   BookingPricingError,
   calculateBookingPricing,
 } from '@/lib/booking-pricing';
+import { withCabinBookingLock } from '@/lib/cabin-booking-lock';
 import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
@@ -297,14 +298,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prevent double-bookings: reject if the cabin is already booked
-    // for an overlapping date range
-    const overlapping = await Booking.findOverlapping(
+    // Prevent double-bookings: reject if the cabin is already booked for an
+    // overlapping date range. The overlap check and the create are wrapped
+    // in a per-cabin lock so two concurrent requests can't both pass the
+    // check before either write lands (see issue #110 — findOverlapping is
+    // a plain read with no lock, so check-then-write alone is not atomic).
+    const lockResult = await withCabinBookingLock(
       validationResult.data.cabin,
-      checkInDate,
-      checkOutDate
+      async () => {
+        const overlapping = await Booking.findOverlapping(
+          validationResult.data.cabin,
+          checkInDate,
+          checkOutDate
+        );
+        if (overlapping.length > 0) {
+          return { ok: false as const };
+        }
+
+        const created = await Booking.create({
+          ...validationResult.data,
+          numNights: pricing.numNights,
+          cabinPrice: pricing.cabinPrice,
+          extrasPrice: pricing.extrasPrice,
+          totalPrice: pricing.totalPrice,
+          extras: pricing.extras,
+        });
+        return { ok: true as const, booking: created };
+      }
     );
-    if (overlapping.length > 0) {
+
+    if (!lockResult.ok) {
       return NextResponse.json(
         {
           success: false,
@@ -315,14 +338,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const booking = await Booking.create({
-      ...validationResult.data,
-      numNights: pricing.numNights,
-      cabinPrice: pricing.cabinPrice,
-      extrasPrice: pricing.extrasPrice,
-      totalPrice: pricing.totalPrice,
-      extras: pricing.extras,
-    });
+    const booking = lockResult.booking;
 
     // Populate the response
     const populatedBooking = await Booking.findById(booking._id).populate(

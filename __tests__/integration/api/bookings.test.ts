@@ -441,6 +441,43 @@ describe('Bookings API Routes', () => {
       expect(body.success).toBe(false);
       expect(body.error).toContain('checkOutDate');
     });
+
+    it('under concurrent overlapping requests for the same cabin, exactly one succeeds and the other gets 409', async () => {
+      const cabin = await createTestCabin();
+
+      const buildRequest = () =>
+        createRequest('http://localhost:3000/api/bookings', {
+          method: 'POST',
+          body: {
+            cabin: cabin._id.toString(),
+            customer: 'user_test123',
+            checkInDate: '2027-09-01',
+            checkOutDate: '2027-09-05',
+            numGuests: 2,
+          },
+        });
+
+      const [responseA, responseB] = await Promise.all([
+        POST(buildRequest()),
+        POST(buildRequest()),
+      ]);
+      const [bodyA, bodyB] = await Promise.all([
+        responseA.json(),
+        responseB.json(),
+      ]);
+
+      const statuses = [responseA.status, responseB.status].sort();
+      expect(statuses).toEqual([201, 409]);
+
+      const succeeded = responseA.status === 201 ? bodyA : bodyB;
+      const failed = responseA.status === 409 ? bodyA : bodyB;
+      expect(succeeded.success).toBe(true);
+      expect(failed.success).toBe(false);
+      expect(failed.error).toContain('overlap');
+
+      const allBookings = await Booking.find({ cabin: cabin._id });
+      expect(allBookings).toHaveLength(1);
+    });
   });
 
   describe('PUT /api/bookings', () => {
