@@ -46,9 +46,10 @@ export const createBookingSchema = z
     checkInDate: z.coerce.date(),
     checkOutDate: z.coerce.date(),
     numGuests: z.number().int().min(1, 'At least 1 guest required').max(50),
-    // numNights, cabinPrice, and totalPrice are optional here because the API
-    // route calculates them server-side. Mongoose requires them, so they must
-    // be set before save — but callers don't need to provide them up front.
+    // numNights, cabinPrice, extrasPrice, and totalPrice are optional here
+    // because the API route recomputes them server-side from the cabin and
+    // settings documents (see calculateBookingPricing in lib/booking-pricing.ts)
+    // — any client-supplied values for these fields are ignored on create.
     numNights: z.number().int().min(1).optional(),
     status: bookingStatusSchema.optional().default('unconfirmed'),
     cabinPrice: z.number().min(0).optional(),

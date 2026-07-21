@@ -287,6 +287,88 @@ describe('Bookings API Routes', () => {
       expect(response.status).toBe(400);
       expect(body.error).toContain('Number of guests cannot exceed 2');
     });
+
+    it('ignores client-supplied pricing fields and computes them from the cabin price', async () => {
+      // Cabin is $200/night with no discount; 4-night stay should price at $800.
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05',
+          numGuests: 2,
+          // Tampered pricing fields a malicious client might send.
+          numNights: 999,
+          cabinPrice: 1,
+          extrasPrice: 1,
+          totalPrice: 1,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.numNights).toBe(4);
+      expect(body.data.cabinPrice).toBe(200);
+      expect(body.data.extrasPrice).toBe(0);
+      expect(body.data.totalPrice).toBe(800);
+    });
+
+    it('applies the cabin discount when computing cabinPrice', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 50 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05',
+          numGuests: 2,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.cabinPrice).toBe(150);
+      expect(body.data.totalPrice).toBe(600); // 150 * 4 nights
+    });
+
+    it('computes extras pricing from settings, ignoring a client-supplied extras fee amount', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05', // 4 nights
+          numGuests: 2,
+          extras: {
+            hasBreakfast: true,
+            breakfastPrice: 999999, // tampered — should be ignored
+          },
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      // Default seeded settings.breakfastPrice is 15/guest/night.
+      const expectedBreakfastPrice = 15 * 2 * 4;
+
+      expect(response.status).toBe(201);
+      expect(body.data.extras.breakfastPrice).toBe(expectedBreakfastPrice);
+      expect(body.data.extrasPrice).toBe(expectedBreakfastPrice);
+      expect(body.data.totalPrice).toBe(800 + expectedBreakfastPrice);
+    });
   });
 
   describe('PUT /api/bookings', () => {

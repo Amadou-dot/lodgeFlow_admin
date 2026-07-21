@@ -6,6 +6,7 @@ import {
 } from '@/lib/api-utils';
 import { differenceInCalendarDays } from 'date-fns';
 import mongoose from 'mongoose';
+import { calculateBookingPricing } from '@/lib/booking-pricing';
 import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
@@ -241,9 +242,19 @@ export async function POST(request: NextRequest) {
     const settings = await Settings.getSettings();
     const { checkInDate, checkOutDate, numGuests, extras } =
       validationResult.data;
-    const numNights = Math.ceil(
-      (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+
+    // Recompute every price-derived field from the trusted cabin/settings
+    // documents rather than trusting the client-supplied numNights,
+    // cabinPrice, extrasPrice, and totalPrice (see issue #109).
+    const pricing = calculateBookingPricing({
+      cabin,
+      settings,
+      checkInDate,
+      checkOutDate,
+      numGuests,
+      extras,
+    });
+    const { numNights } = pricing;
     const effectiveMinNights = Math.max(
       settings.minBookingLength,
       cabin.minNights ?? 0
@@ -302,7 +313,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const booking = await Booking.create(validationResult.data);
+    const booking = await Booking.create({
+      ...validationResult.data,
+      numNights: pricing.numNights,
+      cabinPrice: pricing.cabinPrice,
+      extrasPrice: pricing.extrasPrice,
+      totalPrice: pricing.totalPrice,
+      extras: pricing.extras,
+    });
 
     // Populate the response
     const populatedBooking = await Booking.findById(booking._id).populate(
