@@ -1,5 +1,21 @@
 import { differenceInCalendarDays } from 'date-fns';
 
+/**
+ * Thrown when calculateBookingPricing() is given inputs that can't yield a
+ * sane price (e.g. a non-positive stay length). Callers should catch this
+ * distinctly and surface it as a 400 rather than a generic server error —
+ * it signals bad input, not a server fault.
+ */
+export class BookingPricingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BookingPricingError';
+    // Restore the prototype chain — TS compiles `extends Error` down to
+    // ES5 (tsconfig `target`), which otherwise breaks `instanceof` checks.
+    Object.setPrototypeOf(this, BookingPricingError.prototype);
+  }
+}
+
 export interface BookingPricingCabin {
   price: number;
   discount: number;
@@ -68,10 +84,12 @@ export function calculateBookingPricing({
 }: BookingPricingInput): BookingPricingResult {
   const numNights = differenceInCalendarDays(checkOutDate, checkInDate);
   if (numNights < 1) {
-    throw new Error('checkOutDate must be at least one day after checkInDate');
+    throw new BookingPricingError(
+      'checkOutDate must be at least one day after checkInDate'
+    );
   }
   if (numGuests < 1) {
-    throw new Error('numGuests must be at least 1');
+    throw new BookingPricingError('numGuests must be at least 1');
   }
 
   const cabinPrice =

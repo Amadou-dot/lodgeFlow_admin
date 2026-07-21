@@ -1,4 +1,7 @@
-import { calculateBookingPricing } from '@/lib/booking-pricing';
+import {
+  BookingPricingError,
+  calculateBookingPricing,
+} from '@/lib/booking-pricing';
 
 const baseCabin = { price: 200, discount: 0, extraGuestFee: 0 };
 const baseSettings = {
@@ -60,7 +63,7 @@ describe('calculateBookingPricing', () => {
     expect(result.cabinPrice).toBe(200);
   });
 
-  it('throws when checkOutDate is not after checkInDate', () => {
+  it('throws a BookingPricingError when checkOutDate is not after checkInDate', () => {
     expect(() =>
       calculateBookingPricing({
         cabin: baseCabin,
@@ -69,10 +72,24 @@ describe('calculateBookingPricing', () => {
         checkOutDate: new Date('2027-08-05'),
         numGuests: 2,
       })
-    ).toThrow(/checkOutDate/);
+    ).toThrow(BookingPricingError);
   });
 
-  it('throws when numGuests is less than 1', () => {
+  it('throws a BookingPricingError for a same-calendar-day stay even when the raw timestamps differ', () => {
+    // checkOutDate is later in the day but on the same calendar date —
+    // differenceInCalendarDays yields 0 nights.
+    expect(() =>
+      calculateBookingPricing({
+        cabin: baseCabin,
+        settings: baseSettings,
+        checkInDate: new Date('2027-08-05T09:00:00Z'),
+        checkOutDate: new Date('2027-08-05T15:00:00Z'),
+        numGuests: 2,
+      })
+    ).toThrow(BookingPricingError);
+  });
+
+  it('throws a BookingPricingError when numGuests is less than 1', () => {
     expect(() =>
       calculateBookingPricing({
         cabin: baseCabin,
@@ -81,7 +98,7 @@ describe('calculateBookingPricing', () => {
         checkOutDate: new Date('2027-08-05'),
         numGuests: 0,
       })
-    ).toThrow(/numGuests/);
+    ).toThrow(BookingPricingError);
   });
 
   it('returns zero extras pricing and totalPrice equal to cabinPrice*nights when no extras are selected', () => {

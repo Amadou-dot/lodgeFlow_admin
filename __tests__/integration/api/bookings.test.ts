@@ -417,6 +417,30 @@ describe('Bookings API Routes', () => {
       expect(body.data.extrasPrice).toBe(expectedExtrasPrice);
       expect(body.data.totalPrice).toBe(800 + expectedExtrasPrice);
     });
+
+    it('returns a 400 (not a 500) for a same-calendar-day stay that only differs by time of day', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      // Passes the Zod refine (checkOutDate > checkInDate as raw
+      // timestamps) but is zero nights once measured in calendar days.
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-05T09:00:00.000Z',
+          checkOutDate: '2027-08-05T15:00:00.000Z',
+          numGuests: 2,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain('checkOutDate');
+    });
   });
 
   describe('PUT /api/bookings', () => {
