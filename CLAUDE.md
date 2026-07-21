@@ -29,6 +29,7 @@ pnpm start            # Start production server
 pnpm lint             # Run ESLint with auto-fix
 pnpm format           # Format all files with Prettier
 pnpm format:check     # Check formatting without changes
+pnpm format:fix       # Format only files that differ from Prettier's output
 pnpm ci:check         # Run all checks (format, lint, test)
 pnpm check:types      # TypeScript type checking via script
 pnpm pre-commit       # lint-staged (runs via Husky on commit)
@@ -144,8 +145,10 @@ lib/                    # Core libraries & configuration
   ├── clerk-users.ts    # Clerk API utilities
   ├── logger.ts         # Structured logging (suppressed in test env)
   ├── rate-limit.ts     # In-memory rate limiter for mutation/email endpoints
+  ├── booking-pricing.ts # Server-side pricing calculator (see Booking Pricing below)
   ├── validations/      # Zod schemas per domain (booking, cabin, customer, etc.)
   └── data/seed-data.ts # Default seed payloads (settings, etc.)
+config/                 # Site-wide constants (fonts.ts, site.ts) — not lib/config.ts
 proxy.ts                # Clerk middleware (Next.js 16 — auth gate for all routes)
 ```
 
@@ -206,9 +209,9 @@ const user = await getClerkUser(clerkUserId);
 
 Schemas live in `lib/validations/` and share enum constants from `lib/config.ts` (`BOOKING_STATUSES`, `PAYMENT_METHODS`, `REFUND_STATUSES`, `VALID_TRANSITIONS`).
 
-**Currently wired in API routes:** bookings (create/update/patch), customers (create), settings (PUT).
+**Currently wired in API routes:** bookings (create/update/patch), cabins (create/update), dining (create/update), experiences (create/update), customers (create), settings (PUT).
 
-**Schemas exist but not yet wired to routes:** cabin, dining, experience (covered by `__tests__/validations/`).
+**Schemas exist but not yet wired to a route:** `updateCustomerSchema` (`lib/validations/customer.ts`) — customer updates go through Clerk helper functions (`updateCompleteCustomer`) instead. Delete/bulk endpoints (e.g. `app/api/cabins/bulk`) also use manual validation rather than Zod.
 
 **Pattern:**
 ```typescript
@@ -230,7 +233,7 @@ const data = validationResult.data;
 - `Dining` — Restaurant items with categories, pricing, images
 - `Experience` — Activities/tours with difficulty, duration, participants
 - `Settings` — Business rules, pricing policies (singleton — DO NOT modify directly)
-- `ProcessedStripeEvent` — Idempotency store for Stripe webhook events (TTL index, 30-day expiry)
+- `ProcessedStripeEvent` — Idempotency store for Stripe webhook events (TTL index, 30-day expiry). Not yet exported from `models/index.ts` or referenced anywhere — `proxy.ts` allow-lists `/api/webhooks/*` as a public route, but no `app/api/webhooks/` handler exists yet. Wire this model in when the Stripe webhook route is built.
 
 **Important Indexes:**
 - Bookings: Compound indexes on `{ cabin, checkInDate, checkOutDate }`, `{ customer, createdAt }`
@@ -249,7 +252,7 @@ const data = validationResult.data;
 - `DB_CONFIG` — Connection pool, timeouts
 - `CURRENCY` — Default currency settings
 - `LOYALTY_TIERS` — Customer tier thresholds
-- `BOOKING_STATUSES`, `REFUND_STATUSES`, `PAYMENT_METHODS` — Single source of truth for TypeScript, Zod, and Mongoose
+- `BOOKING_STATUSES`, `REFUND_STATUSES`, `PAYMENT_METHODS`, `CABIN_STATUSES`, `DINING_TYPES`, `MEAL_TYPES`, `DINING_CATEGORIES`, `BEVERAGE_CATEGORIES`, `DIETARY_OPTIONS`, `EXPERIENCE_DIFFICULTIES` — Single source of truth for TypeScript, Zod, and Mongoose
 
 **API Utilities** (`lib/api-utils.ts`):
 - `API_CONFIG` — Pagination defaults (DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
@@ -257,13 +260,15 @@ const data = validationResult.data;
 - `createSuccessResponse()` / `createErrorResponse()` — Standardized responses
 - `createValidationErrorResponse()` / `formatZodErrors()` — Zod error formatting
 - `createRateLimitResponse()` — 429 responses with `Retry-After` header
-- `parsePagination()` / `buildPaginationMeta()` — Pagination helpers
-- `sanitizeUpdatePayload()` — Strip disallowed fields from PATCH/PUT bodies
+- `parsePagination()` / `buildPaginationMeta()` / `createPaginatedResponse()` — Pagination helpers
+- `sanitizeUpdatePayload()` — Strip Mongo operator keys (`$...`), dotted keys, `_id`, `__v` from PATCH/PUT bodies (not a pricing guard — see "Booking Pricing Is Always Server-Computed" below)
+- `escapeRegex()` — Escape user input before building Mongo regex queries (prevents regex injection)
+- `HTTP_STATUS` — Named status code constants
 
 **Rate Limiting** (`lib/rate-limit.ts`):
 - In-memory limiter suitable for single-instance / dev deployments
 - Preset configs: `MUTATION`, `EMAIL`, `CUSTOMER_CREATE`, `BOOKING_CREATE`, `AUTH`
-- Applied on email send and customer-create endpoints; use `checkRateLimit()` + `createRateLimitKey()` for new sensitive routes
+- Applied on email send (`app/api/send/confirm`, `app/api/send/welcome`) and customer-create (`app/api/customers` POST); use `checkRateLimit()` + `createRateLimitKey()` for new sensitive routes. Note: the `BOOKING_CREATE` preset exists but is not yet wired into `app/api/bookings` — apply it there if booking creation needs rate limiting.
 
 **Logging** (`lib/logger.ts`):
 - Use `logger.info/warn/error/debug()` instead of raw `console.*` in server code
@@ -371,11 +376,27 @@ if (overlapping.length > 0) {
 
 Settings is the single source of truth for booking business rules (min/max nights, deposit %, etc.). Booking API validation reads from the Settings document at request time.
 
+### Booking Pricing Is Always Server-Computed
+Pricing fields are never trusted from the client. `lib/booking-pricing.ts` exports
+`calculateBookingPricing({ cabin, settings, checkInDate, checkOutDate, numGuests, extras })`,
+which derives `numNights`, `cabinPrice`, each `extras.*Fee`, `extrasPrice`, and `totalPrice`
+from the `Cabin` and `Settings` documents — never from the request body. It throws
+`BookingPricingError` (caught and returned as HTTP 400) for invalid night counts or guest counts.
+
+- `POST /api/bookings` calls `calculateBookingPricing()` and overwrites the validated body's
+  pricing fields before `Booking.create()`.
+- `PUT /api/bookings` explicitly deletes any client-supplied `numNights`, `cabinPrice`,
+  `extrasPrice`, `totalPrice`, and `remainingAmount`, then recomputes them via
+  `calculateBookingPricing()` whenever a pricing-relevant field (`cabin`, `checkInDate`,
+  `checkOutDate`, `numGuests`, `extras`) changed.
+- The Zod schemas in `lib/validations/booking.ts` still type these fields for compatibility, but
+  they are always ignored/recomputed at the route layer — don't rely on client-submitted values.
+
 ### Clerk Rate Limiting
 API has concurrent call limits. Clerk user batch fetching uses `CLERK_API_CONCURRENT_LIMIT` env var (defaults to 3) in `lib/clerk-users.ts`.
 
 ### Environment Variables Required
-See `.env.example` for the full list. Minimum for local development:
+No `.env.example` is checked into the repo (`.env*` is gitignored) — set these directly in `.env.local`. Minimum for local development:
 ```bash
 MONGODB_URI=mongodb+srv://...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
@@ -514,4 +535,3 @@ __tests__/
 - `docs/issues_template.md` — **Required reading before creating issues** (bug / gap / feature skeletons)
 - `docs/pull_requests_template.md` — **Required reading before opening PRs** (summary, test plan, conventions)
 - `__tests__/API_TESTING.md` — API test coverage notes
-- `.env.example` — All environment variables with descriptions
