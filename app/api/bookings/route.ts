@@ -425,6 +425,7 @@ export async function PUT(request: NextRequest) {
     // boundary as POST (see calculateBookingPricing in lib/booking-pricing.ts
     // and issue #122). These are only ever set below, recomputed from the
     // cabin/settings documents when a pricing-relevant field actually changes.
+    delete updateData.numNights;
     delete updateData.cabinPrice;
     delete updateData.extrasPrice;
     delete updateData.totalPrice;

@@ -629,9 +629,10 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(1400); // cabin price 200 * 7 nights
     });
 
-    it('ignores a client-supplied totalPrice/cabinPrice/extrasPrice and keeps the existing price', async () => {
+    it('ignores a client-supplied totalPrice/cabinPrice/extrasPrice/numNights and keeps the existing values', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
+        numNights: 3,
         cabinPrice: 600,
         extrasPrice: 0,
         totalPrice: 600,
@@ -642,6 +643,7 @@ describe('Bookings API Routes', () => {
         method: 'PUT',
         body: {
           _id: booking._id.toString(),
+          numNights: 999,
           cabinPrice: 1,
           extrasPrice: 1,
           totalPrice: 1,
@@ -652,6 +654,7 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
+      expect(body.data.numNights).toBe(3);
       expect(body.data.cabinPrice).toBe(600);
       expect(body.data.extrasPrice).toBe(0);
       expect(body.data.totalPrice).toBe(600);

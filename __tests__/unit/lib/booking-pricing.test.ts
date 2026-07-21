@@ -101,6 +101,32 @@ describe('calculateBookingPricing', () => {
     ).toThrow(BookingPricingError);
   });
 
+  it('throws a BookingPricingError instead of returning NaN pricing for an invalid date', () => {
+    // NaN comparisons are always false, so `numNights < 1` alone would not
+    // catch this — Number.isFinite() must reject it explicitly.
+    expect(() =>
+      calculateBookingPricing({
+        cabin: baseCabin,
+        settings: baseSettings,
+        checkInDate: new Date('invalid'),
+        checkOutDate: new Date('2027-08-05'),
+        numGuests: 2,
+      })
+    ).toThrow(BookingPricingError);
+  });
+
+  it('throws a BookingPricingError instead of returning NaN pricing for a NaN numGuests', () => {
+    expect(() =>
+      calculateBookingPricing({
+        cabin: baseCabin,
+        settings: baseSettings,
+        checkInDate: new Date('2027-08-01'),
+        checkOutDate: new Date('2027-08-05'),
+        numGuests: NaN,
+      })
+    ).toThrow(BookingPricingError);
+  });
+
   it('returns zero extras pricing and totalPrice equal to cabinPrice*nights when no extras are selected', () => {
     const result = calculateBookingPricing({
       cabin: baseCabin,
