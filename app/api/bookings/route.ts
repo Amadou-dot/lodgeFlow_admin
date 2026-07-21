@@ -650,30 +650,8 @@ export async function PUT(request: NextRequest) {
       updateData.checkOutDate &&
       new Date(updateData.checkOutDate).getTime() !==
         existingBooking.checkOutDate.getTime();
-
-    if (cabinChanged || checkInChanged || checkOutChanged) {
-      const cabinId = updateData.cabin || existingBooking.cabin;
-      const checkIn = updateData.checkInDate || existingBooking.checkInDate;
-      const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
-
-      const overlapping = await Booking.findOverlapping(
-        cabinId,
-        checkIn,
-        checkOut,
-        new mongoose.Types.ObjectId(_id)
-      );
-
-      if (overlapping.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              'The selected dates overlap with an existing booking for this cabin',
-          },
-          { status: 409 }
-        );
-      }
-    }
+    const shouldCheckOverlap =
+      cabinChanged || checkInChanged || checkOutChanged;
 
     // numNights/cabinPrice/extrasPrice/totalPrice are already recomputed above
     // (in the shouldValidateBookingRules block) whenever dates, cabin,
@@ -694,9 +672,49 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const booking = await Booking.findByIdAndUpdate(_id, updateData, {
-      new: true,
-    }).populate('cabin', 'name image capacity price discount');
+    // When dates/cabin change, the overlap check and the write that acts
+    // on it are wrapped in the same per-cabin lock used by POST (see
+    // issue #110) so two concurrent updates can't both pass the check
+    // before either write lands.
+    let booking;
+    if (shouldCheckOverlap) {
+      const cabinId = updateData.cabin || existingBooking.cabin;
+      const checkIn = updateData.checkInDate || existingBooking.checkInDate;
+      const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
+
+      const lockResult = await withCabinBookingLock(cabinId, async () => {
+        const overlapping = await Booking.findOverlapping(
+          cabinId,
+          checkIn,
+          checkOut,
+          new mongoose.Types.ObjectId(_id)
+        );
+        if (overlapping.length > 0) {
+          return { ok: false as const };
+        }
+
+        const updated = await Booking.findByIdAndUpdate(_id, updateData, {
+          new: true,
+        }).populate('cabin', 'name image capacity price discount');
+        return { ok: true as const, booking: updated };
+      });
+
+      if (!lockResult.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'The selected dates overlap with an existing booking for this cabin',
+          },
+          { status: 409 }
+        );
+      }
+      booking = lockResult.booking;
+    } else {
+      booking = await Booking.findByIdAndUpdate(_id, updateData, {
+        new: true,
+      }).populate('cabin', 'name image capacity price discount');
+    }
 
     if (!booking) {
       return NextResponse.json(

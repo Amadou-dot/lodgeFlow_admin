@@ -861,6 +861,54 @@ describe('Bookings API Routes', () => {
       expect(body.success).toBe(false);
       expect(body.error).toContain('checkOutDate');
     });
+
+    it('under concurrent updates that both move bookings into an overlapping range, exactly one succeeds and the other gets 409', async () => {
+      const cabin = await createTestCabin();
+      // Two existing bookings, far apart — no overlap yet.
+      const bookingA = await createTestBooking(cabin._id, {
+        checkInDate: new Date('2027-10-01'),
+        checkOutDate: new Date('2027-10-04'),
+      });
+      const bookingB = await createTestBooking(cabin._id, {
+        checkInDate: new Date('2027-11-01'),
+        checkOutDate: new Date('2027-11-04'),
+      });
+
+      // Both concurrently move into the same overlapping window.
+      const buildRequest = (id: string) =>
+        createRequest('http://localhost:3000/api/bookings', {
+          method: 'PUT',
+          body: {
+            _id: id,
+            checkInDate: '2027-12-01',
+            checkOutDate: '2027-12-05',
+          },
+        });
+
+      const [responseA, responseB] = await Promise.all([
+        PUT(buildRequest(bookingA._id.toString())),
+        PUT(buildRequest(bookingB._id.toString())),
+      ]);
+      const [bodyA, bodyB] = await Promise.all([
+        responseA.json(),
+        responseB.json(),
+      ]);
+
+      const statuses = [responseA.status, responseB.status].sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const succeeded = responseA.status === 200 ? bodyA : bodyB;
+      const failed = responseA.status === 409 ? bodyA : bodyB;
+      expect(succeeded.success).toBe(true);
+      expect(failed.success).toBe(false);
+      expect(failed.error).toContain('overlap');
+
+      const decemberBookings = await Booking.find({
+        cabin: cabin._id,
+        checkInDate: new Date('2027-12-01'),
+      });
+      expect(decemberBookings).toHaveLength(1);
+    });
   });
 
   describe('DELETE /api/bookings', () => {
