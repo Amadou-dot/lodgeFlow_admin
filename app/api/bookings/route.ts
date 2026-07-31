@@ -9,6 +9,11 @@ import {
   BookingPricingError,
   calculateBookingPricing,
 } from '@/lib/booking-pricing';
+import {
+  CabinBookingLockTimeoutError,
+  withCabinBookingLock,
+  type LockedWriteResult,
+} from '@/lib/cabin-booking-lock';
 import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
@@ -297,14 +302,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prevent double-bookings: reject if the cabin is already booked
-    // for an overlapping date range
-    const overlapping = await Booking.findOverlapping(
+    // Prevent double-bookings: reject if the cabin is already booked for an
+    // overlapping date range. The overlap check and the create are wrapped
+    // in a per-cabin lock so two concurrent requests can't both pass the
+    // check before either write lands (see issue #110 — findOverlapping is
+    // a plain read with no lock, so check-then-write alone is not atomic).
+    const lockResult = await withCabinBookingLock<LockedWriteResult<IBooking>>(
       validationResult.data.cabin,
-      checkInDate,
-      checkOutDate
+      async () => {
+        const overlapping = await Booking.findOverlapping(
+          validationResult.data.cabin,
+          checkInDate,
+          checkOutDate
+        );
+        if (overlapping.length > 0) {
+          return { ok: false };
+        }
+
+        const created = await Booking.create({
+          ...validationResult.data,
+          numNights: pricing.numNights,
+          cabinPrice: pricing.cabinPrice,
+          extrasPrice: pricing.extrasPrice,
+          totalPrice: pricing.totalPrice,
+          extras: pricing.extras,
+        });
+        return { ok: true, booking: created };
+      }
     );
-    if (overlapping.length > 0) {
+
+    if (!lockResult.ok) {
       return NextResponse.json(
         {
           success: false,
@@ -315,14 +342,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const booking = await Booking.create({
-      ...validationResult.data,
-      numNights: pricing.numNights,
-      cabinPrice: pricing.cabinPrice,
-      extrasPrice: pricing.extrasPrice,
-      totalPrice: pricing.totalPrice,
-      extras: pricing.extras,
-    });
+    const booking = lockResult.booking;
 
     // Populate the response
     const populatedBooking = await Booking.findById(booking._id).populate(
@@ -359,6 +379,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
+      );
+    }
+
+    // The cabin's booking lock stayed contended past the acquire budget —
+    // heavy concurrent activity on this cabin, not a server fault. Surface
+    // as a retryable 409 rather than a generic 500.
+    if (error instanceof CabinBookingLockTimeoutError) {
+      logger.warn('Booking lock contention timed out (POST)', {
+        message: error.message,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'This cabin is receiving a lot of booking activity right now — please try again in a moment.',
+        },
+        { status: 409 }
       );
     }
 
@@ -634,30 +671,8 @@ export async function PUT(request: NextRequest) {
       updateData.checkOutDate &&
       new Date(updateData.checkOutDate).getTime() !==
         existingBooking.checkOutDate.getTime();
-
-    if (cabinChanged || checkInChanged || checkOutChanged) {
-      const cabinId = updateData.cabin || existingBooking.cabin;
-      const checkIn = updateData.checkInDate || existingBooking.checkInDate;
-      const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
-
-      const overlapping = await Booking.findOverlapping(
-        cabinId,
-        checkIn,
-        checkOut,
-        new mongoose.Types.ObjectId(_id)
-      );
-
-      if (overlapping.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              'The selected dates overlap with an existing booking for this cabin',
-          },
-          { status: 409 }
-        );
-      }
-    }
+    const shouldCheckOverlap =
+      cabinChanged || checkInChanged || checkOutChanged;
 
     // numNights/cabinPrice/extrasPrice/totalPrice are already recomputed above
     // (in the shouldValidateBookingRules block) whenever dates, cabin,
@@ -678,9 +693,51 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const booking = await Booking.findByIdAndUpdate(_id, updateData, {
-      new: true,
-    }).populate('cabin', 'name image capacity price discount');
+    // When dates/cabin change, the overlap check and the write that acts
+    // on it are wrapped in the same per-cabin lock used by POST (see
+    // issue #110) so two concurrent updates can't both pass the check
+    // before either write lands.
+    let booking;
+    if (shouldCheckOverlap) {
+      const cabinId = updateData.cabin || existingBooking.cabin;
+      const checkIn = updateData.checkInDate || existingBooking.checkInDate;
+      const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
+
+      const lockResult = await withCabinBookingLock<
+        LockedWriteResult<IBooking | null>
+      >(cabinId, async () => {
+        const overlapping = await Booking.findOverlapping(
+          cabinId,
+          checkIn,
+          checkOut,
+          new mongoose.Types.ObjectId(_id)
+        );
+        if (overlapping.length > 0) {
+          return { ok: false };
+        }
+
+        const updated = await Booking.findByIdAndUpdate(_id, updateData, {
+          new: true,
+        }).populate('cabin', 'name image capacity price discount');
+        return { ok: true, booking: updated };
+      });
+
+      if (!lockResult.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'The selected dates overlap with an existing booking for this cabin',
+          },
+          { status: 409 }
+        );
+      }
+      booking = lockResult.booking;
+    } else {
+      booking = await Booking.findByIdAndUpdate(_id, updateData, {
+        new: true,
+      }).populate('cabin', 'name image capacity price discount');
+    }
 
     if (!booking) {
       return NextResponse.json(
@@ -712,6 +769,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
+      );
+    }
+
+    // The cabin's booking lock stayed contended past the acquire budget —
+    // heavy concurrent activity on this cabin, not a server fault. Surface
+    // as a retryable 409 rather than a generic 500.
+    if (error instanceof CabinBookingLockTimeoutError) {
+      logger.warn('Booking lock contention timed out (PUT)', {
+        message: error.message,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'This cabin is receiving a lot of booking activity right now — please try again in a moment.',
+        },
+        { status: 409 }
       );
     }
 
