@@ -6,7 +6,12 @@ import type {
 } from '@/types';
 import { clerkClient, User } from '@clerk/nextjs/server';
 
-// In-memory cache for Clerk user data
+import { logger } from '@/lib/logger';
+import { getRedisClient, REDIS_KEY_PREFIX } from '@/lib/redis';
+
+// In-memory cache for Clerk user data. Only used when Upstash is not
+// configured — see lib/redis.ts for why per-instance state is not enough in
+// production.
 const userCache = new Map<
   string,
   { data: Customer | null; timestamp: number }
@@ -18,9 +23,67 @@ let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests
 
 /**
- * Simple cache management
+ * Redis-serialized cache entry. The `Customer | null` payload is wrapped in an
+ * object so a cached "user does not exist" (`null`) stays distinguishable from
+ * a cache miss (Redis returns `null` for an absent key).
  */
-function getCachedUser(userId: string): Customer | null | undefined {
+interface CachedCustomerEntry {
+  data: Customer | null;
+}
+
+function userCacheKey(userId: string): string {
+  return `${REDIS_KEY_PREFIX}:clerk-user:${userId}`;
+}
+
+/**
+ * JSON has no Date type, so every `Date` field survives the Redis round trip as
+ * an ISO string. Rehydrate them to keep the cached `Customer` shape identical
+ * to a freshly converted one.
+ */
+function reviveCustomerDates(customer: Customer): Customer {
+  const toDate = (value: unknown): Date | null =>
+    value == null ? null : new Date(value as string);
+
+  return {
+    ...customer,
+    created_at: toDate(customer.created_at) as Date,
+    updated_at: toDate(customer.updated_at) as Date,
+    last_sign_in_at: toDate(customer.last_sign_in_at),
+    last_active_at: toDate(customer.last_active_at) as Date,
+    lastBookingDate: customer.lastBookingDate
+      ? new Date(customer.lastBookingDate)
+      : undefined,
+  };
+}
+
+function entryToCustomer(entry: CachedCustomerEntry): Customer | null {
+  return entry.data ? reviveCustomerDates(entry.data) : null;
+}
+
+/**
+ * Read one user from the cache.
+ *
+ * @returns the cached `Customer`, `null` when the user is cached as
+ * non-existent, or `undefined` on a miss/expiry. Redis errors are logged and
+ * reported as a miss so a cache outage never fails the request.
+ */
+async function getCachedUser(
+  userId: string
+): Promise<Customer | null | undefined> {
+  const redis = getRedisClient();
+
+  if (redis) {
+    try {
+      const entry = await redis.get<CachedCustomerEntry>(userCacheKey(userId));
+      return entry ? entryToCustomer(entry) : undefined;
+    } catch (error) {
+      logger.error('Redis user cache read failed, treating as miss', error, {
+        userId,
+      });
+      return undefined;
+    }
+  }
+
   const cached = userCache.get(userId);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.data;
@@ -28,15 +91,96 @@ function getCachedUser(userId: string): Customer | null | undefined {
   return undefined; // Not in cache or expired
 }
 
-function setCachedUser(userId: string, user: Customer | null): void {
+/**
+ * Read many users from the cache in a single round trip.
+ *
+ * Only hits are present in the returned map; a `null` value means the user is
+ * cached as non-existent.
+ */
+async function getCachedUsers(
+  userIds: string[]
+): Promise<Map<string, Customer | null>> {
+  const results = new Map<string, Customer | null>();
+  if (userIds.length === 0) return results;
+
+  const redis = getRedisClient();
+
+  if (redis) {
+    try {
+      const entries = await redis.mget<(CachedCustomerEntry | null)[]>(
+        ...userIds.map(userCacheKey)
+      );
+
+      entries.forEach((entry, index) => {
+        if (entry) results.set(userIds[index], entryToCustomer(entry));
+      });
+
+      return results;
+    } catch (error) {
+      logger.error('Redis user cache read failed, treating as miss', error, {
+        count: userIds.length,
+      });
+      return results;
+    }
+  }
+
+  for (const userId of userIds) {
+    const cached = userCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      results.set(userId, cached.data);
+    }
+  }
+
+  return results;
+}
+
+async function setCachedUser(
+  userId: string,
+  user: Customer | null
+): Promise<void> {
+  const redis = getRedisClient();
+
+  if (redis) {
+    try {
+      await redis.set<CachedCustomerEntry>(
+        userCacheKey(userId),
+        { data: user },
+        { px: CACHE_DURATION }
+      );
+    } catch (error) {
+      // A failed write only costs a future cache miss.
+      logger.error('Redis user cache write failed', error, { userId });
+    }
+    return;
+  }
+
   userCache.set(userId, { data: user, timestamp: Date.now() });
 }
 
 /**
  * Invalidate cache for a specific user
  */
-function invalidateCache(userId: string): void {
+async function invalidateCache(userId: string): Promise<void> {
+  const redis = getRedisClient();
+
+  if (redis) {
+    try {
+      await redis.del(userCacheKey(userId));
+    } catch (error) {
+      // Leaving a stale entry is bounded by the 5-minute TTL.
+      logger.error('Redis user cache invalidation failed', error, { userId });
+    }
+    return;
+  }
+
   userCache.delete(userId);
+}
+
+/**
+ * Clear the in-memory user cache. Test-only.
+ */
+export function resetUserCache(): void {
+  userCache.clear();
 }
 
 /**
@@ -227,7 +371,7 @@ export async function getClerkUsers(params: ClerkUserListParams = {}): Promise<{
  */
 export async function getClerkUser(userId: string): Promise<Customer | null> {
   // Check cache first
-  const cachedUser = getCachedUser(userId);
+  const cachedUser = await getCachedUser(userId);
   if (cachedUser !== undefined) {
     return cachedUser;
   }
@@ -243,7 +387,7 @@ export async function getClerkUser(userId: string): Promise<Customer | null> {
     });
 
     // Cache the result
-    setCachedUser(userId, customer);
+    await setCachedUser(userId, customer);
 
     return customer;
   } catch (error: unknown) {
@@ -260,7 +404,7 @@ export async function getClerkUser(userId: string): Promise<Customer | null> {
         typedError.status === 404 ||
         typedError.errors?.[0]?.code === 'resource_not_found'
       ) {
-        setCachedUser(userId, null);
+        await setCachedUser(userId, null);
         return null;
       }
     }
@@ -295,11 +439,11 @@ export async function getClerkUsersBatch(
   const uncachedIds: string[] = [];
   let errorCount = 0;
 
-  // Check cache first for all IDs
+  // Check cache first for all IDs (a single round trip when Redis-backed)
+  const cachedUsers = await getCachedUsers(userIds);
   for (const userId of userIds) {
-    const cached = getCachedUser(userId);
-    if (cached !== undefined) {
-      results.set(userId, cached);
+    if (cachedUsers.has(userId)) {
+      results.set(userId, cachedUsers.get(userId) ?? null);
     } else {
       uncachedIds.push(userId);
     }
@@ -326,7 +470,7 @@ export async function getClerkUsersBatch(
           const clerkUser = await client.users.getUser(userId);
           const customer = convertClerkUserToCustomer(clerkUser);
 
-          setCachedUser(userId, customer);
+          await setCachedUser(userId, customer);
           return { userId, customer, failed: false };
         } catch (error: unknown) {
           console.error(`Error fetching user ${userId}:`, error);
@@ -341,7 +485,7 @@ export async function getClerkUsersBatch(
           // Transient errors (429, 500+, network) should NOT be cached
           // so they can be retried on the next request.
           if (is404) {
-            setCachedUser(userId, null);
+            await setCachedUser(userId, null);
           }
 
           return { userId, customer: null, failed: !is404 };
@@ -611,7 +755,7 @@ export async function deleteCompleteCustomer(
 ): Promise<void> {
   try {
     await deleteClerkUser(clerkUserId);
-    invalidateCache(clerkUserId);
+    await invalidateCache(clerkUserId);
   } catch (error) {
     console.error('Error deleting complete customer:', error);
     throw error;
@@ -710,7 +854,7 @@ export async function updateCompleteCustomer(
     }
 
     // Invalidate cache
-    invalidateCache(clerkUserId);
+    await invalidateCache(clerkUserId);
 
     // 3. Return updated combined customer object
     if (!clerkUser) {
