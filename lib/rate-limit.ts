@@ -1,15 +1,20 @@
 /**
- * Simple in-memory rate limiter
+ * Dual-mode rate limiter.
  *
- * For production, consider using:
- * - @upstash/ratelimit with @upstash/redis for distributed rate limiting
- * - Redis-based solutions for multi-instance deployments
+ * - **Distributed (production):** when `UPSTASH_REDIS_REST_URL` and
+ *   `UPSTASH_REDIS_REST_TOKEN` are set, limits are enforced globally via
+ *   `@upstash/ratelimit` so they hold across serverless instances.
+ * - **In-memory (local development, tests):** without those variables, limits
+ *   fall back to a module-level `Map`. That store is per-instance, so it is
+ *   only meaningful for single-instance deployments.
  *
- * This implementation is suitable for:
- * - Development environments
- * - Single-instance deployments
- * - Low-traffic applications
+ * Both modes use a fixed window, so their semantics match.
  */
+
+import { Ratelimit } from '@upstash/ratelimit';
+
+import { logger } from '@/lib/logger';
+import { getRedisClient, REDIS_KEY_PREFIX } from '@/lib/redis';
 
 interface RateLimitRecord {
   count: number;
@@ -74,13 +79,82 @@ export const RATE_LIMIT_CONFIGS = {
 } as const;
 
 /**
- * Check if a request should be rate limited
+ * Cached `Ratelimit` instances keyed by `limit:windowMs`. Constructing one per
+ * request would rebuild the underlying scripts on every call.
+ */
+const limiterCache = new Map<string, Ratelimit>();
+
+function getDistributedLimiter(
+  redis: NonNullable<ReturnType<typeof getRedisClient>>,
+  config: RateLimitConfig
+): Ratelimit {
+  const cacheKey = `${config.limit}:${config.windowMs}`;
+  const cached = limiterCache.get(cacheKey);
+  if (cached) return cached;
+
+  const limiter = new Ratelimit({
+    redis,
+    // Fixed window matches the in-memory fallback's semantics.
+    limiter: Ratelimit.fixedWindow(config.limit, `${config.windowMs} ms`),
+    prefix: `${REDIS_KEY_PREFIX}:ratelimit`,
+  });
+
+  limiterCache.set(cacheKey, limiter);
+  return limiter;
+}
+
+/**
+ * Check if a request should be rate limited.
+ *
+ * Uses Redis when Upstash is configured, otherwise the in-memory store. If a
+ * configured Redis is unreachable the check **fails open** — the request is
+ * allowed and the error is logged, so an Upstash outage degrades to "no rate
+ * limiting" rather than taking the endpoint down.
  *
  * @param identifier - Unique identifier for the rate limit (e.g., userId, IP address)
  * @param config - Rate limit configuration
  * @returns Rate limit result with success status and metadata
  */
-export function checkRateLimit(
+export async function checkRateLimit(
+  identifier: string,
+  config: RateLimitConfig = RATE_LIMIT_CONFIGS.MUTATION
+): Promise<RateLimitResult> {
+  const redis = getRedisClient();
+
+  if (redis) {
+    try {
+      const { success, remaining, reset } = await getDistributedLimiter(
+        redis,
+        config
+      ).limit(identifier);
+
+      return { success, limit: config.limit, remaining, resetTime: reset };
+    } catch (error) {
+      logger.error(
+        'Distributed rate limit check failed, allowing request',
+        error,
+        { identifier }
+      );
+
+      // Fail open. No counter was incremented, so report the full budget.
+      return {
+        success: true,
+        limit: config.limit,
+        remaining: config.limit,
+        resetTime: Date.now() + config.windowMs,
+      };
+    }
+  }
+
+  return checkRateLimitInMemory(identifier, config);
+}
+
+/**
+ * In-memory fallback used when Upstash is not configured.
+ *
+ * Exported for tests; production code should call `checkRateLimit()`.
+ */
+export function checkRateLimitInMemory(
   identifier: string,
   config: RateLimitConfig = RATE_LIMIT_CONFIGS.MUTATION
 ): RateLimitResult {
@@ -134,4 +208,14 @@ export function createRateLimitKey(
   endpoint: string
 ): string {
   return `${userId || 'anonymous'}:${endpoint}`;
+}
+
+/**
+ * Clear both the in-memory records and the cached `Ratelimit` instances.
+ * Test-only — lets a suite switch between the distributed and in-memory paths.
+ */
+export function resetRateLimitState(): void {
+  rateLimitStore.clear();
+  limiterCache.clear();
+  lastCleanup = Date.now();
 }

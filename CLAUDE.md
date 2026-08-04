@@ -144,7 +144,8 @@ lib/                    # Core libraries & configuration
   ├── auth-helpers.ts   # Role-based access helpers
   ├── clerk-users.ts    # Clerk API utilities
   ├── logger.ts         # Structured logging (suppressed in test env)
-  ├── rate-limit.ts     # In-memory rate limiter for mutation/email endpoints
+  ├── redis.ts          # Shared Upstash client for cross-instance state (null when unconfigured)
+  ├── rate-limit.ts     # Rate limiter for mutation/email endpoints (Redis-backed, in-memory fallback)
   ├── booking-pricing.ts # Server-side pricing calculator (see Booking Pricing below)
   ├── validations/      # Zod schemas per domain (booking, cabin, customer, etc.)
   └── data/seed-data.ts # Default seed payloads (settings, etc.)
@@ -266,9 +267,17 @@ const data = validationResult.data;
 - `HTTP_STATUS` — Named status code constants
 
 **Rate Limiting** (`lib/rate-limit.ts`):
-- In-memory limiter suitable for single-instance / dev deployments
+- **Dual-mode.** When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are both set, limits are enforced **globally** across serverless instances via `@upstash/ratelimit`. Without them (local dev, tests, CI) it falls back to a module-level `Map`, which is **per-instance** and only meaningful for single-instance deployments. Both modes use a fixed window, so the semantics match.
+- `checkRateLimit()` is **async** (`Promise<RateLimitResult>`) — always `await` it. `checkRateLimitInMemory()` is the sync fallback, exported for tests only.
+- If a configured Redis is unreachable, the check **fails open**: the request is allowed and `logger.error` records it. An Upstash outage degrades to "no rate limiting" rather than 429-ing every request.
 - Preset configs: `MUTATION`, `EMAIL`, `CUSTOMER_CREATE`, `BOOKING_CREATE`, `AUTH`
-- Applied on email send (`app/api/send/confirm`, `app/api/send/welcome`) and customer-create (`app/api/customers` POST); use `checkRateLimit()` + `createRateLimitKey()` for new sensitive routes. Note: the `BOOKING_CREATE` preset exists but is not yet wired into `app/api/bookings` — apply it there if booking creation needs rate limiting.
+- Applied on email send (`app/api/send/confirm`, `app/api/send/welcome`) and customer-create (`app/api/customers` POST); use `await checkRateLimit()` + `createRateLimitKey()` for new sensitive routes. Note: the `BOOKING_CREATE` preset exists but is not yet wired into `app/api/bookings` — apply it there if booking creation needs rate limiting.
+
+**Distributed State** (`lib/redis.ts`):
+- `getRedisClient()` returns a memoized `@upstash/redis` client, or `null` when the two `UPSTASH_REDIS_REST_*` vars are absent. Every consumer must handle `null` with an in-memory fallback so local development needs no Redis.
+- `REDIS_KEY_PREFIX` (`lodgeflow`) namespaces all keys. Current consumers: `lodgeflow:ratelimit:*` (`lib/rate-limit.ts`) and `lodgeflow:clerk-user:*` (`lib/clerk-users.ts`).
+- Cache/limiter failures are logged and swallowed — Redis is never on the critical path for correctness.
+- `resetRedisClient()` clears the memoized client; test-only, for suites that toggle the env vars.
 
 **Logging** (`lib/logger.ts`):
 - Use `logger.info/warn/error/debug()` instead of raw `console.*` in server code
@@ -418,6 +427,20 @@ from the `Cabin` and `Settings` documents — never from the request body. It th
 ### Clerk Rate Limiting
 API has concurrent call limits. Clerk user batch fetching uses `CLERK_API_CONCURRENT_LIMIT` env var (defaults to 3) in `lib/clerk-users.ts`.
 
+`getClerkUser()` / `getClerkUsersBatch()` cache resolved `Customer` objects for 5 minutes,
+in Redis when Upstash is configured and in a module-level `Map` otherwise (see **Distributed
+State** above). Two details matter when touching this cache:
+- The payload is wrapped as `{ data: Customer | null }` so a cached "user was deleted" (`null`)
+  stays distinguishable from a cache miss (Redis returns `null` for an absent key). Only a
+  genuine 404 is cached as `null`; transient 429/5xx errors are never cached.
+- JSON has no `Date`, so `reviveCustomerDates()` rehydrates `created_at`, `updated_at`,
+  `last_sign_in_at`, `last_active_at`, and `lastBookingDate` on every Redis read. Add any new
+  `Date` field on `Customer` to that function.
+
+The 100 ms `MIN_REQUEST_INTERVAL` throttle in `waitForRateLimit()` is still per-instance by
+design — it paces this process's own Clerk calls, and moving it to Redis would add a round trip
+per Clerk request.
+
 ### Environment Variables Required
 No `.env.example` is checked into the repo (`.env*` is gitignored) — set these directly in `.env.local`. Minimum for local development:
 ```bash
@@ -433,6 +456,14 @@ Optional:
 CLERK_API_CONCURRENT_LIMIT=3   # Clerk batch fetch concurrency (default: 3)
 TESTING_AUTH_BYPASS=true       # Server-only auth bypass (dev only)
 NEXT_PUBLIC_TESTING=true       # Client UX bypass for AuthGuard (dev only)
+
+# Upstash Redis — set BOTH to enable distributed rate limiting and a shared
+# Clerk user cache. Omit both for the in-memory fallback. Required in any
+# multi-instance deployment (i.e. production on Vercel), where per-instance
+# state means rate limits are silently multiplied by the number of warm
+# instances. Provision via the Vercel Marketplace.
+UPSTASH_REDIS_REST_URL=https://...upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
 ```
 
 ### Auth Bypass for Testing

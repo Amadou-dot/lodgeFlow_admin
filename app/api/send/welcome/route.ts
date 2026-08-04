@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   // Rate limit email sending (stricter limits)
   const rateLimitKey = createRateLimitKey(authResult.userId, 'send-welcome');
-  const rateLimitResult = checkRateLimit(
+  const rateLimitResult = await checkRateLimit(
     rateLimitKey,
     RATE_LIMIT_CONFIGS.EMAIL
   );

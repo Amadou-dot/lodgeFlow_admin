@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
 
   // Rate limit customer creation
   const rateLimitKey = createRateLimitKey(authResult.userId, 'customer-create');
-  const rateLimitResult = checkRateLimit(
+  const rateLimitResult = await checkRateLimit(
     rateLimitKey,
     RATE_LIMIT_CONFIGS.CUSTOMER_CREATE
   );
