@@ -406,6 +406,19 @@ const result = await withCabinBookingLock(cabinId, async () => {
 });
 ```
 
+**This is structurally enforced, not just convention** (issue #126).
+`models/CabinBookingLock.ts` keeps its Mongoose model module-private and
+exports only two protocol methods — `acquire(cabin, token, ttlMs)` and
+`release(cabin, token)` — so raw `.create()` / `.deleteOne()` /
+`.findOneAndUpdate()` on the lock collection is unreachable at the type
+level from outside that module. The lock is also **deliberately absent
+from the `models/index.ts` barrel**: it's mutex infrastructure, not a
+domain model, and re-exporting it there would put raw lock CRUD one
+autocomplete away from every route. `withCabinBookingLock()` owns the
+retry budget, TTL, and `CabinBookingLockTimeoutError`; the model owns the
+fencing-token contract. Don't add a raw-model export or a barrel entry to
+work around this — extend the protocol methods instead.
+
 Settings is the single source of truth for booking business rules (min/max nights, deposit %, etc.). Booking API validation reads from the Settings document at request time.
 
 ### Booking Pricing Is Always Server-Computed

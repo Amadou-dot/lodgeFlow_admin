@@ -32,15 +32,6 @@ export class CabinBookingLockTimeoutError extends Error {
 /** Discriminated result of a locked write that may be rejected by an overlap check. */
 export type LockedWriteResult<T> = { ok: true; booking: T } | { ok: false };
 
-function isDuplicateKeyError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: number }).code === 11000
-  );
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -53,6 +44,14 @@ function sleep(ms: number): Promise<void> {
  * `CabinBookingLock.cabin`, not a MongoDB transaction — two transactions
  * each inserting a *different* document don't conflict under MongoDB's
  * transaction semantics, so a transaction alone wouldn't close this race.
+ *
+ * This is the only supported way to hold the lock. `CabinBookingLock`
+ * keeps its Mongoose model private and exposes just `acquire`/`release`
+ * (issue #126), so the worst a caller reaching past this function can do
+ * is hold a well-formed lock until its TTL expires — raw CRUD that could
+ * delete a live holder's lock or write a bogus `expiresAt` is
+ * unreachable. Prefer this wrapper: it also owns the retry budget and
+ * the guaranteed release.
  */
 export async function withCabinBookingLock<T>(
   cabinId: mongoose.Types.ObjectId | string,
@@ -63,25 +62,14 @@ export async function withCabinBookingLock<T>(
   let acquired = false;
 
   for (let attempt = 0; attempt < ACQUIRE_MAX_ATTEMPTS; attempt++) {
-    const now = new Date();
-    try {
-      // If no lock exists yet for this cabin, or the existing one has
-      // expired, this filter matches and the upsert succeeds (as an
-      // insert or an in-place update, respectively). If an active,
-      // non-expired lock already exists, the filter matches nothing, so
-      // Mongo attempts an upsert *insert* instead — which collides with
-      // the unique index on `cabin` and throws E11000.
-      await CabinBookingLock.findOneAndUpdate(
-        { cabin: cabinObjectId, expiresAt: { $lt: now } },
-        { $set: { token, expiresAt: new Date(now.getTime() + LOCK_TTL_MS) } },
-        { upsert: true, runValidators: true }
-      );
+    // Takes the lock outright when it's free or already expired; returns
+    // false while a live holder still owns it, which is the signal to
+    // back off and retry rather than an error.
+    if (await CabinBookingLock.acquire(cabinObjectId, token, LOCK_TTL_MS)) {
       acquired = true;
       break;
-    } catch (error) {
-      if (!isDuplicateKeyError(error)) throw error;
-      await sleep(ACQUIRE_RETRY_DELAY_MS);
     }
+    await sleep(ACQUIRE_RETRY_DELAY_MS);
   }
 
   if (!acquired) {
@@ -101,7 +89,7 @@ export async function withCabinBookingLock<T>(
   }
 
   try {
-    await CabinBookingLock.deleteOne({ cabin: cabinObjectId, token });
+    await CabinBookingLock.release(cabinObjectId, token);
   } catch (releaseError) {
     logger.warn(
       'Failed to release cabin booking lock (will self-heal via TTL)',

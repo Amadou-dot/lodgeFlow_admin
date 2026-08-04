@@ -4,7 +4,17 @@ import {
   CabinBookingLockTimeoutError,
   withCabinBookingLock,
 } from '@/lib/cabin-booking-lock';
-import CabinBookingLock from '@/models/CabinBookingLock';
+import CabinBookingLock, {
+  type ICabinBookingLock,
+} from '@/models/CabinBookingLock';
+
+// `models/CabinBookingLock.ts` keeps its Mongoose model private so no
+// caller can bypass the acquire/release protocol (issue #126). These
+// tests need to plant and inspect raw lock documents, so they reach the
+// model through Mongoose's registry — a deliberate, visible escape hatch
+// that production code has no reason to reproduce.
+const CabinBookingLockModel =
+  mongoose.model<ICabinBookingLock>('CabinBookingLock');
 
 describe('withCabinBookingLock', () => {
   const cabinId = new mongoose.Types.ObjectId();
@@ -16,7 +26,7 @@ describe('withCabinBookingLock', () => {
 
   it('releases the lock after the callback resolves', async () => {
     await withCabinBookingLock(cabinId, async () => 'done');
-    const remaining = await CabinBookingLock.findOne({ cabin: cabinId });
+    const remaining = await CabinBookingLockModel.findOne({ cabin: cabinId });
     expect(remaining).toBeNull();
   });
 
@@ -27,7 +37,7 @@ describe('withCabinBookingLock', () => {
       })
     ).rejects.toThrow('boom');
 
-    const remaining = await CabinBookingLock.findOne({ cabin: cabinId });
+    const remaining = await CabinBookingLockModel.findOne({ cabin: cabinId });
     expect(remaining).toBeNull();
   });
 
@@ -55,7 +65,7 @@ describe('withCabinBookingLock', () => {
   it('reclaims a stale (expired) lock instead of waiting out the full TTL', async () => {
     // Simulate a crashed holder: a lock doc whose expiresAt is already
     // in the past.
-    await CabinBookingLock.create({
+    await CabinBookingLockModel.create({
       cabin: cabinId,
       token: 'stale-token',
       expiresAt: new Date(Date.now() - 1000),
@@ -96,7 +106,7 @@ describe('withCabinBookingLock', () => {
   });
 
   it('lets only one of two concurrent reclaimers win the same stale lock', async () => {
-    await CabinBookingLock.create({
+    await CabinBookingLockModel.create({
       cabin: cabinId,
       token: 'stale-token',
       expiresAt: new Date(Date.now() - 1000),
@@ -124,7 +134,7 @@ describe('withCabinBookingLock', () => {
 
   it('does not mask a successful result when releasing the lock fails', async () => {
     const releaseSpy = jest
-      .spyOn(CabinBookingLock, 'deleteOne')
+      .spyOn(CabinBookingLock, 'release')
       .mockRejectedValueOnce(new Error('transient release failure'));
 
     const result = await withCabinBookingLock(cabinId, async () => 'done');
@@ -135,7 +145,7 @@ describe('withCabinBookingLock', () => {
 
   it('does not mask the original error when releasing the lock also fails', async () => {
     const releaseSpy = jest
-      .spyOn(CabinBookingLock, 'deleteOne')
+      .spyOn(CabinBookingLock, 'release')
       .mockRejectedValueOnce(new Error('transient release failure'));
 
     await expect(
@@ -156,13 +166,11 @@ describe('withCabinBookingLock', () => {
 
   it('gives up and throws CabinBookingLockTimeoutError once the acquire budget is exhausted', async () => {
     jest.useFakeTimers({ advanceTimers: true });
-    const permanentCollision = Object.assign(
-      new Error('E11000 duplicate key error'),
-      { code: 11000 }
-    );
+    // A permanently contended lock: every acquire attempt loses the race
+    // to a live holder, so the retry budget drains without success.
     const acquireSpy = jest
-      .spyOn(CabinBookingLock, 'findOneAndUpdate')
-      .mockRejectedValue(permanentCollision);
+      .spyOn(CabinBookingLock, 'acquire')
+      .mockResolvedValue(false);
 
     const assertion = expect(
       withCabinBookingLock(cabinId, async () => 'unreachable')
@@ -174,5 +182,92 @@ describe('withCabinBookingLock', () => {
 
     acquireSpy.mockRestore();
     jest.useRealTimers();
+  });
+});
+
+describe('CabinBookingLock protocol', () => {
+  const cabinId = new mongoose.Types.ObjectId();
+
+  // The unique index on `cabin` is what turns a contended acquire into an
+  // E11000 collision, so wait for it to finish building before racing it.
+  beforeAll(async () => {
+    await CabinBookingLockModel.init();
+  });
+
+  it('exposes only acquire and release, never raw Mongoose CRUD', () => {
+    expect(Object.keys(CabinBookingLock).sort()).toEqual([
+      'acquire',
+      'release',
+    ]);
+  });
+
+  it('acquires a free lock and stamps it with the caller token and TTL', async () => {
+    const before = Date.now();
+    await expect(
+      CabinBookingLock.acquire(cabinId, 'token-a', 10_000)
+    ).resolves.toBe(true);
+
+    const doc = await CabinBookingLockModel.findOne({ cabin: cabinId });
+    expect(doc?.token).toBe('token-a');
+    expect(doc?.expiresAt.getTime()).toBeGreaterThanOrEqual(before + 10_000);
+  });
+
+  it('refuses to acquire a lock a live holder still owns', async () => {
+    await CabinBookingLock.acquire(cabinId, 'token-a', 10_000);
+
+    await expect(
+      CabinBookingLock.acquire(cabinId, 'token-b', 10_000)
+    ).resolves.toBe(false);
+
+    // The loser must not have disturbed the holder's stamp.
+    const doc = await CabinBookingLockModel.findOne({ cabin: cabinId });
+    expect(doc?.token).toBe('token-a');
+  });
+
+  it('reclaims an expired lock in place', async () => {
+    await CabinBookingLockModel.create({
+      cabin: cabinId,
+      token: 'crashed-holder',
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    await expect(
+      CabinBookingLock.acquire(cabinId, 'token-b', 10_000)
+    ).resolves.toBe(true);
+
+    const doc = await CabinBookingLockModel.findOne({ cabin: cabinId });
+    expect(doc?.token).toBe('token-b');
+    expect(doc?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('releases a lock the caller still holds', async () => {
+    await CabinBookingLock.acquire(cabinId, 'token-a', 10_000);
+    await CabinBookingLock.release(cabinId, 'token-a');
+
+    expect(await CabinBookingLockModel.findOne({ cabin: cabinId })).toBeNull();
+  });
+
+  it('ignores a release from a holder whose lock was already reclaimed', async () => {
+    // The fencing token: an overran holder's late release must not free
+    // the lock its successor now legitimately owns.
+    await CabinBookingLock.acquire(cabinId, 'new-holder', 10_000);
+
+    await CabinBookingLock.release(cabinId, 'overran-holder');
+
+    const doc = await CabinBookingLockModel.findOne({ cabin: cabinId });
+    expect(doc?.token).toBe('new-holder');
+  });
+
+  it('rethrows acquire failures that are not lock contention', async () => {
+    const failure = Object.assign(new Error('connection reset'), { code: 6 });
+    const spy = jest
+      .spyOn(CabinBookingLockModel, 'findOneAndUpdate')
+      .mockRejectedValueOnce(failure);
+
+    await expect(
+      CabinBookingLock.acquire(cabinId, 'token-a', 10_000)
+    ).rejects.toThrow('connection reset');
+
+    spy.mockRestore();
   });
 });
