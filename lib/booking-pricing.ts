@@ -39,6 +39,16 @@ export interface BookingPricingExtrasSelection {
   hasLateCheckOut?: boolean;
 }
 
+export interface BookingDepositSettings {
+  requireDeposit: boolean;
+  depositPercentage: number;
+}
+
+export interface BookingDepositInput {
+  settings: BookingDepositSettings;
+  totalPrice: number;
+}
+
 export interface BookingPricingInput {
   cabin: BookingPricingCabin;
   settings: BookingPricingSettings;
@@ -65,6 +75,30 @@ export interface BookingPricingResult {
     hasLateCheckOut: boolean;
     lateCheckOutFee: number;
   };
+}
+
+/**
+ * Derives the deposit due on a *new* booking from the settings document,
+ * never from client input (see issue #124 — a client-supplied depositAmount
+ * equal to totalPrice would make a booking read as fully paid with no payment
+ * recorded).
+ *
+ * Deliberately not applied on update: on an existing booking `depositAmount`
+ * doubles as the running total of payments actually taken (see the
+ * `recordPayment` handler in `app/api/bookings/[id]/route.ts`), so recomputing
+ * it would wipe a real deposit whenever an unrelated field changed.
+ */
+export function calculateDepositAmount({
+  settings,
+  totalPrice,
+}: BookingDepositInput): number {
+  if (!settings.requireDeposit) return 0;
+
+  const deposit = Math.round(totalPrice * (settings.depositPercentage / 100));
+  // depositPercentage is schema-bound to 0-100, but clamp anyway so a legacy
+  // or hand-edited settings document can never yield a deposit that exceeds
+  // the total (which would drive remainingAmount negative).
+  return Math.min(Math.max(deposit, 0), totalPrice);
 }
 
 /**

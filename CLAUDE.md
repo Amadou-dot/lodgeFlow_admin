@@ -424,6 +424,20 @@ from the `Cabin` and `Settings` documents — never from the request body. It th
 - The Zod schemas in `lib/validations/booking.ts` still type these fields for compatibility, but
   they are always ignored/recomputed at the route layer — don't rely on client-submitted values.
 
+**`depositAmount` is derived on create and frozen on update** (issue #124). It is never
+read from the request body on either route:
+
+- `POST /api/bookings` sets it from `calculateDepositAmount({ settings, totalPrice })`
+  (`lib/booking-pricing.ts`) — `settings.requireDeposit ? round(totalPrice * depositPercentage / 100) : 0`,
+  clamped to `[0, totalPrice]` — and sets `remainingAmount` to `totalPrice - depositAmount`.
+- `PUT /api/bookings` deletes it outright and never recomputes it. On an existing booking
+  `depositAmount` doubles as the running total of payments actually taken, so recomputing it
+  would wipe a real deposit when an admin edits an unrelated field. `remainingAmount` is
+  recomputed as `max(0, newTotalPrice - existingBooking.depositAmount)` when the total moves.
+- The only writer is `PATCH /api/bookings/[id]`'s `recordPayment` handler, which accumulates
+  `depositAmount` from the `amountPaid` it was given. Any new deposit-adjusting flow must go
+  through that path, not `PUT`.
+
 ### Clerk Rate Limiting
 API has concurrent call limits. Clerk user batch fetching uses `CLERK_API_CONCURRENT_LIMIT` env var (defaults to 3) in `lib/clerk-users.ts`.
 

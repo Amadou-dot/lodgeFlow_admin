@@ -212,6 +212,10 @@ POST /api/bookings
 
 Creates a new booking. Validates for date conflicts with existing bookings.
 
+Every price-derived field is computed server-side from the `Cabin` and
+`Settings` documents and any client-supplied value is discarded — see
+`lib/booking-pricing.ts`.
+
 **Request Body:**
 
 | Field | Type | Required | Description |
@@ -222,13 +226,15 @@ Creates a new booking. Validates for date conflicts with existing bookings.
 | `checkOutDate` | string (ISO) | Yes | Check-out date |
 | `numGuests` | number | Yes | Number of guests (1-50, capped by cabin capacity and settings) |
 | `status` | string | No | Default: `unconfirmed` |
-| `cabinPrice` | number | No | Price per night |
-| `extrasPrice` | number | No | Default: `0` |
-| `totalPrice` | number | No | Total booking price |
+| `numNights` | number | No | **Ignored** — derived from the dates |
+| `cabinPrice` | number | No | **Ignored** — derived from the cabin document |
+| `extrasPrice` | number | No | **Ignored** — derived from cabin/settings |
+| `totalPrice` | number | No | **Ignored** — derived from cabin/settings |
 | `isPaid` | boolean | No | Default: `false` |
 | `paymentMethod` | string | No | `cash`, `card`, `bank-transfer`, `online` |
 | `depositPaid` | boolean | No | Default: `false` |
-| `depositAmount` | number | No | Default: `0` |
+| `depositAmount` | number | No | **Ignored** — derived from `settings.requireDeposit`/`depositPercentage` |
+| `remainingAmount` | number | No | **Ignored** — `totalPrice - depositAmount` |
 | `stripePaymentIntentId` | string | No | Stripe payment intent ID (must start with `pi_`) |
 | `stripeSessionId` | string | No | Stripe session ID (must start with `cs_`) |
 | `paidAt` | string (ISO) | No | Payment timestamp |
@@ -335,11 +341,19 @@ PUT /api/bookings
 
 Updates an existing booking. Validates for date conflicts.
 
+`numNights`, `cabinPrice`, `extrasPrice`, `totalPrice`, and `remainingAmount`
+are ignored if sent: they are recomputed from the `Cabin`/`Settings` documents
+whenever a pricing-relevant field (`cabin`, `checkInDate`, `checkOutDate`,
+`numGuests`, `extras`) changes. `depositAmount` is ignored too, but is *not*
+recomputed — it tracks money actually taken, so it carries over untouched and
+can only be changed through `PATCH /api/bookings/[id]`'s `recordPayment`.
+
 **Request Body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `_id` | string | Yes | Booking ObjectId |
+| `depositAmount` | number | No | **Ignored** — use `PATCH /api/bookings/[id]` `recordPayment` |
 | (other fields) | various | No | Fields to update |
 
 **Response:**

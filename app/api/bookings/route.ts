@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import {
   BookingPricingError,
   calculateBookingPricing,
+  calculateDepositAmount,
 } from '@/lib/booking-pricing';
 import {
   CabinBookingLockTimeoutError,
@@ -261,6 +262,14 @@ export async function POST(request: NextRequest) {
       numGuests,
       extras,
     });
+    // The deposit is likewise derived from settings, never from the request
+    // body — a client-supplied depositAmount equal to totalPrice would drive
+    // remainingAmount to 0 and make the booking read as fully paid (#124).
+    const depositAmount = calculateDepositAmount({
+      settings,
+      totalPrice: pricing.totalPrice,
+    });
+
     const { numNights } = pricing;
     const effectiveMinNights = Math.max(
       settings.minBookingLength,
@@ -326,6 +335,8 @@ export async function POST(request: NextRequest) {
           extrasPrice: pricing.extrasPrice,
           totalPrice: pricing.totalPrice,
           extras: pricing.extras,
+          depositAmount,
+          remainingAmount: Math.max(0, pricing.totalPrice - depositAmount),
         });
         return { ok: true, booking: created };
       }
@@ -467,6 +478,13 @@ export async function PUT(request: NextRequest) {
     delete updateData.extrasPrice;
     delete updateData.totalPrice;
     delete updateData.remainingAmount;
+    // depositAmount is frozen here rather than recomputed (see issue #124).
+    // On an existing booking it doubles as the running total of payments
+    // actually taken — PATCH /api/bookings/[id]'s recordPayment handler is
+    // its only writer — so honoring a client value would let a raw request
+    // mark a booking paid, while recomputing it from settings would wipe a
+    // real deposit whenever an unrelated field changed.
+    delete updateData.depositAmount;
 
     // Fetch the existing booking first so auto-timestamping can check prior state
     const existingBooking = await Booking.findById(_id);
@@ -679,17 +697,12 @@ export async function PUT(request: NextRequest) {
     // numGuests, or extras change — findByIdAndUpdate bypasses the Mongoose
     // pre-save hook that would otherwise handle this.
 
-    if (
-      updateData.totalPrice !== undefined ||
-      updateData.depositAmount !== undefined
-    ) {
-      const effectiveTotalPrice =
-        updateData.totalPrice ?? existingBooking.totalPrice;
-      const effectiveDepositAmount =
-        updateData.depositAmount ?? existingBooking.depositAmount;
+    // Only totalPrice can move here — the deposit already on the booking is
+    // carried over untouched so a recorded payment survives the edit.
+    if (updateData.totalPrice !== undefined) {
       updateData.remainingAmount = Math.max(
         0,
-        effectiveTotalPrice - effectiveDepositAmount
+        updateData.totalPrice - (existingBooking.depositAmount ?? 0)
       );
     }
 
