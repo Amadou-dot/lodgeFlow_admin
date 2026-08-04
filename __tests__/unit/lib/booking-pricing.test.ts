@@ -1,6 +1,7 @@
 import {
   BookingPricingError,
   calculateBookingPricing,
+  calculateDepositAmount,
 } from '@/lib/booking-pricing';
 
 const baseCabin = { price: 200, discount: 0, extraGuestFee: 0 };
@@ -280,5 +281,63 @@ describe('calculateBookingPricing', () => {
     });
 
     expect(result.extras.breakfastPrice).toBe(15 * 2 * 4);
+  });
+});
+
+describe('calculateDepositAmount', () => {
+  it('takes the configured percentage of the total price', () => {
+    expect(
+      calculateDepositAmount({
+        settings: { requireDeposit: true, depositPercentage: 25 },
+        totalPrice: 800,
+      })
+    ).toBe(200);
+  });
+
+  it('rounds to the nearest whole unit', () => {
+    expect(
+      calculateDepositAmount({
+        settings: { requireDeposit: true, depositPercentage: 25 },
+        totalPrice: 610,
+      })
+    ).toBe(153); // 152.5 rounded
+  });
+
+  it('returns 0 when deposits are not required', () => {
+    expect(
+      calculateDepositAmount({
+        settings: { requireDeposit: false, depositPercentage: 25 },
+        totalPrice: 800,
+      })
+    ).toBe(0);
+  });
+
+  it('returns 0 for a zero percentage', () => {
+    expect(
+      calculateDepositAmount({
+        settings: { requireDeposit: true, depositPercentage: 0 },
+        totalPrice: 800,
+      })
+    ).toBe(0);
+  });
+
+  it('never exceeds the total price', () => {
+    // depositPercentage is schema-bound to 0-100, but a legacy or hand-edited
+    // settings document must not be able to drive remainingAmount negative.
+    expect(
+      calculateDepositAmount({
+        settings: { requireDeposit: true, depositPercentage: 150 },
+        totalPrice: 800,
+      })
+    ).toBe(800);
+  });
+
+  it('never returns a negative deposit', () => {
+    expect(
+      calculateDepositAmount({
+        settings: { requireDeposit: true, depositPercentage: -25 },
+        totalPrice: 800,
+      })
+    ).toBe(0);
   });
 });

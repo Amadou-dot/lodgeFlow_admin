@@ -319,6 +319,58 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(800);
     });
 
+    it('ignores a client-supplied depositAmount and derives it from settings', async () => {
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05', // 4 nights → totalPrice 800
+          numGuests: 2,
+          // Claiming a deposit equal to the total would drive remainingAmount
+          // to 0 and make the booking read as fully paid (issue #124).
+          depositAmount: 800,
+          remainingAmount: 0,
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.totalPrice).toBe(800);
+      // Default seeded settings: requireDeposit true, depositPercentage 25.
+      expect(body.data.depositAmount).toBe(200);
+      expect(body.data.remainingAmount).toBe(600); // 800 - 200, not the claimed 0
+    });
+
+    it('sets depositAmount to 0 when settings do not require a deposit', async () => {
+      await Settings.create({ ...settingsData, requireDeposit: false });
+      const cabin = await createTestCabin({ price: 200, discount: 0 });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'POST',
+        body: {
+          cabin: cabin._id.toString(),
+          customer: 'user_test123',
+          checkInDate: '2027-08-01',
+          checkOutDate: '2027-08-05',
+          numGuests: 2,
+          depositAmount: 800, // tampered — should be ignored
+        },
+      });
+
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.data.depositAmount).toBe(0);
+      expect(body.data.remainingAmount).toBe(800);
+    });
+
     it('applies the cabin discount when computing cabinPrice', async () => {
       const cabin = await createTestCabin({ price: 200, discount: 50 });
 
@@ -843,18 +895,20 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(1050); // 350 * 3 nights
     });
 
-    it('recomputes remainingAmount from the existing totalPrice when only depositAmount changes', async () => {
+    it('ignores a client-supplied depositAmount and leaves the recorded deposit untouched', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
         totalPrice: 600,
-        depositAmount: 0,
+        depositAmount: 200, // a real deposit taken via PATCH recordPayment
       });
 
       const request = createRequest('http://localhost:3000/api/bookings', {
         method: 'PUT',
         body: {
           _id: booking._id.toString(),
-          depositAmount: 300,
+          // Claiming a deposit equal to the total would zero out
+          // remainingAmount with no payment recorded (issue #124).
+          depositAmount: 600,
         },
       });
 
@@ -862,9 +916,43 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
-      // totalPrice must be untouched — only depositAmount changed
       expect(body.data.totalPrice).toBe(600);
-      expect(body.data.remainingAmount).toBe(300); // 600 - 300
+      expect(body.data.depositAmount).toBe(200); // not the tampered 600
+      expect(body.data.remainingAmount).toBe(400); // 600 - 200, not 0
+    });
+
+    it('preserves a recorded deposit and recomputes remainingAmount when an unrelated field changes', async () => {
+      const cabin = await createTestCabin({
+        price: 200,
+        capacity: 4,
+        extraGuestFee: 20,
+      });
+      const booking = await createTestBooking(cabin._id, {
+        numGuests: 1,
+        cabinPrice: 200,
+        extrasPrice: 0,
+        totalPrice: 600, // 200 * 3 nights
+        depositAmount: 200,
+      });
+
+      const request = createRequest('http://localhost:3000/api/bookings', {
+        method: 'PUT',
+        body: {
+          _id: booking._id.toString(),
+          numGuests: 3,
+        },
+      });
+
+      const response = await PUT(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      // extraGuestFee: (3 - 1) * 20 * 3 nights = 120
+      expect(body.data.totalPrice).toBe(720);
+      // The deposit must survive a pricing recompute triggered by an
+      // unrelated edit — it reflects money actually taken.
+      expect(body.data.depositAmount).toBe(200);
+      expect(body.data.remainingAmount).toBe(520); // 720 - 200
     });
 
     it('returns a 400 (not a 500) when only checkOutDate changes to the same calendar day as the existing checkInDate', async () => {

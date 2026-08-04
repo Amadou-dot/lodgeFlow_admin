@@ -58,6 +58,10 @@ export const createBookingSchema = z
     isPaid: z.boolean().optional().default(false),
     paymentMethod: paymentMethodSchema.optional(),
     depositPaid: z.boolean().optional().default(false),
+    // depositAmount is accepted for schema shape only — the API route derives
+    // it from settings.requireDeposit/depositPercentage and the server-computed
+    // totalPrice (see calculateDepositAmount in lib/booking-pricing.ts and
+    // issue #124). Any client-supplied value is ignored on create.
     depositAmount: z.number().min(0).optional().default(0),
     stripePaymentIntentId: z.string().startsWith('pi_').max(255).optional(),
     stripeSessionId: z.string().startsWith('cs_').max(255).optional(),
@@ -84,14 +88,16 @@ export const updateBookingSchema = z
     checkInDate: z.coerce.date().optional(),
     checkOutDate: z.coerce.date().optional(),
     numGuests: z.number().int().min(1).max(50).optional(),
-    // numNights, cabinPrice, extrasPrice, totalPrice, and remainingAmount
-    // (below) are accepted here for schema shape only — the API route
-    // recomputes numNights/cabinPrice/extrasPrice/totalPrice server-side from
-    // the cabin and settings documents whenever a pricing-relevant field
-    // (cabin, dates, numGuests, extras) changes, and remainingAmount from
-    // totalPrice/depositAmount whenever either changes. Client-supplied
-    // values for all of these are ignored outright (see
-    // calculateBookingPricing in lib/booking-pricing.ts and issue #122).
+    // numNights, cabinPrice, extrasPrice, totalPrice, depositAmount, and
+    // remainingAmount (below) are accepted here for schema shape only — the
+    // API route recomputes numNights/cabinPrice/extrasPrice/totalPrice
+    // server-side from the cabin and settings documents whenever a
+    // pricing-relevant field (cabin, dates, numGuests, extras) changes, and
+    // remainingAmount from the new totalPrice and the deposit already stored
+    // on the booking. depositAmount itself is never writable through this
+    // route — PATCH /api/bookings/[id]'s recordPayment is its only writer.
+    // Client-supplied values for all of these are ignored outright (see
+    // calculateBookingPricing in lib/booking-pricing.ts and issues #122/#124).
     numNights: z.number().int().min(1).optional(),
     status: bookingStatusSchema.optional(),
     cabinPrice: z.number().min(0).optional(),
