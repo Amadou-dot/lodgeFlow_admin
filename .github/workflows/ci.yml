@@ -49,11 +49,23 @@ jobs:
       # `next build` runs the TypeScript check, which is what caught the
       # duplicate @internationalized/date copies that lint and tests missed.
       #
-      # This is a structurally-valid throwaway key, not a secret. ClerkProvider
-      # wraps both apps and throws without a publishable key while prerendering
-      # static pages. It is the only var the build needs — everything else
-      # constructs its SDK client lazily. No network calls happen during build.
+      # Both values below are structurally-valid throwaway literals, not secrets,
+      # and no network call happens during build.
+      #
+      # NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required for both apps: ClerkProvider
+      # wraps each one and throws without a publishable key while prerendering
+      # static pages.
+      #
+      # RESEND_API_KEY is admin-only. apps/customer constructs its SDK clients
+      # lazily (lib/resend.ts, lib/stripe.ts), so it needs no key at build time.
+      # apps/admin does not: app/api/send/confirm/route.ts and
+      # app/api/send/welcome/route.ts construct `new Resend(...)` at module
+      # scope, and Next evaluates those modules while collecting page data, so
+      # the build fails without *a* key present even though nothing is sent.
+      # This var is a deliberate stopgap for that gap — the real fix is porting
+      # the customer's lazy getResend() to the admin.
       - name: Type check and build
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          RESEND_API_KEY: re_ci_placeholder_000000000000000000000000
         run: pnpm --filter @lodgeflow/${{ matrix.app }} build
