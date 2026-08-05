@@ -4,12 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  check:
-    name: Lint, Format, and Test
+  ci:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [admin, customer]
 
     steps:
       - name: Checkout repository
@@ -18,16 +24,36 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.17.0
 
-      - name: Set up Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run CI checks
-        run: pnpm ci:check
+      - name: Check formatting
+        run: pnpm exec prettier --check .
+
+      # `pnpm lint` is `eslint --fix`, which rewrites files instead of failing
+      # on anything auto-fixable. CI runs eslint without --fix so it gates.
+      - name: Lint
+        run: pnpm --filter @lodgeflow/${{ matrix.app }} exec eslint .
+
+      - name: Test
+        run: pnpm --filter @lodgeflow/${{ matrix.app }} test
+
+      # `next build` runs the TypeScript check, which is what caught the
+      # duplicate @internationalized/date copies that lint and tests missed.
+      #
+      # This is a structurally-valid throwaway key, not a secret. ClerkProvider
+      # wraps both apps and throws without a publishable key while prerendering
+      # static pages. It is the only var the build needs — everything else
+      # constructs its SDK client lazily. No network calls happen during build.
+      - name: Type check and build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+        run: pnpm --filter @lodgeflow/${{ matrix.app }} build
