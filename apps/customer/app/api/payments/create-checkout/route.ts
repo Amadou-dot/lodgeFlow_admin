@@ -1,5 +1,6 @@
 import { Booking, connectDB, Settings } from '@/models';
 import { getStripe } from '@/lib/stripe';
+import { normalizeBaseUrl } from '@/lib/url';
 import type { ApiResponse, PopulatedBooking } from '@/types';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
@@ -88,7 +89,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(response, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    // Stripe rejects success_url/cancel_url unless they are absolute, and
+    // NEXT_PUBLIC_APP_URL is stored as a bare hostname. request.nextUrl.origin
+    // already carries a scheme, so normalizing is a no-op on that branch.
+    const baseUrl = normalizeBaseUrl(
+      process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
+    );
     const stripe = getStripe();
 
     const session = await stripe.checkout.sessions.create({

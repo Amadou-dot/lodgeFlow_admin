@@ -1,19 +1,15 @@
-export type SiteConfig = typeof siteConfig;
+import { normalizeBaseUrl } from '@/lib/url';
 
-// NEXT_PUBLIC_APP_URL is stored in Vercel as a bare hostname ("lodgeflow.app"),
-// but metadataBase runs `new URL()` on this and robots/sitemap concatenate
-// paths onto it — both need a scheme. Normalize instead of relying on how the
-// env var happens to be written.
-function withScheme(url: string): string {
-  return /^https?:\/\//.test(url) ? url : `https://${url}`;
-}
+export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
   name: 'LodgeFlow',
   description:
     'Welcome to paradise. Escape to luxury in the heart of nature at LodgeFlow.',
   // SEO / social fields
-  url: withScheme(process.env.NEXT_PUBLIC_APP_URL ?? 'https://lodgeflow.app'),
+  url: normalizeBaseUrl(
+    process.env.NEXT_PUBLIC_APP_URL ?? 'https://lodgeflow.app'
+  ),
   twitterHandle: '@lodgeflow',
   defaultOgImageAlt: 'LodgeFlow — luxury cabins in nature',
   navItems: [
