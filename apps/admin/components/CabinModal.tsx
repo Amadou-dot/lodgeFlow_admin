@@ -457,9 +457,7 @@ export default function CabinModal({
                   selectedKeys={[formData.status]}
                   onSelectionChange={(keys: SharedSelection) => {
                     const value = Array.from(keys)[0] as
-                      | 'active'
-                      | 'maintenance'
-                      | 'inactive';
+                      'active' | 'maintenance' | 'inactive';
                     if (value)
                       setFormData(prev => ({ ...prev, status: value }));
                   }}

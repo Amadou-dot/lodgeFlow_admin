@@ -135,9 +135,7 @@ export default function ExperiencesPage() {
         price: Number(formData.price) || 0,
         duration: formData.duration,
         difficulty: (formData.difficulty || 'Easy') as
-          | 'Easy'
-          | 'Moderate'
-          | 'Challenging',
+          'Easy' | 'Moderate' | 'Challenging',
         category: formData.category,
         description: formData.shortDescription || '',
         longDescription: formData.longDescription,

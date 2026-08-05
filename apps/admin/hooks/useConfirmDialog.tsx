@@ -14,12 +14,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   confirmColor?:
-    | 'default'
-    | 'primary'
-    | 'secondary'
-    | 'success'
-    | 'warning'
-    | 'danger';
+    'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
   onConfirm: () => void | Promise<void>;
   isLoading?: boolean;
 }

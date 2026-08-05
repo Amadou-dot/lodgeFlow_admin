@@ -92,10 +92,7 @@ export default function ExperienceFiltersComponent({
         selectedKeys={filters.difficulty ? [filters.difficulty] : []}
         onSelectionChange={(keys: SharedSelection) => {
           const value = Array.from(keys)[0] as
-            | 'Easy'
-            | 'Moderate'
-            | 'Challenging'
-            | undefined;
+            'Easy' | 'Moderate' | 'Challenging' | undefined;
           handleDifficultyChange(value);
         }}
         className='w-40'

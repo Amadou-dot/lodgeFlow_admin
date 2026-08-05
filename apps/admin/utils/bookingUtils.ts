@@ -5,11 +5,7 @@ export const formatBookingDates = (
   checkOut: string,
   numNights: number,
   status:
-    | 'unconfirmed'
-    | 'confirmed'
-    | 'checked-in'
-    | 'checked-out'
-    | 'cancelled'
+    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled'
 ) => {
   const checkInDate = new Date(checkIn);
   const checkOutDate = new Date(checkOut);
@@ -58,12 +54,7 @@ export const formatBookingDates = (
 
 // HeroUI Chip color type
 export type ChipColor =
-  | 'default'
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'warning'
-  | 'danger';
+  'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
 
 export const getStatusColor = (status: string): ChipColor => {
   switch (status) {

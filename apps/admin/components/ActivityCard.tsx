@@ -1,10 +1,6 @@
 interface Props {
   status:
-    | 'unconfirmed'
-    | 'confirmed'
-    | 'checked-in'
-    | 'checked-out'
-    | 'cancelled';
+    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
   name: string;
   stayDuration: string;
   bookingId: string;

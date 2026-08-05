@@ -17,8 +17,7 @@ interface ModalProps {
   resourceName: string;
   note?: string;
   onDelete:
-    | UseMutationResult<unknown, Error, string, unknown>
-    | (() => Promise<void>);
+    UseMutationResult<unknown, Error, string, unknown> | (() => Promise<void>);
   onResourceDeleted?: () => void;
   itemName?: string;
   children?: ReactNode; // Custom trigger button
@@ -27,20 +26,9 @@ interface ModalProps {
   buttonProps?: {
     className?: string;
     color?:
-      | 'default'
-      | 'primary'
-      | 'secondary'
-      | 'success'
-      | 'warning'
-      | 'danger';
+      'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
     variant?:
-      | 'solid'
-      | 'bordered'
-      | 'light'
-      | 'flat'
-      | 'faded'
-      | 'shadow'
-      | 'ghost';
+      'solid' | 'bordered' | 'light' | 'flat' | 'faded' | 'shadow' | 'ghost';
     size?: 'sm' | 'md' | 'lg';
     startContent?: ReactNode;
     disabled?: boolean;

@@ -46,11 +46,7 @@ export interface RecentBooking {
   checkOutDate: string | Date;
   numNights: number;
   status:
-    | 'unconfirmed'
-    | 'confirmed'
-    | 'checked-in'
-    | 'checked-out'
-    | 'cancelled';
+    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
   totalPrice: number;
   isPaid?: boolean;
 }

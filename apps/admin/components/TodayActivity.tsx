@@ -7,11 +7,7 @@ interface Activity {
   id: string;
   name: string;
   status:
-    | 'unconfirmed'
-    | 'confirmed'
-    | 'checked-in'
-    | 'checked-out'
-    | 'cancelled';
+    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
   stayDuration: string;
 }
 

@@ -22,11 +22,7 @@ export default function DiningServingDetails({
           selectedKeys={formData.category ? [formData.category] : []}
           onSelectionChange={keys => {
             const selected = Array.from(keys)[0] as
-              | 'regular'
-              | 'craft-beer'
-              | 'wine'
-              | 'spirits'
-              | 'non-alcoholic';
+              'regular' | 'craft-beer' | 'wine' | 'spirits' | 'non-alcoholic';
             onFormDataChange({ ...formData, category: selected });
           }}
           isRequired
