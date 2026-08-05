@@ -1,4 +1,11 @@
 {
-  "**/*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"],
+  "apps/admin/**/*.{js,jsx,ts,tsx}": [
+    "pnpm --filter @lodgeflow/admin exec eslint --fix",
+    "prettier --write"
+  ],
+  "apps/customer/**/*.{js,jsx,ts,tsx}": [
+    "pnpm --filter @lodgeflow/customer exec eslint --fix",
+    "prettier --write"
+  ],
   "**/*.{json,css,scss,md}": ["prettier --write"]
 }
