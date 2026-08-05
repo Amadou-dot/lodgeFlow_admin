@@ -484,7 +484,7 @@ design — it paces this process's own Clerk calls, and moving it to Redis would
 per Clerk request.
 
 ### Environment Variables Required
-No `.env.example` is checked into the repo (`.env*` is gitignored) — set these directly in `.env.local`. Minimum for local development:
+No `.env.example` is checked into this app (`.env*` is gitignored) — set these directly in `.env.local`. (`apps/customer/.env.example` exists and documents that app's own variables; this section covers only `apps/admin`.) Minimum for local development:
 ```bash
 MONGODB_URI=mongodb+srv://...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
@@ -554,7 +554,7 @@ after changing either var.
 - Run `pnpm test` before committing, `pnpm test:coverage` for coverage report
 - `pnpm test:fast` runs unit + jsdom only (no MongoDB binary needed) — use this in sandboxed/offline environments
 - `pnpm test:unit` / `pnpm test:integration` select a single node project
-- CI runs `pnpm ci:check` on every push/PR to `main` (`.github/workflows/ci.yml`)
+- CI (`.github/workflows/ci.yml`) runs on push to `main` and on all pull requests, matrixed over both apps. It does not call `pnpm ci:check` directly — it runs the same checks as four discrete steps (`prettier --check`, `eslint` without `--fix`, `test`, then `build`), so a failure is attributed to the specific step rather than the combined script.
 
 ### Test Structure
 ```
