@@ -1,3 +1,20 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# @heroui/calendar, date-picker and date-input hard-pin 3.12.0, while the
+# @react-aria/* packages they depend on require ^3.12.2. Two copies means two
+# distinct DateValue classes, and their #private brand makes them nominally
+# incompatible — every DateRangePicker/DatePicker value fails to type check.
+#
+# Mirrored as `overrides` in the root package.json so the dedup also holds if
+# anything installs with npm, which does not read this file. That copy uses
+# npm's "$@internationalized/date" reference syntax — a literal 3.12.2 there is
+# rejected with EOVERRIDE for conflicting with the ^3.10.1 direct dependency.
+overrides:
+  '@internationalized/date': 3.12.2
+  postcss: ^8.5.10
+
 allowBuilds:
   '@clerk/shared': true
   '@heroui/shared-utils': true
@@ -7,5 +24,11 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
-overrides:
-  postcss: ^8.5.10
+onlyBuiltDependencies:
+  - '@clerk/shared'
+  - '@heroui/shared-utils'
+  - core-js
+  - esbuild
+  - mongodb-memory-server
+  - sharp
+  - unrs-resolver
