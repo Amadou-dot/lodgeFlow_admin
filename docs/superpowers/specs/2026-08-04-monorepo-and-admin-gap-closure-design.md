@@ -235,6 +235,53 @@ sees fees that do not sum to the total, and any future recompute from `extras` i
 corruption. Fixing it means stripping fee amounts from the customer-editable schema and
 repricing on change. In Step 2 scope.
 
+### The admin's eager Resend client
+
+**The admin app cannot run `next build` in any environment lacking `RESEND_API_KEY`.**
+`apps/admin/app/api/send/confirm/route.ts:11` and `apps/admin/app/api/send/welcome/route.ts:11`
+both do:
+
+```typescript
+const resend = new Resend(process.env.RESEND_API_KEY);
+```
+
+at module scope. Next evaluates those modules while collecting page data during the build, and
+the Resend constructor throws on a missing key. The customer app hit this exact failure and
+fixed it — `apps/customer/lib/resend.ts` exposes a lazy `getResend()` that constructs on first
+use, mirroring `getStripe()` in `lib/stripe.ts`. The admin never received it.
+
+This was found during the step 1 migration, when the new CI workflow ran `next build` against
+the admin for the first time. It had stayed hidden because the admin's previous workflow never
+built. A throwaway placeholder key in `.github/workflows/ci.yml` unblocks CI; the underlying
+fragility is untouched, and it is documented as a known limitation there and in
+`apps/admin/CLAUDE.md`.
+
+**Fix:** port `getResend()` to the admin and call it inside the request handlers. In Step 2
+scope. The placeholder key and its explanatory comment come out of the CI workflow at the same
+time, and `apps/admin/CLAUDE.md`'s known-limitation note goes with them.
+
+### Why these three belong together
+
+The booking lock, the pricing calculator, and the Resend client are the same defect wearing
+three hats: **a fix landed in one app and never reached the other.** Each was found separately
+and none was caught by a test, because in every case both apps' suites were green — the
+divergence lives in code that neither suite exercises.
+
+That is the actual argument for `packages/database`, and it is stronger than "don't repeat
+yourself." Treat the three as one category rather than three tickets: the reconciliation work
+should include a deliberate sweep for further instances rather than waiting for the next one to
+surface through a build failure. Known members of the category so far:
+
+| Hardening | Has it | Lacks it |
+| --- | --- | --- |
+| `withCabinBookingLock()` (TOCTOU on overlapping bookings) | admin | customer |
+| `calculateBookingPricing()` (server-derived pricing) | admin | customer |
+| Lazy SDK construction (`getResend()`) | customer | admin |
+
+Note the direction reverses on the third row. This is not "the admin is hardened and the
+customer is not" — it is two codebases drifting independently, which is why the sweep needs to
+run in both directions.
+
 ### Schema reconciliation
 
 Because the schemas have diverged in semantics (see Problem), Step 2 is a semantic merge, not a
@@ -473,6 +520,12 @@ schema rules are largely uncovered by either suite, so green tests would say not
 whether the merge preserved behavior. That is precisely why 2a carries its own tests and 2b
 audits real data.
 
+**Build-time environment independence (step 2e).** Neither app may require an SDK credential to
+complete `next build`. The check is a CI run that supplies no `RESEND_API_KEY` at all — not a
+unit test, since the failure happens during Next's page-data collection rather than in any
+test's reach. This is the only regression test the eager-Resend class of bug admits, and its
+absence is why the defect survived until the step 1 migration added a build step.
+
 `$unionWith` requires MongoDB 4.4+; `mongodb-memory-server` is on 11.2.0, so the integration
 project supports it.
 
@@ -482,7 +535,7 @@ project supports it.
    `models/`, `lib/`, `tsconfig.json`, and `@/*` alias, so every existing import keeps working.
    *Done when:* both apps build locally, CI passes, both Vercel projects deploy green with root
    directories repointed at `apps/*`.
-2. **`packages/database`.** The largest and riskiest step. It contains four distinct pieces of
+2. **`packages/database`.** The largest and riskiest step. It contains five distinct pieces of
    work, and is a semantic merge rather than a file move:
    - **2a. Schema reconciliation** — resolve every divergence in the table above, drop and
      recreate the conflicting indexes under explicit names, write tests against the merged
@@ -495,10 +548,16 @@ project supports it.
    - **2d. Customer adoption** — `POST /api/bookings` wraps its check-then-write in the lock and
      uses the pricing calculator; `PATCH /api/bookings/[id]` stops accepting raw fee amounts and
      reprices on change.
+   - **2e. Admin adoption, and a divergence sweep** — port `getResend()` to the admin so its
+     `/api/send/*` routes stop constructing Resend at module scope, then remove the placeholder
+     `RESEND_API_KEY` and its comment from `.github/workflows/ci.yml` and the known-limitation
+     note from `apps/admin/CLAUDE.md`. Then sweep both apps for further one-sided hardening,
+     per "Why these three belong together" above.
 
    *Done when:* both apps import from `@lodgeflow/database`, no `models/` directory remains in
-   either app, the data audit reports clean, and integration tests prove both the customer-side
-   race and the `PATCH` pricing hole are closed.
+   either app, the data audit reports clean, integration tests prove both the customer-side race
+   and the `PATCH` pricing hole are closed, and the admin builds with no `RESEND_API_KEY` set
+   anywhere — verified by a CI run that does not supply one.
 3. **Permission layer.** Clerk roles, permission matrix, `requireApiAuth({ permission })`,
    updated call sites, conditional sidebar.
 4. **Audit log.** Model, `recordAudit()` helper, `/audit` page.
@@ -522,8 +581,10 @@ before step 2 begins means the schema merge happens against a stable base.
 with step 1 as "the migration," which was only defensible while the schemas looked identical.
 Now that 2a and 2b involve per-field semantic decisions and a data audit against production
 documents, it is the highest-risk work in the spec and deserves undivided planning attention.
-Sub-steps 2a and 2b may warrant landing ahead of 2c/2d, since reconciling the schemas is valuable
-even if the extraction slips.
+Sub-steps 2a and 2b may warrant landing ahead of 2c/2d/2e, since reconciling the schemas is
+valuable even if the extraction slips. 2e is the reverse case — porting `getResend()` to the
+admin depends on nothing else in step 2 and could ship on its own at any point, which makes it
+a reasonable warm-up if the schema work needs to wait.
 
 **Steps 3–6 are planned individually**, each after the previous has shipped, so later plans can
 respond to what the earlier work revealed.
