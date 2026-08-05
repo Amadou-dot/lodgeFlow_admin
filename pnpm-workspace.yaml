@@ -7,10 +7,23 @@ packages:
 # distinct DateValue classes, and their #private brand makes them nominally
 # incompatible — every DateRangePicker/DatePicker value fails to type check.
 #
-# Mirrored as `overrides` in the root package.json so the dedup also holds if
-# anything installs with npm, which does not read this file. That copy uses
-# npm's "$@internationalized/date" reference syntax — a literal 3.12.2 there is
-# rejected with EOVERRIDE for conflicting with the ^3.10.1 direct dependency.
+# This dedup is pnpm-only: `overrides` here is a pnpm-specific mechanism that
+# npm and yarn do not read. It is not mirrored as npm's `overrides` in the root
+# package.json — doing that correctly would require adding a root
+# `"workspaces"` field (npm otherwise never installs into apps/*) plus a
+# literal "3.12.2" (npm's "$@internationalized/date" reference syntax needs a
+# matching direct dependency in the same manifest, which the root lacks), and
+# even then it would guard only this one package via an npm install path that
+# is never exercised anywhere (CI only ever runs pnpm).
+#
+# Protection against Vercel silently installing with npm instead comes from
+# the root `"packageManager": "pnpm@11.17.0"` field in package.json plus the
+# fact that `pnpm-lock.yaml` is the only lockfile committed anywhere in this
+# repo (no package-lock.json or yarn.lock) — that combination is what Vercel's
+# build image and Corepack key off to select pnpm. A previous incident in the
+# customer repo (pre-monorepo) had Vercel silently install with npm and
+# resolve a different tree; that repo lacked both of those guarantees at the
+# time.
 overrides:
   '@internationalized/date': 3.12.2
   postcss: ^8.5.10
