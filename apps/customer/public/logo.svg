@@ -1,0 +1,51 @@
+<svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main circle background -->
+  <circle cx="70" cy="70" r="65" fill="url(#logoGradient)"/>
+  
+  <!-- Lodge/Cabin structure -->
+  <!-- Roof -->
+  <path d="M 40 65 L 70 45 L 100 65 L 95 65 L 70 50 L 45 65 Z" fill="#ffffff" opacity="0.95"/>
+  
+  <!-- Main building body -->
+  <rect x="50" y="65" width="40" height="30" fill="#ffffff" opacity="0.9" rx="2"/>
+  
+  <!-- Door -->
+  <rect x="63" y="75" width="14" height="20" fill="#3b82f6" rx="1"/>
+  <circle cx="74" cy="85" r="1.5" fill="#ffffff"/>
+  
+  <!-- Windows -->
+  <rect x="53" y="70" width="8" height="8" fill="#93c5fd" rx="1"/>
+  <rect x="79" y="70" width="8" height="8" fill="#93c5fd" rx="1"/>
+  
+  <!-- Window dividers -->
+  <line x1="57" y1="70" x2="57" y2="78" stroke="#3b82f6" stroke-width="0.5"/>
+  <line x1="53" y1="74" x2="61" y2="74" stroke="#3b82f6" stroke-width="0.5"/>
+  <line x1="83" y1="70" x2="83" y2="78" stroke="#3b82f6" stroke-width="0.5"/>
+  <line x1="79" y1="74" x2="87" y2="74" stroke="#3b82f6" stroke-width="0.5"/>
+  
+  <!-- Decorative elements - mountains in background -->
+  <path d="M 25 65 L 35 50 L 45 65 Z" fill="#ffffff" opacity="0.3"/>
+  <path d="M 95 65 L 105 50 L 115 65 Z" fill="#ffffff" opacity="0.3"/>
+  
+  <!-- Flow waves at bottom -->
+  <path d="M 30 100 Q 40 97 50 100 T 70 100 T 90 100 T 110 100" 
+        stroke="#ffffff" 
+        stroke-width="2" 
+        fill="none" 
+        opacity="0.6"
+        stroke-linecap="round"/>
+  <path d="M 30 105 Q 40 102 50 105 T 70 105 T 90 105 T 110 105" 
+        stroke="#ffffff" 
+        stroke-width="2" 
+        fill="none" 
+        opacity="0.4"
+        stroke-linecap="round"/>
+</svg>

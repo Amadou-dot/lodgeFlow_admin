@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm exec prettier --check .
+
+      # `pnpm lint` is `eslint --fix`, which rewrites files instead of failing on
+      # anything auto-fixable. CI runs eslint without --fix so those actually gate.
+      - name: Lint
+        run: pnpm exec eslint .
+
+      - name: Test
+        run: pnpm test
+
+      - name: Type check and build
+        # `next build` runs the TypeScript check, which is what caught the
+        # duplicate @internationalized/date copies that lint and tests missed.
+        #
+        # This is a structurally-valid throwaway key, not a secret. ClerkProvider
+        # wraps the app and throws without a publishable key while prerendering
+        # static pages. It is the only var the build needs — everything else
+        # constructs its SDK client lazily (see lib/stripe.ts, lib/resend.ts).
+        # No network calls happen during build.
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+        run: pnpm build

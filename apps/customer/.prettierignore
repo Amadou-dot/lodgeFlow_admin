@@ -1,0 +1,14 @@
+.next
+node_modules
+.vscode
+out
+dist
+build
+coverage
+*.log
+.DS_Store
+.env*.local
+public
+.vercel
+pnpm-lock.yaml
+package-lock.json
