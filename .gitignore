@@ -60,6 +60,22 @@ local/*
 .worktrees/
 
 # Workspace
+#
+# Every pattern below this point that has a `/` anywhere but the end (or a
+# leading `/`) is anchored to the directory of the .gitignore that declares
+# it. These lines used to live in apps/admin/.gitignore, where that anchor
+# was apps/admin/ -- moving the file to the repo root re-anchored all of them
+# to the root only, silently dropping per-app coverage. This block restores
+# it for every such pattern above (aside from /.next/, /node_modules/, and
+# tsconfig.tsbuildinfo, which the brief's Step 3 already handled).
 apps/*/.next/
 apps/*/node_modules/
 apps/*/tsconfig.tsbuildinfo
+apps/*/coverage/
+apps/*/out/
+apps/*/build/
+apps/*/.vscode/
+apps/*/.clerk/
+apps/*/local/
+apps/*/.playwright-mcp/
+apps/*/.pnp
