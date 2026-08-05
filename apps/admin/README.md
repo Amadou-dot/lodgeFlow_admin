@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  A modern hotel management dashboard built with Next.js 15, HeroUI, and MongoDB. Features comprehensive cabin management, booking system, customer profiles, and business analytics.
+  A modern hotel management dashboard built with Next.js 16, HeroUI, and MongoDB. Features comprehensive cabin management, booking system, customer profiles, and business analytics.
 </p>
 
 ---
@@ -37,11 +37,16 @@
 
 ## 🛠 Tech Stack
 
-- **Frontend**: [Next.js 15](https://nextjs.org/) • [HeroUI v2](https://heroui.com/) • [Tailwind CSS](https://tailwindcss.com/)
+- **Frontend**: [Next.js 16](https://nextjs.org/) • [HeroUI v2](https://heroui.com/) • [Tailwind CSS](https://tailwindcss.com/)
 - **Backend**: [MongoDB](https://mongodb.com/) • [Mongoose ODM](https://mongoosejs.com/)
 - **Tools**: [TypeScript](https://www.typescriptlang.org/) • [SWR](https://swr.vercel.app/) • [Recharts](https://recharts.org/)
 
 ## 🚀 Quick Start
+
+This app lives at `apps/admin` in the LodgeFlow monorepo. See the root
+[`README.md`](../../README.md) for workspace-wide scripts — e.g. `pnpm dev:admin`
+run from the repository root is equivalent to `pnpm dev` run from `apps/admin`,
+as in the steps below.
 
 ### Prerequisites
 - Node.js 18+ and pnpm
@@ -50,12 +55,15 @@
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/Amadou-dot/LodgeFlow_admin.git
-cd LodgeFlow_admin
+# Clone the repository (this is the monorepo root, not this app alone)
+git clone https://github.com/Amadou-dot/lodgeFlow_admin.git
+cd lodgeFlow_admin
 
-# Install dependencies
+# Install dependencies for the whole workspace
 pnpm install
+
+# Move into this app — the commands below assume this as the working directory
+cd apps/admin
 ```
 
 ### Database Setup
@@ -71,6 +79,11 @@ SEED_SECRET=replace-with-a-long-random-secret
 
 `SEED_SECRET` is required for `/api/cron/seed`. Call the route with
 `Authorization: Bearer <SEED_SECRET>`.
+
+This is a minimal example for connecting to a database — `pnpm dev` and
+`pnpm build` also need Clerk and Resend credentials. See
+[`CLAUDE.md`](./CLAUDE.md#environment-variables-required) for the full list of
+required and optional environment variables.
 
 **Local MongoDB**
 1. Install [MongoDB Community Server](https://www.mongodb.com/try/download/community)
@@ -118,7 +131,7 @@ lib/                # Utilities & configurations
 
 ## 📄 License
 
-This project is licensed under the [MIT License](./LICENSE).
+This project is licensed under the [MIT License](../../LICENSE).
 
 ---
 
