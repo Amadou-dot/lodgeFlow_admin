@@ -51,3 +51,15 @@ local/*
 
 .playwright-mcp/*
 .env*
+
+# apps/customer keeps a committed .env.example template documenting which
+# vars it needs; the blanket .env* rule above would otherwise catch it too.
+!.env.example
+
+# Git worktrees left under apps/customer (excluded from its Jest config too)
+.worktrees/
+
+# Workspace
+apps/*/.next/
+apps/*/node_modules/
+apps/*/tsconfig.tsbuildinfo

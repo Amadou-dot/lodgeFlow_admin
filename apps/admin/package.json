@@ -126,7 +126,7 @@
     "lint-staged": "^16.2.7",
     "mongodb-memory-server": "^11.0.1",
     "postcss": "8.5.10",
-    "prettier": "3.7.4",
+    "prettier": "3.9.6",
     "tailwind-variants": "3.2.2",
     "tailwindcss": "4.1.18",
     "ts-jest": "^29.4.6",
