@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Monorepo layout.** This app lives at `apps/admin/` in the LodgeFlow
+> workspace. Every path in this document is relative to that directory unless
+> it starts with `docs/`, `.github/`, or `packages/`, which are repo-root paths.
+> Scripts below run from within `apps/admin/`, or from the repo root as
+> `pnpm --filter @lodgeflow/admin <script>`.
+
+### Duplicated models (temporary)
+
+`models/` exists in both `apps/admin` and `apps/customer` and the two copies
+have **diverged in semantics** — `Booking`'s `pre('save')` hooks, its index
+options, `Settings` validation and seeding, and `Cabin`'s discount validator
+all differ. Do not merge them ad hoc. Reconciliation is Step 2 of
+`docs/superpowers/specs/2026-08-04-monorepo-and-admin-gap-closure-design.md`,
+which resolves each divergence explicitly and audits existing data.
+
 ## Project Overview
 
 LodgeFlow is a modern hotel management dashboard built with Next.js 16, featuring comprehensive cabin management, booking system, customer profiles, and business analytics. The application uses MongoDB for business data and Clerk for authentication.
@@ -32,7 +47,7 @@ pnpm format:check     # Check formatting without changes
 pnpm format:fix       # Format only files that differ from Prettier's output
 pnpm ci:check         # Run all checks (format, lint, test)
 pnpm check:types      # TypeScript type checking via script
-pnpm pre-commit       # lint-staged (runs via Husky on commit)
+pnpm pre-commit       # lint-staged (runs via the workspace-root Husky hook)
 ```
 
 ### Testing
@@ -478,6 +493,14 @@ RESEND_API_KEY=re_...          # Email sending (/api/send/*)
 SEED_SECRET=...                # Bearer token for /api/cron/seed
 ```
 
+`RESEND_API_KEY` is required even to build, not just to send email:
+`app/api/send/confirm/route.ts` and `app/api/send/welcome/route.ts` construct
+`new Resend(...)` at module scope, so `next build` fails while collecting page
+data if the var is absent — a placeholder value is enough, since no network
+call happens unless the route actually runs. CI sets a throwaway placeholder
+for this reason (`.github/workflows/ci.yml`); the real fix (deferred) is
+porting the customer app's lazy `getResend()` pattern to the admin.
+
 Optional:
 ```bash
 CLERK_API_CONCURRENT_LIMIT=3   # Clerk batch fetch concurrency (default: 3)
@@ -612,7 +635,7 @@ __tests__/
 ## Additional Documentation
 
 - `README.md` — Quick start, env setup, project overview
-- `docs/api.md` — Full API endpoint reference (auth, rate limits, request/response shapes)
-- `docs/issues_template.md` — **Required reading before creating issues** (bug / gap / feature skeletons)
-- `docs/pull_requests_template.md` — **Required reading before opening PRs** (summary, test plan, conventions)
+- `../../docs/api.md` — Full API endpoint reference (auth, rate limits, request/response shapes)
+- `../../docs/issues_template.md` — **Required reading before creating issues** (bug / gap / feature skeletons)
+- `../../docs/pull_requests_template.md` — **Required reading before opening PRs** (summary, test plan, conventions)
 - `__tests__/API_TESTING.md` — API test coverage notes

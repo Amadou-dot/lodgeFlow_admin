@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Monorepo layout.** This app lives at `apps/customer/` in the LodgeFlow
+> workspace. Every path in this document is relative to that directory unless
+> it starts with `docs/`, `.github/`, or `packages/`, which are repo-root paths.
+> Scripts below run from within `apps/customer/`, or from the repo root as
+> `pnpm --filter @lodgeflow/customer <script>`.
+
+### Duplicated models (temporary)
+
+`models/` exists in both `apps/admin` and `apps/customer` and the two copies
+have **diverged in semantics** — `Booking`'s `pre('save')` hooks, its index
+options, `Settings` validation and seeding, and `Cabin`'s discount validator
+all differ. Do not merge them ad hoc. Reconciliation is Step 2 of
+`docs/superpowers/specs/2026-08-04-monorepo-and-admin-gap-closure-design.md`,
+which resolves each divergence explicitly and audits existing data.
+
 ## Commands
 
 ```bash
