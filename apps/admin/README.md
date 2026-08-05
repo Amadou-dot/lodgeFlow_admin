@@ -49,8 +49,12 @@ run from the repository root is equivalent to `pnpm dev` run from `apps/admin`,
 as in the steps below.
 
 ### Prerequisites
-- Node.js 18+ and pnpm
-- MongoDB (Atlas or local installation)
+- Node.js 22 — this repo's CI and Vercel project both run Node 22.x; the true
+  floor is Node ≥ 20.9.0, which `next@16.2.10` declares in its own
+  `engines.node` (`node_modules/next/package.json`)
+- pnpm 11.17.0, pinned via the root `package.json`'s `packageManager` field
+- MongoDB (Atlas or local installation) — no minimum server version is
+  declared anywhere in this repo
 
 ### Installation
 
