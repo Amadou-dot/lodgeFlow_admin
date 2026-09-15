@@ -1,3 +1,4 @@
+import { auditSnapshot, CABIN_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -141,6 +142,13 @@ export async function POST(request: NextRequest) {
 
     const cabin = await Cabin.create(validationResult.data);
 
+    await recordAudit(authResult, {
+      action: 'cabin.create',
+      resourceType: 'cabin',
+      resourceId: String(cabin._id),
+      before: {},
+      after: auditSnapshot(cabin, CABIN_AUDIT_FIELDS),
+    });
     return createSuccessResponse(cabin, undefined, HTTP_STATUS.CREATED);
   } catch (error: unknown) {
     // Handle validation errors
@@ -204,6 +212,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const auditBefore = auditSnapshot(
+      await Cabin.findById(_id),
+      CABIN_AUDIT_FIELDS
+    );
     const cabin = await Cabin.findByIdAndUpdate(_id, updateData, {
       new: true,
       runValidators: true,
@@ -213,6 +225,13 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);
     }
 
+    await recordAudit(authResult, {
+      action: 'cabin.update',
+      resourceType: 'cabin',
+      resourceId: String(cabin._id),
+      before: auditBefore,
+      after: auditSnapshot(cabin, CABIN_AUDIT_FIELDS),
+    });
     return createSuccessResponse(cabin);
   } catch (error: unknown) {
     if (isMongooseValidationError(error)) {
@@ -258,6 +277,13 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);
     }
 
+    await recordAudit(authResult, {
+      action: 'cabin.delete',
+      resourceType: 'cabin',
+      resourceId: String(cabin._id),
+      before: auditSnapshot(cabin, CABIN_AUDIT_FIELDS),
+      after: {},
+    });
     return createSuccessResponse(null, 'Cabin deleted successfully');
   } catch (error) {
     logger.error(

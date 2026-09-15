@@ -1,3 +1,5 @@
+import { auditSnapshot, CABIN_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
+import type { ApiAuthResult } from '@/lib/api-utils';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -47,9 +49,9 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'delete':
-        return handleBulkDelete(ids);
+        return handleBulkDelete(ids, authResult);
       case 'update-discount':
-        return handleBulkUpdateDiscount(ids, body.discount);
+        return handleBulkUpdateDiscount(ids, body.discount, authResult);
       default:
         return createErrorResponse(
           `Unknown action: ${action}`,
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleBulkDelete(ids: string[]) {
+async function handleBulkDelete(ids: string[], access: ApiAuthResult) {
   // Check for active bookings on any of the selected cabins
   const activeBookings = await Booking.find({
     cabin: { $in: ids },
@@ -87,14 +89,27 @@ async function handleBulkDelete(ids: string[]) {
     );
   }
 
+  const cabins = await Cabin.find({ _id: { $in: ids } });
   const result = await Cabin.deleteMany({ _id: { $in: ids } });
 
+  for (const cabin of cabins)
+    await recordAudit(access, {
+      action: 'cabin.delete',
+      resourceType: 'cabin',
+      resourceId: String(cabin._id),
+      before: auditSnapshot(cabin, CABIN_AUDIT_FIELDS),
+      after: {},
+    });
   return createSuccessResponse({
     deletedCount: result.deletedCount,
   });
 }
 
-async function handleBulkUpdateDiscount(ids: string[], discount: number) {
+async function handleBulkUpdateDiscount(
+  ids: string[],
+  discount: number,
+  access: ApiAuthResult
+) {
   if (
     discount === undefined ||
     discount === null ||
@@ -130,6 +145,14 @@ async function handleBulkUpdateDiscount(ids: string[], discount: number) {
     { $set: { discount } }
   );
 
+  for (const cabin of cabins)
+    await recordAudit(access, {
+      action: 'cabin.update',
+      resourceType: 'cabin',
+      resourceId: String(cabin._id),
+      before: { discount: cabin.discount },
+      after: { discount },
+    });
   return createSuccessResponse({
     modifiedCount: result.modifiedCount,
   });

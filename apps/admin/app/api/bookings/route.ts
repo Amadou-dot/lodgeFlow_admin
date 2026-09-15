@@ -1,4 +1,10 @@
 import {
+  auditSnapshot,
+  BOOKING_AUDIT_FIELDS,
+  recordAudit,
+  recordBookingAudit,
+} from '@/lib/audit';
+import {
   assertBookingCanReprice,
   BookingPaymentError,
   paymentSummary,
@@ -368,6 +374,13 @@ export async function POST(request: NextRequest) {
     }
 
     const booking = lockResult.booking;
+    await recordAudit(authResult, {
+      action: 'booking.create',
+      resourceType: 'booking',
+      resourceId: String(booking._id),
+      before: {},
+      after: auditSnapshot(booking, BOOKING_AUDIT_FIELDS),
+    });
 
     // Populate the response
     const populatedBooking = await Booking.findById(booking._id).populate(
@@ -523,6 +536,8 @@ export async function PUT(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    const auditBefore = auditSnapshot(existingBooking, BOOKING_AUDIT_FIELDS);
 
     // Validate status transitions
     if (updateData.status && updateData.status !== existingBooking.status) {
@@ -822,6 +837,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    await recordBookingAudit(authResult, _id, auditBefore, booking);
+
     // Populate with Clerk customer data
     const {
       bookings: [populatedWithClerk],
@@ -942,7 +959,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete the booking
-    await Booking.findByIdAndDelete(id);
+    const deleted = await Booking.findByIdAndDelete(id);
+    if (deleted)
+      await recordAudit(authResult, {
+        action: 'booking.delete',
+        resourceType: 'booking',
+        resourceId: id,
+        before: auditSnapshot(deleted, BOOKING_AUDIT_FIELDS),
+        after: {},
+      });
 
     return NextResponse.json({
       success: true,
