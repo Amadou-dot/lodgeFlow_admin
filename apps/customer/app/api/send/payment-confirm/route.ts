@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const { bookingId, amountPaid, isDeposit } = await request.json();
+  const { bookingId } = await request.json();
 
   try {
     if (!bookingId) {
@@ -50,12 +50,14 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    const safeAmountPaid =
-      typeof amountPaid === 'number' && amountPaid > 0
-        ? amountPaid
-        : isDeposit
-          ? booking.depositAmount
-          : booking.totalPrice;
+    const receipt = booking.payments.at(-1);
+    if (!receipt)
+      return Response.json(
+        { error: 'No payment has been received' },
+        { status: 400 }
+      );
+    const safeAmountPaid = receipt.amount;
+    const isDeposit = !booking.isPaid;
 
     const { data, error } = await getResend().emails.send({
       from: 'LodgeFlow <onboarding@resend.dev>',

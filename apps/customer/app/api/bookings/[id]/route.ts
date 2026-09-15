@@ -1,3 +1,10 @@
+import mongoose from 'mongoose';
+import {
+  updateCustomerBooking,
+  BookingRuleError,
+  BookingPaymentError,
+  BookingPricingError,
+} from '@lodgeflow/database';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -96,42 +103,11 @@ export async function PATCH(
       return validationErrorResponse(validation.error);
     }
 
-    // Find the booking
-    const booking = await Booking.findById(id);
-
-    if (!booking) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    // Verify the booking belongs to the authenticated user
-    if (booking.customer.toString() !== userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    // Prevent modifications to checked-in/checked-out bookings
-    if (booking.status === 'checked-in' || booking.status === 'checked-out') {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Cannot modify bookings that are checked-in or checked-out',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    const updates = validation.data;
-
-    // Update the booking
-    const updatedBooking = await Booking.findByIdAndUpdate(id, updates, {
-      new: true,
-      runValidators: true,
-    }).populate('cabin');
+    const updatedBooking = await updateCustomerBooking(
+      id,
+      userId,
+      validation.data
+    );
 
     const response: ApiResponse<any> = {
       success: true,
@@ -141,6 +117,29 @@ export async function PATCH(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    if (
+      error instanceof BookingRuleError ||
+      error instanceof BookingPaymentError ||
+      error instanceof BookingPricingError ||
+      error instanceof mongoose.Error.VersionError
+    ) {
+      const status =
+        error instanceof BookingRuleError
+          ? error.status
+          : error instanceof BookingPricingError
+            ? 400
+            : 409;
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            error instanceof mongoose.Error.VersionError
+              ? 'Booking changed; refresh and try again'
+              : error.message,
+        },
+        { status }
+      );
+    }
     console.error('Error updating booking:', error);
 
     const response: ApiResponse<never> = {
@@ -213,76 +212,97 @@ export async function DELETE(
       return NextResponse.json(response, { status: 404 });
     }
 
-    // Check if booking can be cancelled
-    if (
-      booking.status === 'checked-in' ||
-      booking.status === 'checked-out' ||
-      booking.status === 'cancelled'
-    ) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: `Cannot cancel booking with status: ${booking.status}`,
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    // Get settings for cancellation policy
-    const settings = await Settings.getSettings();
-
-    // Calculate refund based on policy
-    let refundEstimate: {
-      refundAmount: number;
-      refundType: 'full' | 'partial' | 'none';
-      reason: string;
-    } = {
-      refundAmount: 0,
-      refundType: 'none',
-      reason: 'No payment made',
-    };
-
-    if (booking.isPaid || booking.depositPaid) {
-      const estimate = calculateRefund(booking, settings);
-      refundEstimate = {
-        refundAmount: estimate.refundAmount,
-        refundType: estimate.refundType,
-        reason: estimate.reason,
-      };
-    }
-
-    // Process Stripe refund if applicable
-    let refundStatus: 'none' | 'pending' | 'processing' | 'failed' = 'none';
-    let stripeRefundError: string | undefined;
-
-    if (refundEstimate.refundAmount > 0 && booking.stripePaymentIntentId) {
-      refundStatus = 'processing';
-
-      const refundResult = await createRefund(
-        booking.stripePaymentIntentId,
-        refundEstimate.refundAmount
+    if (booking.checkoutPending) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Checkout is active; complete or expire it before cancelling',
+        },
+        { status: 409 }
       );
+    }
+    if (['checked-in', 'checked-out'].includes(booking.status)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot cancel booking with status: ${booking.status}`,
+        },
+        { status: 400 }
+      );
+    }
+    const settings = await Settings.getSettings();
+    const refundEstimate =
+      booking.status === 'cancelled'
+        ? {
+            refundAmount: booking.refundRequestedAmount ?? 0,
+            refundType: 'partial' as const,
+            reason: 'Previously requested cancellation refund',
+          }
+        : calculateRefund(booking, settings);
 
-      if (!refundResult.success) {
-        refundStatus = 'failed';
-        stripeRefundError = refundResult.error;
-        console.error('Stripe refund failed:', refundResult.error);
-      } else {
-        // Refund initiated - webhook will update status to 'partial' or 'full' when completed
-        refundStatus = 'pending';
+    if (booking.status !== 'cancelled') {
+      // Persist the cancellation and its refund plan before contacting Stripe.
+      // Concurrent cancellation/payment requests lose the version comparison.
+      let remaining = refundEstimate.refundAmount;
+      booking.cancellationRefunds = [];
+      for (const payment of booking.payments) {
+        if (!payment.paymentIntentId || remaining <= 0) continue;
+        const amount =
+          Math.round(
+            Math.min(
+              remaining,
+              payment.amount - (payment.refundedAmount ?? 0)
+            ) * 100
+          ) / 100;
+        if (amount <= 0) continue;
+        booking.cancellationRefunds.push({
+          paymentIntentId: payment.paymentIntentId,
+          amount,
+        });
+        remaining = Math.round((remaining - amount) * 100) / 100;
       }
+      booking.status = 'cancelled';
+      booking.cancelledAt = new Date();
+      booking.cancellationReason = cancellationReason;
+      booking.refundRequestedAmount = refundEstimate.refundAmount;
+      booking.refundStatus =
+        refundEstimate.refundAmount > 0 ? 'pending' : 'none';
+      await booking.save();
     }
 
-    // Update booking with cancellation details
-    const updateData = {
-      status: 'cancelled',
-      cancelledAt: new Date(),
-      cancellationReason,
-      refundStatus,
-      refundAmount: refundEstimate.refundAmount,
-    };
-
-    const updatedBooking = await Booking.findByIdAndUpdate(id, updateData, {
-      new: true,
-    }).populate('cabin');
+    let stripeRefundError: string | undefined;
+    for (const refund of booking.cancellationRefunds) {
+      if (refund.refundId) continue;
+      // Stripe retains idempotency keys for at least 24 hours. An unresolved older
+      // request needs reconciliation instead of risking a second refund.
+      if (Date.now() - booking.cancelledAt!.getTime() > 23 * 60 * 60 * 1000) {
+        stripeRefundError = 'Refund requires staff reconciliation';
+        break;
+      }
+      const result = await createRefund(
+        refund.paymentIntentId,
+        refund.amount,
+        `cancel:${id}:${refund.paymentIntentId}`
+      );
+      if (!result.success) {
+        stripeRefundError = result.error;
+        break;
+      }
+      await Booking.updateOne(
+        {
+          _id: id,
+          'cancellationRefunds.paymentIntentId': refund.paymentIntentId,
+        },
+        {
+          $set: { 'cancellationRefunds.$.refundId': result.refundId },
+          $inc: { __v: 1 },
+        }
+      );
+    }
+    // refundAmount records completed refunds only; signed webhooks update it.
+    // Offline receipts remain pending for staff to return and record manually.
+    const updatedBooking = await Booking.findById(id).populate('cabin');
+    const refundStatus = updatedBooking?.refundStatus ?? 'none';
 
     // Send cancellation confirmation email (async, don't block response)
     if (updatedBooking && updatedBooking.cabin) {
@@ -319,6 +339,11 @@ export async function DELETE(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    if (error instanceof mongoose.Error.VersionError)
+      return NextResponse.json(
+        { success: false, error: 'Booking changed; refresh and try again' },
+        { status: 409 }
+      );
     console.error('Error cancelling booking:', error);
 
     const response: ApiResponse<never> = {

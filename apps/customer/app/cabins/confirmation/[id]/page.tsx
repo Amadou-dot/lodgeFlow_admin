@@ -54,6 +54,7 @@ interface BookingData {
   extras: BookingExtras;
   specialRequests: string[];
   depositAmount: number;
+  amountPaid: number;
   depositPaid: boolean;
 }
 
@@ -390,15 +391,14 @@ export default function BookingConfirmationPage({
       {!booking.isPaid &&
         booking.status !== 'cancelled' &&
         (() => {
-          const isDepositDue =
-            booking.depositAmount > 0 && !booking.depositPaid;
+          const amountReceived = booking.amountPaid ?? 0;
+          const isDepositDue = amountReceived < booking.depositAmount;
           const remainingBalance = Math.max(
             0,
-            booking.totalPrice -
-              (booking.depositPaid ? booking.depositAmount : 0)
+            booking.totalPrice - amountReceived
           );
           const amountToPay = isDepositDue
-            ? booking.depositAmount
+            ? booking.depositAmount - amountReceived
             : remainingBalance;
 
           if (amountToPay <= 0) return null;
@@ -409,7 +409,7 @@ export default function BookingConfirmationPage({
                 <h3 className='text-lg font-semibold'>Complete Your Payment</h3>
                 <p className='text-sm text-default-500 text-center'>
                   {isDepositDue
-                    ? `Pay the deposit of $${booking.depositAmount} to secure your booking.`
+                    ? `Pay the remaining deposit of $${amountToPay} to secure your booking.`
                     : `Pay the remaining balance of $${amountToPay} to confirm your reservation.`}
                 </p>
                 <PaymentButton

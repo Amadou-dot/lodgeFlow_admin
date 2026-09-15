@@ -47,15 +47,11 @@ export function calculateRefund(
     cancellationDate
   );
 
-  // Determine refundable amount based on payment state:
-  // - If isPaid is true: full payment was completed, refund from totalPrice
-  // - If only depositPaid: only deposit can be refunded
-  // - If neither: no payment to refund
-  const amountPaid = booking.isPaid
-    ? booking.totalPrice
-    : booking.depositPaid
-      ? booking.depositAmount || 0
-      : 0;
+  // Refund only received money; a required but unpaid deposit is not refundable.
+  const amountPaid = Math.max(
+    0,
+    (booking.amountPaid ?? 0) - (booking.refundAmount ?? 0)
+  );
 
   if (amountPaid === 0) {
     return {

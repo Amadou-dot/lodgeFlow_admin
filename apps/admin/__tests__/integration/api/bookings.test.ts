@@ -48,6 +48,16 @@ async function createTestBooking(
     numGuests: 2,
     cabinPrice: 600,
     totalPrice: 600,
+    payments: overrides.isPaid
+      ? [
+          {
+            id: 'test-receipt',
+            amount: overrides.totalPrice ?? 600,
+            method: 'cash',
+            receivedAt: new Date(),
+          },
+        ]
+      : [],
     ...overrides,
   });
 }
@@ -346,7 +356,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(800);
       // Default seeded settings: requireDeposit true, depositPercentage 25.
       expect(body.data.depositAmount).toBe(200);
-      expect(body.data.remainingAmount).toBe(600); // 800 - 200, not the claimed 0
+      expect(body.data.remainingAmount).toBe(800); // Deposit due is not a payment
     });
 
     it('sets depositAmount to 0 when settings do not require a deposit', async () => {
@@ -635,7 +645,7 @@ describe('Bookings API Routes', () => {
       expect(new Date(body.data.cancelledAt).toISOString()).toBe(explicitDate);
     });
 
-    it('auto-sets paidAt when isPaid becomes true', async () => {
+    it('ignores a forged paid flag without recording a payment', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, { isPaid: false });
 
@@ -651,7 +661,8 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
-      expect(body.data.paidAt).toBeDefined();
+      expect(body.data.paidAt).toBeUndefined();
+      expect(body.data.isPaid).toBe(false);
     });
 
     it('does not overwrite paidAt on already-paid bookings', async () => {
@@ -667,7 +678,7 @@ describe('Bookings API Routes', () => {
         body: {
           _id: booking._id.toString(),
           isPaid: true,
-          numGuests: 3,
+          observations: 'Updated notes',
         },
       });
 
@@ -685,6 +696,7 @@ describe('Bookings API Routes', () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
         status: 'cancelled',
+        isPaid: true,
       });
 
       const request = createRequest('http://localhost:3000/api/bookings', {
@@ -785,7 +797,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.cabinPrice).toBe(600);
       expect(body.data.extrasPrice).toBe(0);
       expect(body.data.totalPrice).toBe(600);
-      expect(body.data.remainingAmount).toBe(400); // 600 - 200, not the tampered 0
+      expect(body.data.remainingAmount).toBe(600); // No receipt has been recorded
     });
 
     it('recomputes totalPrice and remainingAmount from the cabin price when numGuests changes', async () => {
@@ -820,7 +832,7 @@ describe('Bookings API Routes', () => {
       // extraGuestFee: (2 - 1) * 20 * 3 nights = 60
       expect(body.data.extrasPrice).toBe(60);
       expect(body.data.totalPrice).toBe(660); // 600 + 60
-      expect(body.data.remainingAmount).toBe(560); // 660 - 100
+      expect(body.data.remainingAmount).toBe(660); // No receipt has been recorded
     });
 
     it('ignores tampered extras.*Fee values and computes fees from settings', async () => {
@@ -920,10 +932,10 @@ describe('Bookings API Routes', () => {
       expect(response.status).toBe(200);
       expect(body.data.totalPrice).toBe(600);
       expect(body.data.depositAmount).toBe(200); // not the tampered 600
-      expect(body.data.remainingAmount).toBe(400); // 600 - 200, not 0
+      expect(body.data.remainingAmount).toBe(600); // No receipt has been recorded
     });
 
-    it('preserves a recorded deposit and recomputes remainingAmount when an unrelated field changes', async () => {
+    it('recomputes the required deposit when an unpaid booking price changes', async () => {
       const cabin = await createTestCabin({
         price: 200,
         capacity: 4,
@@ -951,10 +963,8 @@ describe('Bookings API Routes', () => {
       expect(response.status).toBe(200);
       // extraGuestFee: (3 - 1) * 20 * 3 nights = 120
       expect(body.data.totalPrice).toBe(720);
-      // The deposit must survive a pricing recompute triggered by an
-      // unrelated edit — it reflects money actually taken.
-      expect(body.data.depositAmount).toBe(200);
-      expect(body.data.remainingAmount).toBe(520); // 720 - 200
+      expect(body.data.depositAmount).toBe(180);
+      expect(body.data.remainingAmount).toBe(720);
     });
 
     it('returns a 400 (not a 500) when only checkOutDate changes to the same calendar day as the existing checkInDate', async () => {

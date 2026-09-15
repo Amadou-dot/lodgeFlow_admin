@@ -1,3 +1,4 @@
+import { paymentSummary, type BookingPayment } from '../booking-payments';
 import { BOOKING_STATUSES, PAYMENT_METHODS, REFUND_STATUSES } from '../config';
 import { differenceInCalendarDays } from 'date-fns';
 import mongoose, { Document, Model, Schema } from 'mongoose';
@@ -14,6 +15,13 @@ export interface IBooking extends Document {
   extrasPrice: number;
   totalPrice: number;
   isPaid: boolean;
+  amountPaid: number;
+  payments: BookingPayment[];
+  checkoutPending: boolean;
+  checkoutToken?: string;
+  checkoutAmount?: number;
+  checkoutTotalPrice?: number;
+  checkoutCurrency?: string;
   paymentMethod?: (typeof PAYMENT_METHODS)[number];
   extras: {
     hasBreakfast: boolean;
@@ -38,6 +46,12 @@ export interface IBooking extends Document {
   cancellationReason?: string;
   refundStatus: (typeof REFUND_STATUSES)[number];
   refundAmount?: number;
+  refundRequestedAmount?: number;
+  cancellationRefunds: {
+    paymentIntentId: string;
+    amount: number;
+    refundId?: string;
+  }[];
   refundedAt?: Date;
   paymentConfirmationSentAt?: Date;
   remainingAmount: number;
@@ -115,6 +129,26 @@ const BookingSchema: Schema = new Schema(
       required: [true, 'Total price is required'],
       min: [0, 'Total price must be positive'],
     },
+    amountPaid: { type: Number, default: 0, min: 0 },
+    payments: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },
+          amount: { type: Number, required: true, min: 0 },
+          method: { type: String, enum: [...PAYMENT_METHODS], required: true },
+          receivedAt: { type: Date, required: true },
+          paymentIntentId: { type: String },
+          refundedAmount: { type: Number, default: 0, min: 0 },
+        },
+      ],
+      default: [],
+    },
+    checkoutPending: { type: Boolean, default: false },
+    checkoutToken: { type: String },
+    checkoutAmount: { type: Number, min: 0 },
+    checkoutTotalPrice: { type: Number, min: 0 },
+    checkoutCurrency: { type: String },
     isPaid: {
       type: Boolean,
       default: false,
@@ -177,6 +211,18 @@ const BookingSchema: Schema = new Schema(
       enum: [...REFUND_STATUSES],
       default: 'none',
     },
+    refundRequestedAmount: { type: Number, min: 0 },
+    cancellationRefunds: {
+      type: [
+        {
+          _id: false,
+          paymentIntentId: { type: String, required: true },
+          amount: { type: Number, required: true, min: 0 },
+          refundId: String,
+        },
+      ],
+      default: [],
+    },
     refundAmount: {
       type: Number,
       min: [0, 'Refund amount cannot be negative'],
@@ -201,6 +247,7 @@ const BookingSchema: Schema = new Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   }
 );
 
@@ -219,40 +266,26 @@ BookingSchema.index({ isPaid: 1 });
 // Compound index for date range queries
 BookingSchema.index({ checkInDate: 1, checkOutDate: 1 });
 
-// Pre-save middleware to calculate numNights and remainingAmount
-BookingSchema.pre('save', function (this: IBooking, next) {
-  if (
-    this.isNew ||
-    this.isModified('checkInDate') ||
-    this.isModified('checkOutDate')
-  ) {
-    if (this.checkInDate && this.checkOutDate) {
-      this.numNights = differenceInCalendarDays(
-        this.checkOutDate,
-        this.checkInDate
-      );
-    }
+// Derive financial state from receipts before validation. Deposit due is never a receipt.
+BookingSchema.pre('validate', function (this: IBooking) {
+  if (this.checkInDate && this.checkOutDate) {
+    this.numNights = differenceInCalendarDays(
+      this.checkOutDate,
+      this.checkInDate
+    );
   }
-
-  if (
-    this.isNew ||
-    this.isModified('totalPrice') ||
-    this.isModified('depositAmount')
-  ) {
-    // Calculate remaining amount (clamped to 0 for overpayment scenarios)
-    this.remainingAmount = Math.max(0, this.totalPrice - this.depositAmount);
-  }
-
-  next();
+  Object.assign(
+    this,
+    paymentSummary(this.totalPrice, this.depositAmount, this.payments)
+  );
 });
 
-// Method to check if booking dates overlap with another booking
 BookingSchema.methods.overlaps = function (
   this: IBooking,
-  otherCheckIn: Date,
-  otherCheckOut: Date
+  checkIn: Date,
+  checkOut: Date
 ) {
-  return this.checkInDate < otherCheckOut && this.checkOutDate > otherCheckIn;
+  return this.checkInDate < checkOut && this.checkOutDate > checkIn;
 };
 
 // Static method to find overlapping bookings
@@ -290,7 +323,7 @@ BookingSchema.virtual('durationText').get(function (this: IBooking) {
 // Virtual for payment status
 BookingSchema.virtual('paymentStatus').get(function (this: IBooking) {
   if (this.isPaid) return 'paid';
-  if (this.depositPaid) return 'partial';
+  if (this.amountPaid > 0) return 'partial';
   return 'unpaid';
 });
 

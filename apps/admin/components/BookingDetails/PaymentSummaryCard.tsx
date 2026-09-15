@@ -10,6 +10,7 @@ interface PaymentSummaryCardProps {
   totalPrice: number;
   depositPaid: boolean;
   depositAmount: number;
+  amountPaid: number;
   remainingAmount: number;
   paymentMethod?: string;
   paidAt?: string;
@@ -28,6 +29,7 @@ export default function PaymentSummaryCard({
   totalPrice,
   depositPaid,
   depositAmount,
+  amountPaid,
   remainingAmount,
   paymentMethod,
   paidAt,
@@ -78,12 +80,16 @@ export default function PaymentSummaryCard({
         <Divider />
 
         <div className='space-y-2 text-sm'>
-          {depositPaid && (
+          {depositAmount > 0 && (
             <div className='flex justify-between text-success'>
-              <span>Deposit Paid</span>
+              <span>Required deposit{depositPaid ? ' (received)' : ''}</span>
               <span>{formatCurrency(depositAmount)}</span>
             </div>
           )}
+          <div className='flex justify-between text-success'>
+            <span>Payments received</span>
+            <span>{formatCurrency(amountPaid)}</span>
+          </div>
           <div className='flex justify-between'>
             <span>Remaining</span>
             <span

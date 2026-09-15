@@ -93,11 +93,9 @@ export const updateBookingSchema = z
     // API route recomputes numNights/cabinPrice/extrasPrice/totalPrice
     // server-side from the cabin and settings documents whenever a
     // pricing-relevant field (cabin, dates, numGuests, extras) changes, and
-    // remainingAmount from the new totalPrice and the deposit already stored
-    // on the booking. depositAmount itself is never writable through this
-    // route — PATCH /api/bookings/[id]'s recordPayment is its only writer.
-    // Client-supplied values for all of these are ignored outright (see
-    // calculateBookingPricing in lib/booking-pricing.ts and issues #122/#124).
+    // remainingAmount comes from receipt totals. Required deposits are recomputed
+    // for unpaid quote changes; payment recording never changes depositAmount.
+    // Client-supplied financial fields are ignored.
     numNights: z.number().int().min(1).optional(),
     status: bookingStatusSchema.optional(),
     cabinPrice: z.number().min(0).optional(),
@@ -138,6 +136,7 @@ export const updateBookingSchema = z
  * Record payment schema (for PATCH /api/bookings/[id])
  */
 export const recordPaymentSchema = z.object({
+  receiptId: z.string().uuid().optional(),
   paymentMethod: paymentMethodSchema,
   amountPaid: z.number().positive('Payment amount must be positive'),
   notes: z.string().max(500).optional(),

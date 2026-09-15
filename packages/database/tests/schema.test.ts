@@ -46,7 +46,7 @@ const bookingInput = () => ({
 test('shared booking computes nights and rejects negative extras', async () => {
   const booking = await Booking.create(bookingInput());
   assert.equal(booking.numNights, 3);
-  assert.equal(booking.remainingAmount, 405);
+  assert.equal(booking.remainingAmount, 540);
   await assert.rejects(
     Booking.create({ ...bookingInput(), extras: { petFee: -1 } })
   );

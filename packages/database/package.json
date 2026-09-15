@@ -17,7 +17,8 @@
     "./logger": "./src/logger.ts",
     "./booking-pricing": "./src/booking-pricing.ts",
     "./cabin-booking-lock": "./src/cabin-booking-lock.ts",
-    "./settings-defaults": "./src/settings-defaults.ts"
+    "./settings-defaults": "./src/settings-defaults.ts",
+    "./booking-payments": "./src/booking-payments.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

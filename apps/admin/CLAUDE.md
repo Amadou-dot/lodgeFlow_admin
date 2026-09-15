@@ -81,7 +81,7 @@ pnpm clerk:users      # Create new Clerk test users
 ```bash
 pnpm verify:bookings           # Verify booking user IDs
 pnpm summary                 # Display data summary
-pnpm backfill:booking-metadata  # Backfill booking payment/refund metadata
+pnpm seed                    # Transactional demo reset; fetches Clerk users before replacing data
 ```
 
 ## Agent Workflow (Issues, PRs & CI)

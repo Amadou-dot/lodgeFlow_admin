@@ -22,3 +22,9 @@ export { default as connectDB } from './mongodb';
 
 export * from './booking-pricing';
 export * from './cabin-booking-lock';
+
+export * from './booking-payments';
+export * from './customer-bookings';
+export * from './checkout-settlement';
+
+export { buildDemoBookings } from './demo-bookings';

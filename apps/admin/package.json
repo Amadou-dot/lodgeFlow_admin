@@ -28,8 +28,7 @@
     "clerk:users": "tsx scripts/create-clerk-users.ts",
     "clerk:list": "tsx scripts/get-clerk-users.ts",
     "verify:bookings": "tsx scripts/verify-bookings.ts",
-    "summary": "tsx scripts/data-summary.ts",
-    "backfill:booking-metadata": "tsx scripts/backfill-booking-metadata.ts"
+    "summary": "tsx scripts/data-summary.ts"
   },
   "dependencies": {
     "@clerk/backend": "^2.29.2",

@@ -27,6 +27,7 @@ export default function BookingSidebar({
         totalPrice={booking.totalPrice}
         depositPaid={booking.depositPaid}
         depositAmount={booking.depositAmount}
+        amountPaid={booking.amountPaid}
         remainingAmount={booking.remainingAmount}
         paymentMethod={booking.paymentMethod}
         paidAt={booking.paidAt?.toString()}

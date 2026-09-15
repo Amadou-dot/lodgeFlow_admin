@@ -86,6 +86,7 @@ const CabinBookingLock = {
     token: string,
     ttlMs: number
   ): Promise<boolean> {
+    await CabinBookingLockModel.init();
     const now = new Date();
     try {
       await CabinBookingLockModel.findOneAndUpdate(

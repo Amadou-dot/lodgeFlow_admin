@@ -1,4 +1,9 @@
 import {
+  assertBookingCanReprice,
+  BookingPaymentError,
+  paymentSummary,
+} from '@lodgeflow/database';
+import {
   createValidationErrorResponse,
   escapeRegex,
   parsePagination,
@@ -336,7 +341,16 @@ export async function POST(request: NextRequest) {
           totalPrice: pricing.totalPrice,
           extras: pricing.extras,
           depositAmount,
-          remainingAmount: Math.max(0, pricing.totalPrice - depositAmount),
+          payments: [],
+          amountPaid: 0,
+          isPaid: false,
+          depositPaid: false,
+          checkoutPending: false,
+          stripeSessionId: undefined,
+          stripePaymentIntentId: undefined,
+          paidAt: undefined,
+          paymentConfirmationSentAt: undefined,
+          remainingAmount: pricing.totalPrice,
         });
         return { ok: true, booking: created };
       }
@@ -382,6 +396,12 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: unknown) {
+    if (error instanceof BookingPaymentError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 409 }
+      );
+    }
     // A same-calendar-day booking can pass the Zod refine (which only
     // compares raw timestamps) but yield zero nights once
     // calculateBookingPricing measures calendar days — surface that as a
@@ -478,13 +498,13 @@ export async function PUT(request: NextRequest) {
     delete updateData.extrasPrice;
     delete updateData.totalPrice;
     delete updateData.remainingAmount;
-    // depositAmount is frozen here rather than recomputed (see issue #124).
-    // On an existing booking it doubles as the running total of payments
-    // actually taken — PATCH /api/bookings/[id]'s recordPayment handler is
-    // its only writer — so honoring a client value would let a raw request
-    // mark a booking paid, while recomputing it from settings would wipe a
-    // real deposit whenever an unrelated field changed.
+    // Payment state comes from receipts; ordinary edits cannot forge a payment.
     delete updateData.depositAmount;
+    delete updateData.isPaid;
+    delete updateData.depositPaid;
+    delete updateData.paidAt;
+    delete updateData.stripeSessionId;
+    delete updateData.stripePaymentIntentId;
 
     // Fetch the existing booking first so auto-timestamping can check prior state
     const existingBooking = await Booking.findById(_id);
@@ -510,6 +530,15 @@ export async function PUT(request: NextRequest) {
     }
 
     // Auto-timestamp with guards to prevent overwriting existing values
+    if (updateData.status === 'cancelled' && existingBooking.checkoutPending) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Checkout is active; complete or expire it before cancelling',
+        },
+        { status: 409 }
+      );
+    }
     if (updateData.status === 'cancelled') {
       if (updateData.cancelledAt) {
         // Honor explicit value from client
@@ -517,14 +546,6 @@ export async function PUT(request: NextRequest) {
         updateData.cancelledAt = new Date();
       }
       updateData.refundStatus = updateData.refundStatus ?? 'none';
-    }
-
-    if (
-      updateData.isPaid &&
-      !existingBooking.paidAt &&
-      !existingBooking.isPaid
-    ) {
-      updateData.paidAt = updateData.paidAt ?? new Date();
     }
 
     if (
@@ -562,12 +583,12 @@ export async function PUT(request: NextRequest) {
     // Validate refundAmount does not exceed totalPrice
     if (
       updateData.refundAmount !== undefined &&
-      updateData.refundAmount > existingBooking.totalPrice
+      updateData.refundAmount > existingBooking.amountPaid
     ) {
       return NextResponse.json(
         {
           success: false,
-          error: `Refund amount (${updateData.refundAmount}) cannot exceed total price (${existingBooking.totalPrice})`,
+          error: `Refund amount (${updateData.refundAmount}) cannot exceed received payments (${existingBooking.amountPaid})`,
         },
         { status: 400 }
       );
@@ -589,15 +610,34 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Validate booking rules only when booking-rule inputs are changed.
+    const extrasChanged =
+      updateData.extras !== undefined &&
+      (
+        [
+          'hasBreakfast',
+          'hasPets',
+          'hasParking',
+          'hasEarlyCheckIn',
+          'hasLateCheckOut',
+        ] as const
+      ).some(key => updateData.extras![key] !== existingBooking.extras[key]);
+    if (updateData.extras !== undefined && !extrasChanged)
+      delete updateData.extras;
     const shouldValidateBookingRules =
-      updateData.cabin !== undefined ||
-      updateData.checkInDate !== undefined ||
-      updateData.checkOutDate !== undefined ||
-      updateData.numGuests !== undefined ||
-      updateData.extras !== undefined;
+      (updateData.cabin !== undefined &&
+        updateData.cabin !== String(existingBooking.cabin)) ||
+      (updateData.checkInDate !== undefined &&
+        updateData.checkInDate.getTime() !==
+          existingBooking.checkInDate.getTime()) ||
+      (updateData.checkOutDate !== undefined &&
+        updateData.checkOutDate.getTime() !==
+          existingBooking.checkOutDate.getTime()) ||
+      (updateData.numGuests !== undefined &&
+        updateData.numGuests !== existingBooking.numGuests) ||
+      extrasChanged;
 
     if (shouldValidateBookingRules) {
+      assertBookingCanReprice(existingBooking);
       const settings = await Settings.getSettings();
       const checkIn = updateData.checkInDate || existingBooking.checkInDate;
       const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
@@ -627,6 +667,10 @@ export async function PUT(request: NextRequest) {
         extras,
       });
 
+      updateData.depositAmount = calculateDepositAmount({
+        settings,
+        totalPrice: pricing.totalPrice,
+      });
       const effectiveMinNights = Math.max(
         settings.minBookingLength,
         cabinForValidation.minNights ?? 0
@@ -697,14 +741,20 @@ export async function PUT(request: NextRequest) {
     // numGuests, or extras change — findByIdAndUpdate bypasses the Mongoose
     // pre-save hook that would otherwise handle this.
 
-    // Only totalPrice can move here — the deposit already on the booking is
-    // carried over untouched so a recorded payment survives the edit.
     if (updateData.totalPrice !== undefined) {
-      updateData.remainingAmount = Math.max(
-        0,
-        updateData.totalPrice - (existingBooking.depositAmount ?? 0)
+      Object.assign(
+        updateData,
+        paymentSummary(
+          updateData.totalPrice,
+          updateData.depositAmount ?? existingBooking.depositAmount,
+          existingBooking.payments
+        )
       );
     }
+    // Checkout reserves the quote by incrementing __v. This compare-and-set
+    // prevents a stale edit from repricing after checkout/payment begins.
+    const updateFilter = { _id, __v: existingBooking.get('__v') };
+    const safeUpdate = { $set: updateData, $inc: { __v: 1 } };
 
     // When dates/cabin change, the overlap check and the write that acts
     // on it are wrapped in the same per-cabin lock used by POST (see
@@ -729,9 +779,13 @@ export async function PUT(request: NextRequest) {
           return { ok: false };
         }
 
-        const updated = await Booking.findByIdAndUpdate(_id, updateData, {
-          new: true,
-        }).populate('cabin', 'name image capacity price discount');
+        const updated = await Booking.findOneAndUpdate(
+          updateFilter,
+          safeUpdate,
+          {
+            new: true,
+          }
+        ).populate('cabin', 'name image capacity price discount');
         return { ok: true, booking: updated };
       });
 
@@ -747,18 +801,15 @@ export async function PUT(request: NextRequest) {
       }
       booking = lockResult.booking;
     } else {
-      booking = await Booking.findByIdAndUpdate(_id, updateData, {
+      booking = await Booking.findOneAndUpdate(updateFilter, safeUpdate, {
         new: true,
       }).populate('cabin', 'name image capacity price discount');
     }
 
     if (!booking) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Booking not found',
-        },
-        { status: 404 }
+        { success: false, error: 'Booking changed; refresh and try again' },
+        { status: 409 }
       );
     }
 
@@ -774,6 +825,12 @@ export async function PUT(request: NextRequest) {
       ...(_clerkWarning ? { _clerkWarning } : {}),
     });
   } catch (error: unknown) {
+    if (error instanceof BookingPaymentError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 409 }
+      );
+    }
     // A same-calendar-day date change can pass the Zod refine (which only
     // compares raw timestamps) but yield zero nights once
     // calculateBookingPricing measures calendar days — surface that as a

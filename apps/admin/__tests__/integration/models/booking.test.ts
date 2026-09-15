@@ -173,7 +173,7 @@ describe('Booking Model', () => {
       );
       await booking.save();
 
-      expect(booking.remainingAmount).toBe(750);
+      expect(booking.remainingAmount).toBe(1000);
     });
 
     it('remainingAmount equals totalPrice when no deposit', async () => {
@@ -335,7 +335,12 @@ describe('Booking Model', () => {
     it('paymentStatus returns "paid" when isPaid', async () => {
       const cabin = await createTestCabin();
       const booking = await Booking.create(
-        createBookingData(cabin._id, { isPaid: true })
+        createBookingData(cabin._id, {
+          totalPrice: 600,
+          payments: [
+            { id: 'full', amount: 600, method: 'cash', receivedAt: new Date() },
+          ],
+        })
       );
       const json = booking.toJSON();
 
@@ -348,6 +353,14 @@ describe('Booking Model', () => {
         createBookingData(cabin._id, {
           isPaid: false,
           depositPaid: true,
+          payments: [
+            {
+              id: 'partial',
+              amount: 100,
+              method: 'cash',
+              receivedAt: new Date(),
+            },
+          ],
         })
       );
       const json = booking.toJSON();

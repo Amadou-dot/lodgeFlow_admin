@@ -13,8 +13,8 @@ These are overlapping counts, not proof of received payments.
 
 **Data decision:** the user explicitly authorized replacing all data on 2026-09-14,
 superseding their preceding request to preserve it. Replace reservation/payment demo
-records only after the new rules and seed generator pass tests. Retain usable catalogs
-and settings. No real payment or email is necessary to create demo data.
+records only after the new rules and seed generator pass tests. Rebuild the demo catalogs and settings together with reservations in one transaction,
+so a failed replacement leaves the prior dataset intact. No real payment or email is necessary to create demo data.
 
 ## Delivery sequence
 
@@ -27,12 +27,12 @@ and settings. No real payment or email is necessary to create demo data.
   non-partial overlap index, settings caps/defaults with `max >= min`, query-safe cabin
   discounts and the 20-amenity cap. Use a targeted, explicit index migration rather than
   letting two apps independently synchronize indexes. Test concurrent singleton seeding.
-- [ ] Reconcile payment accounting: keep required deposit separate from payments received;
+- [x] Reconcile payment accounting: keep required deposit separate from payments received;
   use received payments for balances and paid flags. Share creation/repricing calculations.
   Update admin payment recording and the existing customer checkout/webhook together.
   Reject price-changing edits during checkout or after payment unless a supported
   settlement policy handles the change. Do not add an admin webhook or refund UI.
-- [ ] Adopt shared cabin locking and trusted pricing in customer creation and edits. Cover
+- [x] Adopt shared cabin locking and trusted pricing in customer creation and edits. Cover
   ownership, overlapping concurrent requests, immutable paid amounts, raw fee tampering,
   and stale/duplicate checkout events in integration tests.
 - [ ] Serialize dining capacity through shared state and test competing last-seat requests
@@ -74,3 +74,33 @@ existing name explicitly instead of dropping/recreating a correct index. Keep bo
 status indexes for current query compatibility. Settings now uses a real unique
 `singleton` index instead of the invalid empty-key declaration; existing single-record
 settings remain readable, and concurrent first creation is tested.
+
+## Accounting implementation (deployment pending)
+
+PR 141 merged as `0f105aa`; both apps now consume the same model definitions.
+The next change introduces explicit receipt entries (`amountPaid` is their sum),
+with `depositAmount` representing only the deposit requirement. Offline payment
+recording rejects overpayments and uses receipt IDs; version comparisons prevent
+concurrent writers from overwriting each other. Customer creates use the shared
+cabin lock, and edits use trusted pricing and ownership checks.
+
+Checkout reserves a versioned quote before calling Stripe. Paid bookings and active
+checkouts cannot be repriced. Signed completion events validate the reserved amount,
+currency, and token; duplicate receipts are harmless and failed processing remains
+retryable. Cancellation claims the booking before requesting per-receipt refunds.
+Requested refunds and completed refunds are separate; offline refunds stay pending
+for staff. Unresolved Stripe refund requests older than 23 hours require reconciliation
+because provider idempotency keys expire after at least 24 hours.
+
+The replacement seed creates 500 non-overlapping stays with simulated cash receipts,
+uses the shared pricing helper, and clears dining/experience reservations alongside
+their catalogs. It fetches Clerk users and validates all data before transactional
+replacement. A rollback test injects a write failure. The nightly reset is removed;
+the bearer-protected reset and CLI remain available for intentional demo refreshes.
+The old metadata backfill is retired because it inferred money received from deposit
+due and would corrupt the new accounting.
+
+Validation covers competing cabin requests, stale payment saves, duplicate Stripe
+settlement, signed webhook failure/retry, out-of-order refund events, 500 generated
+reservations, and transactional reset rollback. These checks do not replace an
+end-to-end authenticated Stripe Checkout test on the deployed customer app.

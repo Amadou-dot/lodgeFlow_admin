@@ -9,18 +9,14 @@ import {
 /**
  * Booking extras schema
  */
-const bookingExtrasSchema = z.object({
-  hasBreakfast: z.boolean().optional().default(false),
-  breakfastPrice: z.number().min(0).optional().default(0),
-  hasPets: z.boolean().optional().default(false),
-  petFee: z.number().min(0).optional().default(0),
-  hasParking: z.boolean().optional().default(false),
-  parkingFee: z.number().min(0).optional().default(0),
-  hasEarlyCheckIn: z.boolean().optional().default(false),
-  earlyCheckInFee: z.number().min(0).optional().default(0),
-  hasLateCheckOut: z.boolean().optional().default(false),
-  lateCheckOutFee: z.number().min(0).optional().default(0),
+const extrasSelectionSchema = z.object({
+  hasBreakfast: z.boolean().optional(),
+  hasPets: z.boolean().optional(),
+  hasParking: z.boolean().optional(),
+  hasEarlyCheckIn: z.boolean().optional(),
+  hasLateCheckOut: z.boolean().optional(),
 });
+const bookingExtrasSchema = extrasSelectionSchema;
 
 /**
  * Booking status enum — uses shared constants from lib/config.ts
@@ -49,18 +45,7 @@ export const createBookingSchema = z
     checkInDate: z.coerce.date(),
     checkOutDate: z.coerce.date(),
     numGuests: z.number().int().min(1, 'At least 1 guest required').max(50),
-    extras: bookingExtrasSchema.optional().default({
-      hasBreakfast: false,
-      breakfastPrice: 0,
-      hasPets: false,
-      petFee: 0,
-      hasParking: false,
-      parkingFee: 0,
-      hasEarlyCheckIn: false,
-      earlyCheckInFee: 0,
-      hasLateCheckOut: false,
-      lateCheckOutFee: 0,
-    }),
+    extras: bookingExtrasSchema.optional().default({}),
     specialRequests: z.array(z.string()).optional().default([]),
     observations: z.string().max(1000).optional(),
   })

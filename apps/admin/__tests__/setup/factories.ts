@@ -53,6 +53,19 @@ export function createBookingInput(overrides: Record<string, any> = {}) {
     depositPaid: false,
     depositAmount: 0,
     remainingAmount: cabinPrice,
+    payments:
+      overrides.isPaid || overrides.depositPaid
+        ? [
+            {
+              id: 'test-receipt',
+              method: 'cash',
+              receivedAt: new Date(),
+              amount: overrides.isPaid
+                ? (overrides.totalPrice ?? cabinPrice)
+                : (overrides.depositAmount ?? 0),
+            },
+          ]
+        : [],
     ...overrides,
   };
 }
