@@ -140,3 +140,26 @@ Replica-set tests cover competing last-seat requests, simultaneous slot moves,
 cancellation releasing capacity, experience repricing, and an admin reducing
 capacity during a booking request. No additional database collection or index
 migration is required for the catalog version field.
+
+## External configuration blocker: guest authentication
+
+A browser test on the production customer site authenticated an isolated test account,
+but Clerk reported `session.status = pending` and
+`session.currentTask.key = choose-organization`. The protected booking API returned
+an HTML 404 because pending sessions are treated as signed out. Preview and production
+Clerk keys were compared without exposing values and match; this is an instance
+configuration requirement, not a key mismatch.
+
+The production Clerk instance needs **Organizations → Settings → Membership optional**
+(Personal Accounts enabled), so customers can book without joining the staff
+organization. Staff access remains controlled by the admin app's role checks.
+The supported Backend API's organization-settings update does not expose this setting;
+the project owner needs to change it in the Clerk Dashboard. References:
+[organization configuration](https://clerk.com/docs/guides/organizations/configure#personal-accounts),
+[session task behavior](https://clerk.com/docs/guides/configure/session-tasks), and
+[supported settings API](https://clerk.com/docs/reference/backend/instance/update-organization-settings).
+
+After that change, repeat guest booking → hosted Stripe test checkout → receipt
+settlement → balance payment/refund verification. The isolated account created for
+this test is removed at handoff. No test reservation or charge was created because
+Clerk rejected the booking request. Proceed with Step 3 permissions after this gate.
