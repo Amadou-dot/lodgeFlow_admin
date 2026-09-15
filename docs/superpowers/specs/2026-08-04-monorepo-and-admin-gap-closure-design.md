@@ -448,27 +448,11 @@ helpers, which already cache resolved `Customer` objects in Redis or an in-memor
 
 ### Occupancy calendar
 
-Three views on one page. All three products have a real capacity model:
-
-| | Availability model | Capacity field | Enforcement today |
-| --- | --- | --- | --- |
-| Cabins | Exclusive date-range occupancy per unit | — (one booking blocks the span) | `findOverlapping()` + `withCabinBookingLock()` (admin only) |
-| Dining | Guests per date + serving window | `maxPeople`, **required** | Per-reservation cap, plus aggregate cap inside `session.withTransaction()` → 409 |
-| Experiences | Participants per date | `maxParticipants`, **optional** | Conditional — guarded by `if (experience.maxParticipants)` |
-
-Dining's transaction makes its insert and capacity check atomic, but does **not** serialize
-competing reservations. Each transaction inserts a different document and may count a snapshot
-that excludes the other's insert, allowing both to commit beyond capacity. This is a
-code-review finding to reproduce in a replica-set integration test; the presence of
-`withTransaction()` is not proof of concurrency safety. See MongoDB's documentation on
-[transaction stale reads and write conflicts](https://www.mongodb.com/docs/manual/core/transactions-production-consideration/).
-
-Step 2 must add a shared lock for `(dining, date, serving window)` or an atomic capacity counter
-updated by all capacity-consuming mutations. Include cancellations, status changes, and changes
-to party size/time in the protocol. A test must start competing requests against the last
-available seats and prove that committed reservations never exceed `maxPeople`, with rejected
-requests returning 409. Experience capacity needs the same concurrency audit; an unset
-`maxParticipants` remains an explicitly uncapped product rather than an accidental zero limit.
+The current read and write contracts are captured in
+[Reservations inbox and occupancy calendar](../plans/2026-09-14-reservations-operations.md).
+Step 2 already resolved the capacity races: all guest and staff capacity writers touch
+shared catalog state inside a transaction. Dining capacity is per UTC date and exact
+seating time; experience capacity is per UTC date, with an absent cap explicitly uncapped.
 
 **Cabins** — month grid of cabins × dates, occupancy bars spanning check-in to check-out,
 color-coded by status, click-through to the existing booking detail page. Backed by
@@ -479,8 +463,8 @@ the `{ cabin, checkInDate, checkOutDate }` compound. A month view queries all ca
 date range, leaving the leading `cabin` field unconstrained, which the compound index cannot
 serve efficiently.
 
-**Dining** — per-date capacity fill against `maxPeople`, aggregating `numGuests` per
-`(dining, date)`. The read-side logic already exists in
+**Dining** — per-seating capacity fill against `maxPeople`, aggregating `numGuests` per
+`(dining, UTC date, time)`. Never compare a whole day’s combined seatings to one seating’s cap. The read-side logic already exists in
 `apps/customer/app/api/dining/[id]/availability/route.ts` (`seatsRemaining`, `fullyBookedDates`)
 and generalizes to a range query against `DiningReservationSchema.index({ status: 1, date: 1 })`.
 Backed by `/api/calendar/dining?start=&end=`.
