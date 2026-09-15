@@ -39,6 +39,12 @@ function createMockBooking(overrides: Partial<IBooking> = {}): IBooking {
     specialRequests: [],
     createdAt: new Date(),
     updatedAt: new Date(),
+    amountPaid:
+      overrides.isPaid === false
+        ? overrides.depositPaid
+          ? (overrides.depositAmount ?? 0)
+          : 0
+        : (overrides.totalPrice ?? 350),
     ...overrides,
   } as unknown as IBooking;
 }
@@ -278,7 +284,7 @@ describe('calculateRefund', () => {
       expect(result.reason).toBe('No payment has been made for this booking');
     });
 
-    it('calculates refund based on depositAmount when only deposit is paid', () => {
+    it('calculates refund based on received deposit payment', () => {
       const booking = createMockBooking({
         isPaid: false,
         depositPaid: true,

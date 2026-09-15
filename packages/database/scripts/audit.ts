@@ -2,6 +2,8 @@
 import mongoose from 'mongoose';
 import {
   Booking,
+  paymentSummary,
+  type BookingPayment,
   Cabin,
   Settings,
   Dining,
@@ -53,8 +55,77 @@ async function audit() {
       }
       report[model.modelName] = entry;
     }
-    console.log(JSON.stringify(report, null, 2));
-    if (Object.values(report).some(result => result.invalid > 0))
+    const bookings = await db
+      .collection(Booking.collection.name)
+      .find({})
+      .toArray();
+    const cabinIds = new Set(
+      (
+        await db
+          .collection(Cabin.collection.name)
+          .find({}, { projection: { _id: 1 } })
+          .toArray()
+      ).map(c => String(c._id))
+    );
+    const accounting = {
+      inconsistent: 0,
+      missingCabin: 0,
+      overlapping: 0,
+      invalidReceipts: 0,
+    };
+    const occupiedUntil = new Map<string, number>();
+    for (const booking of bookings.sort(
+      (a, b) => a.checkInDate.getTime() - b.checkInDate.getTime()
+    )) {
+      const payments = (booking.payments ?? []) as BookingPayment[];
+      const summary = paymentSummary(
+        booking.totalPrice,
+        booking.depositAmount,
+        payments
+      );
+      if (
+        Object.entries(summary).some(([key, value]) => booking[key] !== value)
+      )
+        accounting.inconsistent++;
+      if (!cabinIds.has(String(booking.cabin))) accounting.missingCabin++;
+      if (
+        new Set(payments.map(p => p.id)).size !== payments.length ||
+        payments.some(
+          p =>
+            !p.id ||
+            p.amount <= 0 ||
+            (p.refundedAmount ?? 0) > p.amount ||
+            (p.method === 'online' && !p.paymentIntentId)
+        )
+      )
+        accounting.invalidReceipts++;
+      if (booking.status !== 'cancelled') {
+        const cabin = String(booking.cabin);
+        if ((occupiedUntil.get(cabin) ?? 0) > booking.checkInDate.getTime())
+          accounting.overlapping++;
+        occupiedUntil.set(
+          cabin,
+          Math.max(
+            occupiedUntil.get(cabin) ?? 0,
+            booking.checkOutDate.getTime()
+          )
+        );
+      }
+    }
+    const indexes = await db.collection(Booking.collection.name).indexes();
+    const overlapIndex = indexes.find(
+      index => index.name === 'cabin_1_checkInDate_1_checkOutDate_1'
+    );
+    const overlapIndexValid =
+      !!overlapIndex && !overlapIndex.partialFilterExpression;
+    console.log(
+      JSON.stringify({ models: report, accounting, overlapIndexValid }, null, 2)
+    );
+    if (
+      Object.values(report).some(result => result.invalid > 0) ||
+      Object.values(accounting).some(count => count > 0) ||
+      !overlapIndexValid
+    )
       process.exitCode = 1;
   } finally {
     await client.close();

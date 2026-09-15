@@ -324,7 +324,7 @@ export default function BookingPDFTemplate({
         {booking.depositAmount > 0 && (
           <>
             <div style={printStyles.row}>
-              <span style={printStyles.label}>Deposit Paid:</span>
+              <span style={printStyles.label}>Required Deposit:</span>
               <span style={printStyles.value}>
                 {formatPrice(booking.depositAmount)}
               </span>

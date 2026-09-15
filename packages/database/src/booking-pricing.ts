@@ -83,10 +83,8 @@ export interface BookingPricingResult {
  * equal to totalPrice would make a booking read as fully paid with no payment
  * recorded).
  *
- * Deliberately not applied on update: on an existing booking `depositAmount`
- * doubles as the running total of payments actually taken (see the
- * `recordPayment` handler in `app/api/bookings/[id]/route.ts`), so recomputing
- * it would wipe a real deposit whenever an unrelated field changed.
+ * Recompute on an unpaid booking when its quote changes. Received money lives
+ * in receipt entries and never in depositAmount.
  */
 export function calculateDepositAmount({
   settings,

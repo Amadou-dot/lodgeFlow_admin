@@ -332,7 +332,7 @@ export function BookingConfirmationEmail({
           {bookingData.depositAmount > 0 && (
             <>
               <div style={emailStyles.row}>
-                <span style={emailStyles.label}>Deposit Paid:</span>
+                <span style={emailStyles.label}>Required Deposit:</span>
                 <span style={emailStyles.value}>
                   {formatPrice(bookingData.depositAmount)}
                 </span>

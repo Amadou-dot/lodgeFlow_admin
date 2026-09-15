@@ -1,7 +1,7 @@
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
 export default async function globalSetup() {
-  const mongod = await MongoMemoryServer.create();
+  const mongod = await MongoMemoryReplSet.create();
   const uri = mongod.getUri();
 
   (globalThis as any).__MONGOD__ = mongod;

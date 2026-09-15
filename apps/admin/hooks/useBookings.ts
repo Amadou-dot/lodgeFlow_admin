@@ -207,7 +207,9 @@ export const useRecordPayment = () => {
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordPayment: paymentData }),
+        body: JSON.stringify({
+          recordPayment: { ...paymentData, receiptId: crypto.randomUUID() },
+        }),
       });
 
       if (!response.ok) {

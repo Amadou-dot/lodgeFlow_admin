@@ -1,3 +1,6 @@
+import { randomUUID } from 'crypto';
+import mongoose from 'mongoose';
+import { addBookingPayment, BookingPaymentError } from '@lodgeflow/database';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -79,21 +82,17 @@ export async function PATCH(req: Request, { params }: IdParam) {
     if (updateData.recordPayment) {
       const { paymentMethod, amountPaid, notes } = updateData.recordPayment;
 
-      // Calculate remaining amount, accounting for previous payments
-      const totalPreviouslyPaid = booking.depositAmount || 0;
-      const totalPaid = totalPreviouslyPaid + amountPaid;
-      const remainingAmount = booking.totalPrice - totalPaid;
-      const isPaid = remainingAmount <= 0;
-
-      // Update booking payment fields
-      booking.paymentMethod = paymentMethod;
-      booking.isPaid = isPaid;
-      booking.depositPaid = true;
-      booking.depositAmount = totalPaid;
-      booking.remainingAmount = Math.max(0, remainingAmount);
-      if (isPaid) {
-        booking.paidAt = new Date();
-      }
+      if (booking.checkoutPending)
+        return createErrorResponse(
+          'Checkout is active; complete or expire it before recording another payment',
+          409
+        );
+      addBookingPayment(booking, {
+        id: updateData.recordPayment.receiptId ?? randomUUID(),
+        amount: amountPaid,
+        method: paymentMethod,
+        receivedAt: new Date(),
+      });
 
       // Add payment notes to observations if provided
       if (notes) {
@@ -102,6 +101,13 @@ export async function PATCH(req: Request, { params }: IdParam) {
           : `Payment recorded: ${notes}`;
         booking.observations = combined.slice(0, 1000);
       }
+    }
+
+    if (updateData.status === 'cancelled' && booking.checkoutPending) {
+      return createErrorResponse(
+        'Checkout is active; complete or expire it before cancelling',
+        409
+      );
     }
 
     // Handle status changes with transition validation
@@ -145,10 +151,10 @@ export async function PATCH(req: Request, { params }: IdParam) {
     // Validate refundAmount does not exceed totalPrice
     if (
       updateData.refundAmount !== undefined &&
-      updateData.refundAmount > booking.totalPrice
+      updateData.refundAmount > booking.amountPaid
     ) {
       return createErrorResponse(
-        `Refund amount (${updateData.refundAmount}) cannot exceed total price (${booking.totalPrice})`,
+        `Refund amount (${updateData.refundAmount}) cannot exceed received payments (${booking.amountPaid})`,
         400
       );
     }
@@ -223,6 +229,17 @@ export async function PATCH(req: Request, { params }: IdParam) {
 
     return createSuccessResponse(populatedBooking);
   } catch (error) {
+    if (
+      error instanceof BookingPaymentError ||
+      error instanceof mongoose.Error.VersionError
+    ) {
+      return createErrorResponse(
+        error instanceof BookingPaymentError
+          ? error.message
+          : 'Booking changed; refresh and try again',
+        409
+      );
+    }
     if (isMongooseValidationError(error)) {
       logger.warn(
         'Mongoose validation fired after Zod passed — possible schema drift',

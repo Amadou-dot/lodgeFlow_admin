@@ -1,150 +1,136 @@
-import { Booking, connectDB, Settings } from '@lodgeflow/database';
+import { randomUUID } from 'crypto';
+import mongoose from 'mongoose';
+import { Booking, connectDB, Settings, roundMoney } from '@lodgeflow/database';
 import { getStripe } from '@/lib/stripe';
 import { normalizeBaseUrl } from '@/lib/url';
-import type { ApiResponse, PopulatedBooking } from '@/types';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+
+const errorResponse = (error: string, status: number) =>
+  NextResponse.json({ success: false, error }, { status });
 
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
-    if (!userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Authentication required',
-      };
-      return NextResponse.json(response, { status: 401 });
-    }
-
-    await connectDB();
-
+    if (!userId) return errorResponse('Authentication required', 401);
     const { bookingId } = await request.json();
-
-    if (!bookingId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Booking ID is required',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    const booking = (await Booking.findById(bookingId).populate(
-      'cabin'
-    )) as unknown as PopulatedBooking;
-    if (!booking) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    if (booking.customer !== userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Not authorized to pay for this booking',
-      };
-      return NextResponse.json(response, { status: 403 });
-    }
-
-    if (booking.isPaid) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Booking is already paid',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    if (booking.status === 'cancelled') {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Cannot pay for a cancelled booking',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    // Determine payment amount based on deposit settings
+    if (!mongoose.isValidObjectId(bookingId))
+      return errorResponse('Invalid booking ID', 400);
+    await connectDB();
+    let booking = await Booking.findOne({
+      _id: bookingId,
+      customer: userId,
+    }).populate('cabin');
+    if (!booking) return errorResponse('Booking not found', 404);
+    if (booking.isPaid || booking.status === 'cancelled')
+      return errorResponse('Booking is not payable', 400);
     const settings = await Settings.getSettings();
-    let paymentAmount: number;
-    let paymentDescription: string;
-    let isDepositPayment = false;
-
-    if (booking.depositPaid && booking.depositAmount > 0) {
-      paymentAmount = booking.totalPrice - booking.depositAmount;
-      paymentDescription = `Remaining balance for ${booking.cabin.name}`;
-    } else if (settings.requireDeposit && booking.depositAmount > 0) {
-      paymentAmount = booking.depositAmount;
-      paymentDescription = `Deposit for ${booking.cabin.name}`;
-      isDepositPayment = true;
-    } else {
-      paymentAmount = booking.totalPrice;
-      paymentDescription = `Full payment for ${booking.cabin.name}`;
+    const stripe = getStripe();
+    if (booking.checkoutPending && booking.stripeSessionId) {
+      const session = await stripe.checkout.sessions.retrieve(
+        booking.stripeSessionId
+      );
+      if (session.status === 'open' && session.url)
+        return NextResponse.json({ success: true, data: { url: session.url } });
+      if (session.status === 'expired') {
+        await Booking.updateOne(
+          {
+            _id: bookingId,
+            checkoutToken: booking.checkoutToken,
+            checkoutPending: true,
+          },
+          {
+            $set: { checkoutPending: false },
+            $unset: { stripeSessionId: 1 },
+            $inc: { __v: 1 },
+          }
+        );
+        return errorResponse('Checkout expired; please try again', 409);
+      }
+      return errorResponse('Payment is being confirmed; refresh shortly', 409);
     }
-
-    if (paymentAmount <= 0) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Payment amount must be greater than zero',
-      };
-      return NextResponse.json(response, { status: 400 });
+    if (!booking.checkoutPending) {
+      const amount = roundMoney(
+        Math.min(
+          booking.remainingAmount,
+          booking.amountPaid < booking.depositAmount
+            ? booking.depositAmount - booking.amountPaid
+            : booking.remainingAmount
+        )
+      );
+      if (amount <= 0) return errorResponse('No payment is due', 400);
+      const reserved = await Booking.findOneAndUpdate(
+        { _id: bookingId, __v: booking.get('__v'), checkoutPending: false },
+        {
+          $set: {
+            checkoutPending: true,
+            checkoutToken: randomUUID(),
+            checkoutAmount: amount,
+            checkoutTotalPrice: booking.totalPrice,
+            checkoutCurrency: settings.currency.toLowerCase(),
+          },
+          $unset: { stripeSessionId: 1 },
+          $inc: { __v: 1 },
+        },
+        { new: true }
+      ).populate('cabin');
+      if (!reserved)
+        return errorResponse('Booking changed; refresh and try again', 409);
+      booking = reserved;
     }
-
-    // Stripe rejects success_url/cancel_url unless they are absolute, and
-    // NEXT_PUBLIC_APP_URL is stored as a bare hostname. request.nextUrl.origin
-    // already carries a scheme, so normalizing is a no-op on that branch.
+    // Retain the quote token on failures: retrying the same Stripe idempotency key
+    // recovers a session whose creation succeeded before a connection was lost.
     const baseUrl = normalizeBaseUrl(
       process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
     );
-    const stripe = getStripe();
-
-    const session = await stripe.checkout.sessions.create({
-      line_items: [
-        {
-          price_data: {
-            currency: settings.currency?.toLowerCase() || 'usd',
-            product_data: {
-              name: booking.cabin.name,
-              description: paymentDescription,
+    const cabin = booking.cabin as unknown as { name: string };
+    const isDeposit = booking.amountPaid < booking.depositAmount;
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: booking.checkoutCurrency!,
+              unit_amount: Math.round(booking.checkoutAmount! * 100),
+              product_data: {
+                name: cabin.name,
+                description: isDeposit ? 'Booking deposit' : 'Booking balance',
+              },
             },
-            unit_amount: Math.round(paymentAmount * 100),
+            quantity: 1,
           },
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        bookingId: booking._id.toString(),
-        userId,
-        isDeposit: String(isDepositPayment),
-      },
-      payment_intent_data: {
+        ],
         metadata: {
-          bookingId: booking._id.toString(),
+          bookingId: String(booking._id),
           userId,
-          isDeposit: String(isDepositPayment),
+          isDeposit: String(isDeposit),
+          quoteToken: booking.checkoutToken!,
         },
+        payment_intent_data: {
+          metadata: {
+            bookingId: String(booking._id),
+            userId,
+            quoteToken: booking.checkoutToken!,
+          },
+        },
+        success_url: `${baseUrl}/payments/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
+        cancel_url: `${baseUrl}/payments/cancel?booking_id=${booking._id}`,
       },
-      mode: 'payment',
-      success_url: `${baseUrl}/payments/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking._id}`,
-      cancel_url: `${baseUrl}/payments/cancel?booking_id=${booking._id}`,
-    });
-
-    // Store session ID on booking
-    await Booking.findByIdAndUpdate(bookingId, {
-      stripeSessionId: session.id,
-    });
-
-    const response: ApiResponse<{ url: string }> = {
-      success: true,
-      data: { url: session.url! },
-    };
-
-    return NextResponse.json(response);
+      { idempotencyKey: `booking:${booking._id}:${booking.checkoutToken}` }
+    );
+    await Booking.updateOne(
+      {
+        _id: bookingId,
+        checkoutToken: booking.checkoutToken,
+        checkoutPending: true,
+      },
+      { $set: { stripeSessionId: session.id }, $inc: { __v: 1 } }
+    );
+    return NextResponse.json({ success: true, data: { url: session.url } });
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    const response: ApiResponse<never> = {
-      success: false,
-      error: 'Failed to create checkout session',
-    };
-    return NextResponse.json(response, { status: 500 });
+    return errorResponse('Failed to create checkout session', 500);
   }
 }

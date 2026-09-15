@@ -1,208 +1,147 @@
-import { Booking, ProcessedStripeEvent, connectDB } from '@lodgeflow/database';
+import mongoose from 'mongoose';
+import {
+  Booking,
+  ProcessedStripeEvent,
+  connectDB,
+  settleCheckoutPayment,
+  roundMoney,
+} from '@lodgeflow/database';
 import { sendPaymentConfirmationEmail } from '@/lib/email';
 import type { PopulatedBooking } from '@/types';
 import { getStripe } from '@/lib/stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
-/**
- * Atomically claims an event for processing using upsert.
- * Returns true if this is the first time claiming (should process),
- * false if already claimed by another request (skip processing).
- * This prevents race conditions where two concurrent requests both pass a check-then-insert.
- */
-async function claimEventForProcessing(
-  eventId: string,
-  eventType: string
-): Promise<boolean> {
-  try {
-    // Use findOneAndUpdate with upsert to atomically claim the event
-    // If the event already exists, this returns the existing doc (we should skip)
-    // If the event doesn't exist, it creates it and returns null for the original doc
-    const existingEvent = await ProcessedStripeEvent.findOneAndUpdate(
-      { eventId },
-      { $setOnInsert: { eventId, eventType, processedAt: new Date() } },
-      { upsert: true, new: false } // Return the OLD document (null if didn't exist)
-    );
-
-    // If existingEvent is null, we successfully claimed it (first time)
-    // If existingEvent exists, another request already claimed it
-    return existingEvent === null;
-  } catch (error: unknown) {
-    // Handle duplicate key error (race condition where both try to insert)
-    if (
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      error.code === 11000
-    ) {
-      return false; // Already processed by another request
-    }
-    throw error;
-  }
-}
-
 export async function POST(request: NextRequest) {
-  const body = await request.text();
   const signature = request.headers.get('stripe-signature');
-
-  if (!signature) {
+  if (!signature)
     return NextResponse.json(
       { error: 'Missing stripe-signature header' },
       { status: 400 }
     );
-  }
-
-  const stripe = getStripe();
   let event: Stripe.Event;
-
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
+    event = getStripe().webhooks.constructEvent(
+      await request.text(),
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch (error) {
-    console.error('Webhook signature verification failed:', error);
+  } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
-
-  await connectDB();
-
-  // Atomically claim the event for processing to prevent race conditions
-  // This returns true if we should process, false if already processed by another request
-  const shouldProcess = await claimEventForProcessing(event.id, event.type);
-  if (!shouldProcess) {
-    return NextResponse.json({ received: true, status: 'already_processed' });
-  }
-
   try {
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const bookingId = session.metadata?.bookingId;
-        const isDeposit = session.metadata?.isDeposit === 'true';
-
-        if (bookingId) {
-          const booking = (await Booking.findById(bookingId).populate(
-            'cabin',
-            'name image capacity price discount description'
-          )) as unknown as PopulatedBooking | null;
-
-          if (!booking) {
-            console.error(`Booking not found: ${bookingId}`);
-            break;
-          }
-
-          // Guard against duplicate updates
-          if (isDeposit && booking.depositPaid) {
-            break;
-          }
-          if (!isDeposit && booking.isPaid) {
-            break;
-          }
-
-          const updateData: Record<string, unknown> = {
-            stripePaymentIntentId: session.payment_intent as string,
-            stripeSessionId: session.id,
-            paidAt: new Date(),
-            status: 'confirmed',
-          };
-
-          if (isDeposit) {
-            updateData.depositPaid = true;
-          } else {
-            updateData.isPaid = true;
-          }
-
-          await Booking.findByIdAndUpdate(bookingId, updateData);
-
-          // Auto-send payment confirmation email (check if not already sent)
-          if (!booking.paymentConfirmationSentAt) {
-            const amountPaid = isDeposit
-              ? booking.depositAmount
-              : booking.totalPrice;
-
-            const emailResult = await sendPaymentConfirmationEmail({
-              booking,
-              cabin: booking.cabin,
-              amountPaid,
-              isDeposit,
+    await connectDB();
+    if (await ProcessedStripeEvent.exists({ eventId: event.id }))
+      return NextResponse.json({ received: true });
+    if (
+      event.type === 'checkout.session.completed' ||
+      event.type === 'checkout.session.async_payment_succeeded'
+    ) {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.payment_status === 'paid' && session.metadata?.bookingId) {
+        const result = await settleCheckoutPayment({
+          bookingId: session.metadata.bookingId,
+          sessionId: session.id,
+          quoteToken: session.metadata.quoteToken ?? '',
+          amount: (session.amount_total ?? 0) / 100,
+          currency: session.currency ?? '',
+          paymentIntentId:
+            typeof session.payment_intent === 'string'
+              ? session.payment_intent
+              : (session.payment_intent?.id ?? ''),
+        });
+        if (result.changed && result.booking) {
+          const booking = await result.booking.populate('cabin');
+          const populated = booking as unknown as PopulatedBooking;
+          // Email is best-effort; durable receipt accounting has already succeeded.
+          try {
+            const email = await sendPaymentConfirmationEmail({
+              booking: populated,
+              cabin: populated.cabin,
+              amountPaid: (session.amount_total ?? 0) / 100,
+              isDeposit: session.metadata.isDeposit === 'true',
             });
-
-            if (emailResult.success) {
-              await Booking.findByIdAndUpdate(bookingId, {
-                paymentConfirmationSentAt: new Date(),
-              });
-            } else {
-              console.error(
-                'Failed to send payment confirmation email:',
-                emailResult.error
+            if (email.success)
+              await Booking.updateOne(
+                { _id: booking._id },
+                { $set: { paymentConfirmationSentAt: new Date() } }
               );
-            }
+          } catch (error) {
+            console.error('Payment confirmation email failed:', error);
           }
         }
-        break;
       }
-
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        const bookingId = paymentIntent.metadata?.bookingId;
-
-        if (bookingId) {
-          const booking = await Booking.findById(bookingId);
-          if (!booking) {
-            console.error(`Booking not found: ${bookingId}`);
-            break;
+    } else if (event.type === 'checkout.session.expired') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.metadata?.bookingId)
+        await Booking.updateOne(
+          {
+            _id: session.metadata.bookingId,
+            checkoutToken: session.metadata.quoteToken,
+            checkoutPending: true,
+          },
+          {
+            $set: { checkoutPending: false },
+            $unset: { stripeSessionId: 1 },
+            $inc: { __v: 1 },
           }
-
-          // Only update if not already set
-          if (!booking.stripePaymentIntentId) {
-            await Booking.findByIdAndUpdate(bookingId, {
-              stripePaymentIntentId: paymentIntent.id,
-            });
-          }
-        }
-        break;
-      }
-
-      case 'charge.refunded': {
-        const charge = event.data.object as Stripe.Charge;
-        const paymentIntentId = charge.payment_intent as string;
-
-        if (paymentIntentId) {
+        );
+    } else if (event.type === 'charge.refunded') {
+      const charge = event.data.object as Stripe.Charge;
+      const intent =
+        typeof charge.payment_intent === 'string'
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+      if (intent)
+        for (let attempt = 0; attempt < 5; attempt++) {
           const booking = await Booking.findOne({
-            stripePaymentIntentId: paymentIntentId,
+            'payments.paymentIntentId': intent,
           });
-
-          if (booking) {
-            const refundAmountDollars = charge.amount_refunded / 100;
-            const totalPaid = booking.isPaid
-              ? booking.totalPrice
-              : booking.depositAmount;
-
-            // Determine refund status based on amount
-            let refundStatus: 'partial' | 'full' = 'partial';
-            if (Math.abs(refundAmountDollars - totalPaid) < 0.01) {
-              refundStatus = 'full';
-            }
-
-            await Booking.findByIdAndUpdate(booking._id, {
-              refundAmount: refundAmountDollars,
-              refundedAt: new Date(),
-              refundStatus,
-            });
+          if (!booking) break;
+          const payment = booking.payments.find(
+            p => p.paymentIntentId === intent
+          )!;
+          payment.refundedAmount = Math.max(
+            payment.refundedAmount ?? 0,
+            charge.amount_refunded / 100
+          );
+          booking.refundAmount = roundMoney(
+            booking.payments.reduce(
+              (sum, p) => sum + (p.refundedAmount ?? 0),
+              0
+            )
+          );
+          booking.refundStatus =
+            booking.refundAmount >= booking.amountPaid ? 'full' : 'partial';
+          booking.refundedAt = new Date();
+          try {
+            await booking.save();
+            break;
+          } catch (error) {
+            if (
+              !(error instanceof mongoose.Error.VersionError) ||
+              attempt === 4
+            )
+              throw error;
           }
         }
-        break;
-      }
     }
-
-    // Event was already claimed/marked at the start via claimEventForProcessing
+    // Mark only after success. Receipt IDs make concurrent/retried processing safe;
+    // a failed request leaves no premature claim that could swallow Stripe retries.
+    await ProcessedStripeEvent.updateOne(
+      { eventId: event.id },
+      {
+        $setOnInsert: {
+          eventId: event.id,
+          eventType: event.type,
+          processedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook processing error:', error);
-    // Don't mark as processed on error so Stripe can retry
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

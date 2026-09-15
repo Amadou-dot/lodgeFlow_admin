@@ -1,6 +1,5 @@
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Select, SelectItem } from '@heroui/select';
-import { Switch } from '@heroui/switch';
 import { BookingFormFieldProps, PriceBreakdown } from './types';
 import type { ISettings } from '@lodgeflow/database/models/Settings';
 import type { SharedSelection } from '@heroui/system';
@@ -36,26 +35,19 @@ export default function PaymentInformation({
           <SelectItem key='online'>Online</SelectItem>
         </Select>
 
-        <Switch
-          isSelected={formData.isPaid}
-          onValueChange={checked => onInputChange('isPaid', checked)}
-        >
-          Mark as Paid
-        </Switch>
-
         {settings?.requireDeposit && (
-          <Switch
-            isSelected={formData.depositPaid}
-            onValueChange={checked => onInputChange('depositPaid', checked)}
-          >
-            Deposit Paid (
+          <p>
+            Required deposit:{' '}
             {new Intl.NumberFormat('en-US', {
               style: 'currency',
-              currency: 'USD',
+              currency: settings.currency,
             }).format(priceBreakdown.depositAmount)}
-            )
-          </Switch>
+          </p>
         )}
+        <p className='text-sm text-default-500'>
+          Save the reservation, then use Record Payment to record money
+          received.
+        </p>
       </CardBody>
     </Card>
   );

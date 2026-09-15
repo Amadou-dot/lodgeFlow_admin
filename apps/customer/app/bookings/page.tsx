@@ -402,17 +402,15 @@ export default function BookingsPage() {
                         {!booking.isPaid &&
                           booking.status !== 'cancelled' &&
                           (() => {
+                            const amountReceived = booking.amountPaid ?? 0;
                             const isDepositDue =
-                              booking.depositAmount > 0 && !booking.depositPaid;
+                              amountReceived < booking.depositAmount;
                             const remainingBalance = Math.max(
                               0,
-                              booking.totalPrice -
-                                (booking.depositPaid
-                                  ? booking.depositAmount
-                                  : 0)
+                              booking.totalPrice - amountReceived
                             );
                             const amountToPay = isDepositDue
-                              ? booking.depositAmount
+                              ? booking.depositAmount - amountReceived
                               : remainingBalance;
 
                             if (amountToPay <= 0) return null;
@@ -972,11 +970,11 @@ export default function BookingsPage() {
                                 $
                                 {selectedBooking.remainingAmount ??
                                   selectedBooking.totalPrice -
-                                    selectedBooking.depositAmount}
+                                    (selectedBooking.amountPaid ?? 0)}
                               </span>
                               {(selectedBooking.remainingAmount ??
                                 selectedBooking.totalPrice -
-                                  selectedBooking.depositAmount) > 0 && (
+                                  (selectedBooking.amountPaid ?? 0)) > 0 && (
                                 <Chip color='warning' size='sm' variant='flat'>
                                   Outstanding
                                 </Chip>

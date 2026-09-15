@@ -128,13 +128,18 @@ describe('useRecordPayment', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/bookings/b1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recordPayment: {
-          paymentMethod: 'card',
-          amountPaid: 100,
-          notes: 'paid at desk',
-        },
-      }),
+      body: expect.any(String),
+    });
+    const payload = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body
+    );
+    expect(payload).toEqual({
+      recordPayment: {
+        paymentMethod: 'card',
+        amountPaid: 100,
+        notes: 'paid at desk',
+        receiptId: expect.any(String),
+      },
     });
   });
 

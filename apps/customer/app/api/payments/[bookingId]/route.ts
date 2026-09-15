@@ -10,6 +10,8 @@ interface PaymentStatusData {
   depositPaid: boolean;
   depositAmount: number;
   totalPrice: number;
+  amountPaid: number;
+  remainingAmount: number;
   paidAt?: Date;
   stripeSessionId?: string;
   refundAmount?: number;
@@ -56,6 +58,8 @@ export async function GET(
       depositPaid: booking.depositPaid,
       depositAmount: booking.depositAmount,
       totalPrice: booking.totalPrice,
+      amountPaid: booking.amountPaid,
+      remainingAmount: booking.remainingAmount,
       paidAt: booking.paidAt,
       stripeSessionId: booking.stripeSessionId,
       refundAmount: booking.refundAmount,

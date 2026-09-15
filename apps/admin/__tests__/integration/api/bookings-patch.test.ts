@@ -37,6 +37,16 @@ async function createTestBooking(
     numGuests: 2,
     cabinPrice: 600,
     totalPrice: 600,
+    payments: overrides.isPaid
+      ? [
+          {
+            id: 'test-receipt',
+            amount: overrides.totalPrice ?? 600,
+            method: 'cash',
+            receivedAt: new Date(),
+          },
+        ]
+      : [],
     ...overrides,
   });
 }
@@ -68,11 +78,11 @@ describe('PATCH /api/bookings/[id]', () => {
 
       expect(response.status).toBe(200);
       expect(body.success).toBe(true);
-      expect(body.data.depositAmount).toBe(300);
+      expect(body.data.amountPaid).toBe(300);
       expect(body.data.remainingAmount).toBe(700);
       expect(body.data.isPaid).toBe(false);
       expect(body.data.depositPaid).toBe(true);
-      expect(body.data.paidAt).toBeUndefined();
+      expect(body.data.paidAt).toBeDefined();
     });
 
     it('marks booking as fully paid when balance reaches zero', async () => {
@@ -93,7 +103,7 @@ describe('PATCH /api/bookings/[id]', () => {
       expect(body.data.paidAt).toBeDefined();
     });
 
-    it('clamps remainingAmount to 0 on overpayment', async () => {
+    it('rejects overpayment without changing receipts', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, { totalPrice: 200 });
 
@@ -105,10 +115,10 @@ describe('PATCH /api/bookings/[id]', () => {
       });
       const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.data.remainingAmount).toBe(0);
-      expect(body.data.isPaid).toBe(true);
-      expect(body.data.depositAmount).toBe(300);
+      expect(response.status).toBe(409);
+      const unchanged = await Booking.findById(booking._id);
+      expect(unchanged?.amountPaid).toBe(0);
+      expect(unchanged?.remainingAmount).toBe(200);
     });
 
     it('accumulates multiple sequential payments', async () => {
@@ -126,7 +136,7 @@ describe('PATCH /api/bookings/[id]', () => {
       });
       const body = await response.json();
 
-      expect(body.data.depositAmount).toBe(800);
+      expect(body.data.amountPaid).toBe(800);
       expect(body.data.remainingAmount).toBe(200);
       expect(body.data.isPaid).toBe(false);
     });
@@ -450,6 +460,7 @@ describe('PATCH /api/bookings/[id]', () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
         status: 'cancelled',
+        isPaid: true,
       });
 
       const response = await callPatch(booking._id.toString(), {
@@ -480,7 +491,7 @@ describe('PATCH /api/bookings/[id]', () => {
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.success).toBe(false);
-      expect(body.error).toContain('cannot exceed total price');
+      expect(body.error).toContain('cannot exceed received payments');
     });
 
     it('allows refundedAt on cancelled bookings', async () => {

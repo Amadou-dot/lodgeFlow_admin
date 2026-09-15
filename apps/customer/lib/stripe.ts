@@ -67,7 +67,8 @@ export interface RefundResult {
 
 export async function createRefund(
   paymentIntentId: string,
-  amount?: number
+  amount?: number,
+  idempotencyKey?: string
 ): Promise<RefundResult> {
   const stripe = getStripe();
 
@@ -80,7 +81,10 @@ export async function createRefund(
       refundParams.amount = Math.round(amount * 100);
     }
 
-    const refund = await stripe.refunds.create(refundParams);
+    const refund = await stripe.refunds.create(
+      refundParams,
+      idempotencyKey ? { idempotencyKey } : undefined
+    );
 
     return {
       success: true,
