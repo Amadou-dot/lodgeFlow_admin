@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import {
   DiningReservation,
+  reservationPaymentSummary,
+  Settings,
   ExperienceBooking,
   ReservationRuleError,
   transitionCapacityReservation,
@@ -37,6 +39,8 @@ export async function reservationDetails(id: string, kind: Kind) {
         : EXPERIENCE_STATUS_TRANSITIONS;
     return createSuccessResponse({
       reservation,
+      payment: reservationPaymentSummary(reservation),
+      currency: (await Settings.getSettings()).currency,
       customerName: customer?.name || 'Unavailable guest',
       allowedStatuses: transitions[reservation.status] ?? [],
     });

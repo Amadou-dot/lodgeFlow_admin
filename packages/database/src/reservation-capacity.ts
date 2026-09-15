@@ -1,3 +1,4 @@
+import { reservationPaymentSummary } from './reservation-payment-state';
 import {
   DINING_STATUS_TRANSITIONS,
   EXPERIENCE_STATUS_TRANSITIONS,
@@ -121,7 +122,7 @@ async function checkDining(
   );
   if (occupied + reservation.numGuests > dining.maxPeople)
     throw new ReservationRuleError('Not enough dining seats available', 409);
-  if (!reservation.isPaid)
+  if (!reservation.isPaid && !reservation.receipts?.length)
     reservation.totalPrice = roundMoney(dining.price * reservation.numGuests);
 }
 export async function createDiningReservation(
@@ -166,15 +167,24 @@ export async function updateDiningReservation(
         throw new ReservationRuleError(
           'This reservation can no longer be changed'
         );
-      if (cancel && reservation.isPaid)
+      if (
+        cancel &&
+        (reservationPaymentSummary(reservation).legacyPaid ||
+          reservationPaymentSummary(reservation).refundableCents > 0)
+      )
         throw new ReservationRuleError(
           'Contact the property to cancel a paid reservation',
           409
         );
+      if (
+        reservation.checkout?.pending ||
+        reservation.stripeRefund?.status === 'pending'
+      )
+        throw new ReservationRuleError('An online transaction is pending', 409);
       if (cancel) reservation.status = 'cancelled';
       else {
         if (
-          reservation.isPaid &&
+          (reservation.isPaid || reservation.receipts?.length > 0) &&
           ['date', 'time', 'numGuests'].some(key => key in updates)
         )
           throw new ReservationRuleError(
@@ -220,7 +230,7 @@ async function checkExperience(
       'Not enough experience spots available',
       409
     );
-  if (!booking.isPaid)
+  if (!booking.isPaid && !booking.receipts?.length)
     booking.totalPrice = roundMoney(experience.price * booking.numParticipants);
 }
 export async function createExperienceReservation(
@@ -269,15 +279,24 @@ export async function updateExperienceReservation(
         throw new ReservationRuleError(
           'This reservation can no longer be changed'
         );
-      if (cancel && booking.isPaid)
+      if (
+        cancel &&
+        (reservationPaymentSummary(booking).legacyPaid ||
+          reservationPaymentSummary(booking).refundableCents > 0)
+      )
         throw new ReservationRuleError(
           'Contact the property to cancel a paid reservation',
           409
         );
+      if (
+        booking.checkout?.pending ||
+        booking.stripeRefund?.status === 'pending'
+      )
+        throw new ReservationRuleError('An online transaction is pending', 409);
       if (cancel) booking.status = 'cancelled';
       else {
         if (
-          booking.isPaid &&
+          (booking.isPaid || booking.receipts?.length > 0) &&
           ['date', 'timeSlot', 'numParticipants'].some(key => key in updates)
         )
           throw new ReservationRuleError(
@@ -412,11 +431,20 @@ export async function transitionCapacityReservation(
         : EXPERIENCE_STATUS_TRANSITIONS;
     if (!transitions[beforeStatus]?.includes(nextStatus))
       throw new ReservationRuleError('Invalid reservation status transition');
-    if (nextStatus === 'cancelled' && reservation.isPaid)
+    if (
+      nextStatus === 'cancelled' &&
+      (reservationPaymentSummary(reservation).legacyPaid ||
+        reservationPaymentSummary(reservation).refundableCents > 0)
+    )
       throw new ReservationRuleError(
         'Paid reservations require refund reconciliation before cancellation',
         409
       );
+    if (
+      reservation.checkout?.pending ||
+      reservation.stripeRefund?.status === 'pending'
+    )
+      throw new ReservationRuleError('An online transaction is pending', 409);
     reservation.set('status', nextStatus);
     await reservation.save({ session });
     return { changed: true, beforeStatus, reservation };

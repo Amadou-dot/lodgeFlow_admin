@@ -1,9 +1,14 @@
 'use client';
+import {
+  ReservationPayments,
+  type PaymentSummary,
+} from './ReservationPayments';
+import type { ReservationPaymentState } from '@lodgeflow/database';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import { utcDate } from '@/lib/reservation-options';
-interface Reservation {
+interface Reservation extends ReservationPaymentState {
   _id: string;
   date: string;
   time?: string;
@@ -32,6 +37,8 @@ export function ReservationDetail({
     reservation: Reservation;
     customerName: string;
     allowedStatuses: string[];
+    payment: PaymentSummary;
+    currency: string;
   } | null>(null);
   const [nextStatus, setNextStatus] = useState(''),
     [error, setError] = useState(''),
@@ -116,6 +123,16 @@ export function ReservationDetail({
             <p>Special requests: {reservation.specialRequests.join(', ')}</p>
           )}
           {reservation.observations && <p>Notes: {reservation.observations}</p>}
+          <ReservationPayments
+            endpoint={endpoint}
+            payment={data.payment}
+            currency={data.currency}
+            receipts={reservation.receipts}
+            checkout={reservation.checkout}
+            stripeRefund={reservation.stripeRefund}
+            status={reservation.status}
+            reload={load}
+          />
           {canManage && !!data.allowedStatuses.length && (
             <div className='space-y-3'>
               <label className='flex flex-col gap-1'>
@@ -130,14 +147,20 @@ export function ReservationDetail({
                   {data.allowedStatuses.map(status => (
                     <option
                       key={status}
-                      disabled={status === 'cancelled' && reservation.isPaid}
+                      disabled={
+                        status === 'cancelled' &&
+                        (data.payment.legacyPaid ||
+                          data.payment.refundableCents > 0 ||
+                          reservation.checkout?.pending ||
+                          reservation.stripeRefund?.status === 'pending')
+                      }
                     >
                       {status}
                     </option>
                   ))}
                 </select>
               </label>
-              {reservation.isPaid &&
+              {(data.payment.legacyPaid || data.payment.refundableCents > 0) &&
                 data.allowedStatuses.includes('cancelled') && (
                   <p className='text-sm'>
                     Paid reservations require refund reconciliation before

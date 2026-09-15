@@ -40,6 +40,12 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!reservation.isPaid && reservation.totalPrice > 0)
+      return Response.json(
+        { error: 'Payment is required before confirmation' },
+        { status: 409 }
+      );
+
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
     const firstName = user?.firstName || 'Guest';

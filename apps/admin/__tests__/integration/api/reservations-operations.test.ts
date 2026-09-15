@@ -436,3 +436,87 @@ it('maps lifecycle labels without losing native statuses', () => {
     'cancelled',
   ]);
 });
+
+it('records partial payments with refund permissions and allows cancellation after reconciliation', async () => {
+  const { reservationPayment } =
+    await import('@/lib/reservation-payment-route');
+  const { recordReservationReceipt, updateDiningReservation } =
+    await import('@lodgeflow/database');
+  const f = await fixtures();
+  const row = await createDiningReservation(String(f.dining._id), 'guest', {
+    date: day,
+    time: '19:00',
+    numGuests: 2,
+  });
+  const id = String(row!._id);
+  const payload = {
+    id: '780b7330-b62d-4b6e-80cb-7c9f588ce19b',
+    type: 'payment',
+    method: 'cash',
+    amountCents: 2500,
+    reference: '',
+  };
+  const call = (body: unknown) =>
+    reservationPayment(req(body), { kind: 'dining', id });
+  expect((await call(payload))?.status).toBe(200);
+  expect((await call(payload))?.status).toBe(200);
+  expect(
+    await AuditLog.countDocuments({ resourceId: id, action: 'payment.record' })
+  ).toBe(1);
+  await expect(
+    updateDiningReservation(id, 'guest', { numGuests: 3 })
+  ).rejects.toMatchObject({ status: 409 });
+  await expect(
+    transitionCapacityReservation('dining', id, 'pending', 'cancelled')
+  ).rejects.toMatchObject({ status: 409 });
+  (requireApiAuth as jest.Mock).mockImplementation(async ({ permission }) =>
+    permission === 'refunds:issue'
+      ? { authenticated: false, error: new Response(null, { status: 403 }) }
+      : { authenticated: true, userId: 'user_staff', role: 'front_desk' }
+  );
+  expect(
+    (
+      await call({
+        ...payload,
+        id: '780b7330-b62d-4b6e-80cb-7c9f588ce19c',
+        type: 'refund',
+        reference: 'Cancellation',
+      })
+    )?.status
+  ).toBe(403);
+  await recordReservationReceipt({
+    kind: 'dining',
+    id,
+    receipt: {
+      id: 'refund',
+      type: 'refund',
+      method: 'cash',
+      amountCents: 2500,
+      reference: 'Cancellation',
+      actor: 'manager',
+    },
+  });
+  await expect(
+    transitionCapacityReservation('dining', id, 'pending', 'cancelled')
+  ).resolves.toMatchObject({ changed: true });
+});
+it('rejects malformed payment payloads and unauthorized collection', async () => {
+  const { reservationPayment } =
+    await import('@/lib/reservation-payment-route');
+  const id = '780b7330b62d4b6e80cb7c9f';
+  expect(
+    (
+      await reservationPayment(req({ amountCents: -1 }), {
+        kind: 'experience',
+        id,
+      })
+    )?.status
+  ).toBe(400);
+  (requireApiAuth as jest.Mock).mockResolvedValue({
+    authenticated: false,
+    error: new Response(null, { status: 403 }),
+  });
+  expect(
+    (await reservationPayment(req({}), { kind: 'experience', id }))?.status
+  ).toBe(403);
+});

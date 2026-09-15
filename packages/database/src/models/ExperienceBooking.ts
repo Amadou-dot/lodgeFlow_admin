@@ -1,7 +1,11 @@
+import {
+  reservationPaymentFields,
+  type ReservationPaymentState,
+} from '../reservation-payment-state';
 import { EXPERIENCE_BOOKING_STATUSES } from '../config';
 import mongoose, { Document, Schema } from 'mongoose';
 
-export interface IExperienceBooking extends Document {
+export interface IExperienceBooking extends Document, ReservationPaymentState {
   experience: mongoose.Types.ObjectId | string;
   customer: string; // Clerk user ID
   date: Date;
@@ -50,6 +54,7 @@ const ExperienceBookingSchema: Schema = new Schema(
       required: [true, 'Total price is required'],
       min: [0, 'Total price must be positive'],
     },
+    ...reservationPaymentFields,
     isPaid: {
       type: Boolean,
       default: false,
@@ -68,6 +73,7 @@ const ExperienceBookingSchema: Schema = new Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }

@@ -1,6 +1,10 @@
+import { sendReservationConfirmation } from '@/lib/reservation-confirmation-email';
 import mongoose from 'mongoose';
 import {
   Booking,
+  settleReservationCheckout,
+  expireReservationCheckout,
+  settleReservationRefund,
   ProcessedStripeEvent,
   connectDB,
   settleCheckoutPayment,
@@ -38,6 +42,34 @@ export async function POST(request: NextRequest) {
       event.type === 'checkout.session.async_payment_succeeded'
     ) {
       const session = event.data.object as Stripe.Checkout.Session;
+      const kind = session.metadata?.reservationKind;
+      if (
+        session.payment_status === 'paid' &&
+        (kind === 'dining' || kind === 'experience') &&
+        session.metadata?.reservationId
+      ) {
+        await settleReservationCheckout({
+          kind,
+          id: session.metadata.reservationId,
+          token: session.metadata.quoteToken ?? '',
+          sessionId: session.id,
+          amountCents: session.amount_total ?? 0,
+          currency: session.currency ?? '',
+          paymentIntentId:
+            typeof session.payment_intent === 'string'
+              ? session.payment_intent
+              : (session.payment_intent?.id ?? ''),
+        });
+      }
+      if (
+        session.payment_status === 'paid' &&
+        (kind === 'dining' || kind === 'experience') &&
+        session.metadata?.reservationId
+      )
+        await sendReservationConfirmation({
+          kind,
+          id: session.metadata.reservationId,
+        });
       if (session.payment_status === 'paid' && session.metadata?.bookingId) {
         const result = await settleCheckoutPayment({
           bookingId: session.metadata.bookingId,
@@ -73,6 +105,16 @@ export async function POST(request: NextRequest) {
       }
     } else if (event.type === 'checkout.session.expired') {
       const session = event.data.object as Stripe.Checkout.Session;
+      const kind = session.metadata?.reservationKind;
+      if (
+        (kind === 'dining' || kind === 'experience') &&
+        session.metadata?.reservationId
+      )
+        await expireReservationCheckout({
+          kind,
+          id: session.metadata.reservationId,
+          token: session.metadata.quoteToken ?? '',
+        });
       if (session.metadata?.bookingId)
         await Booking.updateOne(
           {
@@ -86,6 +128,24 @@ export async function POST(request: NextRequest) {
             $inc: { __v: 1 },
           }
         );
+    } else if (
+      event.type === 'refund.created' ||
+      event.type === 'refund.updated' ||
+      event.type === 'refund.failed'
+    ) {
+      const refund = event.data.object as Stripe.Refund;
+      const kind = refund.metadata?.reservationKind;
+      if (
+        (kind === 'dining' || kind === 'experience') &&
+        refund.metadata?.reservationId
+      )
+        await settleReservationRefund({
+          kind,
+          id: refund.metadata.reservationId,
+          token: refund.metadata.refundToken ?? '',
+          refundId: refund.id,
+          status: refund.status ?? 'pending',
+        });
     } else if (event.type === 'charge.refunded') {
       const charge = event.data.object as Stripe.Charge;
       const intent =

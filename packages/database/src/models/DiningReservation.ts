@@ -1,7 +1,11 @@
+import {
+  reservationPaymentFields,
+  type ReservationPaymentState,
+} from '../reservation-payment-state';
 import { DINING_RESERVATION_STATUSES, TABLE_PREFERENCES } from '../config';
 import mongoose, { Document, Schema } from 'mongoose';
 
-export interface IDiningReservation extends Document {
+export interface IDiningReservation extends Document, ReservationPaymentState {
   dining: mongoose.Types.ObjectId | string;
   customer: string; // Clerk user ID
   date: Date;
@@ -54,6 +58,7 @@ const DiningReservationSchema: Schema = new Schema(
       required: [true, 'Total price is required'],
       min: [0, 'Total price must be positive'],
     },
+    ...reservationPaymentFields,
     isPaid: {
       type: Boolean,
       default: false,
@@ -81,6 +86,7 @@ const DiningReservationSchema: Schema = new Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }

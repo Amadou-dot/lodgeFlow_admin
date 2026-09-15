@@ -66,6 +66,7 @@
     "@heroui/use-infinite-scroll": "^2.2.12",
     "@heroui/user": "^2.2.24",
     "@internationalized/date": "^3.10.1",
+    "@lodgeflow/database": "workspace:*",
     "@react-aria/i18n": "^3.12.14",
     "@react-aria/ssr": "3.9.10",
     "@react-aria/visually-hidden": "3.8.29",
@@ -88,9 +89,9 @@
     "react-dom": "18.3.1",
     "recharts": "^3.6.0",
     "resend": "^6.7.0",
+    "stripe": "^20.4.1",
     "swr": "^2.3.8",
-    "zod": "^4.3.5",
-    "@lodgeflow/database": "workspace:*"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.1",

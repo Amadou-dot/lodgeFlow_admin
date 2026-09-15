@@ -1,5 +1,6 @@
 'use client';
 
+import { openReservationCheckout } from '@/lib/open-reservation-checkout';
 import { useState } from 'react';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
@@ -81,7 +82,23 @@ export default function ExperienceBookingForm({
         color: 'success',
       });
 
-      router.push(`/experiences/confirmation/${result.data._id}`);
+      const confirmationUrl = `/experiences/confirmation/${result.data._id}`;
+      if (result.data.totalPrice > 0 && !result.data.isPaid) {
+        try {
+          await openReservationCheckout({
+            kind: 'experience',
+            id: String(result.data._id),
+          });
+        } catch {
+          addToast({
+            title: 'Payment still required',
+            description:
+              'Your reservation was saved. Continue payment from the confirmation page.',
+            color: 'warning',
+          });
+          router.push(confirmationUrl);
+        }
+      } else router.push(confirmationUrl);
     } catch (error) {
       addToast({
         title: 'Booking Failed',

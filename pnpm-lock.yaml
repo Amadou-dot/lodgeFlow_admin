@@ -198,6 +198,9 @@ importers:
       resend:
         specifier: ^6.7.0
         version: 6.17.2
+      stripe:
+        specifier: ^20.4.1
+        version: 20.4.1(@types/node@22.15.29)
       swr:
         specifier: ^2.3.8
         version: 2.4.2(react@18.3.1)
@@ -13356,6 +13359,10 @@ snapshots:
       min-indent: 1.0.1
 
   strip-json-comments@3.1.1: {}
+
+  stripe@20.4.1(@types/node@22.15.29):
+    optionalDependencies:
+      '@types/node': 22.15.29
 
   stripe@20.4.1(@types/node@22.20.1):
     optionalDependencies:

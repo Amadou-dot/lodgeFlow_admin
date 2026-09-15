@@ -1,5 +1,6 @@
 'use client';
 
+import { ReservationCheckout } from '@/components/ReservationCheckout';
 import { useEffect, useState } from 'react';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
@@ -155,7 +156,11 @@ export default function ExperienceConfirmationPage({
         <CheckCircle className='w-20 h-20 text-success' />
         <h1 className={title({ size: 'lg' })}>Booking Submitted!</h1>
         <p className={subtitle()}>
-          Your experience booking has been received. We'll confirm it shortly.
+          {booking.isPaid
+            ? 'Your payment has been received.'
+            : booking.totalPrice > 0
+              ? 'Payment is pending. Complete checkout to pay for your reservation.'
+              : 'Your reservation has been received.'}
         </p>
         <Chip color='warning' size='lg' variant='flat'>
           Status:{' '}
@@ -259,6 +264,12 @@ export default function ExperienceConfirmationPage({
           <h2 className={title({ size: 'sm' })}>Price Breakdown</h2>
         </CardHeader>
         <CardBody className='space-y-3'>
+          <ReservationCheckout
+            id={booking._id}
+            isPaid={booking.isPaid}
+            kind='experience'
+            status={booking.status}
+          />
           <div className='flex justify-between items-center'>
             <span className='text-default-600'>
               ${booking.experience.price} x {booking.numParticipants}{' '}

@@ -1,20 +1,30 @@
 /** @jest-environment node */
+jest.mock('@/lib/reservation-confirmation-email', () => ({
+  sendReservationConfirmation: jest.fn(),
+}));
 jest.mock('@lodgeflow/database', () => ({
   connectDB: jest.fn(),
   Booking: { findOne: jest.fn(), updateOne: jest.fn() },
   ProcessedStripeEvent: { exists: jest.fn(), updateOne: jest.fn() },
   settleCheckoutPayment: jest.fn(),
+  settleReservationCheckout: jest.fn(),
+  expireReservationCheckout: jest.fn(),
+  settleReservationRefund: jest.fn(),
   roundMoney: (amount: number) => Math.round(amount * 100) / 100,
 }));
 jest.mock('@/lib/stripe', () => ({ getStripe: jest.fn() }));
 jest.mock('@/lib/email', () => ({ sendPaymentConfirmationEmail: jest.fn() }));
 import Stripe from 'stripe';
+import { sendReservationConfirmation } from '@/lib/reservation-confirmation-email';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/payments/webhook/route';
 import {
   Booking,
   ProcessedStripeEvent,
   settleCheckoutPayment,
+  settleReservationCheckout,
+  expireReservationCheckout,
+  settleReservationRefund,
 } from '@lodgeflow/database';
 import { getStripe } from '@/lib/stripe';
 const stripe = new Stripe('sk_test_webhook_unit_test');
@@ -115,4 +125,111 @@ it('older refund events cannot reduce the amount already refunded', async () => 
   ).toBe(200);
   expect(booking.refundAmount).toBe(100);
   expect(booking.payments[0].refundedAmount).toBe(100);
+});
+
+for (const kind of ['dining', 'experience']) {
+  it(`routes signed ${kind} payments and expirations to reservation accounting`, async () => {
+    const object = {
+      ...paidEvent.data.object,
+      metadata: {
+        reservationKind: kind,
+        reservationId: 'reservation',
+        quoteToken: 'quote',
+      },
+    };
+    expect(
+      (await POST(signedRequest({ ...paidEvent, data: { object } }))).status
+    ).toBe(200);
+    expect(settleReservationCheckout).toHaveBeenCalledWith({
+      kind,
+      id: 'reservation',
+      token: 'quote',
+      sessionId: 'cs_paid',
+      amountCents: 15000,
+      currency: 'usd',
+      paymentIntentId: 'pi_paid',
+    });
+    expect(settleCheckoutPayment).not.toHaveBeenCalled();
+    expect(
+      (
+        await POST(
+          signedRequest({
+            ...paidEvent,
+            type: 'checkout.session.expired',
+            data: { object },
+          })
+        )
+      ).status
+    ).toBe(200);
+    expect(expireReservationCheckout).toHaveBeenCalledWith({
+      kind,
+      id: 'reservation',
+      token: 'quote',
+    });
+  });
+}
+it('routes refund status changes and preserves retries after database failure', async () => {
+  const event = {
+    id: 'evt_refund',
+    type: 'refund.updated',
+    data: {
+      object: {
+        id: 're_test',
+        status: 'succeeded',
+        metadata: {
+          reservationKind: 'dining',
+          reservationId: 'reservation',
+          refundToken: 'refund',
+        },
+      },
+    },
+  };
+  (settleReservationRefund as jest.Mock)
+    .mockRejectedValueOnce(new Error('Database unavailable'))
+    .mockResolvedValueOnce(undefined);
+  expect((await POST(signedRequest(event))).status).toBe(500);
+  expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+  expect((await POST(signedRequest(event))).status).toBe(200);
+  expect(settleReservationRefund).toHaveBeenCalledWith({
+    kind: 'dining',
+    id: 'reservation',
+    token: 'refund',
+    refundId: 're_test',
+    status: 'succeeded',
+  });
+});
+
+it('retries confirmation delivery after settlement without treating an unpaid event as confirmed', async () => {
+  const event = {
+    ...paidEvent,
+    data: {
+      object: {
+        ...paidEvent.data.object,
+        metadata: {
+          reservationKind: 'dining',
+          reservationId: 'reservation',
+          quoteToken: 'quote',
+        },
+      },
+    },
+  };
+  (sendReservationConfirmation as jest.Mock)
+    .mockRejectedValueOnce(new Error('Email unavailable'))
+    .mockResolvedValueOnce(undefined);
+  expect((await POST(signedRequest(event))).status).toBe(500);
+  expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+  expect((await POST(signedRequest(event))).status).toBe(200);
+  expect(sendReservationConfirmation).toHaveBeenCalledTimes(2);
+  jest.clearAllMocks();
+  expect(
+    (
+      await POST(
+        signedRequest({
+          ...event,
+          data: { object: { ...event.data.object, payment_status: 'unpaid' } },
+        })
+      )
+    ).status
+  ).toBe(200);
+  expect(sendReservationConfirmation).not.toHaveBeenCalled();
 });
