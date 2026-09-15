@@ -28,10 +28,9 @@ documents its — copy it to `.env.local` and fill in real values.
 | `pnpm ci:check` | Format check, lint, and test everything |
 | `pnpm --filter @lodgeflow/admin <script>` | Run a script in one app |
 
-`pnpm build` requires `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (both apps, for `ClerkProvider`
-during prerendering) and, admin-only, `RESEND_API_KEY` (`apps/admin/app/api/send/*`
-constructs its Resend client at module scope). See `.github/workflows/ci.yml` and
-`apps/admin/CLAUDE.md` for details.
+`pnpm build` requires `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` for both apps' ClerkProvider
+prerendering. Resend and Stripe credentials are needed only when their features run;
+SDK clients are constructed lazily. CI builds without those credentials.
 
 ## Structure
 

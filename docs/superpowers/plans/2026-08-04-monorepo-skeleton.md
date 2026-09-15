@@ -1,6 +1,6 @@
 # Monorepo Skeleton Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Status:** Production cutover completed on 2026-09-14 (America/Denver). The completion record below supersedes historical task checkboxes and assumptions. Adapt implementation details when evidence warrants it.
 
 **Goal:** Merge the two LodgeFlow repositories into a single pnpm workspace with both apps building, testing, and deploying — without changing a single line of application code.
 
@@ -937,3 +937,15 @@ Created both previews through the authenticated Vercel CLI (`vercel api /v13/dep
 Smoke tests used `vercel curl` with each project's deployment-protection context. No authenticated booking, payment, or browser-rendering tests were performed. Both deployment records identify the reviewed SHA; the resulting app-specific HTML and customer build logs confirm the intended apps were built.
 
 **Permanent cutover remains pending.** Inspection after deployment confirmed both project root directories are still `.`. Admin is linked to `Amadou-dot/lodgeFlow_admin`; customer remains linked to `Amadou-dot/lodgeFlow` and still has an ignored-build command that skips non-production builds. These previews supplied per-deployment root/Git/ignore-command overrides. Clear the customer's skip command and complete Steps 2–3 in coordination with the merge before expecting automatic monorepo deployments. Production domains were not promoted or changed. Step 1 is not complete until production cutover and its verification pass.
+
+## Production cutover completed — 2026-09-14
+
+- PR 131 merged with merge commit `3fcf37c135da66f14753ca7ce23f40bb495a745f`. Customer head `f3deb7975c4626fe2c78761cdd01c0f401dc43fd` is an ancestor of `origin/main`; `main` contains 506 commits at cutover.
+- Both Vercel projects now connect to `Amadou-dot/lodgeFlow_admin` on production branch `main`, using roots `apps/admin` and `apps/customer`. Customer's skip-preview command was cleared. Fresh previews without root/Git overrides passed, as did both CI jobs for the updated PR.
+- Admin production deployment `dpl_4YLx1GWBjTX6DkLrSB3TTgvPApCE` and customer production deployment `dpl_H6ny3icdtcHJ5oYbHMMY4MZWsmyv` are Ready and assigned to their production domains. After both became Ready, admin sign-in and customer home returned 200; an unsigned customer webhook POST returned 400.
+- The generic Vercel check on the last PR revision retained a failed build started before the root-directory change. Both subsequent app-specific checks passed using permanent settings; the stale result did not indicate a remaining application failure.
+- Previous production rollback points: admin `dpl_AoxhUR6cirv4GaddFSr5WEgp8gJA` (`72b266f`), customer `dpl_3j2e2Ri9qC79gxQUvj9sWULM1WCT` (`f3deb79`). Follow the source/settings rollback procedure above.
+- All eight open customer issues moved to this repository: old → new mappings are `77 → 132`, `76 → 133`, `75 → 134`, `74 → 135`, `69 → 136`, `68 → 137`, `67 → 138`, `11 → 139`. The old repository has no remaining open issues and is archived.
+- Two unmerged customer PRs are preserved for selective porting: [PR 73](https://github.com/Amadou-dot/lodgeFlow/pull/73), commit `203620a`, branch `archive/customer-pr-73`; [PR 78](https://github.com/Amadou-dot/lodgeFlow/pull/78), commit `c7ee697`, branch `archive/customer-pr-78`. Those branches retain the old customer-root layout and must not be merged wholesale into the monorepo. Original PR discussion remains available in the archived repository.
+
+Step 1 is complete. Step 2 must account for the preserved PRs, especially the unfinished dining/experience checkout and overlapping concurrency fixes, rather than assuming those features already shipped.

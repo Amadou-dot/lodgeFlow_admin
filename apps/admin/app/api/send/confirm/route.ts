@@ -6,9 +6,7 @@ import {
 } from '@/lib/rate-limit';
 import { BookingConfirmationEmail } from '@/components/EmailTemplates';
 import { validateEmail } from '@/utils/utilityFunctions';
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { getResend } from '@/lib/resend';
 
 export async function POST(request: Request) {
   // Require authentication - prevents email spam abuse
@@ -39,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: 'LodgeFlow <onboarding@resend.dev>',
       to: `${email}`,
       subject: 'Booking Confirmation',

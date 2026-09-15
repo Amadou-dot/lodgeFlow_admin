@@ -6,9 +6,7 @@ import {
 } from '@/lib/rate-limit';
 import { WelcomeEmail } from '@/components/EmailTemplates';
 import { validateEmail } from '@/utils/utilityFunctions';
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { getResend } from '@/lib/resend';
 
 export async function POST(request: Request) {
   // Require authentication - prevents email spam abuse
@@ -31,7 +29,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: 'LodgeFlow <onboarding@resend.dev>',
       to: email,
       subject: 'Welcome to LodgeFlow',
