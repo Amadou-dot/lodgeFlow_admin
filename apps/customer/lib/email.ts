@@ -77,8 +77,13 @@ export async function sendPaymentConfirmationEmail(
 }
 
 export interface SendCancellationConfirmationParams {
-  booking: PopulatedBooking;
-  cabin: Cabin;
+  booking: {
+    customer: string;
+    checkInDate: Date;
+    checkOutDate: Date;
+    totalPrice: number;
+  };
+  cabin: { name: string };
   refundAmount: number;
   refundType: 'full' | 'partial' | 'none';
   reason: string;
@@ -91,7 +96,7 @@ export async function sendCancellationConfirmationEmail(
 
   try {
     const clerk = await clerkClient();
-    const user = await clerk.users.getUser(booking.customer as string);
+    const user = await clerk.users.getUser(booking.customer);
 
     const email = user.emailAddresses?.[0]?.emailAddress;
     const firstName = user.firstName || 'Guest';
@@ -130,8 +135,8 @@ export async function sendCancellationConfirmationEmail(
             <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e2e8f0;">
               <h3 style="margin-top: 0; color: #1e293b;">Cancellation Details</h3>
               <p><strong>Property:</strong> ${cabin.name}</p>
-              <p><strong>Check-in:</strong> ${new Date(booking.checkInDate).toLocaleDateString()}</p>
-              <p><strong>Check-out:</strong> ${new Date(booking.checkOutDate).toLocaleDateString()}</p>
+              <p><strong>Check-in:</strong> ${booking.checkInDate.toLocaleDateString()}</p>
+              <p><strong>Check-out:</strong> ${booking.checkOutDate.toLocaleDateString()}</p>
               <p><strong>Original Total:</strong> $${booking.totalPrice.toFixed(2)}</p>
             </div>
 

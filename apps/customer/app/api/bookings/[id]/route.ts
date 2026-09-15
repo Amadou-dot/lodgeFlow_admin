@@ -17,7 +17,7 @@ import { Booking, Settings, connectDB } from '@lodgeflow/database';
 import { calculateRefund } from '@/lib/cancellation';
 import { createRefund } from '@/lib/stripe';
 import { sendCancellationConfirmationEmail } from '@/lib/email';
-import type { ApiResponse, PopulatedBooking } from '@/types';
+import type { ApiResponse, CancellationResponse } from '@/types';
 import { updateBookingDetailsSchema } from '@/lib/validations';
 import {
   validateRequest,
@@ -197,10 +197,9 @@ export async function DELETE(
     // If no content-type or not JSON, cancellationReason remains undefined (expected for simple DELETE)
 
     // Find the booking with cabin populated for email
-    const booking = await Booking.findById(id).populate(
-      'cabin',
-      'name image capacity price discount description'
-    );
+    const booking = await Booking.findById(id).populate<{
+      cabin: Pick<DetailCabinSource, 'name'> | null;
+    }>('cabin', 'name image capacity price discount description');
 
     if (!booking) {
       const response: ApiResponse<never> = {
@@ -308,15 +307,16 @@ export async function DELETE(
     }
     // refundAmount records completed refunds only; signed webhooks update it.
     // Offline receipts remain pending for staff to return and record manually.
-    const updatedBooking = await Booking.findById(id).populate('cabin');
+    const updatedBooking = await Booking.findById(id).populate<{
+      cabin: DetailCabinSource | null;
+    }>('cabin');
     const refundStatus = updatedBooking?.refundStatus ?? 'none';
 
     // Send cancellation confirmation email (async, don't block response)
     if (updatedBooking && updatedBooking.cabin) {
-      const populatedBooking = updatedBooking as unknown as PopulatedBooking;
       sendCancellationConfirmationEmail({
-        booking: populatedBooking,
-        cabin: populatedBooking.cabin,
+        booking: updatedBooking,
+        cabin: updatedBooking.cabin,
         refundAmount: refundEstimate.refundAmount,
         refundType: refundEstimate.refundType,
         reason: refundEstimate.reason,
@@ -329,10 +329,10 @@ export async function DELETE(
       );
     }
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<CancellationResponse> = {
       success: true,
       data: {
-        booking: updatedBooking,
+        booking: updatedBooking ? serializeBookingDetail(updatedBooking) : null,
         refund: {
           amount: refundEstimate.refundAmount,
           type: refundEstimate.refundType,
