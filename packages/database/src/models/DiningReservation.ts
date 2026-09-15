@@ -13,7 +13,7 @@ export interface IDiningReservation extends Document {
   stripePaymentIntentId?: string;
   dietaryRequirements?: string[];
   specialRequests?: string[];
-  tablePreference?: 'indoor' | 'outdoor' | 'bar' | 'no-preference';
+  tablePreference?: (typeof TABLE_PREFERENCES)[number];
   occasion?: string;
   createdAt: Date;
   updatedAt: Date;

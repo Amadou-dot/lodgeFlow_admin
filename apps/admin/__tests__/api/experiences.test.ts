@@ -3,6 +3,18 @@
  */
 
 import { NextRequest } from 'next/server';
+jest.mock('@lodgeflow/database/reservation-capacity', () => ({
+  ...jest.requireActual('@lodgeflow/database/reservation-capacity'),
+  updateCapacityCatalog: jest.fn(),
+  deleteCapacityCatalog: jest.fn(),
+}));
+import {
+  updateCapacityCatalog,
+  deleteCapacityCatalog,
+} from '@lodgeflow/database/reservation-capacity';
+const mockUpdate = updateCapacityCatalog as jest.Mock;
+const mockDelete = deleteCapacityCatalog as jest.Mock;
+
 import { GET, POST } from '@/app/api/experiences/route';
 import { GET as getById, PUT, DELETE } from '@/app/api/experiences/[id]/route';
 import connectToDatabase from '@lodgeflow/database/mongodb';
@@ -325,9 +337,7 @@ describe('/api/experiences/[id]', () => {
   describe('PUT /api/experiences/[id]', () => {
     it('should update an existing experience', async () => {
       const updatedData = { ...mockExperienceData, name: 'Updated Adventure' };
-      MockExperience.findByIdAndUpdate = jest
-        .fn()
-        .mockResolvedValue(updatedData);
+      mockUpdate.mockResolvedValue(updatedData);
 
       const request = new NextRequest(
         'http://localhost/api/experiences/507f1f77bcf86cd799439011',
@@ -342,10 +352,10 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(MockExperience.findByIdAndUpdate).toHaveBeenCalledWith(
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'experience',
         '507f1f77bcf86cd799439011',
-        { name: 'Updated Adventure' },
-        { new: true, runValidators: true }
+        { name: 'Updated Adventure' }
       );
       expect(response.status).toBe(200);
       expect(data).toEqual({ success: true, data: updatedData });
@@ -353,9 +363,7 @@ describe('/api/experiences/[id]', () => {
 
     it('should accept a full round-tripped payload including _id', async () => {
       const updatedData = { ...mockExperienceData, name: 'Updated Adventure' };
-      MockExperience.findByIdAndUpdate = jest
-        .fn()
-        .mockResolvedValue(updatedData);
+      mockUpdate.mockResolvedValue(updatedData);
 
       const request = new NextRequest(
         'http://localhost/api/experiences/507f1f77bcf86cd799439011',
@@ -376,15 +384,14 @@ describe('/api/experiences/[id]', () => {
       expect(data).toEqual({ success: true, data: updatedData });
       // _id/createdAt/updatedAt from the round-tripped object must not reach
       // findByIdAndUpdate as part of the update payload.
-      const [, updatePayload] =
-        MockExperience.findByIdAndUpdate.mock.calls.at(-1)!;
+      const [, updatePayload] = mockUpdate.mock.calls.at(-1)!;
       expect(updatePayload).not.toHaveProperty('_id');
       expect(updatePayload).not.toHaveProperty('createdAt');
       expect(updatePayload).not.toHaveProperty('updatedAt');
     });
 
     it('should return 404 when updating non-existent experience', async () => {
-      MockExperience.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+      mockUpdate.mockResolvedValue(null);
 
       const request = new NextRequest(
         'http://localhost/api/experiences/nonexistent',
@@ -403,9 +410,7 @@ describe('/api/experiences/[id]', () => {
     });
 
     it('should handle update errors', async () => {
-      MockExperience.findByIdAndUpdate = jest
-        .fn()
-        .mockRejectedValue(new Error('Update error'));
+      mockUpdate.mockRejectedValue(new Error('Update error'));
 
       const request = new NextRequest(
         'http://localhost/api/experiences/507f1f77bcf86cd799439011',
@@ -449,9 +454,7 @@ describe('/api/experiences/[id]', () => {
 
   describe('DELETE /api/experiences/[id]', () => {
     it('should delete an existing experience', async () => {
-      MockExperience.findByIdAndDelete = jest
-        .fn()
-        .mockResolvedValue(mockExperienceData);
+      mockDelete.mockResolvedValue(mockExperienceData);
 
       const request = new NextRequest(
         'http://localhost/api/experiences/507f1f77bcf86cd799439011',
@@ -465,7 +468,8 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(MockExperience.findByIdAndDelete).toHaveBeenCalledWith(
+      expect(mockDelete).toHaveBeenCalledWith(
+        'experience',
         '507f1f77bcf86cd799439011'
       );
       expect(response.status).toBe(200);
@@ -477,7 +481,7 @@ describe('/api/experiences/[id]', () => {
     });
 
     it('should return 404 when deleting non-existent experience', async () => {
-      MockExperience.findByIdAndDelete = jest.fn().mockResolvedValue(null);
+      mockDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
         'http://localhost/api/experiences/nonexistent',
@@ -495,9 +499,7 @@ describe('/api/experiences/[id]', () => {
     });
 
     it('should handle deletion errors', async () => {
-      MockExperience.findByIdAndDelete = jest
-        .fn()
-        .mockRejectedValue(new Error('Delete error'));
+      mockDelete.mockRejectedValue(new Error('Delete error'));
 
       const request = new NextRequest(
         'http://localhost/api/experiences/507f1f77bcf86cd799439011',

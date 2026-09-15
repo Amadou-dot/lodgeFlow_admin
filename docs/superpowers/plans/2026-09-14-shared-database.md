@@ -37,7 +37,7 @@ so a failed replacement leaves the prior dataset intact. No real payment or emai
   and stale/duplicate checkout events in integration tests.
 - [ ] Serialize dining capacity through shared state and test competing last-seat requests
   on a replica set. Include all capacity-changing mutations; audit experience capacity too.
-- [ ] Seed coherent demo reservations using the shared pricing/payment rules, with explicit
+- [x] Seed coherent demo reservations using the shared pricing/payment rules, with explicit
   demo provenance and no Stripe-looking payment IDs. Audit the resulting data and indexes.
 - [ ] Deploy both apps, verify production and update this record before Step 3 permissions.
 
@@ -75,7 +75,7 @@ status indexes for current query compatibility. Settings now uses a real unique
 `singleton` index instead of the invalid empty-key declaration; existing single-record
 settings remain readable, and concurrent first creation is tested.
 
-## Accounting implementation (deployment pending)
+## Accounting implementation (deployed)
 
 PR 141 merged as `0f105aa`; both apps now consume the same model definitions.
 The next change introduces explicit receipt entries (`amountPaid` is their sum),
@@ -104,3 +104,39 @@ Validation covers competing cabin requests, stale payment saves, duplicate Strip
 settlement, signed webhook failure/retry, out-of-order refund events, 500 generated
 reservations, and transactional reset rollback. These checks do not replace an
 end-to-end authenticated Stripe Checkout test on the deployed customer app.
+
+## Production accounting and reset verification
+
+PR 142 merged as `6fac178`. Both Vercel production deployments are Ready:
+customer `lodgeflow-6yyahbanf-asecklabs.vercel.app` and admin
+`lodgeflowadmin-kapzvjfp8-asecklabs.vercel.app`. Preview home/sign-in return 200;
+an unsigned webhook request returns 400. A real browser loads `https://lodgeflow.app`
+and Clerk sign-in successfully.
+
+The authorized production reset succeeded with 500 bookings, 15 cabins, 14 dining
+listings, 8 experiences, and 1 settings record, using 52 existing Clerk identities.
+Dining/experience reservations were cleared with their catalogs. The subsequent
+read-only audit found zero schema failures, inconsistent financial totals, missing
+cabin references, overlapping active stays, or invalid receipts. The overlap index
+has the expected non-partial definition. No real charges were created by seeding.
+
+## Capacity implementation (deployment pending)
+
+All dining and experience reservation creates, edits, and cancellations now write
+a shared version field on the relevant catalog document within their transaction.
+This creates a real write conflict and forces competing transactions to retry with
+fresh capacity; a transaction containing only independent reservation inserts was
+insufficient. Admin capacity edits and listing deletions use the same transaction
+boundary. Lowering capacity below existing future reservations is rejected, and
+listings referenced by reservation history cannot be deleted.
+
+Dining capacity remains per UTC date and exact time; experience capacity remains
+per UTC date across all descriptive time slots. Guest PATCH requests validate party
+sizes/dates, scope ownership, and recompute prices. Paid reservations cannot be
+repriced or moved; cancelling paid dining/experience reservations requires staff
+until those products have an implemented refund flow.
+
+Replica-set tests cover competing last-seat requests, simultaneous slot moves,
+cancellation releasing capacity, experience repricing, and an admin reducing
+capacity during a booking request. No additional database collection or index
+migration is required for the catalog version field.

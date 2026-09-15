@@ -1,4 +1,9 @@
 import {
+  updateCapacityCatalog,
+  deleteCapacityCatalog,
+  ReservationRuleError,
+} from '@lodgeflow/database/reservation-capacity';
+import {
   createErrorResponse,
   createSuccessResponse,
   createValidationErrorResponse,
@@ -82,6 +87,8 @@ export async function GET(request: NextRequest) {
 
     return createSuccessResponse(dining);
   } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error fetching dining',
       error instanceof Error ? error : undefined
@@ -117,6 +124,8 @@ export async function POST(request: NextRequest) {
       HTTP_STATUS.CREATED
     );
   } catch (error: unknown) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
         'Validation failed',
@@ -153,10 +162,7 @@ export async function PUT(request: NextRequest) {
 
     const { _id, ...updateData } = validationResult.data;
 
-    const dining = await Dining.findByIdAndUpdate(_id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    const dining = await updateCapacityCatalog('dining', _id, updateData);
 
     if (!dining) {
       return createErrorResponse(
@@ -167,6 +173,8 @@ export async function PUT(request: NextRequest) {
 
     return createSuccessResponse(dining, 'Dining item updated successfully');
   } catch (error: unknown) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
         'Validation failed',
@@ -204,7 +212,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const dining = await Dining.findByIdAndDelete(id);
+    const dining = await deleteCapacityCatalog('dining', id);
 
     if (!dining) {
       return createErrorResponse(
@@ -215,6 +223,8 @@ export async function DELETE(request: NextRequest) {
 
     return createSuccessResponse(null, 'Dining item deleted successfully');
   } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error deleting dining item',
       error instanceof Error ? error : undefined

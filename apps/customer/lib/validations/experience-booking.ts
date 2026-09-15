@@ -59,3 +59,11 @@ export type CreateExperienceBookingInput = z.infer<
 export type PatchExperienceBookingInput = z.infer<
   typeof patchExperienceBookingSchema
 >;
+
+export const updateExperienceDetailsSchema = z.object({
+  date: z.coerce.date().optional(),
+  timeSlot: z.string().max(50).optional(),
+  numParticipants: z.number().int().min(1).max(500).optional(),
+  specialRequests: z.array(z.string()).optional(),
+  observations: z.string().max(1000).optional(),
+});

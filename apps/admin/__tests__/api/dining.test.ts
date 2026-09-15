@@ -3,6 +3,18 @@
  */
 
 import { NextRequest } from 'next/server';
+jest.mock('@lodgeflow/database/reservation-capacity', () => ({
+  ...jest.requireActual('@lodgeflow/database/reservation-capacity'),
+  updateCapacityCatalog: jest.fn(),
+  deleteCapacityCatalog: jest.fn(),
+}));
+import {
+  updateCapacityCatalog,
+  deleteCapacityCatalog,
+} from '@lodgeflow/database/reservation-capacity';
+const mockUpdate = updateCapacityCatalog as jest.Mock;
+const mockDelete = deleteCapacityCatalog as jest.Mock;
+
 import { GET, POST, PUT, DELETE } from '@/app/api/dining/route';
 import {
   GET as getById,
@@ -284,7 +296,7 @@ describe('/api/dining', () => {
   describe('PUT /api/dining', () => {
     it('should update a dining item', async () => {
       const updatedDining = { ...mockDiningData, price: 30 };
-      mockDiningModel.findByIdAndUpdate.mockResolvedValue(updatedDining);
+      mockUpdate.mockResolvedValue(updatedDining);
 
       const request = new NextRequest('http://localhost/api/dining', {
         method: 'PUT',
@@ -298,13 +310,13 @@ describe('/api/dining', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(mockDiningModel.findByIdAndUpdate).toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalled();
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
     });
 
     it('should return 404 when item not found', async () => {
-      mockDiningModel.findByIdAndUpdate.mockResolvedValue(null);
+      mockUpdate.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/dining', {
         method: 'PUT',
@@ -324,7 +336,7 @@ describe('/api/dining', () => {
 
   describe('DELETE /api/dining', () => {
     it('should delete a dining item', async () => {
-      mockDiningModel.findByIdAndDelete.mockResolvedValue(mockDiningData);
+      mockDelete.mockResolvedValue(mockDiningData);
 
       const request = new NextRequest(
         'http://localhost/api/dining?id=507f1f77bcf86cd799439011',
@@ -337,7 +349,8 @@ describe('/api/dining', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(mockDiningModel.findByIdAndDelete).toHaveBeenCalledWith(
+      expect(mockDelete).toHaveBeenCalledWith(
+        'dining',
         '507f1f77bcf86cd799439011'
       );
       expect(response.status).toBe(200);
@@ -345,7 +358,7 @@ describe('/api/dining', () => {
     });
 
     it('should return 404 when item not found', async () => {
-      mockDiningModel.findByIdAndDelete.mockResolvedValue(null);
+      mockDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
         'http://localhost/api/dining?id=nonexistent',
@@ -411,7 +424,7 @@ describe('/api/dining/[id]', () => {
   describe('PUT /api/dining/[id]', () => {
     it('should update a dining item by ID', async () => {
       const updatedDining = { ...mockDiningData, isAvailable: false };
-      mockDiningModel.findByIdAndUpdate.mockResolvedValue(updatedDining);
+      mockUpdate.mockResolvedValue(updatedDining);
 
       const request = new NextRequest(
         'http://localhost/api/dining/507f1f77bcf86cd799439011',
@@ -451,7 +464,7 @@ describe('/api/dining/[id]', () => {
 
   describe('DELETE /api/dining/[id]', () => {
     it('should delete a dining item by ID', async () => {
-      mockDiningModel.findByIdAndDelete.mockResolvedValue(mockDiningData);
+      mockDelete.mockResolvedValue(mockDiningData);
 
       const request = new NextRequest(
         'http://localhost/api/dining/507f1f77bcf86cd799439011',
@@ -469,7 +482,7 @@ describe('/api/dining/[id]', () => {
     });
 
     it('should return 404 when item not found', async () => {
-      mockDiningModel.findByIdAndDelete.mockResolvedValue(null);
+      mockDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
         'http://localhost/api/dining/nonexistent',

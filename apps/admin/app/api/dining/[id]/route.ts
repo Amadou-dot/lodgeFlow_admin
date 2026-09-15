@@ -1,4 +1,9 @@
 import {
+  updateCapacityCatalog,
+  deleteCapacityCatalog,
+  ReservationRuleError,
+} from '@lodgeflow/database/reservation-capacity';
+import {
   createErrorResponse,
   createSuccessResponse,
   createValidationErrorResponse,
@@ -34,6 +39,8 @@ export async function GET(
 
     return createSuccessResponse(dining);
   } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error fetching dining item',
       error instanceof Error ? error : undefined
@@ -66,10 +73,7 @@ export async function PUT(
 
     const { _id: _validatedId, ...updateData } = validationResult.data;
 
-    const dining = await Dining.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    const dining = await updateCapacityCatalog('dining', id, updateData);
 
     if (!dining) {
       return createErrorResponse(
@@ -80,6 +84,8 @@ export async function PUT(
 
     return createSuccessResponse(dining, 'Dining item updated successfully');
   } catch (error: unknown) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
         'Validation failed',
@@ -111,7 +117,7 @@ export async function DELETE(
     await connectDB();
 
     const { id } = await params;
-    const dining = await Dining.findByIdAndDelete(id);
+    const dining = await deleteCapacityCatalog('dining', id);
 
     if (!dining) {
       return createErrorResponse(
@@ -122,6 +128,8 @@ export async function DELETE(
 
     return createSuccessResponse(null, 'Dining item deleted successfully');
   } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error deleting dining item',
       error instanceof Error ? error : undefined
