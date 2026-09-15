@@ -18,7 +18,8 @@
     "./booking-pricing": "./src/booking-pricing.ts",
     "./cabin-booking-lock": "./src/cabin-booking-lock.ts",
     "./settings-defaults": "./src/settings-defaults.ts",
-    "./booking-payments": "./src/booking-payments.ts"
+    "./booking-payments": "./src/booking-payments.ts",
+    "./reservation-capacity": "./src/reservation-capacity.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

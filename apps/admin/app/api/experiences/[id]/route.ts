@@ -1,4 +1,9 @@
 import {
+  updateCapacityCatalog,
+  deleteCapacityCatalog,
+  ReservationRuleError,
+} from '@lodgeflow/database/reservation-capacity';
+import {
   createErrorResponse,
   createSuccessResponse,
   createValidationErrorResponse,
@@ -30,6 +35,8 @@ export async function GET(_request: Request, { params }: ParamProps) {
 
     return createSuccessResponse(experience);
   } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error fetching experience',
       error instanceof Error ? error : undefined
@@ -61,16 +68,19 @@ export async function PUT(request: Request, { params }: ParamProps) {
 
     const { _id: _validatedId, ...updateData } = validationResult.data;
 
-    const experience = await Experience.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    const experience = await updateCapacityCatalog(
+      'experience',
+      id,
+      updateData
+    );
     if (!experience) {
       return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
     }
 
     return createSuccessResponse(experience);
   } catch (error: unknown) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
         'Validation failed',
@@ -98,13 +108,15 @@ export async function DELETE(_request: Request, { params }: ParamProps) {
   const { id } = await params;
   try {
     await connectToDatabase();
-    const experience = await Experience.findByIdAndDelete(id);
+    const experience = await deleteCapacityCatalog('experience', id);
     if (!experience) {
       return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
     }
 
     return createSuccessResponse(null, 'Experience deleted successfully');
   } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error deleting experience',
       error instanceof Error ? error : undefined

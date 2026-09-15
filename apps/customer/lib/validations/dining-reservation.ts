@@ -5,7 +5,7 @@ import { DINING_RESERVATION_STATUSES, TABLE_PREFERENCES } from '@/lib/config';
 /**
  * Time format regex (HH:MM)
  */
-const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+const timeRegex = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
 /**
  * Dining reservation status enum
@@ -69,3 +69,13 @@ export type CreateDiningReservationInput = z.infer<
 export type PatchDiningReservationInput = z.infer<
   typeof patchDiningReservationSchema
 >;
+
+export const updateDiningDetailsSchema = z.object({
+  date: z.coerce.date().optional(),
+  time: z.string().regex(timeRegex).optional(),
+  numGuests: z.number().int().min(1).max(100).optional(),
+  dietaryRequirements: z.array(z.string()).optional(),
+  specialRequests: z.array(z.string()).optional(),
+  tablePreference: tablePreferenceSchema.optional(),
+  occasion: z.string().max(100).optional(),
+});

@@ -28,3 +28,5 @@ export * from './customer-bookings';
 export * from './checkout-settlement';
 
 export { buildDemoBookings } from './demo-bookings';
+
+export * from './reservation-capacity';

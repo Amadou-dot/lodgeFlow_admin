@@ -1,3 +1,8 @@
+import {
+  updateExperienceReservation,
+  ReservationRuleError,
+} from '@lodgeflow/database';
+import { updateExperienceDetailsSchema } from '@/lib/validations/experience-booking';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -57,146 +62,59 @@ export async function GET(
   }
 }
 
+async function change(request: NextRequest, params: Params, cancel: boolean) {
+  try {
+    const { userId } = await auth();
+    if (!userId)
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    const parsed = updateExperienceDetailsSchema.safeParse(
+      cancel ? {} : await request.json()
+    );
+    if (!parsed.success)
+      return NextResponse.json(
+        { success: false, error: 'Invalid reservation details' },
+        { status: 400 }
+      );
+    await connectDB();
+    const { id } = await params;
+    const data = await updateExperienceReservation(
+      id,
+      userId,
+      parsed.data,
+      cancel
+    );
+    return NextResponse.json({
+      success: true,
+      data,
+      message: cancel
+        ? 'Reservation cancelled successfully'
+        : 'Reservation updated successfully',
+    });
+  } catch (error) {
+    if (error instanceof ReservationRuleError)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status }
+      );
+    console.error('Failed to change reservation:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to change reservation' },
+      { status: 500 }
+    );
+  }
+}
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Authentication required',
-      };
-      return NextResponse.json(response, { status: 401 });
-    }
-
-    await connectDB();
-
-    const { id } = await params;
-    const booking = await ExperienceBooking.findById(id);
-
-    if (!booking) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Experience booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    if (booking.customer !== userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Experience booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    if (booking.status === 'cancelled' || booking.status === 'completed') {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: `Cannot update a ${booking.status} booking`,
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    const updates = await request.json();
-    const allowedFields = [
-      'date',
-      'timeSlot',
-      'numParticipants',
-      'specialRequests',
-      'observations',
-    ];
-
-    const filteredUpdates: Record<string, unknown> = {};
-    for (const key of allowedFields) {
-      if (updates[key] !== undefined) {
-        filteredUpdates[key] = updates[key];
-      }
-    }
-
-    const updated = await ExperienceBooking.findByIdAndUpdate(
-      id,
-      filteredUpdates,
-      { new: true }
-    ).populate('experience');
-
-    const response: ApiResponse<typeof updated> = {
-      success: true,
-      data: updated,
-      message: 'Experience booking updated successfully',
-    };
-
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error('Error updating experience booking:', error);
-    const response: ApiResponse<never> = {
-      success: false,
-      error: 'Failed to update experience booking',
-    };
-    return NextResponse.json(response, { status: 500 });
-  }
+  return change(request, params, false);
 }
-
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Params }
 ) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Authentication required',
-      };
-      return NextResponse.json(response, { status: 401 });
-    }
-
-    await connectDB();
-
-    const { id } = await params;
-    const booking = await ExperienceBooking.findById(id);
-
-    if (!booking) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Experience booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    if (booking.customer !== userId) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Experience booking not found',
-      };
-      return NextResponse.json(response, { status: 404 });
-    }
-
-    if (booking.status === 'cancelled' || booking.status === 'completed') {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: `Cannot cancel a ${booking.status} booking`,
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    await ExperienceBooking.findByIdAndUpdate(id, { status: 'cancelled' });
-
-    const response: ApiResponse<null> = {
-      success: true,
-      data: null,
-      message: 'Experience booking cancelled successfully',
-    };
-
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error('Error cancelling experience booking:', error);
-    const response: ApiResponse<never> = {
-      success: false,
-      error: 'Failed to cancel experience booking',
-    };
-    return NextResponse.json(response, { status: 500 });
-  }
+  return change(request, params, true);
 }

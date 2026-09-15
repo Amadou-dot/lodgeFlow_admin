@@ -52,6 +52,7 @@ export interface IDining {
 
 const diningSchema = new Schema(
   {
+    reservationVersion: { type: Number, default: 0, select: false },
     name: { type: String, required: true },
     description: { type: String, required: true },
     type: {

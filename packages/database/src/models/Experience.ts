@@ -33,6 +33,7 @@ export interface IExperience {
 
 const experienceSchema = new Schema(
   {
+    reservationVersion: { type: Number, default: 0, select: false },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     duration: { type: String, required: true },
