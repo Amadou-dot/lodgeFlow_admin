@@ -1,3 +1,4 @@
+import type { BookingHistoryItem, BookingDetail } from '@/types/booking-read';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -46,7 +47,7 @@ export const useCreateBooking = () => {
  */
 export const useBookingHistory = (status?: string) => {
   return useQuery({
-    queryFn: async (): Promise<Booking[]> => {
+    queryFn: async (): Promise<BookingHistoryItem[]> => {
       const url = status
         ? `/api/bookings/history?status=${status}`
         : '/api/bookings/history';
@@ -57,7 +58,7 @@ export const useBookingHistory = (status?: string) => {
         throw new Error('Failed to fetch booking history');
       }
 
-      const data: ApiResponse<Booking[]> = await response.json();
+      const data: ApiResponse<BookingHistoryItem[]> = await response.json();
       return data.data || [];
     },
     queryKey: ['bookings-history', status],
@@ -70,14 +71,14 @@ export const useBookingHistory = (status?: string) => {
 export const useBookingById = (bookingId: string) => {
   return useQuery({
     enabled: !!bookingId,
-    queryFn: async (): Promise<Booking | null> => {
+    queryFn: async (): Promise<BookingDetail | null> => {
       const response = await fetch(`/api/bookings/${bookingId}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch booking');
       }
 
-      const data: ApiResponse<Booking> = await response.json();
+      const data: ApiResponse<BookingDetail> = await response.json();
       return data.data || null;
     },
     queryKey: ['booking', bookingId],

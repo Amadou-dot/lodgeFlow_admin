@@ -1,3 +1,8 @@
+import {
+  serializeBookingDetail,
+  type DetailCabinSource,
+} from '@/lib/serializers/booking-read';
+import type { BookingDetail } from '@/types/booking-read';
 import mongoose from 'mongoose';
 import {
   updateCustomerBooking,
@@ -37,7 +42,9 @@ export async function GET(
     await connectDB();
     const { id } = await params;
 
-    const booking = await Booking.findById(id).populate('cabin');
+    const booking = await Booking.findById(id).populate<{
+      cabin: DetailCabinSource | null;
+    }>('cabin');
 
     if (!booking) {
       const response: ApiResponse<never> = {
@@ -55,9 +62,9 @@ export async function GET(
       return NextResponse.json(response, { status: 404 });
     }
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<BookingDetail> = {
       success: true,
-      data: booking,
+      data: serializeBookingDetail(booking),
     };
 
     return NextResponse.json(response, { status: 200 });

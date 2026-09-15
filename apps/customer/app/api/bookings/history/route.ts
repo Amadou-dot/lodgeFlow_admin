@@ -2,6 +2,13 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { Booking, connectDB } from '@lodgeflow/database';
+import type { BookingHistoryItem } from '@/types/booking-read';
+import {
+  serializeBookingHistory,
+  type HistoryCabinSource,
+} from '@/lib/serializers/booking-read';
+import type { FilterQuery } from 'mongoose';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { ApiResponse } from '@/types';
 
 /**
@@ -27,23 +34,23 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
 
     // Build query
-    const query: any = { customer: userId };
+    const query: FilterQuery<IBooking> = { customer: userId };
     if (status) {
       query.status = status;
     }
 
     // Fetch bookings with cabin details
     const bookings = await Booking.find(query)
-      .populate(
+      .populate<{ cabin: HistoryCabinSource | null }>(
         'cabin',
         'name image images capacity price discount description status bedrooms bathrooms size minNights'
       )
       .sort({ createdAt: -1 })
       .lean();
 
-    const response: ApiResponse<typeof bookings> = {
+    const response: ApiResponse<BookingHistoryItem[]> = {
       success: true,
-      data: bookings,
+      data: bookings.map(serializeBookingHistory),
     };
 
     return NextResponse.json(response, { status: 200 });

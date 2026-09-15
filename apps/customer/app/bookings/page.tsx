@@ -37,6 +37,7 @@ import {
   useCancelExperienceBooking,
   useExperienceBookingHistory,
 } from '@/hooks/useExperienceBooking';
+import type { BookingHistoryItem } from '@/types/booking-read';
 import type { Booking, ExperienceBooking } from '@/types';
 
 const statusFilters = [
@@ -82,7 +83,8 @@ const diningStatusFilters = [
 export default function BookingsPage() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] =
+    useState<BookingHistoryItem | null>(null);
   const {
     isOpen: isDetailsOpen,
     onOpen: onDetailsOpen,
@@ -138,12 +140,12 @@ export default function BookingsPage() {
   );
   const cancelDiningReservation = useCancelDiningReservation();
 
-  const handleViewDetails = (booking: Booking) => {
+  const handleViewDetails = (booking: BookingHistoryItem) => {
     setSelectedBooking(booking);
     onDetailsOpen();
   };
 
-  const handleEditBooking = (booking: Booking) => {
+  const handleEditBooking = (booking: BookingHistoryItem) => {
     setSelectedBooking(booking);
     setEditFormData({
       checkInDate: new Date(booking.checkInDate).toISOString().split('T')[0],
@@ -154,7 +156,7 @@ export default function BookingsPage() {
     onEditOpen();
   };
 
-  const handleCancelBooking = (booking: Booking) => {
+  const handleCancelBooking = (booking: BookingHistoryItem) => {
     setSelectedBooking(booking);
     onCancelOpen();
   };
@@ -225,11 +227,11 @@ export default function BookingsPage() {
     });
   };
 
-  const canCancelBooking = (booking: Booking) => {
+  const canCancelBooking = (booking: BookingHistoryItem) => {
     return booking.status === 'unconfirmed' || booking.status === 'confirmed';
   };
 
-  const canModifyBooking = (booking: Booking) => {
+  const canModifyBooking = (booking: BookingHistoryItem) => {
     return booking.status === 'unconfirmed';
   };
 
@@ -300,7 +302,7 @@ export default function BookingsPage() {
             {/* Bookings List */}
             {!isLoading && !error && bookings && bookings.length > 0 && (
               <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-2'>
-                {bookings.map((booking: any) => (
+                {bookings.map(booking => (
                   <Card key={booking._id.toString()} className='w-full'>
                     <CardHeader className='flex gap-3'>
                       <div className='relative w-24 h-24 shrink-0 rounded-lg overflow-hidden'>
@@ -403,14 +405,15 @@ export default function BookingsPage() {
                           booking.status !== 'cancelled' &&
                           (() => {
                             const amountReceived = booking.amountPaid ?? 0;
+                            const requiredDeposit = booking.depositAmount ?? 0;
                             const isDepositDue =
-                              amountReceived < booking.depositAmount;
+                              amountReceived < requiredDeposit;
                             const remainingBalance = Math.max(
                               0,
                               booking.totalPrice - amountReceived
                             );
                             const amountToPay = isDepositDue
-                              ? booking.depositAmount - amountReceived
+                              ? requiredDeposit - amountReceived
                               : remainingBalance;
 
                             if (amountToPay <= 0) return null;
@@ -851,23 +854,21 @@ export default function BookingsPage() {
                       <div className='flex gap-4'>
                         <div className='relative w-32 h-32 shrink-0 rounded-lg overflow-hidden'>
                           <Image
+                            alt={selectedBooking.cabin?.name || 'Cabin'}
                             className='object-cover'
                             fill
-                            alt={
-                              (selectedBooking as any).cabin?.name || 'Cabin'
-                            }
                             src={
-                              (selectedBooking as any).cabin?.image ||
+                              selectedBooking.cabin?.image ||
                               '/placeholder-cabin.jpg'
                             }
                           />
                         </div>
                         <div>
                           <p className='font-semibold text-xl'>
-                            {(selectedBooking as any).cabin?.name}
+                            {selectedBooking.cabin?.name}
                           </p>
                           <p className='text-sm text-default-500 mt-1'>
-                            {(selectedBooking as any).cabin?.description}
+                            {selectedBooking.cabin?.description}
                           </p>
                           <Chip
                             className='mt-2'
@@ -914,7 +915,7 @@ export default function BookingsPage() {
                           <span>Cabin Price</span>
                           <span>${selectedBooking.cabinPrice}</span>
                         </div>
-                        {selectedBooking.extrasPrice > 0 && (
+                        {(selectedBooking.extrasPrice ?? 0) > 0 && (
                           <div className='flex justify-between'>
                             <span>Extras</span>
                             <span>${selectedBooking.extrasPrice}</span>
@@ -940,7 +941,7 @@ export default function BookingsPage() {
                     </div>
 
                     {/* Deposit / Remaining */}
-                    {selectedBooking.depositAmount > 0 && (
+                    {(selectedBooking.depositAmount ?? 0) > 0 && (
                       <div>
                         <h3 className='text-lg font-semibold mb-3'>
                           Deposit & Balance
@@ -1142,7 +1143,7 @@ export default function BookingsPage() {
                 <p>
                   Are you sure you want to cancel your booking at{' '}
                   <span className='font-semibold'>
-                    {(selectedBooking as any)?.cabin?.name}
+                    {selectedBooking?.cabin?.name}
                   </span>
                   ?
                 </p>
@@ -1182,7 +1183,7 @@ export default function BookingsPage() {
                 Edit Booking
                 <p className='text-sm font-normal text-default-500'>
                   Update your booking details for{' '}
-                  {(selectedBooking as any)?.cabin?.name || 'your cabin'}
+                  {selectedBooking?.cabin?.name || 'your cabin'}
                 </p>
               </ModalHeader>
               <ModalBody>
@@ -1227,7 +1228,7 @@ export default function BookingsPage() {
                       Number of Guests
                     </label>
                     <Input
-                      max={(selectedBooking as any)?.cabin?.maxCapacity || 10}
+                      max={selectedBooking?.cabin?.capacity || 10}
                       min={1}
                       type='number'
                       value={editFormData.numGuests.toString()}
@@ -1238,10 +1239,10 @@ export default function BookingsPage() {
                         }))
                       }
                     />
-                    {(selectedBooking as any)?.cabin?.maxCapacity && (
+                    {selectedBooking?.cabin?.capacity && (
                       <p className='text-xs text-default-400 mt-1'>
-                        Maximum capacity:{' '}
-                        {(selectedBooking as any).cabin.maxCapacity} guests
+                        Maximum capacity: {selectedBooking.cabin.capacity}{' '}
+                        guests
                       </p>
                     )}
                   </div>

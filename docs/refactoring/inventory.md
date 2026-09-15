@@ -36,7 +36,7 @@ rather than treating counts as the completion gate.
 
 | ID  | Source / symbol                                                                                                  | Rule or observed mismatch                                                                    | Phase    | Next action and validation                                                                                                                                      |
 | --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates accept `string                 | Date`.   | 1                                                                                                                                                               | Start with cabin booking read DTOs; test JSON dates/IDs and absent populated cabins, then migrate hooks/components/fixtures. |
+| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.   | 1                                                                                                                                                               | Start with cabin booking read DTOs; test JSON dates/IDs and absent populated cabins, then migrate hooks/components/fixtures. |
 | T02 | `apps/customer/app/api/bookings/[id]/route.ts`: `GET`                                                            | `ApiResponse<any>` returns a populated document without an explicit DTO contract.            | 1        | Type and serialize the owner-scoped response; assert owner/missing/foreign behavior remains intact.                                                             |
 | T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Narrow/serialize the populated cabin explicitly and test a missing reference without creating a checkout.                                                       |
 | T04 | `apps/customer/app/api/payments/webhook/route.ts`: confirmation payload                                          | Double cast converts a populated booking to the UI/email type.                               | 1        | Define an email DTO at settlement-to-email boundary; keep signature, retry and delivery-failure regressions passing.                                            |
@@ -59,6 +59,43 @@ rather than treating counts as the completion gate.
 | E01 | Both apps' existing send routes and customer email helpers                                                       | Sandbox sender is repeated despite the configured Resend domain.                             | 5 / #132 | Centralize validated sender configuration for existing flows; retain Phase 0C failures/retry coverage and validate authorized delivery later. No #139 features. |
 | O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Resolve candidate findings by symbol and add appropriate targeted checks after the code passes; do not blanket-disable diagnostics or rewrite every script now. |
 | D01 | Both `CLAUDE.md` files                                                                                           | Stale model paths, deposit accounting, fixture cast advice, domains and CI description.      | 0A       | Corrected in this Phase 0 tree against source; final format/read-through verification required before review completion.                                        |
+
+## Phase 1 slice 1: customer cabin booking reads
+
+Implementation: `types/booking-read.ts`, `lib/serializers/booking-read.ts`,
+`GET /api/bookings/history`, `GET /api/bookings/[id]`, the two read hooks and
+cabin booking selection/rendering in `apps/customer/app/bookings/page.tsx`.
+All unqualified implementation paths above are within `apps/customer`.
+
+- **T02 implemented:** detail response uses an explicit JSON DTO and serializer.
+  Its existing hydrated virtuals and full populated cabin remain intact.
+- **T01 partially implemented:** history/detail read hooks and their booking-page
+  consumers use plain JSON types. History retains its lean selected cabin shape;
+  missing populated cabins remain null. `Booking`, `Cabin` and `PopulatedBooking`
+  aliases in `types/index.ts` remain debt for mutation, catalog and email slices.
+- History query `any` and cabin booking-page read casts are removed. Other resource
+  tabs in the same page remain separate slices; no #136/#139 work is included.
+- The edit guest limit now reads `cabin.capacity`; `maxCapacity` was not a schema
+  field, so the old UI always fell back to ten guests and omitted the capacity hint.
+  The server's existing guest validation and request allowlist remain authoritative.
+- Verified legacy boundary exception: sparse lean rows omit newer receipt/checkout
+  fields and may explicitly store nulls. DTO optional/null fields preserve that
+  wire distinction; serializers do not add defaults, fabricate receipts or change
+  money units. Keep this exception at the existing transport boundary; new domain
+  operations should use one absence representation.
+- Remaining same-flow work: mutation response/input DTOs, cancellation/confirmation
+  email payloads, checkout population, and refund-estimate date DTOs. The editor
+  still submits dates/observations that its existing PATCH schema strips; address
+  that UX/API mismatch in a separately tested validation slice.
+
+Characterization: `scripts/http-smoke/run.mjs` compares full response JSON against
+real hydrated and lean Mongoose results, including raw legacy rows, null populated
+cabins, status filters, ownership and database failures. These assertions passed
+against original runtime at `26d09e3` before final review of the refactor, and pass
+against the new serializers. Focused serializer, hook and UI tests accompany the
+slice. Final command and commit evidence is recorded on tracking issue #150.
+The candidate JSON remains the original baseline snapshot; this section records
+slice dispositions without claiming every match in an affected file is resolved.
 
 ## Triage rules for subsequent slices
 

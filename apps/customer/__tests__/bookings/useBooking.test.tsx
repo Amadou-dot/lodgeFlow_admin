@@ -1,3 +1,4 @@
+import type { BookingHistoryItem, BookingDetail } from '@/types/booking-read';
 import { renderHook, waitFor } from '@testing-library/react';
 import {
   useCreateBooking,
@@ -8,6 +9,27 @@ import {
 } from '@/hooks/useBooking';
 import { createTestQueryClient } from '@/__tests__/shared/test-utils';
 import { QueryClientProvider } from '@tanstack/react-query';
+
+function historyBooking({
+  id,
+  status,
+}: {
+  id: string;
+  status: BookingHistoryItem['status'];
+}): BookingHistoryItem {
+  return {
+    _id: id,
+    customer: 'user_customer',
+    cabin: null,
+    checkInDate: '2030-01-01T00:00:00.000Z',
+    checkOutDate: '2030-01-03T00:00:00.000Z',
+    numNights: 2,
+    numGuests: 2,
+    status,
+    cabinPrice: 200,
+    totalPrice: 200,
+  };
+}
 
 // Create wrapper for hooks
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -86,8 +108,8 @@ describe('useBookingHistory', () => {
 
   it('fetches booking history without status filter', async () => {
     const mockBookings = [
-      { _id: '1', cabinId: 'cabin-1', status: 'confirmed' },
-      { _id: '2', cabinId: 'cabin-2', status: 'checked-in' },
+      historyBooking({ id: '1', status: 'confirmed' }),
+      historyBooking({ id: '2', status: 'checked-in' }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -104,9 +126,7 @@ describe('useBookingHistory', () => {
   });
 
   it('fetches booking history with status filter', async () => {
-    const mockBookings = [
-      { _id: '1', cabinId: 'cabin-1', status: 'confirmed' },
-    ];
+    const mockBookings = [historyBooking({ id: '1', status: 'confirmed' })];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -146,7 +166,13 @@ describe('useBookingById', () => {
   });
 
   it('fetches a single booking by ID', async () => {
-    const mockBooking = { _id: '1', cabinId: 'cabin-1', status: 'confirmed' };
+    const mockBooking = {
+      ...historyBooking({ id: '1', status: 'confirmed' }),
+      cabin: null,
+      id: '1',
+      durationText: '2 nights',
+      paymentStatus: 'unpaid',
+    } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
