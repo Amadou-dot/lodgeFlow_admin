@@ -58,7 +58,7 @@ catalog edit/delete/create controls are disabled for front desk users.
 - [x] Test organization isolation, missing assignments, membership revocation, unique
   assignments, permission denials, self-change denial, and reciprocal admin revocation.
 - [x] Final checks and Vercel preview verification.
-- [ ] Merge and verify production using an isolated staff account, then remove it.
+- [x] Merge and verify production using an isolated staff account, then remove it.
 
 Bootstrap command (dry run by default; add `--apply` once after reviewing the count):
 
@@ -82,3 +82,13 @@ that application roles control access: unassigned → 403; front desk → bookin
 read 200 and self-revocation 409. Deleting its application assignment returned 403
 with the same active Clerk session. No catalog or booking records were modified.
 The test identity remains only until the production verification completes.
+
+## Production verification
+
+PR 146 merged as `4b0e4ac`. Admin production
+`lodgeflowadmin-9oyzz7lw2-asecklabs.vercel.app` is Ready. The full deployed permission
+matrix passed again on production. Browser checks verified the staff management page
+and disabled front-desk catalog creation controls. Removing the test account's Clerk
+membership immediately returned 403 using its already-issued session token. The
+temporary assignment and identity were removed; two existing administrator assignments
+and 500 demo bookings remain. Step 3 is complete.

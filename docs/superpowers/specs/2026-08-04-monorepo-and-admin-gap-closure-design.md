@@ -348,6 +348,11 @@ remain administrator-only while permissions are migrated.
 
 ### Audit log
 
+Current implementation details and verification are tracked in
+[Staff audit history](../plans/2026-09-14-staff-audit-log.md). The admin refund action
+is named `refund.record` because it records metadata; it does not issue a Stripe
+refund. Customer webhooks are outside this staff-only audit scope.
+
 `AuditLog` model in `packages/database`:
 
 | Field | Notes |

@@ -35,3 +35,5 @@ export {
   default as StaffAccess,
   type IStaffAccess,
 } from './models/StaffAccess';
+
+export { default as AuditLog, type IAuditLog } from './models/AuditLog';

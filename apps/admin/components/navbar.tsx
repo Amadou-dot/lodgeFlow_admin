@@ -50,6 +50,7 @@ export const Navbar = () => {
   const pathName = usePathname();
   const { setTheme, theme } = useTheme();
   const menuItems = [
+    { name: 'Audit history', href: '/audit', icon: Calendar },
     { name: 'Staff', href: '/staff', icon: Users },
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Cabins', href: '/cabins', icon: Home },

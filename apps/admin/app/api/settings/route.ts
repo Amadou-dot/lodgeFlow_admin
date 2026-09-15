@@ -1,3 +1,4 @@
+import { auditSnapshot, SETTINGS_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
 import {
   createErrorResponse,
   createValidationErrorResponse,
@@ -126,6 +127,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const auditBefore = auditSnapshot(settings, SETTINGS_AUDIT_FIELDS);
     if (settings) {
       // Update existing settings
       Object.assign(settings, validationResult.data);
@@ -134,6 +136,14 @@ export async function PUT(request: NextRequest) {
       // Create new settings
       settings = await Settings.create(validationResult.data);
     }
+
+    await recordAudit(authResult, {
+      action: 'settings.update',
+      resourceType: 'settings',
+      resourceId: 'global',
+      before: auditBefore,
+      after: auditSnapshot(settings, SETTINGS_AUDIT_FIELDS),
+    });
 
     return NextResponse.json({
       success: true,
@@ -171,9 +181,21 @@ export async function POST() {
   try {
     await connectDB();
 
+    const auditBefore = auditSnapshot(
+      await Settings.findOne({}),
+      SETTINGS_AUDIT_FIELDS
+    );
     // Delete existing settings and recreate with defaults
     await Settings.deleteMany({});
     const settings = await Settings.create(DEFAULT_SETTINGS);
+
+    await recordAudit(authResult, {
+      action: 'settings.update',
+      resourceType: 'settings',
+      resourceId: 'global',
+      before: auditBefore,
+      after: auditSnapshot(settings, SETTINGS_AUDIT_FIELDS),
+    });
 
     return NextResponse.json({
       success: true,

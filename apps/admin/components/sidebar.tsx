@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { getDetailMemory } from '@/hooks/useDetailPageMemory';
 
 const sidebarItems = [
+  { label: 'Audit history', href: '/audit', icon: '📋' },
   { label: 'Staff', href: '/staff', icon: '🔑' },
   {
     label: 'Dashboard',

@@ -1,3 +1,4 @@
+import { recordAudit } from '@/lib/audit';
 import { clerkClient } from '@clerk/nextjs/server';
 import mongoose from 'mongoose';
 import StaffAccess from '@lodgeflow/database/models/StaffAccess';
@@ -77,6 +78,7 @@ export async function PUT(request: Request) {
     await connectDB();
     await StaffAccess.init();
     let authorized = false;
+    let previousRole: string | null = null;
     await mongoose.connection.transaction(async session => {
       // Write to the actor as well as the target: concurrent revocation of this
       // administrator conflicts and retries with fresh authorization.
@@ -87,6 +89,13 @@ export async function PUT(request: Request) {
       );
       authorized = Boolean(actor);
       if (!actor) return;
+      previousRole =
+        (
+          await StaffAccess.findOne({
+            organizationId,
+            userId: body.userId,
+          }).session(session)
+        )?.role ?? null;
       if (body.role === null) {
         await StaffAccess.deleteOne(
           { organizationId, userId: body.userId },
@@ -105,6 +114,13 @@ export async function PUT(request: Request) {
         'Staff administration access was revoked',
         403
       );
+    await recordAudit(access, {
+      action: 'staff.role_change',
+      resourceType: 'staff',
+      resourceId: body.userId,
+      before: { role: previousRole },
+      after: { role: body.role },
+    });
     return createSuccessResponse({ userId: body.userId, role: body.role });
   } catch {
     return createErrorResponse('Unable to update staff access', 503);

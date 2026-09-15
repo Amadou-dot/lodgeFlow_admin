@@ -33,6 +33,7 @@ export function permissionsFor(role: StaffRole): readonly Permission[] {
   return matrix[role];
 }
 export function pagePermission(path: string): Permission {
+  if (path === '/audit' || path.startsWith('/audit/')) return 'audit:read';
   if (path === '/staff' || path.startsWith('/staff/')) return 'staff:manage';
   if (path === '/settings' || path.startsWith('/settings/'))
     return 'settings:write';

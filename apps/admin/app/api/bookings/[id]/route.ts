@@ -1,3 +1,8 @@
+import {
+  auditSnapshot,
+  BOOKING_AUDIT_FIELDS,
+  recordBookingAudit,
+} from '@/lib/audit';
 import { randomUUID } from 'crypto';
 import mongoose from 'mongoose';
 import { addBookingPayment, BookingPaymentError } from '@lodgeflow/database';
@@ -86,6 +91,8 @@ export async function PATCH(req: Request, { params }: IdParam) {
     if (!booking) {
       return createErrorResponse('Booking not found', 404);
     }
+
+    const auditBefore = auditSnapshot(booking, BOOKING_AUDIT_FIELDS);
 
     // Handle payment recording
     if (updateData.recordPayment) {
@@ -215,6 +222,12 @@ export async function PATCH(req: Request, { params }: IdParam) {
     }
 
     const updatedBooking = await booking.save();
+    await recordBookingAudit(
+      authResult,
+      bookingId,
+      auditBefore,
+      updatedBooking
+    );
     await updatedBooking.populate('cabin');
 
     // Get customer data from Clerk (best-effort — don't fail the request
