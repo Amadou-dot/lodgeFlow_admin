@@ -30,7 +30,7 @@ function getGroupFormat(period: Period): 'daily' | 'weekly' {
 }
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {

@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import type { Dining } from '@/types';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
@@ -78,6 +80,7 @@ export default function DiningTableView({
   onEdit,
   onDelete,
 }: DiningTableViewProps) {
+  const canWrite = usePermission('cabins:write');
   const loadingState = isLoading && dining.length === 0 ? 'loading' : 'idle';
 
   const renderCell = (item: Dining, columnKey: string) => {
@@ -171,6 +174,7 @@ export default function DiningTableView({
               <DropdownItem
                 key='edit'
                 startContent={<EditIcon size={16} />}
+                isDisabled={!canWrite}
                 onPress={() => onEdit(item)}
               >
                 Edit
@@ -180,6 +184,7 @@ export default function DiningTableView({
                 className='text-danger'
                 color='danger'
                 startContent={<TrashIcon size={16} />}
+                isDisabled={!canWrite}
                 onPress={() => onDelete(item)}
               >
                 Delete

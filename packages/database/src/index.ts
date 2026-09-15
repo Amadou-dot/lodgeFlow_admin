@@ -30,3 +30,8 @@ export * from './checkout-settlement';
 export { buildDemoBookings } from './demo-bookings';
 
 export * from './reservation-capacity';
+
+export {
+  default as StaffAccess,
+  type IStaffAccess,
+} from './models/StaffAccess';

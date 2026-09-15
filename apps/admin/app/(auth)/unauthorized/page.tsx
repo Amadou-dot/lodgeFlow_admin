@@ -1,4 +1,4 @@
-import { SignOutButton } from '@clerk/nextjs';
+import { SignOutButton, OrganizationSwitcher } from '@clerk/nextjs';
 import { Button } from '@heroui/button';
 
 export default function UnauthorizedPage() {
@@ -35,10 +35,17 @@ export default function UnauthorizedPage() {
               You do not have permission to access this application.
             </p>
             <p className='text-sm text-foreground-500'>
-              This admin portal is only accessible to administrators. If you
+              This admin portal is only accessible to authorized staff. If you
               believe this is an error, please contact your system
               administrator.
             </p>
+          </div>
+
+          <div className='space-y-2'>
+            <p className='text-sm'>
+              If you belong to LodgeFlow, select that organization to continue.
+            </p>
+            <OrganizationSwitcher hidePersonal afterSelectOrganizationUrl='/' />
           </div>
 
           {/* Sign Out Button */}

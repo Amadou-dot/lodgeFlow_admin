@@ -1,7 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-import { hasAuthorizedRole, isAuthBypassEnabled } from './auth-helpers';
+import { isAuthBypassEnabled } from './auth-helpers';
+import { resolveStaffRole } from './staff-access';
+import { hasPermission, type Permission, type StaffRole } from './permissions';
 import { logger } from './logger';
 
 /**
@@ -101,6 +103,7 @@ export function createErrorResponse(
 export interface ApiAuthResult {
   authenticated: boolean;
   userId?: string;
+  role?: StaffRole;
   error?: NextResponse<ApiErrorResponse>;
 }
 
@@ -117,17 +120,20 @@ export interface ApiAuthResult {
  * }
  * ```
  */
-export async function requireApiAuth(): Promise<ApiAuthResult> {
+export async function requireApiAuth(
+  options: { permission?: Permission } = {}
+): Promise<ApiAuthResult> {
   // Bypass auth for local development/testing only (fails closed in prod).
   if (isAuthBypassEnabled()) {
     return {
       authenticated: true,
       userId: 'test-user',
+      role: 'admin',
     };
   }
 
   try {
-    const { userId, has } = await auth();
+    const { userId, orgId } = await auth();
 
     if (!userId) {
       return {
@@ -136,7 +142,8 @@ export async function requireApiAuth(): Promise<ApiAuthResult> {
       };
     }
 
-    if (!hasAuthorizedRole(has)) {
+    const role = await resolveStaffRole(userId, orgId);
+    if (!role || !hasPermission(role, options.permission)) {
       return {
         authenticated: false,
         error: createErrorResponse(
@@ -149,6 +156,7 @@ export async function requireApiAuth(): Promise<ApiAuthResult> {
     return {
       authenticated: true,
       userId,
+      role,
     };
   } catch (error) {
     logger.error(

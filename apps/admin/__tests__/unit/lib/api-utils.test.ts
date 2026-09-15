@@ -1,3 +1,7 @@
+import { resolveStaffRole } from '@/lib/staff-access';
+jest.mock('@/lib/staff-access', () => ({
+  resolveStaffRole: jest.fn().mockResolvedValue(null),
+}));
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
@@ -485,6 +489,7 @@ describe('api-utils', () => {
     afterEach(() => {
       process.env.TESTING_AUTH_BYPASS = originalBypass;
       mockAuth.mockReset();
+      (resolveStaffRole as jest.Mock).mockReset().mockResolvedValue(null);
     });
 
     it('bypasses auth when TESTING_AUTH_BYPASS=true outside production', async () => {
@@ -492,7 +497,11 @@ describe('api-utils', () => {
 
       const result = await requireApiAuth();
 
-      expect(result).toEqual({ authenticated: true, userId: 'test-user' });
+      expect(result).toEqual({
+        authenticated: true,
+        userId: 'test-user',
+        role: 'admin',
+      });
       expect(mockAuth).not.toHaveBeenCalled();
     });
 
@@ -526,9 +535,14 @@ describe('api-utils', () => {
         has: ({ role }: { role: string }) => role === 'org:admin',
       });
 
+      (resolveStaffRole as jest.Mock).mockResolvedValue('admin');
       const result = await requireApiAuth();
 
-      expect(result).toEqual({ authenticated: true, userId: 'user_admin' });
+      expect(result).toEqual({
+        authenticated: true,
+        userId: 'user_admin',
+        role: 'admin',
+      });
     });
 
     it('returns 401 when the auth check throws', async () => {

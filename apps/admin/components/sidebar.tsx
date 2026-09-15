@@ -1,5 +1,8 @@
 'use client';
 
+import { useStaffAccess } from '@/components/AuthGuard';
+import { pagePermission } from '@/lib/permissions';
+
 import clsx from 'clsx';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -9,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { getDetailMemory } from '@/hooks/useDetailPageMemory';
 
 const sidebarItems = [
+  { label: 'Staff', href: '/staff', icon: '🔑' },
   {
     label: 'Dashboard',
     href: '/',
@@ -52,6 +56,7 @@ const MEMORY_SECTIONS: Record<string, string> = {
 };
 
 export const Sidebar = () => {
+  const access = useStaffAccess();
   const pathname = usePathname();
   const router = useRouter();
   const [_mounted, setMounted] = useState(false);
@@ -71,39 +76,46 @@ export const Sidebar = () => {
 
       <nav className='flex-1 px-4 py-4'>
         <ul className='space-y-2'>
-          {sidebarItems.map(item => {
-            const isActive =
-              item.href === '/'
-                ? pathname === '/'
-                : pathname.startsWith(item.href);
+          {sidebarItems
+            .filter(item =>
+              access?.permissions.includes(pagePermission(item.href))
+            )
+            .map(item => {
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={e => {
-                    const sectionKey = MEMORY_SECTIONS[item.href];
-                    if (sectionKey) {
-                      const savedPath = getDetailMemory(sectionKey);
-                      if (savedPath && savedPath.startsWith(item.href + '/')) {
-                        e.preventDefault();
-                        router.push(savedPath);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={e => {
+                      const sectionKey = MEMORY_SECTIONS[item.href];
+                      if (sectionKey) {
+                        const savedPath = getDetailMemory(sectionKey);
+                        if (
+                          savedPath &&
+                          savedPath.startsWith(item.href + '/')
+                        ) {
+                          e.preventDefault();
+                          router.push(savedPath);
+                        }
                       }
-                    }
-                  }}
-                  className={clsx(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors w-full text-left',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground hover:bg-default-100'
-                  )}
-                >
-                  <span className='text-lg'>{item.icon}</span>
-                  <span className='font-medium'>{item.label}</span>
-                </Link>
-              </li>
-            );
-          })}
+                    }}
+                    className={clsx(
+                      'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors w-full text-left',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-foreground hover:bg-default-100'
+                    )}
+                  >
+                    <span className='text-lg'>{item.icon}</span>
+                    <span className='font-medium'>{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
         </ul>
       </nav>
 

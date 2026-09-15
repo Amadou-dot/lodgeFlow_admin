@@ -22,7 +22,7 @@ type ParamProps = {
 
 export async function GET(_request: Request, { params }: ParamProps) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   const { id } = await params;
@@ -50,7 +50,7 @@ export async function GET(_request: Request, { params }: ParamProps) {
 
 export async function PUT(request: Request, { params }: ParamProps) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'cabins:write' });
   if (!authResult.authenticated) return authResult.error;
 
   const { id } = await params;
@@ -102,7 +102,7 @@ export async function PUT(request: Request, { params }: ParamProps) {
 
 export async function DELETE(_request: Request, { params }: ParamProps) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'cabins:write' });
   if (!authResult.authenticated) return authResult.error;
 
   const { id } = await params;

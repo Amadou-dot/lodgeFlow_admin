@@ -1,5 +1,8 @@
 'use client';
 
+import { useStaffAccess } from '@/components/AuthGuard';
+import { pagePermission } from '@/lib/permissions';
+
 import {
   SignInButton,
   SignUpButton,
@@ -42,10 +45,12 @@ const MEMORY_SECTIONS: Record<string, string> = {
 };
 
 export const Navbar = () => {
+  const access = useStaffAccess();
   const [isOpen, setIsOpen] = useState(false);
   const pathName = usePathname();
   const { setTheme, theme } = useTheme();
   const menuItems = [
+    { name: 'Staff', href: '/staff', icon: Users },
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Cabins', href: '/cabins', icon: Home },
     { name: 'Bookings', href: '/bookings', icon: Calendar },
@@ -106,33 +111,37 @@ export const Navbar = () => {
       </NavbarContent>
 
       <NavbarMenu>
-        {menuItems.map((item, index) => {
-          const sectionKey = MEMORY_SECTIONS[item.href];
-          const savedPath = sectionKey ? getDetailMemory(sectionKey) : null;
-          const effectiveHref =
-            savedPath && savedPath.startsWith(item.href + '/')
-              ? savedPath
-              : item.href;
-          const isLinkActive = pathName === item.href;
-          const Icon = item.icon;
-          return (
-            <NavbarMenuItem key={index}>
-              <Link
-                onPress={() => setIsOpen(!isOpen)}
-                color='foreground'
-                className={clsx(
-                  'w-full p-2 flex items-center gap-3',
-                  isLinkActive && 'font-bold rounded-lg bg-primary'
-                )}
-                href={effectiveHref}
-                size='lg'
-              >
-                <Icon size={20} />
-                {item.name}
-              </Link>
-            </NavbarMenuItem>
-          );
-        })}
+        {menuItems
+          .filter(item =>
+            access?.permissions.includes(pagePermission(item.href))
+          )
+          .map((item, index) => {
+            const sectionKey = MEMORY_SECTIONS[item.href];
+            const savedPath = sectionKey ? getDetailMemory(sectionKey) : null;
+            const effectiveHref =
+              savedPath && savedPath.startsWith(item.href + '/')
+                ? savedPath
+                : item.href;
+            const isLinkActive = pathName === item.href;
+            const Icon = item.icon;
+            return (
+              <NavbarMenuItem key={index}>
+                <Link
+                  onPress={() => setIsOpen(!isOpen)}
+                  color='foreground'
+                  className={clsx(
+                    'w-full p-2 flex items-center gap-3',
+                    isLinkActive && 'font-bold rounded-lg bg-primary'
+                  )}
+                  href={effectiveHref}
+                  size='lg'
+                >
+                  <Icon size={20} />
+                  {item.name}
+                </Link>
+              </NavbarMenuItem>
+            );
+          })}
       </NavbarMenu>
     </HeroUINavbar>
   );

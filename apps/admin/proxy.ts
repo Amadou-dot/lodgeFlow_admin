@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-import { hasAuthorizedRole, isAuthBypassEnabled } from '@/lib/auth-helpers';
+import { isAuthBypassEnabled } from '@/lib/auth-helpers';
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
@@ -24,15 +24,24 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Protect all other routes - require authentication
-  const { has, redirectToSignIn, sessionClaims } = await auth();
+  const { orgId, redirectToSignIn, sessionClaims } = await auth();
 
   // Check if user is authenticated
   if (!sessionClaims) {
     return redirectToSignIn();
   }
 
-  // Only allow admin role to access the application
-  if (!hasAuthorizedRole(has)) {
+  // Coarse organization boundary; each API resolves current membership and app role.
+  if (
+    !process.env.LODGEFLOW_STAFF_ORG_ID ||
+    orgId !== process.env.LODGEFLOW_STAFF_ORG_ID
+  ) {
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
     const unauthorizedUrl = new URL('/unauthorized', req.url);
     return NextResponse.redirect(unauthorizedUrl);
   }

@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import DeletionModal from '@/components/DeletionModal';
 import ExperienceFilters from '@/components/ExperienceFilters';
 import { ExperienceGrid } from '@/components/ExperienceGrid';
@@ -43,6 +45,7 @@ function ExperienceCardSkeleton() {
 }
 
 export default function ExperiencesPage() {
+  const canWrite = usePermission('cabins:write');
   const [filters, setFilters] = useState<ExperienceFiltersType>({});
   const [selectedExperience, setSelectedExperience] =
     useState<Experience | null>(null);
@@ -233,6 +236,7 @@ export default function ExperiencesPage() {
           <Button
             color='primary'
             startContent={<PlusIcon size={18} />}
+            isDisabled={!canWrite}
             onPress={handleCreateExperience}
             className='w-full sm:w-auto'
           >
@@ -313,6 +317,7 @@ export default function ExperiencesPage() {
                 ) : (
                   <Button
                     color='primary'
+                    isDisabled={!canWrite}
                     onPress={handleCreateExperience}
                     startContent={<PlusIcon size={18} />}
                   >

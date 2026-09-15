@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -117,7 +117,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:manage' });
   if (!authResult.authenticated) return authResult.error;
 
   try {

@@ -10,7 +10,7 @@ import { getResend } from '@/lib/resend';
 
 export async function POST(request: Request) {
   // Require authentication - prevents email spam abuse
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:manage' });
   if (!authResult.authenticated) return authResult.error;
 
   // Rate limit email sending (stricter limits)

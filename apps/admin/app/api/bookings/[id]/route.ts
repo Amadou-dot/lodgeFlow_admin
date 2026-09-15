@@ -17,7 +17,7 @@ import { isMongooseValidationError, getErrorMessage } from '@/types/errors';
 
 export async function GET(_req: Request, { params }: IdParam) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   const bookingId = (await params).id;
@@ -56,13 +56,22 @@ export async function GET(_req: Request, { params }: IdParam) {
 
 export async function PATCH(req: Request, { params }: IdParam) {
   // Require authentication and admin role
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:manage' });
   if (!authResult.authenticated) return authResult.error;
 
   const bookingId = (await params).id;
   try {
     await connectDB();
     const rawUpdateData = await req.json();
+    if (
+      ['refundStatus', 'refundAmount', 'refundedAt'].some(key =>
+        Object.prototype.hasOwnProperty.call(rawUpdateData, key)
+      )
+    ) {
+      const refundAuth = await requireApiAuth({ permission: 'refunds:issue' });
+      if (!refundAuth.authenticated) return refundAuth.error;
+    }
+
     const validationResult = patchBookingSchema.safeParse(rawUpdateData);
     if (!validationResult.success) {
       return createErrorResponse(
