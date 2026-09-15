@@ -1,0 +1,10 @@
+# pnpm-lock.yaml must NOT be listed here. Vercel picks its package manager from
+# the lockfiles present in the upload, so hiding it made Vercel install with npm
+# — which ignores pnpm-workspace.yaml (including the @internationalized/date
+# override) and resolves a different tree than CI and local dev.
+yarn.lock
+package-lock.json
+node_modules
+.git
+.env.local
+.env.*.local

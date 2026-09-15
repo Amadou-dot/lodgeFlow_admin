@@ -4,12 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  check:
-    name: Lint, Format, and Test
+  ci:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [admin, customer]
 
     steps:
       - name: Checkout repository
@@ -18,16 +24,48 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.17.0
 
-      - name: Set up Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run CI checks
-        run: pnpm ci:check
+      - name: Check formatting
+        run: pnpm exec prettier --check .
+
+      # `pnpm lint` is `eslint --fix`, which rewrites files instead of failing
+      # on anything auto-fixable. CI runs eslint without --fix so it gates.
+      - name: Lint
+        run: pnpm --filter @lodgeflow/${{ matrix.app }} exec eslint .
+
+      - name: Test
+        run: pnpm --filter @lodgeflow/${{ matrix.app }} test
+
+      # `next build` runs the TypeScript check, which is what caught the
+      # duplicate @internationalized/date copies that lint and tests missed.
+      #
+      # Both values below are structurally-valid throwaway literals, not secrets,
+      # and no network call happens during build.
+      #
+      # NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required for both apps: ClerkProvider
+      # wraps each one and throws without a publishable key while prerendering
+      # static pages.
+      #
+      # RESEND_API_KEY is admin-only. apps/customer constructs its SDK clients
+      # lazily (lib/resend.ts, lib/stripe.ts), so it needs no key at build time.
+      # apps/admin does not: app/api/send/confirm/route.ts and
+      # app/api/send/welcome/route.ts construct `new Resend(...)` at module
+      # scope, and Next evaluates those modules while collecting page data, so
+      # the build fails without *a* key present even though nothing is sent.
+      # This var is a deliberate stopgap for that gap — the real fix is porting
+      # the customer's lazy getResend() to the admin.
+      - name: Type check and build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          RESEND_API_KEY: re_ci_placeholder_000000000000000000000000
+        run: pnpm --filter @lodgeflow/${{ matrix.app }} build

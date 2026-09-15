@@ -141,3 +141,16 @@ public/
 
 # Ignore the changeset files
 .changeset/
+
+# Union of apps/customer/.prettierignore entries not already covered above
+# (build/coverage/dist/.next/node_modules/out/public/.vscode/pnpm-lock.yaml/
+# package-lock.json/.DS_Store were already covered under different spellings)
+.env*.local
+*.log
+.vercel/
+
+# Workspace
+apps/*/.next/
+apps/*/node_modules/
+apps/*/public/
+pnpm-lock.yaml

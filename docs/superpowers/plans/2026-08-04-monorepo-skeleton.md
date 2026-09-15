@@ -693,11 +693,11 @@ Expected: `ci (admin)` and `ci (customer)` both green. **Do not merge yet** — 
 - Consumes: the pushed branch and open PR from Task 4.
 - Produces: both production sites serving from the monorepo. Task 6 documents what changed here.
 
-**Manual steps required.** These need dashboard access and cannot be scripted from this session. If a step needs the Vercel CLI interactively, run it yourself with the `!` prefix so its output lands in the conversation.
+Use the authenticated Vercel CLI or dashboard to inspect settings and create previews. Preview deployments may override the root directory and Git source for that deployment; this verifies the monorepo before changing the settings used by production builds. Record permanent Git/root-directory cutover separately from preview verification.
 
 - [ ] **Step 1: Record the current state before changing anything**
 
-You need these to roll back.
+Record both projects' Git repository, production branch, root directory, build/install commands, ignored-build command, and current successful production deployment URL/ID and source commit. These are the rollback baseline; a local project link alone is insufficient.
 
 ```bash
 cat apps/admin/.vercel/project.json
@@ -731,7 +731,11 @@ For the project serving `lodgeflow.app`:
 gh pr checks --watch
 ```
 
-Expected: both Vercel preview deployments report success alongside the two CI legs. Open each preview URL and confirm the app renders — a green build with a blank page usually means a missing runtime env var.
+Require a new **Ready** preview for each app built from the reviewed PR commit, with root directories `apps/admin` and `apps/customer`. A green GitHub status can represent an ignored/skipped deployment and does not satisfy this check. Record each deployment URL/ID, commit, effective root directory, and smoke-test result.
+
+Use `vercel inspect <url>` to check status and `vercel curl / --deployment <url>` for protected previews. Verify customer HTML and the admin sign-in flow, and check that protected admin API requests are denied. Check the customer preview's `/api/payments/webhook` with an unsigned POST: it must reject the request without processing a payment. If browser access is available, also check rendering and browser errors. HTTP smoke tests alone do not verify authenticated booking/payment flows.
+
+If deploying through the CLI's `vercel api /v13/deployments`, the API names the preview target `staging`. Supply the PR's Git repository, branch, and SHA, plus deployment-specific `projectSettings.rootDirectory` and `sourceFilesOutsideRootDirectory: true`. Verify the effective settings afterward. A preview override does not complete the permanent project cutover in Steps 2–3.
 
 - [ ] **Step 5: Verify the Stripe webhook endpoint still resolves**
 
@@ -746,10 +750,12 @@ Expected: `400` (Stripe signature verification rejecting an unsigned request), *
 - [ ] **Step 6: Merge, then verify production**
 
 ```bash
-gh pr merge --squash --delete-branch=false
+gh pr merge 131 --merge --delete-branch=false
 ```
 
-Do **not** delete the branch — `--delete-branch=false` is deliberate, since the subtree graft is easier to re-examine with the branch intact.
+Use a merge commit: squashing would remove the imported customer commits from `main`'s ancestry. Keep the branch for inspection. After merging, verify `git merge-base --is-ancestor <imported-customer-head> origin/main`; commit count alone is insufficient evidence of preservation.
+
+Coordinate the permanent Vercel root/Git changes with this merge: old `main` still has admin at the repository root, while the merged revision requires `apps/admin`. Ensure both production builds select the merged commit and intended app before declaring cutover complete.
 
 Then confirm both production sites:
 
@@ -913,4 +919,21 @@ Expected: all pass. Step 1 of the spec is complete, and Step 2 (schema reconcili
 
 Through Task 4 everything is confined to the `feat/monorepo-skeleton` branch — `git checkout main` abandons it entirely.
 
-After Task 5, rollback means reverting Vercel configuration, not code: restore each project's Root Directory to empty and reconnect the customer project to `Amadou-dot/lodgeFlow` (un-archive it first if Task 5 Step 7 already ran). Because the old customer repository is only archived rather than deleted, and the merge is a squash on `main`, no history is lost in either direction.
+After cutover, restore the recorded known-good production deployments for both projects using Vercel rollback, then verify the domains and webhook routing. Restoring a deployment does not restore project settings for subsequent builds.
+
+Before resuming automatic deployments, restore compatible source **and** settings: the pre-migration admin revision uses the repository root, but merged `main` uses `apps/admin`. Either retain the monorepo settings and fix forward, or revert the migration merge through a reviewed revert commit and restore the old root. Never point root `.` at merged monorepo `main` and expect the old admin app to build.
+
+For a full return to separate repositories, reconnect the customer project to `Amadou-dot/lodgeFlow`, restore its recorded root/build settings and production branch, and unarchive that repository if necessary. Recheck the next deployment's source and settings before allowing it to replace the restored production deployment. Preserve the merge and subtree ancestry; do not rewrite history as part of rollback.
+
+## Preview verification — 2026-09-14
+
+Created both previews through the authenticated Vercel CLI (`vercel api /v13/deployments`), using PR 131 commit `20544ea750a83db910e68f250c8c13e9cd64868c` from `Amadou-dot/lodgeFlow_admin`, branch `feat/monorepo-skeleton`. Both completed with status **Ready**. These deployments test the reviewed application code; the subsequent plan-only edits are local and are not part of that deployed commit.
+
+| App | Deployment | Requested root override | Verification |
+| --- | --- | --- | --- |
+| Admin | [Preview](https://lodgeflowadmin-r21ddgqii-asecklabs.vercel.app), `dpl_GEZbrxNJhVQpg4CDKVzGnUiqiLA1` | `apps/admin` | `/` and `/sign-in` return 200 with `LodgeFlow Admin` HTML; unauthenticated `/api/bookings` returns 307 rather than booking data |
+| Customer | [Preview](https://lodgeflow-jlf1s1i80-asecklabs.vercel.app), `dpl_EoYxvLqn6xPJZrih89bykTvE1Yx2` | `apps/customer` | `/` returns 200 with LodgeFlow welcome content; `/api/cabins` returns 200, `success: true`, 13 cabins; unsigned POST `/api/payments/webhook` returns 400, `Missing stripe-signature header` |
+
+Smoke tests used `vercel curl` with each project's deployment-protection context. No authenticated booking, payment, or browser-rendering tests were performed. Both deployment records identify the reviewed SHA; the resulting app-specific HTML and customer build logs confirm the intended apps were built.
+
+**Permanent cutover remains pending.** Inspection after deployment confirmed both project root directories are still `.`. Admin is linked to `Amadou-dot/lodgeFlow_admin`; customer remains linked to `Amadou-dot/lodgeFlow` and still has an ignored-build command that skips non-production builds. These previews supplied per-deployment root/Git/ignore-command overrides. Clear the customer's skip command and complete Steps 2–3 in coordination with the merge before expecting automatic monorepo deployments. Production domains were not promoted or changed. Step 1 is not complete until production cutover and its verification pass.

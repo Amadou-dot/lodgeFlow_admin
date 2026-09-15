@@ -1,0 +1,10 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "cSpell.words": [
+    "checkin",
+    "heroui",
+    "LODGEFLOW",
+    "vercel",
+    "Waitlist"
+  ]
+}

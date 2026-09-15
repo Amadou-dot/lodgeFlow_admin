@@ -4,6 +4,9 @@
 **Base URL:** `/api`
 **Authentication:** All endpoints require Clerk authentication unless noted otherwise.
 
+> This document describes the **admin** app (`@lodgeflow/admin`). File paths below
+> (e.g. `lib/booking-pricing.ts`, `lib/validations/`) are relative to `apps/admin/`.
+
 ---
 
 ## Table of Contents
