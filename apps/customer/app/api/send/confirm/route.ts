@@ -1,7 +1,7 @@
 import { getResend } from '@/lib/resend';
 
 import { BookingConfirmationEmail } from '@/components/EmailTemplates';
-import { Booking, connectDB } from '@/models';
+import { Booking, connectDB } from '@lodgeflow/database';
 import type { PopulatedBooking } from '@/types';
 import { auth, currentUser } from '@clerk/nextjs/server';
 

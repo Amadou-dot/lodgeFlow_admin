@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Experience, ExperienceBooking } from '@/models';
+import { connectDB, Experience, ExperienceBooking } from '@lodgeflow/database';
 
 export async function GET(
   request: NextRequest,

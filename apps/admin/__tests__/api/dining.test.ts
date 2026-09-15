@@ -9,10 +9,10 @@ import {
   PUT as updateById,
   DELETE as deleteById,
 } from '@/app/api/dining/[id]/route';
-import connectToDatabase from '@/lib/mongodb';
+import connectToDatabase from '@lodgeflow/database/mongodb';
 
 // Mock the database connection
-jest.mock('@/lib/mongodb');
+jest.mock('@lodgeflow/database/mongodb');
 const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
   typeof connectToDatabase
 >;
@@ -25,7 +25,7 @@ const mockDiningModel = {
   findByIdAndDelete: jest.fn(),
 };
 
-jest.mock('@/models/Dining', () => ({
+jest.mock('@lodgeflow/database/models/Dining', () => ({
   __esModule: true,
   default: jest.fn(() => ({
     save: jest.fn(),
@@ -33,7 +33,7 @@ jest.mock('@/models/Dining', () => ({
 }));
 
 // Get the mocked module
-import Dining from '@/models/Dining';
+import Dining from '@lodgeflow/database/models/Dining';
 const MockDining = Dining as jest.MockedFunction<typeof Dining> &
   typeof mockDiningModel;
 

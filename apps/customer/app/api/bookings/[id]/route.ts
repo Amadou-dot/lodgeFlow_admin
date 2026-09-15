@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { Booking, Settings, connectDB } from '@/models';
+import { Booking, Settings, connectDB } from '@lodgeflow/database';
 import { calculateRefund } from '@/lib/cancellation';
 import { createRefund } from '@/lib/stripe';
 import { sendCancellationConfirmationEmail } from '@/lib/email';

@@ -5,7 +5,7 @@ import {
   requireApiAuth,
 } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
-import { Booking } from '../../../../models';
+import { Booking } from '@lodgeflow/database';
 import { NextRequest } from 'next/server';
 
 type Period = '7d' | '30d' | '90d' | '1y' | 'all';

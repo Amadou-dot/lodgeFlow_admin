@@ -8,7 +8,7 @@ import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import connectDB from '@/lib/mongodb';
 import { patchBookingSchema } from '@/lib/validations';
-import { Booking } from '@/models';
+import { Booking } from '@lodgeflow/database';
 import { IdParam } from '@/types';
 import { isMongooseValidationError, getErrorMessage } from '@/types/errors';
 

@@ -5,7 +5,7 @@ import {
   requireApiAuth,
 } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
-import { Dining } from '../../../../models';
+import { Dining } from '@lodgeflow/database';
 
 export async function GET() {
   const authResult = await requireApiAuth();

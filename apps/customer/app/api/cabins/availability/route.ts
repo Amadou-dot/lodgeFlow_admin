@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB, Booking, Cabin } from '@/models';
+import { connectDB, Booking, Cabin } from '@lodgeflow/database';
 import type { ApiResponse, AvailableCabin, AvailabilityQuery } from '@/types';
 
 export async function POST(request: NextRequest) {

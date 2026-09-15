@@ -4,7 +4,7 @@ import {
   DINING_CATEGORIES,
   DINING_TYPES,
   MEAL_TYPES,
-} from '@/lib/config';
+} from '../config';
 import { Schema, model, models } from 'mongoose';
 
 export interface IDining {

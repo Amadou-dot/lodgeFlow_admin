@@ -2,7 +2,7 @@ import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Select, SelectItem } from '@heroui/select';
 import { Switch } from '@heroui/switch';
 import { BookingFormFieldProps, PriceBreakdown } from './types';
-import type { ISettings } from '@/models/Settings';
+import type { ISettings } from '@lodgeflow/database/models/Settings';
 import type { SharedSelection } from '@heroui/system';
 
 interface PaymentInformationProps extends BookingFormFieldProps {

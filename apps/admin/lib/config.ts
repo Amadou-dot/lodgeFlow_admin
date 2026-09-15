@@ -22,16 +22,8 @@ export const SWR_CONFIG = {
 /**
  * MongoDB Configuration
  */
-export const DB_CONFIG = {
-  /** Maximum connection pool size */
-  MAX_POOL_SIZE: 10,
-
-  /** Server selection timeout in milliseconds */
-  SERVER_SELECTION_TIMEOUT: 5000,
-
-  /** Socket timeout in milliseconds */
-  SOCKET_TIMEOUT: 45000,
-} as const;
+import { DB_CONFIG } from '@lodgeflow/database/config';
+export { DB_CONFIG };
 
 /**
  * Currency Configuration
@@ -44,29 +36,14 @@ export const CURRENCY = {
 /**
  * Booking Enum Values — single source of truth for TypeScript, Zod, and Mongoose
  */
-export const BOOKING_STATUSES = [
-  'unconfirmed',
-  'confirmed',
-  'checked-in',
-  'checked-out',
-  'cancelled',
-] as const;
+import { BOOKING_STATUSES } from '@lodgeflow/database/config';
+export { BOOKING_STATUSES };
 
-export const REFUND_STATUSES = [
-  'none',
-  'pending',
-  'processing',
-  'partial',
-  'full',
-  'failed',
-] as const;
+import { REFUND_STATUSES } from '@lodgeflow/database/config';
+export { REFUND_STATUSES };
 
-export const PAYMENT_METHODS = [
-  'cash',
-  'card',
-  'bank-transfer',
-  'online',
-] as const;
+import { PAYMENT_METHODS } from '@lodgeflow/database/config';
+export { PAYMENT_METHODS };
 
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
@@ -86,41 +63,26 @@ export const VALID_TRANSITIONS: Record<
 /**
  * Cabin/Dining/Experience Enum Values — single source of truth for Zod and Mongoose
  */
-export const CABIN_STATUSES = ['active', 'maintenance', 'inactive'] as const;
+import { CABIN_STATUSES } from '@lodgeflow/database/config';
+export { CABIN_STATUSES };
 
-export const DINING_TYPES = ['menu', 'experience'] as const;
+import { DINING_TYPES } from '@lodgeflow/database/config';
+export { DINING_TYPES };
 
-export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'all-day'] as const;
+import { MEAL_TYPES } from '@lodgeflow/database/config';
+export { MEAL_TYPES };
 
-export const DINING_CATEGORIES = [
-  'regular',
-  'craft-beer',
-  'wine',
-  'spirits',
-  'non-alcoholic',
-] as const;
+import { DINING_CATEGORIES } from '@lodgeflow/database/config';
+export { DINING_CATEGORIES };
 
-export const BEVERAGE_CATEGORIES = [
-  'craft-beer',
-  'wine',
-  'spirits',
-  'non-alcoholic',
-] as const;
+import { BEVERAGE_CATEGORIES } from '@lodgeflow/database/config';
+export { BEVERAGE_CATEGORIES };
 
-export const DIETARY_OPTIONS = [
-  'vegetarian',
-  'vegan',
-  'gluten-free',
-  'dairy-free',
-  'keto',
-  'paleo',
-] as const;
+import { DIETARY_OPTIONS } from '@lodgeflow/database/config';
+export { DIETARY_OPTIONS };
 
-export const EXPERIENCE_DIFFICULTIES = [
-  'Easy',
-  'Moderate',
-  'Challenging',
-] as const;
+import { EXPERIENCE_DIFFICULTIES } from '@lodgeflow/database/config';
+export { EXPERIENCE_DIFFICULTIES };
 
 export type CabinStatus = (typeof CABIN_STATUSES)[number];
 export type DiningType = (typeof DINING_TYPES)[number];

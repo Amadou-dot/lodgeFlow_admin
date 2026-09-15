@@ -35,9 +35,8 @@ SDK clients are constructed lazily. CI builds without those credentials.
 ## Structure
 
 - `apps/*` — the two Next.js applications, each self-contained
-- `packages/*` — reserved for shared code, not created yet. `pnpm-workspace.yaml`
-  already includes the glob for when it lands; see the design spec in
-  `docs/superpowers/specs/`
+- `packages/database` — shared models, schema enums, database connection, and booking safety helpers. Both apps consume `@lodgeflow/database`.
 
-Both apps currently carry their own copy of `models/`, and the two copies have
-diverged in semantics. Do not merge them ad hoc — see the spec.
+Schema changes belong in `packages/database` and must pass its tests plus both app suites.
+Payment accounting and capacity hardening follow the extraction; see
+`docs/superpowers/plans/2026-09-14-shared-database.md`.

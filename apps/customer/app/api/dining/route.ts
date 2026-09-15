@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { connectDB, Dining } from '@/models';
+import { connectDB, Dining } from '@lodgeflow/database';
 import { diningQuerySchema } from '@/lib/validations';
 import {
   validateRequest,

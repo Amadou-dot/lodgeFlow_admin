@@ -9,7 +9,7 @@ import {
 import { logger } from '@/lib/logger';
 import connectToDatabase from '@/lib/mongodb';
 import { createExperienceSchema } from '@/lib/validations';
-import { Experience } from '@/models/Experience';
+import { Experience } from '@lodgeflow/database/models/Experience';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Dining, DiningReservation } from '@/models';
+import { connectDB, Dining, DiningReservation } from '@lodgeflow/database';
 
 /**
  * Validates HH:MM time format

@@ -1,3 +1,4 @@
+import { EXPERIENCE_BOOKING_STATUSES } from '../config';
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IExperienceBooking extends Document {
@@ -41,7 +42,7 @@ const ExperienceBookingSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+      enum: EXPERIENCE_BOOKING_STATUSES,
       default: 'pending',
     },
     totalPrice: {

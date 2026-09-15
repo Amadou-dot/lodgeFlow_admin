@@ -1,7 +1,9 @@
-import { settingsData } from '@/lib/data/seed-data';
+import { settingsData } from '../settings-defaults';
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface ISettings extends Document {
+  singleton: string;
+  readonly fullAddress: string;
   minBookingLength: number;
   maxBookingLength: number;
   maxGuestsPerBooking: number;
@@ -48,19 +50,27 @@ export interface ISettings extends Document {
   updatedAt: Date;
 }
 
-interface ISettingsModel extends Model<ISettings> {
+export interface ISettingsModel extends Model<ISettings> {
   getSettings(): Promise<ISettings>;
 }
 
 const SettingsSchema: Schema<ISettings, ISettingsModel> = new Schema(
   {
+    singleton: {
+      type: String,
+      default: 'global',
+      immutable: true,
+      enum: ['global'],
+    },
     minBookingLength: {
+      default: settingsData.minBookingLength,
       type: Number,
       required: [true, 'Minimum booking length is required'],
       min: [1, 'Minimum booking length must be at least 1 day'],
       max: [30, 'Minimum booking length cannot exceed 30 days'],
     },
     maxBookingLength: {
+      default: settingsData.maxBookingLength,
       type: Number,
       required: [true, 'Maximum booking length is required'],
       min: [1, 'Maximum booking length must be at least 1 day'],
@@ -74,17 +84,20 @@ const SettingsSchema: Schema<ISettings, ISettingsModel> = new Schema(
       },
     },
     maxGuestsPerBooking: {
+      default: settingsData.maxGuestsPerBooking,
       type: Number,
       required: [true, 'Maximum guests per booking is required'],
       min: [1, 'Maximum guests must be at least 1'],
       max: [50, 'Maximum guests cannot exceed 50'],
     },
     breakfastPrice: {
+      default: settingsData.breakfastPrice,
       type: Number,
       required: [true, 'Breakfast price is required'],
       min: [0, 'Breakfast price must be positive'],
     },
     checkInTime: {
+      default: settingsData.checkInTime,
       type: String,
       required: [true, 'Check-in time is required'],
       validate: {
@@ -95,6 +108,7 @@ const SettingsSchema: Schema<ISettings, ISettingsModel> = new Schema(
       },
     },
     checkOutTime: {
+      default: settingsData.checkOutTime,
       type: String,
       required: [true, 'Check-out time is required'],
       validate: {
@@ -114,6 +128,7 @@ const SettingsSchema: Schema<ISettings, ISettingsModel> = new Schema(
       default: true,
     },
     depositPercentage: {
+      default: settingsData.depositPercentage,
       type: Number,
       required: [true, 'Deposit percentage is required'],
       min: [0, 'Deposit percentage must be positive'],
@@ -253,35 +268,45 @@ const SettingsSchema: Schema<ISettings, ISettingsModel> = new Schema(
 );
 
 // Ensure only one settings document exists
-SettingsSchema.index({}, { unique: true });
+SettingsSchema.index(
+  { singleton: 1 },
+  { unique: true, name: 'settings_singleton' }
+);
 
 // Static method to get or create settings
 SettingsSchema.statics.getSettings = async function () {
   let settings = await this.findOne();
   if (!settings) {
-    settings = await this.create({
-      ...settingsData,
-      businessHours: {
-        open: '09:00',
-        close: '18:00',
-        daysOpen: [
-          'monday',
-          'tuesday',
-          'wednesday',
-          'thursday',
-          'friday',
-          'saturday',
-          'sunday',
-        ],
-      },
-      notifications: {
-        emailEnabled: true,
-        smsEnabled: false,
-        bookingConfirmation: true,
-        paymentReminders: true,
-        checkInReminders: true,
-      },
-    });
+    await this.init();
+    try {
+      settings = await this.create({
+        ...settingsData,
+        businessHours: {
+          open: '09:00',
+          close: '18:00',
+          daysOpen: [
+            'monday',
+            'tuesday',
+            'wednesday',
+            'thursday',
+            'friday',
+            'saturday',
+            'sunday',
+          ],
+        },
+        notifications: {
+          emailEnabled: true,
+          smsEnabled: false,
+          bookingConfirmation: true,
+          paymentReminders: true,
+          checkInReminders: true,
+        },
+      });
+    } catch (error) {
+      if ((error as { code?: number }).code !== 11000) throw error;
+      settings = await this.findOne();
+      if (!settings) throw error;
+    }
   }
   return settings;
 };

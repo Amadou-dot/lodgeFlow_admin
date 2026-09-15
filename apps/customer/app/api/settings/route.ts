@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB, Settings } from '@/models';
+import { connectDB, Settings } from '@lodgeflow/database';
 import type { ApiResponse, Settings as SettingsType } from '@/types';
 
 export async function GET() {

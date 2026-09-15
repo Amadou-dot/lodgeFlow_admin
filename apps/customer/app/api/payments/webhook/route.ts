@@ -1,4 +1,4 @@
-import { Booking, ProcessedStripeEvent, connectDB } from '@/models';
+import { Booking, ProcessedStripeEvent, connectDB } from '@lodgeflow/database';
 import { sendPaymentConfirmationEmail } from '@/lib/email';
 import type { PopulatedBooking } from '@/types';
 import { getStripe } from '@/lib/stripe';

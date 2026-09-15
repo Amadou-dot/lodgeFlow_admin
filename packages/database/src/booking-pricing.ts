@@ -1,0 +1,188 @@
+import { differenceInCalendarDays } from 'date-fns';
+
+/**
+ * Thrown when calculateBookingPricing() is given inputs that can't yield a
+ * sane price (e.g. a non-positive stay length). Callers should catch this
+ * distinctly and surface it as a 400 rather than a generic server error —
+ * it signals bad input, not a server fault.
+ */
+export class BookingPricingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BookingPricingError';
+    // Restore the prototype chain — TS compiles `extends Error` down to
+    // ES5 (tsconfig `target`), which otherwise breaks `instanceof` checks.
+    Object.setPrototypeOf(this, BookingPricingError.prototype);
+  }
+}
+
+export interface BookingPricingCabin {
+  price: number;
+  discount: number;
+  extraGuestFee?: number;
+}
+
+export interface BookingPricingSettings {
+  breakfastPrice: number;
+  petFee: number;
+  parkingFee: number;
+  parkingIncluded: boolean;
+  earlyCheckInFee: number;
+  lateCheckOutFee: number;
+}
+
+export interface BookingPricingExtrasSelection {
+  hasBreakfast?: boolean;
+  hasPets?: boolean;
+  hasParking?: boolean;
+  hasEarlyCheckIn?: boolean;
+  hasLateCheckOut?: boolean;
+}
+
+export interface BookingDepositSettings {
+  requireDeposit: boolean;
+  depositPercentage: number;
+}
+
+export interface BookingDepositInput {
+  settings: BookingDepositSettings;
+  totalPrice: number;
+}
+
+export interface BookingPricingInput {
+  cabin: BookingPricingCabin;
+  settings: BookingPricingSettings;
+  checkInDate: Date;
+  checkOutDate: Date;
+  numGuests: number;
+  extras?: BookingPricingExtrasSelection;
+}
+
+export interface BookingPricingResult {
+  numNights: number;
+  cabinPrice: number;
+  extrasPrice: number;
+  totalPrice: number;
+  extras: {
+    hasBreakfast: boolean;
+    breakfastPrice: number;
+    hasPets: boolean;
+    petFee: number;
+    hasParking: boolean;
+    parkingFee: number;
+    hasEarlyCheckIn: boolean;
+    earlyCheckInFee: number;
+    hasLateCheckOut: boolean;
+    lateCheckOutFee: number;
+  };
+}
+
+/**
+ * Derives the deposit due on a *new* booking from the settings document,
+ * never from client input (see issue #124 — a client-supplied depositAmount
+ * equal to totalPrice would make a booking read as fully paid with no payment
+ * recorded).
+ *
+ * Deliberately not applied on update: on an existing booking `depositAmount`
+ * doubles as the running total of payments actually taken (see the
+ * `recordPayment` handler in `app/api/bookings/[id]/route.ts`), so recomputing
+ * it would wipe a real deposit whenever an unrelated field changed.
+ */
+export function calculateDepositAmount({
+  settings,
+  totalPrice,
+}: BookingDepositInput): number {
+  if (!settings.requireDeposit) return 0;
+
+  const deposit = Math.round(totalPrice * (settings.depositPercentage / 100));
+  // depositPercentage is schema-bound to 0-100, but clamp anyway so a legacy
+  // or hand-edited settings document can never yield a deposit that exceeds
+  // the total (which would drive remainingAmount negative).
+  return Math.min(Math.max(deposit, 0), totalPrice);
+}
+
+/**
+ * Recomputes every price-derived booking field from trusted server data
+ * (the cabin and settings documents) instead of client input. Only the
+ * boolean extras selections are taken from the caller — every fee amount
+ * is looked up from `settings`/`cabin` so a tampered request body can't
+ * influence the price actually charged.
+ */
+export function calculateBookingPricing({
+  cabin,
+  settings,
+  checkInDate,
+  checkOutDate,
+  numGuests,
+  extras,
+}: BookingPricingInput): BookingPricingResult {
+  const numNights = differenceInCalendarDays(checkOutDate, checkInDate);
+  // NaN comparisons are always false, so an invalid date/guest count must be
+  // rejected explicitly — otherwise it silently passes the `< 1` guard below
+  // and propagates as a NaN price instead of a 400.
+  if (!Number.isFinite(numNights) || numNights < 1) {
+    throw new BookingPricingError(
+      'checkOutDate must be at least one day after checkInDate'
+    );
+  }
+  if (!Number.isFinite(numGuests) || numGuests < 1) {
+    throw new BookingPricingError('numGuests must be at least 1');
+  }
+
+  const cabinPrice =
+    cabin.discount > 0 ? cabin.price - cabin.discount : cabin.price;
+
+  const hasBreakfast = extras?.hasBreakfast ?? false;
+  const hasPets = extras?.hasPets ?? false;
+  const hasParking = extras?.hasParking ?? false;
+  const hasEarlyCheckIn = extras?.hasEarlyCheckIn ?? false;
+  const hasLateCheckOut = extras?.hasLateCheckOut ?? false;
+
+  const breakfastPrice = hasBreakfast
+    ? settings.breakfastPrice * numGuests * numNights
+    : 0;
+
+  const extraGuestFee =
+    numGuests > 1 && (cabin.extraGuestFee ?? 0) > 0
+      ? (numGuests - 1) * (cabin.extraGuestFee ?? 0) * numNights
+      : 0;
+
+  const petFee = hasPets ? settings.petFee * numNights : 0;
+
+  const parkingFee =
+    hasParking && !settings.parkingIncluded
+      ? settings.parkingFee * numNights
+      : 0;
+
+  const earlyCheckInFee = hasEarlyCheckIn ? settings.earlyCheckInFee : 0;
+  const lateCheckOutFee = hasLateCheckOut ? settings.lateCheckOutFee : 0;
+
+  const extrasPrice =
+    breakfastPrice +
+    extraGuestFee +
+    petFee +
+    parkingFee +
+    earlyCheckInFee +
+    lateCheckOutFee;
+
+  const totalPrice = cabinPrice * numNights + extrasPrice;
+
+  return {
+    numNights,
+    cabinPrice,
+    extrasPrice,
+    totalPrice,
+    extras: {
+      hasBreakfast,
+      breakfastPrice,
+      hasPets,
+      petFee,
+      hasParking,
+      parkingFee,
+      hasEarlyCheckIn,
+      earlyCheckInFee,
+      hasLateCheckOut,
+      lateCheckOutFee,
+    },
+  };
+}

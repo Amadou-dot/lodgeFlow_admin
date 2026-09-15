@@ -5,29 +5,14 @@
 /**
  * Booking Enum Values — single source of truth for TypeScript, Zod, and Mongoose
  */
-export const BOOKING_STATUSES = [
-  'unconfirmed',
-  'confirmed',
-  'checked-in',
-  'checked-out',
-  'cancelled',
-] as const;
+import { BOOKING_STATUSES } from '@lodgeflow/database/config';
+export { BOOKING_STATUSES };
 
-export const REFUND_STATUSES = [
-  'none',
-  'pending',
-  'processing',
-  'partial',
-  'full',
-  'failed',
-] as const;
+import { REFUND_STATUSES } from '@lodgeflow/database/config';
+export { REFUND_STATUSES };
 
-export const PAYMENT_METHODS = [
-  'cash',
-  'card',
-  'bank-transfer',
-  'online',
-] as const;
+import { PAYMENT_METHODS } from '@lodgeflow/database/config';
+export { PAYMENT_METHODS };
 
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
@@ -36,41 +21,17 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 /**
  * Dining Enum Values
  */
-export const DINING_TYPES = [
-  'breakfast',
-  'lunch',
-  'dinner',
-  'snack',
-  'beverage',
-  'dessert',
-] as const;
+import { DINING_TYPES } from '@lodgeflow/database/config';
+export { DINING_TYPES };
 
-export const MEAL_TYPES = [
-  'vegetarian',
-  'vegan',
-  'gluten-free',
-  'dairy-free',
-  'nut-free',
-  'regular',
-] as const;
+import { MEAL_TYPES } from '@lodgeflow/database/config';
+export { MEAL_TYPES };
 
-export const TABLE_PREFERENCES = [
-  'window',
-  'outdoor',
-  'indoor',
-  'private',
-  'bar',
-  'no-preference',
-] as const;
+import { TABLE_PREFERENCES } from '@lodgeflow/database/config';
+export { TABLE_PREFERENCES };
 
-export const DINING_RESERVATION_STATUSES = [
-  'pending',
-  'confirmed',
-  'seated',
-  'completed',
-  'cancelled',
-  'no-show',
-] as const;
+import { DINING_RESERVATION_STATUSES } from '@lodgeflow/database/config';
+export { DINING_RESERVATION_STATUSES };
 
 export type DiningType = (typeof DINING_TYPES)[number];
 export type MealType = (typeof MEAL_TYPES)[number];
@@ -81,18 +42,11 @@ export type DiningReservationStatus =
 /**
  * Experience Enum Values
  */
-export const EXPERIENCE_DIFFICULTIES = [
-  'Easy',
-  'Moderate',
-  'Challenging',
-] as const;
+import { EXPERIENCE_DIFFICULTIES } from '@lodgeflow/database/config';
+export { EXPERIENCE_DIFFICULTIES };
 
-export const EXPERIENCE_BOOKING_STATUSES = [
-  'pending',
-  'confirmed',
-  'completed',
-  'cancelled',
-] as const;
+import { EXPERIENCE_BOOKING_STATUSES } from '@lodgeflow/database/config';
+export { EXPERIENCE_BOOKING_STATUSES };
 
 export type ExperienceDifficulty = (typeof EXPERIENCE_DIFFICULTIES)[number];
 export type ExperienceBookingStatus =

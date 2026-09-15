@@ -7,10 +7,12 @@
  */
 import mongoose from 'mongoose';
 
-jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('@lodgeflow/database/mongodb', () =>
+  jest.fn().mockResolvedValue(undefined)
+);
 
-import Booking from '@/models/Booking';
-import Cabin from '@/models/Cabin';
+import Booking from '@lodgeflow/database/models/Booking';
+import Cabin from '@lodgeflow/database/models/Cabin';
 
 async function createTestCabin() {
   return Cabin.create({

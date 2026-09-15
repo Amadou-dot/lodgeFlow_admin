@@ -1,24 +1,4 @@
-export const settingsData = {
-  minBookingLength: 2,
-  maxBookingLength: 30,
-  maxGuestsPerBooking: 8,
-  breakfastPrice: 15,
-  checkInTime: '15:00',
-  checkOutTime: '11:00',
-  cancellationPolicy: 'moderate',
-  requireDeposit: true,
-  depositPercentage: 25,
-  allowPets: true,
-  petFee: 20,
-  smokingAllowed: false,
-  earlyCheckInFee: 50,
-  lateCheckOutFee: 50,
-  wifiIncluded: true,
-  parkingIncluded: false,
-  parkingFee: 10,
-  currency: 'USD',
-  timezone: 'UTC',
-};
+export { settingsData } from '@lodgeflow/database/settings-defaults';
 
 export const cabinData = [
   {

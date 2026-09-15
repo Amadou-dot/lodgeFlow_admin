@@ -1,4 +1,4 @@
-import { connectDB, Dining } from '@/models';
+import { connectDB, Dining } from '@lodgeflow/database';
 import type { ApiResponse, Dining as DiningType } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
 

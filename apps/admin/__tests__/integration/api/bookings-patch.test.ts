@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 
-jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('@lodgeflow/database/mongodb', () =>
+  jest.fn().mockResolvedValue(undefined)
+);
 
 import { PATCH } from '@/app/api/bookings/[id]/route';
-import Booking from '@/models/Booking';
-import Cabin from '@/models/Cabin';
+import Booking from '@lodgeflow/database/models/Booking';
+import Cabin from '@lodgeflow/database/models/Cabin';
 
 // Helper to create a test cabin
 async function createTestCabin(overrides: Record<string, unknown> = {}) {

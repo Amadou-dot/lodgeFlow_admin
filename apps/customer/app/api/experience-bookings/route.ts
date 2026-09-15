@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Experience, ExperienceBooking } from '@/models';
+import { connectDB, Experience, ExperienceBooking } from '@lodgeflow/database';
 import type { ApiResponse } from '@/types';
 import { createExperienceBookingSchema } from '@/lib/validations';
 import {

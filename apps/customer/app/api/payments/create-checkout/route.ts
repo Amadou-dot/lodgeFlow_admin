@@ -1,4 +1,4 @@
-import { Booking, connectDB, Settings } from '@/models';
+import { Booking, connectDB, Settings } from '@lodgeflow/database';
 import { getStripe } from '@/lib/stripe';
 import { normalizeBaseUrl } from '@/lib/url';
 import type { ApiResponse, PopulatedBooking } from '@/types';

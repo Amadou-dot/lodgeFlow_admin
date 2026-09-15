@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import Booking from '@/models/Booking';
-import Cabin from '@/models/Cabin';
+import Booking from '@lodgeflow/database/models/Booking';
+import Cabin from '@lodgeflow/database/models/Cabin';
 
 describe('Diagnostic', () => {
   it('checks mongoose connection state', () => {

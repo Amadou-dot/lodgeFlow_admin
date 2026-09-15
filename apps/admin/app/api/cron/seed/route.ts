@@ -6,7 +6,13 @@ import {
   settingsData,
 } from '@/lib/data/seed-data';
 import connectDB from '@/lib/mongodb';
-import { Booking, Cabin, Dining, Experience, Settings } from '@/models';
+import {
+  Booking,
+  Cabin,
+  Dining,
+  Experience,
+  Settings,
+} from '@lodgeflow/database';
 import { createClerkClient } from '@clerk/backend';
 import { faker } from '@faker-js/faker';
 import { NextResponse } from 'next/server';

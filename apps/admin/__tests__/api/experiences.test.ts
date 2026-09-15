@@ -5,17 +5,17 @@
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/experiences/route';
 import { GET as getById, PUT, DELETE } from '@/app/api/experiences/[id]/route';
-import connectToDatabase from '@/lib/mongodb';
-import { Experience } from '@/models/Experience';
+import connectToDatabase from '@lodgeflow/database/mongodb';
+import { Experience } from '@lodgeflow/database/models/Experience';
 
 // Mock the database connection
-jest.mock('@/lib/mongodb');
+jest.mock('@lodgeflow/database/mongodb');
 const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
   typeof connectToDatabase
 >;
 
 // Mock the Experience model
-jest.mock('@/models/Experience');
+jest.mock('@lodgeflow/database/models/Experience');
 const MockExperience = Experience as jest.MockedClass<typeof Experience>;
 
 // Mock auth to bypass authentication

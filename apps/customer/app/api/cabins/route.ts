@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Cabin } from '@/models';
+import { connectDB, Cabin } from '@lodgeflow/database';
 import type { ApiResponse, Cabin as CabinType } from '@/types';
 import { cabinQuerySchema } from '@/lib/validations';
 import {

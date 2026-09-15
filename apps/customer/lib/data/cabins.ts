@@ -1,6 +1,6 @@
 import { cache } from 'react';
 
-import { Cabin, connectDB } from '@/models';
+import { Cabin, connectDB } from '@lodgeflow/database';
 import type { Cabin as CabinType } from '@/types';
 
 /**

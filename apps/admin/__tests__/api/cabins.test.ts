@@ -9,10 +9,10 @@ import {
   PUT as updateById,
   DELETE as deleteById,
 } from '@/app/api/cabins/[id]/route';
-import connectToDatabase from '@/lib/mongodb';
+import connectToDatabase from '@lodgeflow/database/mongodb';
 
 // Mock the database connection
-jest.mock('@/lib/mongodb');
+jest.mock('@lodgeflow/database/mongodb');
 const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
   typeof connectToDatabase
 >;
@@ -26,7 +26,7 @@ const mockCabinModel = {
   create: jest.fn(),
 };
 
-jest.mock('@/models/Cabin', () => ({
+jest.mock('@lodgeflow/database/models/Cabin', () => ({
   __esModule: true,
   default: jest.fn(() => ({
     save: jest.fn(),
@@ -34,7 +34,7 @@ jest.mock('@/models/Cabin', () => ({
 }));
 
 // Get the mocked module
-import Cabin from '@/models/Cabin';
+import Cabin from '@lodgeflow/database/models/Cabin';
 const MockCabin = Cabin as jest.MockedFunction<typeof Cabin> &
   typeof mockCabinModel;
 

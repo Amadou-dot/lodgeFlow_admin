@@ -16,7 +16,7 @@ import {
   RATE_LIMIT_CONFIGS,
 } from '@/lib/rate-limit';
 import { createCustomerSchema } from '@/lib/validations';
-import { Booking } from '@/models';
+import { Booking } from '@lodgeflow/database';
 import { Customer } from '@/types/clerk';
 import { getErrorMessage } from '@/types/errors';
 import { getLoyaltyTier } from '@/utils/utilityFunctions';

@@ -1,4 +1,4 @@
-import Dining from '@/models/Dining';
+import Dining from '@lodgeflow/database/models/Dining';
 
 function createDiningData(overrides: Record<string, any> = {}) {
   return {

@@ -9,8 +9,14 @@ import {
   settingsData,
 } from '../lib/data/seed-data';
 import connectDB from '../lib/mongodb';
-import type { IBooking, IExperience } from '../models';
-import { Booking, Cabin, Dining, Experience, Settings } from '../models';
+import type { IBooking, IExperience } from '@lodgeflow/database';
+import {
+  Booking,
+  Cabin,
+  Dining,
+  Experience,
+  Settings,
+} from '@lodgeflow/database';
 
 // Load environment variables from .env.local
 config({ path: resolve(process.cwd(), '.env.local') });

@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import mongoose from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Dining, DiningReservation } from '@/models';
+import { connectDB, Dining, DiningReservation } from '@lodgeflow/database';
 import type { ApiResponse } from '@/types';
 import { createDiningReservationSchema } from '@/lib/validations';
 import {

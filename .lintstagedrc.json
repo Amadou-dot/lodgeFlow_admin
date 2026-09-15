@@ -7,5 +7,9 @@
     "pnpm --filter @lodgeflow/customer exec eslint --fix",
     "prettier --write"
   ],
-  "**/*.{json,css,scss,md}": ["prettier --write"]
+  "**/*.{json,css,scss,md}": ["prettier --write"],
+  "packages/database/**/*.{js,ts,mjs}": [
+    "pnpm --filter @lodgeflow/database exec eslint --fix",
+    "prettier --write"
+  ]
 }

@@ -1,4 +1,4 @@
-import Cabin from '@/models/Cabin';
+import Cabin from '@lodgeflow/database/models/Cabin';
 
 function createCabinData(overrides: Record<string, any> = {}) {
   return {

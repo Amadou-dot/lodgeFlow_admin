@@ -1,4 +1,4 @@
-import { CABIN_STATUSES } from '@/lib/config';
+import { CABIN_STATUSES } from '../config';
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ICabin extends Document {
@@ -78,12 +78,13 @@ const CabinSchema: Schema = new Schema(
       trim: true,
       maxlength: [1000, 'Description cannot exceed 1000 characters'],
     },
-    amenities: [
-      {
-        type: String,
-        trim: true,
+    amenities: {
+      type: [{ type: String, trim: true }],
+      validate: {
+        validator: (values: string[]) => values.length <= 20,
+        message: 'A cabin cannot have more than 20 amenities',
       },
-    ],
+    },
     images: [
       {
         type: String,

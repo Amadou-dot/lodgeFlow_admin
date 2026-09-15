@@ -1,13 +1,15 @@
 import mongoose from 'mongoose';
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('@lodgeflow/database/mongodb', () =>
+  jest.fn().mockResolvedValue(undefined)
+);
 
 import { GET, POST, PUT, DELETE } from '@/app/api/bookings/route';
-import * as cabinBookingLock from '@/lib/cabin-booking-lock';
-import Booking from '@/models/Booking';
-import Cabin from '@/models/Cabin';
-import Settings from '@/models/Settings';
+import * as cabinBookingLock from '@lodgeflow/database/cabin-booking-lock';
+import Booking from '@lodgeflow/database/models/Booking';
+import Cabin from '@lodgeflow/database/models/Cabin';
+import Settings from '@lodgeflow/database/models/Settings';
 import { settingsData } from '@/lib/data/seed-data';
 
 // getClerkUsersBatch is already mocked in jest.setup.node.ts

@@ -1,7 +1,7 @@
 import { getResend } from '@/lib/resend';
 
 import { ExperienceBookingConfirmationEmail } from '@/components/EmailTemplates';
-import { connectDB, ExperienceBooking } from '@/models';
+import { connectDB, ExperienceBooking } from '@lodgeflow/database';
 import { auth, currentUser } from '@clerk/nextjs/server';
 
 function validateEmail(email: string): boolean {

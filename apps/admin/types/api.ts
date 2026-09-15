@@ -1,7 +1,7 @@
 import type { FilterQuery, SortOrder } from 'mongoose';
-import type { IBooking } from '@/models/Booking';
-import type { ICabin } from '@/models/Cabin';
-import type { IDining } from '@/models/Dining';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
+import type { ICabin } from '@lodgeflow/database/models/Cabin';
+import type { IDining } from '@lodgeflow/database/models/Dining';
 
 // ============================================================================
 // API Input Types (re-exported from Zod validation schemas — single source of truth)
