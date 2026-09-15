@@ -39,7 +39,7 @@ so a failed replacement leaves the prior dataset intact. No real payment or emai
   on a replica set. Include all capacity-changing mutations; audit experience capacity too.
 - [x] Seed coherent demo reservations using the shared pricing/payment rules, with explicit
   demo provenance and no Stripe-looking payment IDs. Audit the resulting data and indexes.
-- [ ] Deploy both apps, verify production and update this record before Step 3 permissions.
+- [x] Deploy both apps, verify production and update this record before Step 3 permissions.
 
 ## Preserved customer work
 
@@ -184,6 +184,70 @@ checkout/receipt/refund verification. Never put the replacement secret in Git or
 chat. A temporary isolated reservation is retained only while this smoke test is
 in progress and must be removed with its test account at completion or handoff.
 
-Step 2 code and the production demo reset are deployed. End-to-end Stripe verification
-is the remaining gate before Step 3 permissions; the roadmap remains a guide and can
-be revised if this external configuration work changes the sequence.
+## Stripe verification (resolved)
+
+The replacement Preview and Production secrets both authenticated successfully against
+Stripe's balance API and reported `livemode: false`. Both environments were redeployed
+through the Vercel CLI from `b30389e`.
+
+The Stripe test account had no LodgeFlow webhook destination. Created
+`https://www.lodgeflow.app/api/payments/webhook` for checkout completion, asynchronous
+payment success, checkout expiration, and charge refunds. Stored its signing secret
+directly in both Vercel environments and redeployed again. Final deployments are Ready:
+
+- Production: `lodgeflow-lo0q345q8-asecklabs.vercel.app`
+- Preview: `lodgeflow-np8o35bxz-asecklabs.vercel.app`
+
+An isolated Clerk guest account exercised the production application with Stripe's
+[documented test card](https://docs.stripe.com/testing):
+
+1. Guest booking creation returned 201; hosted Checkout creation returned 200.
+2. A $90 deposit on a $360 stay settled through the real Stripe webhook. The booking
+   became confirmed with one receipt, $90 received, and $270 outstanding.
+3. A second hosted checkout collected the $270 balance. The ledger showed two
+   receipts, $360 received, and zero outstanding.
+4. Customer cancellation returned 200 and requested a full refund. Both Stripe
+   payments were independently verified fully refunded. Refund webhooks recorded
+   `refundAmount: 360` and `refundStatus: full` on the cancelled booking.
+5. Removed only the verified, fully refunded temporary booking and its Clerk account.
+   The database again contains 500 demo bookings. Stripe retains the refunded test
+   transactions as provider history.
+
+This was a test-mode payment exercise on the production deployment. No real money
+was charged. Browser observation ended on Stripe's success indicator; the automatic
+return navigation to LodgeFlow was not asserted. Receipt and refund settlement were
+verified independently against both Stripe and MongoDB. Step 2's settlement gate is
+complete; existing unit/integration checks remain 1,104 passing tests.
+
+## Step 3 prerequisite and proposed revision
+
+Clerk currently exposes `org:admin` and `org:customer`. Attempting to create the
+planned `org:front_desk` role returned **HTTP 402** with
+`unsupported_subscription_plan_features`. No role or membership was changed.
+Clerk's [custom role documentation](https://clerk.com/docs/guides/organizations/control-access/roles-and-permissions)
+requires its B2B Authentication add-on for production custom roles. Do not upgrade
+the subscription without the project owner's choice.
+
+Recommended alternative for this personal project, pending that choice:
+
+- Keep Clerk for identity and organization membership; store front-desk and manager
+  assignments in a shared LodgeFlow staff-access collection, keyed by organization
+  and Clerk user ID, with a unique compound index.
+- Bind staff access to the designated LodgeFlow staff organization. Creating an
+  unrelated organization must never grant access to LodgeFlow administration.
+- Keep the planned permission matrix and server-side enforcement. Resolve staff
+  assignments on the server and require active membership of the trusted organization.
+  Preserve its existing administrators' access; only they may manage assignments.
+- Keep the coarse proxy gate separate from database-backed authorization. Every
+  protected API must enforce staff access and its operation-specific permission;
+  sidebar visibility is only presentation. Unannotated API routes remain admin-only
+  while the route migration is in progress.
+- Deny personal guest accounts, customer memberships, unknown roles, and missing
+  assignments. Fail closed when authorization cannot be resolved. The previous
+  assumption that every guest has `org:customer` is obsolete: personal guests work.
+- Test the full permission matrix, organization isolation, revocation, membership
+  removal, and default-deny behavior before deploying the expanded staff access.
+
+The other option is for the owner to enable Clerk's required paid feature, retaining
+the planned custom-role source. Implementation and deployment of Step 3 wait for this
+architecture/billing choice; checkout and refund verification no longer block it.
