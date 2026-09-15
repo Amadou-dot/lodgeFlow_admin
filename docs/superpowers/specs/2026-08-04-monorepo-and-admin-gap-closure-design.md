@@ -284,6 +284,27 @@ run in both directions.
 
 ### Schema reconciliation
 
+**Payment semantics must be reconciled before repricing ships.** Customer booking creation
+sets `depositAmount` to the deposit due, even when `depositPaid` is false. Admin
+`recordPayment` treats the same field as money already received and adds the new payment to
+it. An unpaid $200 deposit followed by a $100 payment therefore becomes $300 recorded as
+paid. Choosing the admin schema or sharing the pricing calculator does not resolve this.
+
+Step 2 must distinguish required deposit from verified payments received, and derive the
+outstanding balance from received payments. Define how `depositPaid`, `isPaid`, refunds,
+and partial/full payments relate to these amounts. Apply the contract to admin payment
+recording, customer checkout creation, and the existing customer Stripe webhook; a new admin
+webhook and refund issuance remain out of scope. Do not infer a historical payment solely
+from `depositAmount`: audit existing records against available payment evidence and report
+ambiguous records for reconciliation rather than silently crediting them.
+
+Define repricing rules for bookings with payments or an outstanding Stripe checkout session.
+An old checkout must not settle a newly priced booking for an obsolete amount. The Step 2
+plan must specify whether changes are rejected while checkout is active or invalidate and
+replace checkout, and how delayed/duplicate webhook events are handled. Tests must cover an
+unpaid required deposit, partial and full payments, repricing after payment, and stale checkout
+completion. A $200 deposit due with only $100 actually received must credit exactly $100.
+
 Because the schemas have diverged in semantics (see Problem), Step 2 is a semantic merge, not a
 move. It requires an explicit winner per divergence:
 
@@ -292,6 +313,7 @@ move. It requires an explicit winner per divergence:
 | `Booking` `pre('save')` | Admin's — conditional, clamped, recomputes `numNights` |
 | `Booking` `extras.*Fee` `min: 0` | Admin's — keep the floor |
 | `Booking` `remainingAmount` default | Admin's — default `0` |
+| Deposit due vs payments received | Separate the concepts; derive balance and paid flags from verified receipts, including the existing customer webhook |
 | `Booking` `{cabin, checkIn, checkOut}` index | Single definition, named explicitly; decide partial-filter on/off once |
 | `Booking` status index | Admin's `{status: 1}` plus customer's `{status: 1, checkInDate: 1}` if query patterns justify both |
 | `Settings` caps | Admin's — keep the upper bounds |
@@ -457,9 +479,19 @@ Three views on one page. All three products have a real capacity model:
 | Dining | Guests per date + serving window | `maxPeople`, **required** | Per-reservation cap, plus aggregate cap inside `session.withTransaction()` → 409 |
 | Experiences | Participants per date | `maxParticipants`, **optional** | Conditional — guarded by `if (experience.maxParticipants)` |
 
-Note the ranking: dining is the *best*-guarded of the three flows, being the only one using a
-real MongoDB transaction. Experiences are the weakest, since `maxParticipants` is optional and
-enforcement is skipped when it is unset.
+Dining's transaction makes its insert and capacity check atomic, but does **not** serialize
+competing reservations. Each transaction inserts a different document and may count a snapshot
+that excludes the other's insert, allowing both to commit beyond capacity. This is a
+code-review finding to reproduce in a replica-set integration test; the presence of
+`withTransaction()` is not proof of concurrency safety. See MongoDB's documentation on
+[transaction stale reads and write conflicts](https://www.mongodb.com/docs/manual/core/transactions-production-consideration/).
+
+Step 2 must add a shared lock for `(dining, date, serving window)` or an atomic capacity counter
+updated by all capacity-consuming mutations. Include cancellations, status changes, and changes
+to party size/time in the protocol. A test must start competing requests against the last
+available seats and prove that committed reservations never exceed `maxPeople`, with rejected
+requests returning 409. Experience capacity needs the same concurrency audit; an unset
+`maxParticipants` remains an explicitly uncapped product rather than an accidental zero limit.
 
 **Cabins** — month grid of cabins × dates, occupancy bars spanning check-in to check-out,
 color-coded by status, click-through to the existing booking detail page. Backed by
@@ -535,28 +567,37 @@ project supports it.
    `models/`, `lib/`, `tsconfig.json`, and `@/*` alias, so every existing import keeps working.
    *Done when:* both apps build locally, CI passes, both Vercel projects deploy green with root
    directories repointed at `apps/*`.
-2. **`packages/database`.** The largest and riskiest step. It contains five distinct pieces of
+2. **`packages/database`.** The largest and riskiest step. It contains six distinct pieces of
    work, and is a semantic merge rather than a file move:
    - **2a. Schema reconciliation** — resolve every divergence in the table above, drop and
      recreate the conflicting indexes under explicit names, write tests against the merged
-     schema.
+     schema. Reconcile deposit-due versus payments-received semantics across both apps and
+     the existing customer payment webhook before adopting shared balance calculations.
    - **2b. Data audit** — read-only script checking existing documents against the merged
-     stricter schema; backfill if it finds violations.
+     stricter schema and payment evidence; backfill verified violations and report ambiguous
+     payment records for reconciliation. Plan index/data rollout so old app instances cannot
+     recreate conflicting indexes or write incompatible documents during deployment.
    - **2c. Extraction** — models, `connectDB` (admin's configured version), enums from both
      apps' `lib/config.ts`, `logger`, `DB_CONFIG`, `withCabinBookingLock()`,
      `calculateBookingPricing()`.
    - **2d. Customer adoption** — `POST /api/bookings` wraps its check-then-write in the lock and
      uses the pricing calculator; `PATCH /api/bookings/[id]` stops accepting raw fee amounts and
-     reprices on change.
+     reprices on change under explicit rules for already-paid bookings and active checkout
+     sessions. Test delayed checkout completion and duplicate payment events.
    - **2e. Admin adoption, and a divergence sweep** — port `getResend()` to the admin so its
      `/api/send/*` routes stop constructing Resend at module scope, then remove the placeholder
      `RESEND_API_KEY` and its comment from `.github/workflows/ci.yml` and the known-limitation
      note from `apps/admin/CLAUDE.md`. Then sweep both apps for further one-sided hardening,
      per "Why these three belong together" above.
+   - **2f. Capacity concurrency** — reproduce the dining race with real concurrent transactions,
+     introduce a shared lock or atomic capacity counter used by every capacity-changing path,
+     and audit experience capacity enforcement for the same check-then-write pattern.
 
    *Done when:* both apps import from `@lodgeflow/database`, no `models/` directory remains in
    either app, the data audit reports clean, integration tests prove both the customer-side race
-   and the `PATCH` pricing hole are closed, and the admin builds with no `RESEND_API_KEY` set
+   and the `PATCH` pricing hole are closed, payment tests prove unpaid deposits are never credited
+   as received and stale checkout cannot settle a repriced booking incorrectly, dining concurrency
+   tests prove capacity cannot be exceeded, and the admin builds with no `RESEND_API_KEY` set
    anywhere — verified by a CI run that does not supply one.
 3. **Permission layer.** Clerk roles, permission matrix, `requireApiAuth({ permission })`,
    updated call sites, conditional sidebar.
@@ -581,7 +622,7 @@ before step 2 begins means the schema merge happens against a stable base.
 with step 1 as "the migration," which was only defensible while the schemas looked identical.
 Now that 2a and 2b involve per-field semantic decisions and a data audit against production
 documents, it is the highest-risk work in the spec and deserves undivided planning attention.
-Sub-steps 2a and 2b may warrant landing ahead of 2c/2d/2e, since reconciling the schemas is
+Sub-steps 2a and 2b may warrant landing ahead of 2c/2d/2e/2f, since reconciling the schemas is
 valuable even if the extraction slips. 2e is the reverse case — porting `getResend()` to the
 admin depends on nothing else in step 2 and could ship on its own at any point, which makes it
 a reasonable warm-up if the schema work needs to wait.
@@ -607,5 +648,6 @@ These were deliberate calls, not defaults:
   The alternative — keeping both variants behind a flag — would preserve exactly the ambiguity
   the extraction exists to remove.
 - **Dining is on the calendar.** An earlier draft excluded it on the false premise that dining had
-  no capacity model. `Dining.maxPeople` is required and transactionally enforced, so the third
-  view costs one aggregation against an index that already exists.
+  no capacity model. `Dining.maxPeople` is required, so the third view has a defined capacity
+  to display. Its write-side concurrency gap is addressed in Step 2f; a transaction alone
+  does not prove that the limit holds under competing reservations.
