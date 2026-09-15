@@ -493,13 +493,9 @@ RESEND_API_KEY=re_...          # Email sending (/api/send/*)
 SEED_SECRET=...                # Bearer token for /api/cron/seed
 ```
 
-`RESEND_API_KEY` is required even to build, not just to send email:
-`app/api/send/confirm/route.ts` and `app/api/send/welcome/route.ts` construct
-`new Resend(...)` at module scope, so `next build` fails while collecting page
-data if the var is absent — a placeholder value is enough, since no network
-call happens unless the route actually runs. CI sets a throwaway placeholder
-for this reason (`.github/workflows/ci.yml`); the real fix (deferred) is
-porting the customer app's lazy `getResend()` pattern to the admin.
+`RESEND_API_KEY` is required only when sending email. `lib/resend.ts` constructs
+its client lazily inside the authenticated, rate-limited send handlers, so
+`next build` succeeds without a Resend credential. CI deliberately omits it.
 
 Optional:
 ```bash
