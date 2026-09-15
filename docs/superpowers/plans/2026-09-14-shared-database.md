@@ -35,7 +35,7 @@ so a failed replacement leaves the prior dataset intact. No real payment or emai
 - [x] Adopt shared cabin locking and trusted pricing in customer creation and edits. Cover
   ownership, overlapping concurrent requests, immutable paid amounts, raw fee tampering,
   and stale/duplicate checkout events in integration tests.
-- [ ] Serialize dining capacity through shared state and test competing last-seat requests
+- [x] Serialize dining capacity through shared state and test competing last-seat requests
   on a replica set. Include all capacity-changing mutations; audit experience capacity too.
 - [x] Seed coherent demo reservations using the shared pricing/payment rules, with explicit
   demo provenance and no Stripe-looking payment IDs. Audit the resulting data and indexes.
@@ -120,7 +120,7 @@ read-only audit found zero schema failures, inconsistent financial totals, missi
 cabin references, overlapping active stays, or invalid receipts. The overlap index
 has the expected non-partial definition. No real charges were created by seeding.
 
-## Capacity implementation (deployment pending)
+## Capacity implementation (deployed)
 
 All dining and experience reservation creates, edits, and cancellations now write
 a shared version field on the relevant catalog document within their transaction.
@@ -141,7 +141,7 @@ cancellation releasing capacity, experience repricing, and an admin reducing
 capacity during a booking request. No additional database collection or index
 migration is required for the catalog version field.
 
-## External configuration blocker: guest authentication
+## Guest authentication configuration (resolved)
 
 A browser test on the production customer site authenticated an isolated test account,
 but Clerk reported `session.status = pending` and
@@ -163,3 +163,27 @@ After that change, repeat guest booking → hosted Stripe test checkout → rece
 settlement → balance payment/refund verification. The isolated account created for
 this test is removed at handoff. No test reservation or charge was created because
 Clerk rejected the booking request. Proceed with Step 3 permissions after this gate.
+
+## Latest checkpoint
+
+PR 143 merged as `03e33d1`. Both production deployments are Ready:
+customer `lodgeflow-p1fmw7n7t-asecklabs.vercel.app` and admin
+`lodgeflowadmin-h1lfoxg3o-asecklabs.vercel.app`. Its customer preview returned 200
+with all 14 dining listings and 8 experiences. All 1,104 tests pass (953 admin,
+135 customer, 16 shared database), and both application builds pass.
+
+The project owner enabled optional Organization membership. A fresh browser test
+confirmed the guest session is now **active** and the booking API returns **201**.
+The previous `choose-organization` blocker is resolved.
+
+Hosted checkout then returned 500. A direct, read-only Stripe API probe confirmed
+**401 / `api_key_expired`** for the configured `STRIPE_SECRET_KEY`; it is a test-mode
+key. The owner needs to replace that variable in the customer Vercel project's
+Preview and Production environments. Redeploy after the replacement, then repeat
+checkout/receipt/refund verification. Never put the replacement secret in Git or
+chat. A temporary isolated reservation is retained only while this smoke test is
+in progress and must be removed with its test account at completion or handoff.
+
+Step 2 code and the production demo reset are deployed. End-to-end Stripe verification
+is the remaining gate before Step 3 permissions; the roadmap remains a guide and can
+be revised if this external configuration work changes the sequence.
