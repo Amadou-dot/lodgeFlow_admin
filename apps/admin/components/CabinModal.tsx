@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import { useCreateCabin, useUpdateCabin } from '@/hooks/useCabins';
 import type { Cabin } from '@/types';
 import { isImageUrl } from '@/utils/utilityFunctions';
@@ -34,6 +36,7 @@ export default function CabinModal({
   mode,
   onEdit,
 }: CabinModalProps) {
+  const canWrite = usePermission('cabins:write');
   const [formData, setFormData] = useState({
     name: '',
     image: '',
@@ -680,6 +683,7 @@ export default function CabinModal({
             <Button
               color='primary'
               variant='bordered'
+              isDisabled={!canWrite}
               onPress={() => onEdit(cabin)}
             >
               Edit Cabin

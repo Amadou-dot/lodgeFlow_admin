@@ -20,7 +20,7 @@ import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'cabins:write' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'cabins:write' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -196,7 +196,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'cabins:write' });
   if (!authResult.authenticated) return authResult.error;
 
   try {

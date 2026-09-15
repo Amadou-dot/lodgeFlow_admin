@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import BulkActionsToolbar from '@/components/BulkActionsToolbar';
 import CabinCard from '@/components/CabinCard';
 import CabinFilters from '@/components/CabinFilters';
@@ -42,6 +44,7 @@ function CabinCardSkeleton() {
 }
 
 export default function CabinsPage() {
+  const canWrite = usePermission('cabins:write');
   const [filters, setFilters] = useState<CabinFiltersType>({});
   const [selectedCabin, setSelectedCabin] = useState<Cabin | null>(null);
   const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>(
@@ -186,6 +189,7 @@ export default function CabinsPage() {
           <Button
             color='primary'
             startContent={<PlusIcon size={18} />}
+            isDisabled={!canWrite}
             onPress={handleCreateCabin}
             className='w-full sm:w-auto'
           >
@@ -210,7 +214,7 @@ export default function CabinsPage() {
       </div>
 
       {/* Bulk Actions Toolbar */}
-      {isSelectionMode && (
+      {canWrite && isSelectionMode && (
         <div className='mb-4'>
           <BulkActionsToolbar
             selectedCount={selectedIds.size}
@@ -280,6 +284,7 @@ export default function CabinsPage() {
                 ) : (
                   <Button
                     color='primary'
+                    isDisabled={!canWrite}
                     onPress={handleCreateCabin}
                     startContent={<PlusIcon size={18} />}
                   >

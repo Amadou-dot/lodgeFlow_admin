@@ -12,7 +12,7 @@ const MAX_BULK_ITEMS = 50;
 const OBJECT_ID_REGEX = /^[a-f0-9]{24}$/i;
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'cabins:write' });
   if (!authResult.authenticated) return authResult.error;
 
   try {

@@ -1,94 +1,75 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  pagePermission,
+  PERMISSIONS,
+  type Permission,
+  type StaffRole,
+} from '@/lib/permissions';
 
-import { hasAuthorizedRole } from '@/lib/auth-helpers';
-
-interface AuthGuardProps {
-  children: React.ReactNode;
+type Access = {
+  userId: string;
+  role: StaffRole;
+  permissions: readonly Permission[];
+};
+const AccessContext = createContext<Access | null>(null);
+export function useStaffAccess() {
+  return useContext(AccessContext);
 }
-
-// COSMETIC ONLY — this client-side flag skips the Clerk redirect so the UI
-// renders without a configured Clerk provider during local development. It is
-// NOT a security boundary: enforcement happens server-side in the middleware
-// (`proxy.ts`) and API routes (`requireApiAuth`), both gated on the server-only
-// `TESTING_AUTH_BYPASS` via `isAuthBypassEnabled()`. Setting this public flag in
-// a deployed environment cannot grant access to any protected data.
+export function usePermission(permission: Permission) {
+  return useStaffAccess()?.permissions.includes(permission) ?? false;
+}
 const isTestMode =
   process.env.NODE_ENV !== 'production' &&
   process.env.NEXT_PUBLIC_TESTING === 'true';
-
-export function AuthGuard({ children }: AuthGuardProps) {
-  if (isTestMode) return <TestModeGuard>{children}</TestModeGuard>;
+export function AuthGuard({ children }: { children: React.ReactNode }) {
+  if (isTestMode)
+    return (
+      <AccessContext.Provider
+        value={{ userId: 'test-user', role: 'admin', permissions: PERMISSIONS }}
+      >
+        {children}
+      </AccessContext.Provider>
+    );
   return <ClerkAuthGuard>{children}</ClerkAuthGuard>;
 }
-
-function TestModeGuard({ children }: AuthGuardProps) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-  return <>{children}</>;
-}
-
-function ClerkAuthGuard({ children }: AuthGuardProps) {
-  const { isLoaded, isSignedIn, has } = useAuth();
+function ClerkAuthGuard({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn, orgId, userId } = useAuth();
   const router = useRouter();
-
+  const pathname = usePathname();
+  const [access, setAccess] = useState<Access | null>(null);
   useEffect(() => {
-    // Wait for auth to load
+    setAccess(null);
     if (!isLoaded) return;
-
-    // If user is not signed in, redirect to sign-in page
     if (!isSignedIn) {
-      router.push('/sign-in');
+      router.replace('/sign-in');
       return;
     }
-
-    // Check user role - only allow admin
-    if (!hasAuthorizedRole(has)) {
-      router.replace('/unauthorized');
-      return;
-    }
-  }, [isLoaded, isSignedIn, has, router]);
-
-  // Show loading state while auth is loading
-  if (!isLoaded) {
-    return (
-      <div className='flex items-center justify-center min-h-screen'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4'></div>
-          <p className='text-muted-foreground'>Loading...</p>
-        </div>
-      </div>
-    );
+    const controller = new AbortController();
+    fetch('/api/staff/access', { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('Staff access denied');
+        const { data } = await response.json();
+        if (!data.permissions.includes(pagePermission(pathname)))
+          throw new Error('Page access denied');
+        if (!controller.signal.aborted) setAccess(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) router.replace('/unauthorized');
+      });
+    return () => controller.abort();
+  }, [isLoaded, isSignedIn, orgId, userId, pathname, router]);
+  if (
+    !access ||
+    !isSignedIn ||
+    !access.permissions.includes(pagePermission(pathname))
+  ) {
+    return <div className='p-8 text-center'>Checking staff access…</div>;
   }
-
-  // Show loading state while redirecting
-  if (!isSignedIn) {
-    return (
-      <div className='flex items-center justify-center min-h-screen'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4'></div>
-          <p className='text-muted-foreground'>Redirecting to sign in...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Check role before rendering
-  if (!hasAuthorizedRole(has)) {
-    return (
-      <div className='flex items-center justify-center min-h-screen'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4'></div>
-          <p className='text-muted-foreground'>Checking permissions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // User is authenticated and has valid role, show the protected content
-  return <>{children}</>;
+  return (
+    <AccessContext.Provider value={access}>{children}</AccessContext.Provider>
+  );
 }

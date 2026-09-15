@@ -1,12 +1,16 @@
+import { requireApiAuth } from '@/lib/api-utils';
+import { redirect } from 'next/navigation';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Navbar } from '@/components/navbar';
 import { Sidebar } from '@/components/sidebar';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const access = await requireApiAuth({ permission: 'bookings:read' });
+  if (!access.authenticated) redirect('/unauthorized');
   return (
     <AuthGuard>
       <div className='flex h-screen'>

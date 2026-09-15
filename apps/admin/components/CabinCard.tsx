@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import type { Cabin } from '@/types';
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
@@ -40,6 +42,7 @@ export default function CabinCard({
   onToggleSelect,
   selectionMode,
 }: CabinCardProps) {
+  const canWrite = usePermission('cabins:write');
   const discountedPrice = cabin.price - cabin.discount;
   const cabinStatus = cabin.status || 'active';
 
@@ -141,6 +144,7 @@ export default function CabinCard({
                 <DropdownItem
                   key='edit'
                   startContent={<EditIcon size={16} />}
+                  isDisabled={!canWrite}
                   onPress={() => onEdit(cabin)}
                 >
                   Edit
@@ -150,6 +154,7 @@ export default function CabinCard({
                   className='text-danger'
                   color='danger'
                   startContent={<TrashIcon size={16} />}
+                  isDisabled={!canWrite}
                   onPress={() => onDelete(cabin)}
                 >
                   Delete

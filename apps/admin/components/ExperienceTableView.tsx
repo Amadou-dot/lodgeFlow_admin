@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import type { Experience } from '@/types';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
@@ -67,6 +69,7 @@ export default function ExperienceTableView({
   onEdit,
   onDelete,
 }: ExperienceTableViewProps) {
+  const canWrite = usePermission('cabins:write');
   const loadingState =
     isLoading && experiences.length === 0 ? 'loading' : 'idle';
 
@@ -143,6 +146,7 @@ export default function ExperienceTableView({
               <DropdownItem
                 key='edit'
                 startContent={<EditIcon size={16} />}
+                isDisabled={!canWrite}
                 onPress={() => onEdit(item)}
               >
                 Edit
@@ -152,6 +156,7 @@ export default function ExperienceTableView({
                 className='text-danger'
                 color='danger'
                 startContent={<TrashIcon size={16} />}
+                isDisabled={!canWrite}
                 onPress={() => onDelete(item)}
               >
                 Delete

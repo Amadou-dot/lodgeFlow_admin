@@ -251,3 +251,9 @@ Recommended alternative for this personal project, pending that choice:
 The other option is for the owner to enable Clerk's required paid feature, retaining
 the planned custom-role source. Implementation and deployment of Step 3 wait for this
 architecture/billing choice; checkout and refund verification no longer block it.
+
+## Staff-role decision (approved)
+
+The owner chose application-owned roles without a Clerk upgrade. Continue with
+[the staff-role implementation plan](2026-09-14-application-staff-roles.md). The
+architecture/billing choice above is resolved.

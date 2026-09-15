@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import DiningFilters from '@/components/DiningFilters';
 import { DiningGrid } from '@/components/DiningGrid';
 import { DiningModal } from '@/components/DiningModal';
@@ -34,6 +36,7 @@ function DiningCardSkeleton() {
 }
 
 export default function DiningPage() {
+  const canWrite = usePermission('cabins:write');
   const [filters, setFilters] = useState<DiningFiltersType>({});
   const [selectedDining, setSelectedDining] = useState<Dining | null>(null);
   const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>(
@@ -128,6 +131,7 @@ export default function DiningPage() {
           <Button
             color='primary'
             startContent={<PlusIcon size={18} />}
+            isDisabled={!canWrite}
             onPress={handleCreateDining}
             className='w-full sm:w-auto'
           >
@@ -208,6 +212,7 @@ export default function DiningPage() {
                 ) : (
                   <Button
                     color='primary'
+                    isDisabled={!canWrite}
                     onPress={handleCreateDining}
                     startContent={<PlusIcon size={18} />}
                   >

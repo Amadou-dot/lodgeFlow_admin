@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import { Experience } from '@/types';
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
@@ -59,6 +61,7 @@ export const ExperienceCard = ({
   onEdit,
   onDelete,
 }: ExperienceCardProps) => {
+  const canWrite = usePermission('cabins:write');
   return (
     <Card
       shadow='sm'
@@ -135,6 +138,7 @@ export const ExperienceCard = ({
                     <DropdownItem
                       key='edit'
                       startContent={<EditIcon size={16} />}
+                      isDisabled={!canWrite}
                       onPress={() => onEdit(experience)}
                     >
                       Edit
@@ -146,6 +150,7 @@ export const ExperienceCard = ({
                       className='text-danger'
                       color='danger'
                       startContent={<TrashIcon size={16} />}
+                      isDisabled={!canWrite}
                       onPress={() => onDelete(experience)}
                     >
                       Delete

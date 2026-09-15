@@ -69,7 +69,7 @@ async function populateBookingsWithClerkCustomers(bookings: IBooking[]) {
 
 export async function GET(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:manage' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -473,13 +473,22 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:manage' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
     await connectDB();
 
     const body = await request.json();
+
+    if (
+      ['refundStatus', 'refundAmount', 'refundedAt'].some(key =>
+        Object.prototype.hasOwnProperty.call(body, key)
+      )
+    ) {
+      const refundAuth = await requireApiAuth({ permission: 'refunds:issue' });
+      if (!refundAuth.authenticated) return refundAuth.error;
+    }
 
     // Validate request body
     const validationResult = updateBookingSchema.safeParse(body);

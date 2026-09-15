@@ -3,7 +3,6 @@ import {
   createValidationErrorResponse,
   requireApiAuth,
 } from '@/lib/api-utils';
-import { AUTHORIZED_ROLES, isAuthBypassEnabled } from '@/lib/auth-helpers';
 import { settingsData } from '@/lib/data/seed-data';
 import connectDB from '@/lib/mongodb';
 import {
@@ -12,7 +11,6 @@ import {
   updateSettingsSchema,
 } from '@/lib/validations/settings';
 import { isMongooseValidationError } from '@/types/errors';
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { Settings } from '@lodgeflow/database';
 
@@ -53,7 +51,7 @@ const DEFAULT_SETTINGS = {
 
 export async function GET() {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -88,7 +86,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'settings:write' });
   if (!authResult.authenticated) return authResult.error;
 
   try {
@@ -169,17 +167,6 @@ export async function POST() {
   // Require authentication
   const authResult = await requireApiAuth();
   if (!authResult.authenticated) return authResult.error;
-
-  // Resetting settings is a destructive operation — require admin role
-  if (!isAuthBypassEnabled()) {
-    const { has } = await auth();
-    if (!has?.({ role: AUTHORIZED_ROLES.ADMIN })) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden: Admin role required' },
-        { status: 403 }
-      );
-    }
-  }
 
   try {
     await connectDB();

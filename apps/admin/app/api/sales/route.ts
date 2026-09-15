@@ -12,7 +12,7 @@ export interface SalesData {
 
 export async function GET() {
   // Require authentication
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {

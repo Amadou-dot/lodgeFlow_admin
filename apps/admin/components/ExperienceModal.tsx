@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import { useUpdateExperience } from '@/hooks/useExperiences';
 import { Experience } from '@/types';
 import { Button } from '@heroui/button';
@@ -36,6 +38,7 @@ export const ExperienceModal = ({
   onEdit,
   onCreateSubmit,
 }: ExperienceModalProps) => {
+  const canWrite = usePermission('cabins:write');
   const updateExperience = useUpdateExperience();
   const [formData, setFormData] = useState<FormData>({} as FormData);
 
@@ -348,6 +351,7 @@ export const ExperienceModal = ({
               <Button
                 color='primary'
                 variant='bordered'
+                isDisabled={!canWrite}
                 onPress={() => onEdit(experience)}
               >
                 Edit Experience
@@ -363,6 +367,7 @@ export const ExperienceModal = ({
             </Button>
             <Button
               color='primary'
+              isDisabled={!canWrite}
               onPress={handleCreateSubmit}
               isLoading={isLoading}
             >

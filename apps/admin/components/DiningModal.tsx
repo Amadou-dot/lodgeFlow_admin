@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import { useCreateDining, useUpdateDining } from '@/hooks/useDining';
 import { Dining } from '@/types';
 import { Button } from '@heroui/button';
@@ -39,6 +41,7 @@ export const DiningModal = ({
   mode,
   onEdit,
 }: DiningModalProps) => {
+  const canWrite = usePermission('cabins:write');
   const createDining = useCreateDining();
   const updateDining = useUpdateDining();
 
@@ -287,6 +290,7 @@ export const DiningModal = ({
               <Button
                 color='primary'
                 variant='bordered'
+                isDisabled={!canWrite}
                 onPress={() => onEdit(dining)}
               >
                 Edit Dining Item

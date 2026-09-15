@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import { Dining } from '@/types';
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
@@ -65,6 +67,7 @@ export const DiningCard = ({
   onEdit,
   onDelete,
 }: DiningCardProps) => {
+  const canWrite = usePermission('cabins:write');
   return (
     <Card
       shadow='sm'
@@ -158,6 +161,7 @@ export const DiningCard = ({
                     <DropdownItem
                       key='edit'
                       startContent={<EditIcon size={16} />}
+                      isDisabled={!canWrite}
                       onPress={() => onEdit(dining)}
                     >
                       Edit
@@ -169,6 +173,7 @@ export const DiningCard = ({
                       className='text-danger'
                       color='danger'
                       startContent={<TrashIcon size={16} />}
+                      isDisabled={!canWrite}
                       onPress={() => onDelete(dining)}
                     >
                       Delete

@@ -8,7 +8,7 @@ import connectDB from '@/lib/mongodb';
 import { Dining } from '@lodgeflow/database';
 
 export async function GET() {
-  const authResult = await requireApiAuth();
+  const authResult = await requireApiAuth({ permission: 'bookings:read' });
   if (!authResult.authenticated) return authResult.error;
 
   try {

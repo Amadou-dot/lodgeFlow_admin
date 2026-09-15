@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermission } from '@/components/AuthGuard';
+
 import type { Cabin } from '@/types';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
@@ -61,6 +63,7 @@ export default function CabinTableView({
   selectedKeys,
   onSelectionChange,
 }: CabinTableViewProps) {
+  const canWrite = usePermission('cabins:write');
   const loadingState = isLoading && cabins.length === 0 ? 'loading' : 'idle';
 
   const handleRowAction = (key: Key) => {
@@ -171,6 +174,7 @@ export default function CabinTableView({
               <DropdownItem
                 key='edit'
                 startContent={<EditIcon size={16} />}
+                isDisabled={!canWrite}
                 onPress={() => onEdit(cabin)}
               >
                 Edit
@@ -180,6 +184,7 @@ export default function CabinTableView({
                 className='text-danger'
                 color='danger'
                 startContent={<TrashIcon size={16} />}
+                isDisabled={!canWrite}
                 onPress={() => onDelete(cabin)}
               >
                 Delete

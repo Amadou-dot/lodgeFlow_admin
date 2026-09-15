@@ -171,14 +171,14 @@ proxy.ts                # Clerk middleware (Next.js 16 — auth gate for all rou
 ### Authentication Architecture
 
 **Clerk-Based Auth** (Clerk manages users, MongoDB stores business data):
-- Users are stored in Clerk with roles: `org:admin`, `org:customer`
-- Only `org:admin` may access the admin dashboard (enforced in `proxy.ts` and API routes)
+- Clerk stores identities and organization membership; MongoDB `StaffAccess` stores application roles.
+- The active organization must match `LODGEFLOW_STAFF_ORG_ID`. APIs check current Clerk membership and the application permission matrix.
 - Bookings reference Clerk user IDs (string) instead of MongoDB ObjectIds
 - Customer statistics are calculated on-demand using Clerk user data
-- Protected routes use `AuthGuard` component (client-side)
-- API routes check auth using `requireApiAuth()` from `@/lib/api-utils`
+- The server dashboard layout and API handlers enforce access; client `AuthGuard` provides navigation and permission-aware presentation.
+- API routes use `requireApiAuth({ permission })` from `@/lib/api-utils`; omitting the permission restricts the operation to application administrators.
 
-**Public routes** (no Clerk session required): `/sign-in`, `/sign-up`, `/unauthorized`, `/`, `/api/cron/seed`, `/api/webhooks/*`
+**Public routes** (no Clerk session required): `/sign-in`, `/sign-up`, `/unauthorized`, `/api/cron/seed`, `/api/webhooks/*`
 
 **Key Auth Patterns:**
 ```typescript
@@ -321,7 +321,7 @@ Use `@/` for absolute imports:
 ```typescript
 import { Booking } from '@/models';
 import { useBookings } from '@/hooks/useBookings';
-import { hasAuthorizedRole } from '@/lib/auth-helpers';
+import { hasPermission } from '@/lib/permissions';
 ```
 
 ### Error Handling

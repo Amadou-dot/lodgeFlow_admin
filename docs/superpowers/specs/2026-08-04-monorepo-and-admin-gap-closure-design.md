@@ -338,41 +338,13 @@ uncovered by either suite. Reconciliation needs its own tests, written against t
 
 ### Permission layer
 
-Roles live in Clerk (`org:front_desk`, `org:manager`, `org:admin`). The role → permission matrix
-lives in `apps/admin/lib/permissions.ts`, keeping membership in the Clerk dashboard while the
-matrix stays version-controlled, reviewable, and unit-testable.
-
-| Permission | front_desk | manager | admin |
-| --- | :-: | :-: | :-: |
-| `bookings:read` | ✓ | ✓ | ✓ |
-| `bookings:manage` | ✓ | ✓ | ✓ |
-| `cabins:write` | | ✓ | ✓ |
-| `settings:write` | | ✓ | ✓ |
-| `refunds:issue` | | ✓ | ✓ |
-| `audit:read` | | ✓ | ✓ |
-| `staff:manage` | | | ✓ |
-
-**Layering.** `proxy.ts` stays coarse — "is this any staff role?" Per-route permission checks in
-middleware would require a second copy of the route → permission map that would drift from the
-real one. Fine-grained enforcement lives in `requireApiAuth({ permission })`, which is the actual
-security boundary. `components/AuthGuard.tsx` and the sidebar hide what the user cannot use;
-that is UX, not enforcement.
-
-"Any staff role" means exactly `org:front_desk`, `org:manager`, or `org:admin`. `org:customer` —
-the role every customer-site user holds — must remain denied at the middleware gate. The check
-is an explicit allow-list of staff roles, never a deny-list or a "has any role" test, so a role
-added in the Clerk dashboard grants no admin access until it is added to the matrix in code.
-
-```typescript
-const authResult = await requireApiAuth({ permission: 'settings:write' });
-if (!authResult.authenticated) return authResult.error;
-```
-
-The `permission` argument is optional and defaults to current behavior, so all existing routes
-keep working untouched and are tightened one at a time. Existing `org:admin` users lose no
-access. There are **four** existing call sites of `hasAuthorizedRole()` — `proxy.ts:35`,
-`lib/api-utils.ts:139`, and *two* in `components/AuthGuard.tsx` (line 50 in the effect, line 81
-in the render path). `__tests__/unit/lib/auth-helpers.test.ts` also needs updating.
+The owner approved application-owned roles to avoid Clerk's paid custom-role feature.
+The current design and delivery checklist are in
+[Application-owned staff roles](../plans/2026-09-14-application-staff-roles.md).
+Clerk provides identity and current membership in the configured LodgeFlow organization;
+MongoDB staff assignments provide `front_desk`, `manager`, and `admin` access. Personal
+guest accounts and unrelated organizations must remain denied. Unannotated API routes
+remain administrator-only while permissions are migrated.
 
 ### Audit log
 
