@@ -30,14 +30,18 @@
 
 ## Authentication
 
-All API endpoints require authentication via Clerk. The server validates the user session using `@clerk/nextjs/server`.
+Except explicitly public or bearer-protected routes, APIs require a Clerk session with the configured LodgeFlow organization active. The server checks live organization membership and the MongoDB `StaffAccess` assignment.
 
 **Required Headers:**
 - Clerk session cookie (automatically handled by Clerk middleware)
 
-**Role-Based Access:**
-- `org:admin` - Full access to all endpoints
-- `org:customer` - Limited access to own data
+**Application-owned access:**
+- `front_desk`: booking/customer/catalog reads, booking management, guest profile edits, and payment recording.
+- `manager`: front desk permissions plus catalog/settings writes, refund metadata, and audit reads.
+- `admin`: all permissions, including staff assignments and destructive account/booking operations.
+- Personal guests, customer memberships without a staff assignment, and unrelated organizations have no admin API access. Clerk role claims and customer metadata cannot grant access.
+
+`requireApiAuth({ permission })` enforces the operation. Calls without a permission remain application-administrator-only. `LODGEFLOW_STAFF_ORG_ID` must be configured on the admin app. Missing configuration or failed membership lookup denies access.
 
 **Unauthorized Response:**
 ```json
@@ -47,6 +51,41 @@ All API endpoints require authentication via Clerk. The server validates the use
 }
 ```
 **Status Code:** `401`
+
+---
+
+## Staff operations
+
+| Endpoint | Permission | Behavior |
+| --- | --- | --- |
+| `GET /api/staff/access` | `bookings:read` | Current application role and permissions |
+| `GET /api/staff` | `staff:manage` | Organization members and assigned application roles |
+| `PUT /api/staff` | `staff:manage` | `{ userId, role }`, where role is `front_desk`, `manager`, `admin`, or null; self-changes rejected |
+| `GET /api/audit` | `audit:read` | Filters: actor, action, resourceId, from, to; page/limit; data contains events, total, page, limit |
+| `GET /api/reservations` | `bookings:read` | Filters: type, lifecycle, resourceId, from (inclusive), to (exclusive); page/limit; data contains rows, total, page, limit |
+| `GET /api/dining-reservations/:id` | `bookings:read` | Reservation, guest name, and allowed next statuses |
+| `PATCH /api/dining-reservations/:id` | `bookings:manage` | `{ expectedStatus, status }` only; stale state returns 409 |
+| `GET /api/experience-bookings/:id` | `bookings:read` | Reservation, guest name, and allowed next statuses |
+| `PATCH /api/experience-bookings/:id` | `bookings:manage` | `{ expectedStatus, status }` only; stale state returns 409 |
+| `GET /api/calendar/cabins` | `bookings:read` | Listings and overlapping non-cancelled stays |
+| `GET /api/calendar/dining` | `bookings:read` | Listings and seat counts per UTC date and seating time |
+| `GET /api/calendar/experiences` | `bookings:read` | Listings and participant counts per UTC date; missing cap means uncapped |
+
+Calendars accept `start`/`end`, use a half-open UTC date window, and clamp it to 180 days.
+Their response includes the effective window. Inbox/audit pagination defaults to 25 and
+allows at most 100 rows. Inbox rows preserve product-native status and add a lifecycle
+for cross-product filtering. Catalog joins occur after the union is paginated.
+
+Dining transitions: pending → confirmed/cancelled; confirmed → completed/cancelled/no-show.
+Experience transitions omit no-show. Terminal states cannot reopen. Status writes use
+shared capacity transactions and produce audit events. Paid dining/experience cancellation
+is blocked until those products have refund reconciliation support.
+
+Audit history records selected changed business fields and redacts free text/contact fields.
+It excludes guest notes and credentials, has no TTL, and survives demo resets. Audit writes
+are best-effort after successful mutations. `refund.record` records metadata; it does not
+issue a Stripe refund. Both cabin-booking update APIs separately require `refunds:issue`
+when a request includes refund metadata.
 
 ---
 

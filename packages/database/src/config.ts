@@ -93,3 +93,18 @@ export const TABLE_PREFERENCES = [
   'bar',
   'no-preference',
 ] as const;
+
+export const DINING_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['completed', 'cancelled', 'no-show'],
+  completed: [],
+  cancelled: [],
+  'no-show': [],
+};
+export const EXPERIENCE_STATUS_TRANSITIONS: Record<string, readonly string[]> =
+  {
+    pending: ['confirmed', 'cancelled'],
+    confirmed: ['completed', 'cancelled'],
+    completed: [],
+    cancelled: [],
+  };

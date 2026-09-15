@@ -1,3 +1,7 @@
+import {
+  DINING_STATUS_TRANSITIONS,
+  EXPERIENCE_STATUS_TRANSITIONS,
+} from './config';
 import mongoose, { type ClientSession } from 'mongoose';
 import Dining, { type IDining } from './models/Dining';
 import { Experience, type IExperience } from './models/Experience';
@@ -368,5 +372,53 @@ export async function deleteCapacityCatalog(
       );
     await catalog.deleteOne({ session });
     return catalog;
+  });
+}
+
+/** Staff status edits use the same catalog lock as guest capacity writers. */
+export async function transitionCapacityReservation(
+  kind: 'dining' | 'experience',
+  id: string,
+  expectedStatus: string,
+  nextStatus: string
+) {
+  requireId(id);
+  const initial =
+    kind === 'dining'
+      ? await DiningReservation.findById(id)
+      : await ExperienceBooking.findById(id);
+  if (!initial) throw new ReservationRuleError('Reservation not found', 404);
+  const resourceId = String(
+    initial.get(kind === 'dining' ? 'dining' : 'experience')
+  );
+  return withCatalog(kind, resourceId, async (_catalog, session) => {
+    const reservation =
+      kind === 'dining'
+        ? await DiningReservation.findById(id).session(session)
+        : await ExperienceBooking.findById(id).session(session);
+    if (!reservation)
+      throw new ReservationRuleError('Reservation not found', 404);
+    if (reservation.status !== expectedStatus)
+      throw new ReservationRuleError(
+        'Reservation changed; refresh and try again',
+        409
+      );
+    const beforeStatus = reservation.status;
+    if (nextStatus === beforeStatus)
+      return { changed: false, beforeStatus, reservation };
+    const transitions =
+      kind === 'dining'
+        ? DINING_STATUS_TRANSITIONS
+        : EXPERIENCE_STATUS_TRANSITIONS;
+    if (!transitions[beforeStatus]?.includes(nextStatus))
+      throw new ReservationRuleError('Invalid reservation status transition');
+    if (nextStatus === 'cancelled' && reservation.isPaid)
+      throw new ReservationRuleError(
+        'Paid reservations require refund reconciliation before cancellation',
+        409
+      );
+    reservation.set('status', nextStatus);
+    await reservation.save({ session });
+    return { changed: true, beforeStatus, reservation };
   });
 }
