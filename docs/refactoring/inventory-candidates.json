@@ -1,0 +1,2410 @@
+{
+  "commit": "07670932f0b8349fa826802a6ee27f20b3501908",
+  "findings": [
+    {
+      "file": "apps/admin/__tests__/api/dining.test.ts",
+      "line": 278,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/api/experiences.test.ts",
+      "line": 76,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/api/experiences.test.ts",
+      "line": 121,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/api/experiences.test.ts",
+      "line": 186,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/api/experiences.test.ts",
+      "line": 245,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/api/experiences.test.ts",
+      "line": 278,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/components/PrintBooking.test.tsx",
+      "line": 108,
+      "rule": "any",
+      "symbol": "mockBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookingAnalytics.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedQueryConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookingAnalytics.test.ts",
+      "line": 5,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedMutationConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
+      "line": 8,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
+      "line": 57,
+      "rule": "any",
+      "symbol": "bookingInput",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
+      "line": 168,
+      "rule": "any",
+      "symbol": "update",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookings.test.ts",
+      "line": 10,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useBookings.test.ts",
+      "line": 18,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCabins.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedQueryConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCabins.test.ts",
+      "line": 3,
+      "rule": "any",
+      "symbol": "capturedMutationConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCabins.test.ts",
+      "line": 9,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCabins.test.ts",
+      "line": 19,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCustomers.mutations.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedMutationConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCustomers.mutations.test.ts",
+      "line": 5,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
+      "line": 6,
+      "rule": "any",
+      "symbol": "capturedConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
+      "line": 12,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
+      "line": 21,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
+      "line": 136,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useData.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedQueryConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useData.test.ts",
+      "line": 5,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useDetailPageMemory.test.ts",
+      "line": 14,
+      "rule": "same-type-positionals",
+      "symbol": "<module>",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedQueryConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
+      "line": 3,
+      "rule": "any",
+      "symbol": "capturedMutationConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
+      "line": 9,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
+      "line": 19,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedQueryConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
+      "line": 3,
+      "rule": "any",
+      "symbol": "capturedMutationConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
+      "line": 9,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
+      "line": 19,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSendEmail.test.ts",
+      "line": 20,
+      "rule": "any",
+      "symbol": "mockBookingData",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSendEmail.test.ts",
+      "line": 21,
+      "rule": "any",
+      "symbol": "mockCabinData",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSendEmail.test.ts",
+      "line": 60,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSendEmail.test.ts",
+      "line": 61,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSendEmail.test.ts",
+      "line": 78,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSendEmail.test.ts",
+      "line": 79,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.mutations.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedMutationConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.mutations.test.ts",
+      "line": 5,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
+      "line": 7,
+      "rule": "any",
+      "symbol": "capturedConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
+      "line": 13,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
+      "line": 22,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
+      "line": 71,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
+      "line": 90,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useStats.test.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "capturedQueryConfig",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useStats.test.ts",
+      "line": 5,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/hooks/useURLFilters.test.ts",
+      "line": 143,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings-stats.test.ts",
+      "line": 26,
+      "rule": "any",
+      "symbol": "createTestBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings.test.ts",
+      "line": 23,
+      "rule": "any",
+      "symbol": "createTestCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings.test.ts",
+      "line": 40,
+      "rule": "any",
+      "symbol": "createTestBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings.test.ts",
+      "line": 66,
+      "rule": "any",
+      "symbol": "body",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings.test.ts",
+      "line": 86,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings.test.ts",
+      "line": 112,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/bookings.test.ts",
+      "line": 120,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/cabins.test.ts",
+      "line": 11,
+      "rule": "any",
+      "symbol": "body",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/cabins.test.ts",
+      "line": 20,
+      "rule": "any",
+      "symbol": "validCabinPayload",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/dining.test.ts",
+      "line": 11,
+      "rule": "any",
+      "symbol": "body",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/dining.test.ts",
+      "line": 20,
+      "rule": "any",
+      "symbol": "validDiningPayload",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/experiences.test.ts",
+      "line": 14,
+      "rule": "any",
+      "symbol": "body",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/experiences.test.ts",
+      "line": 23,
+      "rule": "any",
+      "symbol": "validExperiencePayload",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/staff-access.test.ts",
+      "line": 26,
+      "rule": "double-cast",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/staff-access.test.ts",
+      "line": 30,
+      "rule": "double-cast",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/staff-access.test.ts",
+      "line": 83,
+      "rule": "double-cast",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/staff-access.test.ts",
+      "line": 89,
+      "rule": "double-cast",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/api/staff-access.test.ts",
+      "line": 153,
+      "rule": "double-cast",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
+      "line": 6,
+      "rule": "any",
+      "symbol": "createTestCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
+      "line": 23,
+      "rule": "any",
+      "symbol": "createBookingData",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
+      "line": 384,
+      "rule": "any",
+      "symbol": "compoundIndex",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
+      "line": 394,
+      "rule": "any",
+      "symbol": "statusIndex",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
+      "line": 3,
+      "rule": "any",
+      "symbol": "createCabinData",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
+      "line": 226,
+      "rule": "any",
+      "symbol": "idx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
+      "line": 232,
+      "rule": "any",
+      "symbol": "idx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
+      "line": 238,
+      "rule": "any",
+      "symbol": "textIdx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
+      "line": 3,
+      "rule": "any",
+      "symbol": "createDiningData",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
+      "line": 261,
+      "rule": "any",
+      "symbol": "idx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
+      "line": 268,
+      "rule": "any",
+      "symbol": "idx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
+      "line": 274,
+      "rule": "any",
+      "symbol": "idx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
+      "line": 280,
+      "rule": "any",
+      "symbol": "idx",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/integration/models/experience.test.ts",
+      "line": 3,
+      "rule": "any",
+      "symbol": "createExperienceData",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/auth-helpers.ts",
+      "line": 28,
+      "rule": "any",
+      "symbol": "mockAuthAsUnauthenticated",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/factories.ts",
+      "line": 5,
+      "rule": "any",
+      "symbol": "createCabinInput",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/factories.ts",
+      "line": 20,
+      "rule": "any",
+      "symbol": "createBookingInput",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/factories.ts",
+      "line": 74,
+      "rule": "any",
+      "symbol": "createDiningInput",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/factories.ts",
+      "line": 94,
+      "rule": "any",
+      "symbol": "createExperienceInput",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/factories.ts",
+      "line": 110,
+      "rule": "any",
+      "symbol": "createSettingsInput",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/factories.ts",
+      "line": 130,
+      "rule": "any",
+      "symbol": "createMockClerkUser",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/globalSetup.ts",
+      "line": 7,
+      "rule": "any",
+      "symbol": "globalSetup",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/setup/globalTeardown.ts",
+      "line": 2,
+      "rule": "any",
+      "symbol": "mongod",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
+      "line": 285,
+      "rule": "any",
+      "symbol": "result",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
+      "line": 299,
+      "rule": "any",
+      "symbol": "result",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
+      "line": 309,
+      "rule": "any",
+      "symbol": "result",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
+      "line": 319,
+      "rule": "any",
+      "symbol": "result",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
+      "line": 331,
+      "rule": "any",
+      "symbol": "response",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
+      "line": 514,
+      "rule": "double-cast",
+      "symbol": "mockAuth",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.batch.test.ts",
+      "line": 8,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.batch.test.ts",
+      "line": 9,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.batch.test.ts",
+      "line": 29,
+      "rule": "any",
+      "symbol": "clerkUser",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 10,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 27,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 28,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 29,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 30,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 61,
+      "rule": "any",
+      "symbol": "clerkUser",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
+      "line": 85,
+      "rule": "any",
+      "symbol": "redisEntry",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 8,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 9,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 18,
+      "rule": "any",
+      "symbol": "createMockClerkUser",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 50,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 65,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 77,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 91,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 102,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 112,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 127,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 147,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 155,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 163,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 173,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 186,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/clerk-users.test.ts",
+      "line": 198,
+      "rule": "any",
+      "symbol": "customer",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
+      "line": 14,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
+      "line": 16,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
+      "line": 18,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/__tests__/unit/types/errors.test.ts",
+      "line": 37,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/(dashboard)/bookings/page.tsx",
+      "line": 115,
+      "rule": "same-type-positionals",
+      "symbol": "handleStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/(dashboard)/guests/[id]/page.tsx",
+      "line": 44,
+      "rule": "mixed-representation",
+      "symbol": "formatDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/bookings/[id]/route.ts",
+      "line": 52,
+      "rule": "double-cast",
+      "symbol": "populatedBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/bookings/[id]/route.ts",
+      "line": 159,
+      "rule": "record-index-cast",
+      "symbol": "cancellationFields",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/bookings/[id]/route.ts",
+      "line": 249,
+      "rule": "double-cast",
+      "symbol": "populatedBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/bookings/route.ts",
+      "line": 63,
+      "rule": "double-cast",
+      "symbol": "populatedBookings",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/bookings/route.ts",
+      "line": 595,
+      "rule": "record-index-cast",
+      "symbol": "cancellationFields",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/cabins/[id]/availability/route.ts",
+      "line": 39,
+      "rule": "any",
+      "symbol": "query",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/cabins/[id]/availability/route.ts",
+      "line": 66,
+      "rule": "double-cast",
+      "symbol": "unavailableDates",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/cabins/bulk/route.ts",
+      "line": 80,
+      "rule": "double-cast",
+      "symbol": "cabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/app/api/dashboard/route.ts",
+      "line": 277,
+      "rule": "double-cast",
+      "symbol": "bookingsList",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/AddGuestForm/AddressSection.tsx",
+      "line": 6,
+      "rule": "same-type-positionals",
+      "symbol": "onInputChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/AddGuestForm/BasicInformationSection.tsx",
+      "line": 9,
+      "rule": "same-type-positionals",
+      "symbol": "onInputChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/AddGuestForm/EmergencyContactSection.tsx",
+      "line": 8,
+      "rule": "same-type-positionals",
+      "symbol": "onInputChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/AddGuestForm/PreferencesSection.tsx",
+      "line": 7,
+      "rule": "same-type-positionals",
+      "symbol": "onInputChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/AddGuestForm.tsx",
+      "line": 78,
+      "rule": "same-type-positionals",
+      "symbol": "handleInputChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingDetails/BookingPDFTemplate.tsx",
+      "line": 107,
+      "rule": "mixed-representation",
+      "symbol": "formatDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingDetails/BookingPDFTemplate.tsx",
+      "line": 113,
+      "rule": "mixed-representation",
+      "symbol": "formatDateTime",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingDetails/BookingStatusDates.tsx",
+      "line": 6,
+      "rule": "same-type-positionals",
+      "symbol": "safeFormat",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingForm/BookingDatesGuests.tsx",
+      "line": 126,
+      "rule": "any",
+      "symbol": "BookingDatesGuests",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingForm/PaymentInformation.tsx",
+      "line": 8,
+      "rule": "optional-null",
+      "symbol": "settings",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingForm/PriceBreakdown.tsx",
+      "line": 10,
+      "rule": "optional-null",
+      "symbol": "settings",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingFormFields.tsx",
+      "line": 70,
+      "rule": "mixed-representation",
+      "symbol": "handleInputChange",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingsTable/BookingActionsMenu.tsx",
+      "line": 15,
+      "rule": "same-type-positionals",
+      "symbol": "onStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingsTable/BookingCard.tsx",
+      "line": 14,
+      "rule": "same-type-positionals",
+      "symbol": "onStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingsTable/BookingTableCell.tsx",
+      "line": 16,
+      "rule": "same-type-positionals",
+      "symbol": "onStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingsTable/BookingTableDesktop.tsx",
+      "line": 18,
+      "rule": "same-type-positionals",
+      "symbol": "onStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingsTable/BookingTableMobile.tsx",
+      "line": 10,
+      "rule": "same-type-positionals",
+      "symbol": "onStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/BookingsTable.tsx",
+      "line": 16,
+      "rule": "same-type-positionals",
+      "symbol": "onStatusChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/CabinModal.tsx",
+      "line": 27,
+      "rule": "optional-null",
+      "symbol": "cabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/DiningModal.tsx",
+      "line": 24,
+      "rule": "optional-null",
+      "symbol": "dining",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/EmailTemplates.tsx",
+      "line": 147,
+      "rule": "mixed-representation",
+      "symbol": "formatDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/components/ExperienceModal.tsx",
+      "line": 27,
+      "rule": "optional-null",
+      "symbol": "experience",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/hooks/useSendEmail.ts",
+      "line": 6,
+      "rule": "same-type-positionals",
+      "symbol": "sendConfirmationEmail",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/hooks/useSendEmail.ts",
+      "line": 35,
+      "rule": "same-type-positionals",
+      "symbol": "sendWelcomeEmail",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/hooks/useURLFilters.ts",
+      "line": 7,
+      "rule": "mixed-representation",
+      "symbol": "FilterValue",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/hooks/useURLFilters.ts",
+      "line": 115,
+      "rule": "double-cast",
+      "symbol": "updates",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/hooks/useURLFilters.ts",
+      "line": 154,
+      "rule": "double-cast",
+      "symbol": "updates",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/api-utils.ts",
+      "line": 366,
+      "rule": "same-type-positionals",
+      "symbol": "buildPaginationMeta",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/api-utils.ts",
+      "line": 386,
+      "rule": "same-type-positionals",
+      "symbol": "createPaginatedResponse",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/clerk-users.ts",
+      "line": 202,
+      "rule": "same-type-positionals",
+      "symbol": "retryWithBackoff",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/clerk-users.ts",
+      "line": 419,
+      "rule": "same-type-positionals",
+      "symbol": "searchClerkUsers",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/staff-access.ts",
+      "line": 9,
+      "rule": "same-type-positionals",
+      "symbol": "isOrganizationMember",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/validations/cabin.ts",
+      "line": 96,
+      "rule": "same-type-positionals",
+      "symbol": "isDiscountValid",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/lib/validations/settings.ts",
+      "line": 169,
+      "rule": "same-type-positionals",
+      "symbol": "getBookingLengthRangeError",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/clerk.ts",
+      "line": 179,
+      "rule": "mixed-representation",
+      "symbol": "checkInDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/clerk.ts",
+      "line": 180,
+      "rule": "mixed-representation",
+      "symbol": "checkOutDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/index.ts",
+      "line": 45,
+      "rule": "mixed-representation",
+      "symbol": "checkInDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/index.ts",
+      "line": 46,
+      "rule": "mixed-representation",
+      "symbol": "checkOutDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/index.ts",
+      "line": 61,
+      "rule": "mixed-representation",
+      "symbol": "checkInDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/index.ts",
+      "line": 62,
+      "rule": "mixed-representation",
+      "symbol": "checkOutDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/types/index.ts",
+      "line": 100,
+      "rule": "mixed-representation",
+      "symbol": "FilterValue",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/utils/bookingUtils.ts",
+      "line": 3,
+      "rule": "same-type-positionals",
+      "symbol": "formatBookingDates",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/admin/utils/utilityFunctions.ts",
+      "line": 38,
+      "rule": "same-type-positionals",
+      "symbol": "calcNumNights",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/bookings/useBooking.test.tsx",
+      "line": 51,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/bookings/useBooking.test.tsx",
+      "line": 73,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/bookings/useBooking.test.tsx",
+      "line": 207,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/bookings/useBooking.test.tsx",
+      "line": 228,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/bookings/useBooking.test.tsx",
+      "line": 244,
+      "rule": "any",
+      "symbol": "<module>",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinCard.test.tsx",
+      "line": 13,
+      "rule": "any",
+      "symbol": "mockCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinDetails.test.tsx",
+      "line": 20,
+      "rule": "double-cast",
+      "symbol": "mockCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinDetails.test.tsx",
+      "line": 73,
+      "rule": "double-cast",
+      "symbol": "cabinNoAmenities",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinDetails.test.tsx",
+      "line": 91,
+      "rule": "double-cast",
+      "symbol": "singleGuestCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinDetailsSections.test.tsx",
+      "line": 14,
+      "rule": "double-cast",
+      "symbol": "mockCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinDetailsSections.test.tsx",
+      "line": 43,
+      "rule": "double-cast",
+      "symbol": "{ container }",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinMobileTabs.test.tsx",
+      "line": 25,
+      "rule": "double-cast",
+      "symbol": "mockCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/cabins/CabinPageLayout.test.tsx",
+      "line": 108,
+      "rule": "double-cast",
+      "symbol": "mockCabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/lib/cancellation.test.ts",
+      "line": 11,
+      "rule": "double-cast",
+      "symbol": "createMockBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/__tests__/lib/cancellation.test.ts",
+      "line": 56,
+      "rule": "double-cast",
+      "symbol": "createMockSettings",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/bookings/[id]/route.ts",
+      "line": 58,
+      "rule": "any",
+      "symbol": "response",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/bookings/[id]/route.ts",
+      "line": 112,
+      "rule": "any",
+      "symbol": "response",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/bookings/[id]/route.ts",
+      "line": 309,
+      "rule": "double-cast",
+      "symbol": "populatedBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/bookings/[id]/route.ts",
+      "line": 325,
+      "rule": "any",
+      "symbol": "response",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/bookings/history/route.ts",
+      "line": 30,
+      "rule": "any",
+      "symbol": "query",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/cabins/route.ts",
+      "line": 29,
+      "rule": "any",
+      "symbol": "query",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/dining/[id]/availability/route.ts",
+      "line": 24,
+      "rule": "same-type-positionals",
+      "symbol": "isWithinServingWindow",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/dining/route.ts",
+      "line": 37,
+      "rule": "any",
+      "symbol": "query",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/experiences/route.ts",
+      "line": 30,
+      "rule": "any",
+      "symbol": "query",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/payments/create-checkout/route.ts",
+      "line": 86,
+      "rule": "double-cast",
+      "symbol": "cabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/payments/webhook/route.ts",
+      "line": 87,
+      "rule": "double-cast",
+      "symbol": "populated",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/send/confirm/route.ts",
+      "line": 31,
+      "rule": "double-cast",
+      "symbol": "booking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/api/send/payment-confirm/route.ts",
+      "line": 31,
+      "rule": "double-cast",
+      "symbol": "booking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 220,
+      "rule": "mixed-representation",
+      "symbol": "formatDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 303,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 526,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 707,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 857,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 860,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 867,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 870,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 1145,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 1185,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 1230,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 1241,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/bookings/page.tsx",
+      "line": 1244,
+      "rule": "any",
+      "symbol": "BookingsPage",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/dining/page.tsx",
+      "line": 58,
+      "rule": "any",
+      "symbol": "aValue",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/dining/page.tsx",
+      "line": 59,
+      "rule": "any",
+      "symbol": "bValue",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/dining/page.tsx",
+      "line": 85,
+      "rule": "any",
+      "symbol": "additionalFilters",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/dining/page.tsx",
+      "line": 99,
+      "rule": "any",
+      "symbol": "additionalFilters",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/dining/page.tsx",
+      "line": 115,
+      "rule": "any",
+      "symbol": "additionalFilters",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/page.tsx",
+      "line": 99,
+      "rule": "any",
+      "symbol": "Home",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/sitemap.ts",
+      "line": 59,
+      "rule": "any",
+      "symbol": "cabinEntries",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/sitemap.ts",
+      "line": 67,
+      "rule": "any",
+      "symbol": "experienceEntries",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/app/sitemap.ts",
+      "line": 75,
+      "rule": "any",
+      "symbol": "diningEntries",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/BookingForm.tsx",
+      "line": 83,
+      "rule": "any",
+      "symbol": "isDateUnavailable",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/CabinDetailClient.tsx",
+      "line": 33,
+      "rule": "any",
+      "symbol": "cabinId",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/CabinDetails.tsx",
+      "line": 38,
+      "rule": "any",
+      "symbol": "amenityIconMap",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/CabinFilters.tsx",
+      "line": 19,
+      "rule": "same-type-positionals",
+      "symbol": "handleFilterChange",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/CabinsListClient.tsx",
+      "line": 46,
+      "rule": "any",
+      "symbol": "aValue",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/CabinsListClient.tsx",
+      "line": 47,
+      "rule": "any",
+      "symbol": "bValue",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/DiningReservationForm.tsx",
+      "line": 27,
+      "rule": "same-type-positionals",
+      "symbol": "generateTimeSlots",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/EmailTemplates.tsx",
+      "line": 182,
+      "rule": "mixed-representation",
+      "symbol": "formatDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/EmailTemplates.tsx",
+      "line": 420,
+      "rule": "mixed-representation",
+      "symbol": "formatDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/components/ui/StatsGrid.tsx",
+      "line": 4,
+      "rule": "mixed-representation",
+      "symbol": "value",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/hooks/useDiningReservation.ts",
+      "line": 133,
+      "rule": "same-type-positionals",
+      "symbol": "useDiningAvailability",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/hooks/useExperienceBooking.ts",
+      "line": 130,
+      "rule": "same-type-positionals",
+      "symbol": "useExperienceAvailability",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/lib/seo/jsonLd.ts",
+      "line": 23,
+      "rule": "any",
+      "symbol": "cabinId",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/types/index.ts",
+      "line": 37,
+      "rule": "mixed-representation",
+      "symbol": "checkInDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/types/index.ts",
+      "line": 38,
+      "rule": "mixed-representation",
+      "symbol": "checkOutDate",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/types/index.ts",
+      "line": 156,
+      "rule": "mixed-representation",
+      "symbol": "date",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "apps/customer/types/index.ts",
+      "line": 186,
+      "rule": "mixed-representation",
+      "symbol": "date",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/booking-payments.ts",
+      "line": 25,
+      "rule": "same-type-positionals",
+      "symbol": "paymentSummary",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/customer-bookings.ts",
+      "line": 98,
+      "rule": "same-type-positionals",
+      "symbol": "updateCustomerBooking",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/AuditLog.ts",
+      "line": 20,
+      "rule": "document-interface",
+      "symbol": "IAuditLog",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/Booking.ts",
+      "line": 6,
+      "rule": "document-interface",
+      "symbol": "IBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/Cabin.ts",
+      "line": 4,
+      "rule": "document-interface",
+      "symbol": "ICabin",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/CabinBookingLock.ts",
+      "line": 8,
+      "rule": "document-interface",
+      "symbol": "ICabinBookingLock",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/DiningReservation.ts",
+      "line": 8,
+      "rule": "document-interface",
+      "symbol": "IDiningReservation",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/ExperienceBooking.ts",
+      "line": 8,
+      "rule": "document-interface",
+      "symbol": "IExperienceBooking",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/ProcessedStripeEvent.ts",
+      "line": 3,
+      "rule": "document-interface",
+      "symbol": "IProcessedStripeEvent",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/Settings.ts",
+      "line": 4,
+      "rule": "document-interface",
+      "symbol": "ISettings",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/models/StaffAccess.ts",
+      "line": 5,
+      "rule": "document-interface",
+      "symbol": "IStaffAccess",
+      "phase": "1",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/reservation-capacity.ts",
+      "line": 46,
+      "rule": "same-type-positionals",
+      "symbol": "validateCount",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/reservation-capacity.ts",
+      "line": 128,
+      "rule": "same-type-positionals",
+      "symbol": "createDiningReservation",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/reservation-capacity.ts",
+      "line": 147,
+      "rule": "same-type-positionals",
+      "symbol": "updateDiningReservation",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/reservation-capacity.ts",
+      "line": 236,
+      "rule": "same-type-positionals",
+      "symbol": "createExperienceReservation",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/reservation-capacity.ts",
+      "line": 259,
+      "rule": "same-type-positionals",
+      "symbol": "updateExperienceReservation",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    },
+    {
+      "file": "packages/database/src/reservation-capacity.ts",
+      "line": 398,
+      "rule": "same-type-positionals",
+      "symbol": "transitionCapacityReservation",
+      "phase": "2",
+      "status": "candidate: inspect contract before changing",
+      "nextAction": "Review this symbol and callers in the owning phase; link its regression case, then migrate or record a justified boundary exception."
+    }
+  ],
+  "scannedFileCount": 522,
+  "method": "TypeScript 5.9.3 AST scan of tracked JS/TS source, tests and scripts in both apps and packages/database; excluded declaration/generated/build/dependency files. Counts are syntax candidates, not a coverage metric or confirmed bug count."
+}
