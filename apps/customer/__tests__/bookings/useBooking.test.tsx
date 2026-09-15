@@ -49,34 +49,52 @@ describe('useCreateBooking', () => {
 
   it('creates a booking successfully', async () => {
     const mockBooking = {
-      _id: '1',
-      cabinId: 'cabin-1',
-      userId: 'user-1',
-      startDate: '2025-02-01',
-      endDate: '2025-02-05',
-      totalPrice: 1000,
-    };
+      ...historyBooking({ id: '1', status: 'unconfirmed' }),
+      cabin: null,
+      id: '1',
+    } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ data: mockBooking, success: true }),
     });
 
-    const { result } = renderHook(() => useCreateBooking(), { wrapper });
+    const queryClient = createTestQueryClient();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateBooking(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
 
-    await result.current.mutateAsync({
+    const response = await result.current.mutateAsync({
       cabinId: 'cabin-1',
-      startDate: '2025-02-01',
-      endDate: '2025-02-05',
+      checkInDate: '2025-02-01T00:00:00.000Z',
+      checkOutDate: '2025-02-05T00:00:00.000Z',
       numGuests: 2,
       observations: 'Test booking',
-    } as any);
+    });
 
     expect(global.fetch).toHaveBeenCalledWith('/api/bookings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: expect.any(String),
+      body: JSON.stringify({
+        cabinId: 'cabin-1',
+        checkInDate: '2025-02-01T00:00:00.000Z',
+        checkOutDate: '2025-02-05T00:00:00.000Z',
+        numGuests: 2,
+        observations: 'Test booking',
+      }),
     });
+    expect(response).toEqual({ data: mockBooking, success: true });
+    expect(invalidate.mock.calls).toEqual([
+      [{ queryKey: ['bookings'] }],
+      [{ queryKey: ['bookings-history'] }],
+      [{ queryKey: ['activities'] }],
+      [{ queryKey: ['overview'] }],
+    ]);
   });
 
   it('handles booking creation errors', async () => {
@@ -85,15 +103,25 @@ describe('useCreateBooking', () => {
       json: async () => ({ error: 'Failed to create booking' }),
     });
 
-    const { result } = renderHook(() => useCreateBooking(), { wrapper });
+    const queryClient = createTestQueryClient();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateBooking(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
 
     await expect(
       result.current.mutateAsync({
         cabinId: 'cabin-1',
-        startDate: '2025-02-01',
-        endDate: '2025-02-05',
-      } as any)
+        checkInDate: '2025-02-01T00:00:00.000Z',
+        checkOutDate: '2025-02-05T00:00:00.000Z',
+        numGuests: 2,
+      })
     ).rejects.toThrow('Failed to create booking');
+    expect(invalidate).not.toHaveBeenCalled();
   });
 });
 
@@ -216,27 +244,42 @@ describe('useUpdateBooking', () => {
 
   it('updates a booking successfully', async () => {
     const mockUpdatedBooking = {
-      _id: '1',
-      status: 'checked-in',
-    };
+      ...historyBooking({ id: '1', status: 'unconfirmed' }),
+      cabin: null,
+      id: '1',
+      numGuests: 3,
+    } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ data: mockUpdatedBooking }),
     });
 
-    const { result } = renderHook(() => useUpdateBooking(), { wrapper });
+    const queryClient = createTestQueryClient();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateBooking(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
 
-    await result.current.mutateAsync({
+    const response = await result.current.mutateAsync({
       bookingId: '1',
-      updates: { status: 'checked-in' },
-    } as any);
+      updates: { numGuests: 3 },
+    });
 
     expect(global.fetch).toHaveBeenCalledWith('/api/bookings/1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'checked-in' }),
+      body: JSON.stringify({ numGuests: 3 }),
     });
+    expect(response).toEqual({ data: mockUpdatedBooking });
+    expect(invalidate.mock.calls).toEqual([
+      [{ queryKey: ['booking', '1'] }],
+      [{ queryKey: ['bookings-history'] }],
+    ]);
   });
 
   it('handles update errors with error message', async () => {
@@ -245,14 +288,23 @@ describe('useUpdateBooking', () => {
       json: async () => ({ error: 'Booking not found' }),
     });
 
-    const { result } = renderHook(() => useUpdateBooking(), { wrapper });
+    const queryClient = createTestQueryClient();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateBooking(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
 
     await expect(
       result.current.mutateAsync({
         bookingId: '1',
-        updates: { status: 'checked-in' },
-      } as any)
+        updates: { numGuests: 3 },
+      })
     ).rejects.toThrow('Booking not found');
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('handles update errors without error message', async () => {
@@ -261,14 +313,23 @@ describe('useUpdateBooking', () => {
       json: async () => ({}),
     });
 
-    const { result } = renderHook(() => useUpdateBooking(), { wrapper });
+    const queryClient = createTestQueryClient();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateBooking(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
 
     await expect(
       result.current.mutateAsync({
         bookingId: '1',
-        updates: { status: 'checked-in' },
-      } as any)
+        updates: { numGuests: 3 },
+      })
     ).rejects.toThrow('Failed to update booking');
+    expect(invalidate).not.toHaveBeenCalled();
   });
 });
 

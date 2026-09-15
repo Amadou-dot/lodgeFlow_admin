@@ -1,11 +1,13 @@
+import type {
+  CreateBookingRequest,
+  UpdateBookingDetailsInput,
+} from '@/lib/validations/booking';
 import type { BookingHistoryItem, BookingDetail } from '@/types/booking-read';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
   ApiResponse,
-  Booking,
   CancellationResponse,
-  CreateBookingData,
   RefundEstimateResponse,
 } from '@/types';
 
@@ -17,8 +19,8 @@ export const useCreateBooking = () => {
 
   return useMutation({
     mutationFn: async (
-      bookingData: CreateBookingData
-    ): Promise<{ data: Booking; message?: string; success: boolean }> => {
+      bookingData: CreateBookingRequest
+    ): Promise<ApiResponse<BookingDetail>> => {
       const response = await fetch('/api/bookings', {
         body: JSON.stringify(bookingData),
         headers: { 'Content-Type': 'application/json' },
@@ -97,8 +99,8 @@ export const useUpdateBooking = () => {
       updates,
     }: {
       bookingId: string;
-      updates: Partial<Booking>;
-    }): Promise<ApiResponse<Booking>> => {
+      updates: UpdateBookingDetailsInput;
+    }): Promise<ApiResponse<BookingDetail>> => {
       const response = await fetch(`/api/bookings/${bookingId}`, {
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },

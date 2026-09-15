@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BookingHistoryItem } from '@/types/booking-read';
 import BookingsPage from '@/app/bookings/page';
+
+const mockUpdateBooking = jest.fn();
 
 const mockBooking: BookingHistoryItem = {
   _id: '507f1f77bcf86cd799439011',
@@ -76,7 +78,10 @@ jest.mock('@/hooks/useBooking', () => ({
     error: null,
   }),
   useCancelBooking: () => ({ mutateAsync: jest.fn(), isPending: false }),
-  useUpdateBooking: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useUpdateBooking: () => ({
+    mutateAsync: mockUpdateBooking,
+    isPending: false,
+  }),
 }));
 jest.mock('@/hooks/useDiningReservation', () => ({
   useDiningReservationHistory: () => ({
@@ -101,6 +106,27 @@ jest.mock('@/components/PaymentButton', () => ({
 jest.mock('@heroui/date-picker', () => ({ DatePicker: () => <div /> }));
 
 describe('booking history JSON in the bookings page', () => {
+  beforeEach(() => mockUpdateBooking.mockReset());
+
+  it('only offers supported guest edits and submits no ignored dates or notes', async () => {
+    mockUpdateBooking.mockResolvedValue({ success: true });
+    const { container } = render(<BookingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(await screen.findByRole('spinbutton'), {
+      target: { value: '3' },
+    });
+    expect(container.querySelector('input[type="date"]')).toBeNull();
+    expect(
+      screen.queryByPlaceholderText('Any special requests or notes...')
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Update Booking' }));
+    await waitFor(() =>
+      expect(mockUpdateBooking).toHaveBeenCalledWith({
+        bookingId: mockBooking._id,
+        updates: { numGuests: 3 },
+      })
+    );
+  });
   it('uses the persisted cabin capacity when editing a booking', async () => {
     render(<BookingsPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));

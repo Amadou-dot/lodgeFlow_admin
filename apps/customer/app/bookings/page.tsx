@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
-import { DatePicker } from '@heroui/date-picker';
 import { Input } from '@heroui/input';
 import {
   Modal,
@@ -38,7 +37,8 @@ import {
   useExperienceBookingHistory,
 } from '@/hooks/useExperienceBooking';
 import type { BookingHistoryItem } from '@/types/booking-read';
-import type { Booking, ExperienceBooking } from '@/types';
+import type { ExperienceBooking } from '@/types';
+import type { UpdateBookingDetailsInput } from '@/lib/validations/booking';
 
 const statusFilters = [
   { key: 'all', label: 'All Bookings' },
@@ -103,10 +103,7 @@ export default function BookingsPage() {
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
-    checkInDate: '',
-    checkOutDate: '',
     numGuests: 0,
-    observations: '',
   });
 
   const {
@@ -148,10 +145,7 @@ export default function BookingsPage() {
   const handleEditBooking = (booking: BookingHistoryItem) => {
     setSelectedBooking(booking);
     setEditFormData({
-      checkInDate: new Date(booking.checkInDate).toISOString().split('T')[0],
-      checkOutDate: new Date(booking.checkOutDate).toISOString().split('T')[0],
       numGuests: booking.numGuests,
-      observations: booking.observations || '',
     });
     onEditOpen();
   };
@@ -165,11 +159,8 @@ export default function BookingsPage() {
     if (!selectedBooking) return;
 
     try {
-      const updates: Partial<Booking> = {
-        checkInDate: new Date(editFormData.checkInDate),
-        checkOutDate: new Date(editFormData.checkOutDate),
+      const updates: UpdateBookingDetailsInput = {
         numGuests: editFormData.numGuests,
-        observations: editFormData.observations,
       };
 
       await updateBooking.mutateAsync({
@@ -1182,46 +1173,12 @@ export default function BookingsPage() {
               <ModalHeader className='flex flex-col gap-1'>
                 Edit Booking
                 <p className='text-sm font-normal text-default-500'>
-                  Update your booking details for{' '}
+                  Update the number of guests for{' '}
                   {selectedBooking?.cabin?.name || 'your cabin'}
                 </p>
               </ModalHeader>
               <ModalBody>
                 <div className='space-y-4'>
-                  {/* Check-in Date */}
-                  <div>
-                    <label className='text-sm font-medium mb-2 block'>
-                      Check-in Date
-                    </label>
-                    <Input
-                      type='date'
-                      value={editFormData.checkInDate}
-                      onChange={e =>
-                        setEditFormData(prev => ({
-                          ...prev,
-                          checkInDate: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  {/* Check-out Date */}
-                  <div>
-                    <label className='text-sm font-medium mb-2 block'>
-                      Check-out Date
-                    </label>
-                    <Input
-                      type='date'
-                      value={editFormData.checkOutDate}
-                      onChange={e =>
-                        setEditFormData(prev => ({
-                          ...prev,
-                          checkOutDate: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
                   {/* Number of Guests */}
                   <div>
                     <label className='text-sm font-medium mb-2 block'>
@@ -1245,32 +1202,6 @@ export default function BookingsPage() {
                         guests
                       </p>
                     )}
-                  </div>
-
-                  {/* Observations */}
-                  <div>
-                    <label className='text-sm font-medium mb-2 block'>
-                      Special Requests / Observations
-                    </label>
-                    <Input
-                      placeholder='Any special requests or notes...'
-                      value={editFormData.observations}
-                      onChange={e =>
-                        setEditFormData(prev => ({
-                          ...prev,
-                          observations: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  {/* Info Box */}
-                  <div className='bg-primary/10 rounded-lg p-3'>
-                    <p className='text-sm text-default-700'>
-                      <strong>Note:</strong> Changes to dates may affect
-                      pricing. You&apos;ll be notified of any price changes
-                      before finalizing the update.
-                    </p>
                   </div>
                 </div>
               </ModalBody>

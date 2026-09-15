@@ -40,7 +40,19 @@ export function paymentSummary(
 
 /** Mutates a loaded document; callers persist with optimistic concurrency enabled. */
 export function addBookingPayment(
-  booking: IBooking,
+  booking: Pick<
+    IBooking,
+    | 'status'
+    | 'payments'
+    | 'totalPrice'
+    | 'depositAmount'
+    | 'amountPaid'
+    | 'remainingAmount'
+    | 'isPaid'
+    | 'depositPaid'
+    | 'paymentMethod'
+    | 'paidAt'
+  >,
   payment: BookingPayment
 ): boolean {
   if (booking.status === 'cancelled')

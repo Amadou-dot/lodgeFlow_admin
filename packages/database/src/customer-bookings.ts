@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import Booking from './models/Booking';
-import Cabin from './models/Cabin';
+import Cabin, { type ICabin } from './models/Cabin';
 import Settings from './models/Settings';
 import {
   calculateBookingPricing,
@@ -9,6 +9,9 @@ import {
 } from './booking-pricing';
 import { assertBookingCanReprice } from './booking-payments';
 import { withCabinBookingLock } from './cabin-booking-lock';
+
+/** Complete hydrated cabin populated by customer booking mutations. */
+export type CustomerBookingCabin = ICabin & { _id: mongoose.Types.ObjectId };
 
 export class BookingRuleError extends Error {
   constructor(
@@ -91,7 +94,7 @@ export async function createCustomerBooking(input: BookingSelection) {
       specialRequests: input.specialRequests,
       observations: input.observations,
     });
-    return booking.populate('cabin');
+    return booking.populate<{ cabin: CustomerBookingCabin | null }>('cabin');
   });
 }
 
@@ -141,5 +144,5 @@ export async function updateCustomerBooking(
   if (updates.specialRequests !== undefined)
     booking.specialRequests = updates.specialRequests;
   await booking.save();
-  return booking.populate('cabin');
+  return booking.populate<{ cabin: CustomerBookingCabin | null }>('cabin');
 }

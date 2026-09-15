@@ -503,6 +503,13 @@ try {
   });
   assert.equal(created.success, true);
   const bookingId = created.data._id;
+  assert.deepEqual(created, {
+    success: true,
+    data: JSON.parse(
+      JSON.stringify(await Booking.findById(bookingId).populate('cabin'))
+    ),
+    message: 'Booking created successfully',
+  });
   let persisted = await Booking.findById(bookingId).lean();
   assert.equal(persisted.customer, 'smoke_customer');
   assert.equal(persisted.totalPrice, 300);
@@ -729,15 +736,87 @@ try {
     JSON.stringify(await Booking.findById(bookingId).lean()),
     beforeDetails
   );
+  const mutationCallsBefore = calls.length;
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: detailRoute,
+    method: 'PATCH',
+    body: { numGuests: 3 },
+  });
+  for (const numGuests of [0, 50]) {
+    const rejected = await request({
+      origin: customer,
+      route: detailRoute,
+      identity: 'customer',
+      method: 'PATCH',
+      body: { numGuests },
+      status: 400,
+    });
+    assert.equal(rejected.success, false);
+    assert.equal(typeof rejected.error, 'string');
+  }
+  for (const id of ['invalid-id', new mongoose.Types.ObjectId().toString()]) {
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route: `/api/bookings/${id}`,
+        identity: 'customer',
+        method: 'PATCH',
+        body: { numGuests: 3 },
+        status: 404,
+      }),
+      { success: false, error: 'Booking not found' }
+    );
+  }
+  await mongoose.connection.db.admin().command({
+    configureFailPoint: 'failCommand',
+    mode: { times: 1 },
+    data: { failCommands: ['update'], errorCode: 2 },
+  });
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: detailRoute,
+      identity: 'customer',
+      method: 'PATCH',
+      body: { numGuests: 3 },
+      status: 500,
+    }),
+    { success: false, error: 'Failed to update booking' }
+  );
+  await mongoose.connection.db
+    .admin()
+    .command({ configureFailPoint: 'failCommand', mode: 'off' });
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforeDetails
+  );
+  assert.equal(calls.length, mutationCallsBefore);
   const updatedDetails = await request({
     origin: customer,
     route: detailRoute,
     identity: 'customer',
     method: 'PATCH',
-    body: { numGuests: 3, totalPrice: 1 },
+    body: {
+      numGuests: 3,
+      totalPrice: 1,
+      checkInDate: '2031-01-01',
+      checkOutDate: '2031-01-05',
+      observations: 'Unsupported edit',
+    },
     status: 200,
   });
   assert.equal(updatedDetails.data.numGuests, 3);
+  assert.deepEqual(updatedDetails, {
+    success: true,
+    data: JSON.parse(
+      JSON.stringify(await Booking.findById(bookingId).populate('cabin'))
+    ),
+    message: 'Booking updated successfully',
+  });
+  assert.equal(updatedDetails.data.checkInDate, created.data.checkInDate);
+  assert.equal(updatedDetails.data.checkOutDate, created.data.checkOutDate);
+  assert.equal(updatedDetails.data.observations, created.data.observations);
   assert.equal((await Booking.findById(bookingId).lean()).totalPrice, 300);
   console.log(
     'PASS booking detail ownership and allowlisted update persistence'
