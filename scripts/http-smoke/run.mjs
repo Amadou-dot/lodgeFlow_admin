@@ -529,6 +529,188 @@ try {
     status: 200,
   });
   assert.equal(ownBooking.data._id, bookingId);
+  assert.deepEqual(
+    ownBooking.data,
+    JSON.parse(
+      JSON.stringify(await Booking.findById(bookingId).populate('cabin'))
+    )
+  );
+  assert.equal(ownBooking.data.id, bookingId);
+  assert.equal(ownBooking.data.durationText, '3 nights');
+  assert.equal(ownBooking.data.paymentStatus, 'unpaid');
+  assert.equal(typeof ownBooking.data.checkInDate, 'string');
+  assert.equal(ownBooking.data.cabin.discountedPrice, 100);
+  const historyRoute = '/api/bookings/history';
+  await expectAuthenticationRedirect({ origin: customer, route: historyRoute });
+  const history = await request({
+    origin: customer,
+    route: historyRoute,
+    identity: 'customer',
+    status: 200,
+  });
+  const expectedHistory = await Booking.find({ customer: 'smoke_customer' })
+    .populate(
+      'cabin',
+      'name image images capacity price discount description status bedrooms bathrooms size minNights'
+    )
+    .sort({ createdAt: -1 })
+    .lean();
+  assert.deepEqual(history, {
+    success: true,
+    data: JSON.parse(JSON.stringify(expectedHistory)),
+  });
+  assert.equal(Object.hasOwn(history.data[0], 'durationText'), false);
+  assert.equal(Object.hasOwn(history.data[0].cabin, 'discountedPrice'), false);
+  assert.equal(Object.hasOwn(history.data[0].cabin, 'amenities'), false);
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: `${historyRoute}?status=${persisted.status}`,
+      identity: 'customer',
+      status: 200,
+    }),
+    history
+  );
+  for (const query of [
+    { route: historyRoute, identity: 'foreign' },
+    { route: `${historyRoute}?status=cancelled`, identity: 'customer' },
+  ]) {
+    assert.deepEqual(
+      await request({ origin: customer, status: 200, ...query }),
+      {
+        success: true,
+        data: [],
+      }
+    );
+  }
+  // A deleted populated reference must remain null, without dropping the booking.
+  const orphan = await Booking.create({
+    cabin: new mongoose.Types.ObjectId(),
+    customer: 'smoke_foreign',
+    checkInDate: new Date('2030-07-01T00:00:00.000Z'),
+    checkOutDate: new Date('2030-07-02T00:00:00.000Z'),
+    numGuests: 1,
+    cabinPrice: 100,
+    totalPrice: 100,
+  });
+  const orphanDetail = await request({
+    origin: customer,
+    route: `/api/bookings/${orphan._id}`,
+    identity: 'foreign',
+    status: 200,
+  });
+  assert.equal(orphanDetail.data.cabin, null);
+  const orphanHistory = await request({
+    origin: customer,
+    route: historyRoute,
+    identity: 'foreign',
+    status: 200,
+  });
+  assert.equal(orphanHistory.data.length, 1);
+  assert.equal(orphanHistory.data[0]._id, String(orphan._id));
+  assert.equal(orphanHistory.data[0].cabin, null);
+  await Booking.deleteOne({ _id: orphan._id });
+  // Legacy rows predate receipt/checkout fields; lean reads must not add defaults.
+  const legacyBooking = {
+    _id: new mongoose.Types.ObjectId(),
+    cabin: cabin._id,
+    customer: 'smoke_foreign',
+    checkInDate: new Date('2030-08-01T00:00:00.000Z'),
+    checkOutDate: new Date('2030-08-03T00:00:00.000Z'),
+    numNights: 2,
+    numGuests: 2,
+    status: 'confirmed',
+    cabinPrice: 200,
+    totalPrice: 200,
+    isPaid: true,
+    observations: null,
+    paidAt: null,
+    createdAt: new Date('2020-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2020-01-01T00:00:00.000Z'),
+  };
+  await Booking.collection.insertOne(legacyBooking);
+  const legacyHistory = await request({
+    origin: customer,
+    route: historyRoute,
+    identity: 'foreign',
+    status: 200,
+  });
+  assert.equal(legacyHistory.data.length, 1);
+  assert.deepEqual(legacyHistory.data[0], {
+    ...JSON.parse(JSON.stringify(legacyBooking)),
+    cabin: history.data[0].cabin,
+  });
+  const legacyDetail = await request({
+    origin: customer,
+    route: `/api/bookings/${legacyBooking._id}`,
+    identity: 'foreign',
+    status: 200,
+  });
+  assert.deepEqual(
+    legacyDetail.data,
+    JSON.parse(
+      JSON.stringify(
+        await Booking.findById(legacyBooking._id).populate('cabin')
+      )
+    )
+  );
+  await Booking.deleteOne({ _id: legacyBooking._id });
+  await expectAuthenticationRedirect({ origin: customer, route: detailRoute });
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: `/api/bookings/${new mongoose.Types.ObjectId()}`,
+      identity: 'customer',
+      status: 404,
+    }),
+    { success: false, error: 'Booking not found' }
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/bookings/invalid-id',
+      identity: 'customer',
+      status: 500,
+    }),
+    { success: false, error: 'Failed to fetch booking' }
+  );
+  const beforeReadFailures = JSON.stringify(
+    await Booking.findById(bookingId).lean()
+  );
+  const callsBeforeReadFailures = calls.length;
+  for (const route of [detailRoute, historyRoute]) {
+    await mongoose.connection.db.admin().command({
+      configureFailPoint: 'failCommand',
+      mode: { times: 1 },
+      data: { failCommands: ['find'], errorCode: 2 },
+    });
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route,
+        identity: 'customer',
+        status: 500,
+      }),
+      {
+        success: false,
+        error:
+          route === detailRoute
+            ? 'Failed to fetch booking'
+            : 'Failed to fetch booking history',
+      }
+    );
+    await mongoose.connection.db
+      .admin()
+      .command({ configureFailPoint: 'failCommand', mode: 'off' });
+  }
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforeReadFailures
+  );
+  assert.equal(calls.length, callsBeforeReadFailures);
+  console.log(
+    'PASS booking read wire contracts, history isolation/filter and missing cabin'
+  );
   const beforeDetails = JSON.stringify(
     await Booking.findById(bookingId).lean()
   );
