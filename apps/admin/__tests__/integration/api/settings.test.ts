@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('@lodgeflow/database/mongodb', () =>
+  jest.fn().mockResolvedValue(undefined)
+);
 
 import { PUT } from '@/app/api/settings/route';
-import Settings from '@/models/Settings';
+import Settings from '@lodgeflow/database/models/Settings';
 import { settingsData } from '@/lib/data/seed-data';
 
 function createRequest(body: unknown) {

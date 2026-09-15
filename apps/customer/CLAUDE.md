@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > Scripts below run from within `apps/customer/`, or from the repo root as
 > `pnpm --filter @lodgeflow/customer <script>`.
 
-### Duplicated models (temporary)
+### Shared database
 
-`models/` exists in both `apps/admin` and `apps/customer` and the two copies
-have **diverged in semantics** — `Booking`'s `pre('save')` hooks, its index
-options, `Settings` validation and seeding, and `Cabin`'s discount validator
-all differ. Do not merge them ad hoc. Reconciliation is Step 2 of
-`docs/superpowers/specs/2026-08-04-monorepo-and-admin-gap-closure-design.md`,
-which resolves each divergence explicitly and audits existing data.
+Models now live in `packages/database/src/models` at the workspace root. Import
+`@lodgeflow/database` or an exported model subpath; there is no app-local `models/`
+directory. Schema enums and connection/pricing helpers have shared implementations.
+The lock storage module is private; app routes use `withCabinBookingLock()`.
+See `docs/superpowers/plans/2026-09-14-shared-database.md` for remaining payment
+and capacity reconciliation work.
 
 ## Commands
 

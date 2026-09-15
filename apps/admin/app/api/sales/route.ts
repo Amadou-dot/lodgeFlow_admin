@@ -1,7 +1,7 @@
 import { requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { NextResponse } from 'next/server';
-import { Booking } from '../../../models';
+import { Booking } from '@lodgeflow/database';
 
 export interface SalesData {
   date: string;

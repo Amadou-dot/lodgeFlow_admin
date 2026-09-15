@@ -1,5 +1,5 @@
-import { IBooking } from '@/models/Booking';
-import { ISettings } from '@/models/Settings';
+import { IBooking } from '@lodgeflow/database/models/Booking';
+import { ISettings } from '@lodgeflow/database/models/Settings';
 
 export type CancellationPolicy = 'flexible' | 'moderate' | 'strict';
 

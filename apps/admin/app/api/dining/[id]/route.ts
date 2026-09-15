@@ -7,7 +7,7 @@ import {
 } from '@/lib/api-utils';
 import { logger } from '@/lib/logger';
 import { updateDiningSchema } from '@/lib/validations';
-import { connectDB, Dining } from '@/models';
+import { connectDB, Dining } from '@lodgeflow/database';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
 

@@ -1,4 +1,4 @@
-import { Experience } from '@/models/Experience';
+import { Experience } from '@lodgeflow/database/models/Experience';
 
 function createExperienceData(overrides: Record<string, any> = {}) {
   return {

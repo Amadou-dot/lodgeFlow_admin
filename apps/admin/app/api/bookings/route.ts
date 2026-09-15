@@ -20,11 +20,11 @@ import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import connectDB from '@/lib/mongodb';
 import { createBookingSchema, updateBookingSchema } from '@/lib/validations';
-import type { IBooking } from '@/models/Booking';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { BookingQueryFilter, MongoSortOrder } from '@/types/api';
 import { getErrorMessage, isMongooseValidationError } from '@/types/errors';
 import { NextRequest, NextResponse } from 'next/server';
-import { Booking, Cabin, Settings } from '../../../models';
+import { Booking, Cabin, Settings } from '@lodgeflow/database';
 
 async function populateBookingsWithClerkCustomers(bookings: IBooking[]) {
   const customerIds = bookings.map(booking => booking.customer);

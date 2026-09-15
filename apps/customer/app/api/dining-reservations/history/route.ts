@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, DiningReservation } from '@/models';
+import { connectDB, DiningReservation } from '@lodgeflow/database';
 import type { ApiResponse } from '@/types';
 
 /**

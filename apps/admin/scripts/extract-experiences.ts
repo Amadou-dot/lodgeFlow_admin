@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import connectDB from '../lib/mongodb';
-import { Experience } from '../models';
+import { Experience } from '@lodgeflow/database';
 
 // Load environment variables from .env.local
 config({ path: resolve(process.cwd(), '.env.local') });

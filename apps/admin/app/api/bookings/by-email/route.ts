@@ -1,7 +1,7 @@
 import { requireApiAuth } from '@/lib/api-utils';
 import { getClerkUsers } from '@/lib/clerk-users';
 import connectDB from '@/lib/mongodb';
-import Booking from '@/models/Booking';
+import Booking from '@lodgeflow/database/models/Booking';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {

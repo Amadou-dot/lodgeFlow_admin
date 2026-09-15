@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { siteConfig } from '@/config/site';
-import { connectDB, Cabin, Dining, Experience } from '@/models';
+import { connectDB, Cabin, Dining, Experience } from '@lodgeflow/database';
 
 export const revalidate = 3600; // Regenerate sitemap hourly
 

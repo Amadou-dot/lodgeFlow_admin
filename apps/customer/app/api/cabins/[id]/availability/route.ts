@@ -1,4 +1,4 @@
-import { connectDB, Booking, Cabin } from '@/models';
+import { connectDB, Booking, Cabin } from '@lodgeflow/database';
 import type { ApiResponse } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
 

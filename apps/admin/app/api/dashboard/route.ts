@@ -9,7 +9,7 @@ import type {
 } from '@/types/api';
 import { clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { Booking, Cabin } from '../../../models';
+import { Booking, Cabin } from '@lodgeflow/database';
 
 export async function GET() {
   // Require authentication

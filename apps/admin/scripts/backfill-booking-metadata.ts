@@ -28,7 +28,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import mongoose from 'mongoose';
 import connectDB from '../lib/mongodb';
-import { Booking } from '../models';
+import { Booking } from '@lodgeflow/database';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 

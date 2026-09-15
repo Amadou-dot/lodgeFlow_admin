@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Experience } from '@/models';
+import { connectDB, Experience } from '@lodgeflow/database';
 import type { ApiResponse, Experience as ExperienceType } from '@/types';
 import { experienceQuerySchema } from '@/lib/validations';
 import {

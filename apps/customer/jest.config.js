@@ -19,6 +19,8 @@ const customJestConfig = {
     '**/?(*.)+(spec|test).{js,jsx,ts,tsx}',
   ],
   moduleNameMapper: {
+    '^@lodgeflow/database$': '<rootDir>/../../packages/database/src/index.ts',
+    '^@lodgeflow/database/(.*)$': '<rootDir>/../../packages/database/src/$1',
     '^@/(.*)$': '<rootDir>/$1',
     // Mock framer-motion for testing
     '^framer-motion$': '<rootDir>/__tests__/__mocks__/framer-motion.js',

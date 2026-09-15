@@ -5,7 +5,7 @@ import {
   updateCompleteCustomer,
 } from '@/lib/clerk-users';
 import connectDB from '@/lib/mongodb';
-import { Booking } from '@/models';
+import { Booking } from '@lodgeflow/database';
 import { getLoyaltyTier } from '@/utils/utilityFunctions';
 import { NextRequest, NextResponse } from 'next/server';
 

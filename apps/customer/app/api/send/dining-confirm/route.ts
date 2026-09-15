@@ -1,7 +1,7 @@
 import { getResend } from '@/lib/resend';
 
 import { DiningReservationConfirmationEmail } from '@/components/EmailTemplates';
-import { connectDB, DiningReservation } from '@/models';
+import { connectDB, DiningReservation } from '@lodgeflow/database';
 import { auth, currentUser } from '@clerk/nextjs/server';
 
 function validateEmail(email: string): boolean {

@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('@lodgeflow/database/mongodb', () =>
+  jest.fn().mockResolvedValue(undefined)
+);
 
 import { GET, POST, PUT } from '@/app/api/dining/route';
 import { GET as getById, PUT as updateById } from '@/app/api/dining/[id]/route';
-import Dining from '@/models/Dining';
+import Dining from '@lodgeflow/database/models/Dining';
 
 function createRequest(url: string, options?: { method?: string; body?: any }) {
   const init: RequestInit = { method: options?.method || 'GET' };

@@ -1,6 +1,6 @@
 import { requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
-import Booking from '@/models/Booking';
+import Booking from '@lodgeflow/database/models/Booking';
 import mongoose from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 

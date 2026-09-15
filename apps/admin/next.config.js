@@ -2,6 +2,7 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['@lodgeflow/database'],
   outputFileTracingRoot: path.join(__dirname, '../../'),
   images: {
     remotePatterns: [

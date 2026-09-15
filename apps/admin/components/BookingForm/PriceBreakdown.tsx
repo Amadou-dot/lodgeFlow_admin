@@ -2,7 +2,7 @@ import { formatCurrency } from '@/utils/utilityFunctions';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Divider } from '@heroui/divider';
 import { PriceBreakdown as PriceBreakdownType } from './types';
-import type { ISettings } from '@/models/Settings';
+import type { ISettings } from '@lodgeflow/database/models/Settings';
 
 interface PriceBreakdownProps {
   priceBreakdown: PriceBreakdownType;

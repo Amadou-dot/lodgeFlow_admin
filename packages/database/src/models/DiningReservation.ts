@@ -1,3 +1,4 @@
+import { DINING_RESERVATION_STATUSES, TABLE_PREFERENCES } from '../config';
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IDiningReservation extends Document {
@@ -45,7 +46,7 @@ const DiningReservationSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'],
+      enum: DINING_RESERVATION_STATUSES,
       default: 'pending',
     },
     totalPrice: {
@@ -70,7 +71,7 @@ const DiningReservationSchema: Schema = new Schema(
     },
     tablePreference: {
       type: String,
-      enum: ['indoor', 'outdoor', 'bar', 'no-preference'],
+      enum: TABLE_PREFERENCES,
       default: 'no-preference',
     },
     occasion: {

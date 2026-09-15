@@ -1,11 +1,17 @@
-import type { IBooking, IBookingModel } from '@/models/Booking';
-import type { ICabin } from '@/models/Cabin';
-import type { IDining } from '@/models/Dining';
-import type { IDiningReservation } from '@/models/DiningReservation';
-import type { IExperience } from '@/models/Experience';
-import type { IExperienceBooking } from '@/models/ExperienceBooking';
-import type { IProcessedStripeEvent } from '@/models/ProcessedStripeEvent';
-import type { ISettings, ISettingsModel } from '@/models/Settings';
+import type {
+  IBooking,
+  IBookingModel,
+} from '@lodgeflow/database/models/Booking';
+import type { ICabin } from '@lodgeflow/database/models/Cabin';
+import type { IDining } from '@lodgeflow/database/models/Dining';
+import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
+import type { IExperience } from '@lodgeflow/database/models/Experience';
+import type { IExperienceBooking } from '@lodgeflow/database/models/ExperienceBooking';
+import type { IProcessedStripeEvent } from '@lodgeflow/database/models/ProcessedStripeEvent';
+import type {
+  ISettings,
+  ISettingsModel,
+} from '@lodgeflow/database/models/Settings';
 import { SVGProps } from 'react';
 
 export type IconSvgProps = SVGProps<SVGSVGElement> & {
@@ -17,7 +23,7 @@ export type Cabin = ICabin;
 export type Booking = IBooking;
 export type Settings = ISettings;
 export type Experience = IExperience;
-export type Dining = IDining;
+export type Dining = IDining & { _id: string };
 export type ExperienceBooking = IExperienceBooking;
 export type DiningReservation = IDiningReservation;
 
@@ -195,8 +201,8 @@ export interface CreateDiningReservationData {
 export type ProcessedStripeEvent = IProcessedStripeEvent;
 
 // Model type re-exports
-export type { IBookingModel } from '@/models/Booking';
-export type { ISettingsModel } from '@/models/Settings';
+export type { IBookingModel } from '@lodgeflow/database/models/Booking';
+export type { ISettingsModel } from '@lodgeflow/database/models/Settings';
 
 // Zod-validated input types (preferred for new code)
 export type {

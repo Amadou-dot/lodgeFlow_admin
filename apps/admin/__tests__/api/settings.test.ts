@@ -3,16 +3,16 @@
  */
 
 import { NextRequest } from 'next/server';
-import connectToDatabase from '@/lib/mongodb';
+import connectToDatabase from '@lodgeflow/database/mongodb';
 
 // Mock the database connection
-jest.mock('@/lib/mongodb');
+jest.mock('@lodgeflow/database/mongodb');
 
 // Create mock save function
 const mockSave = jest.fn();
 
 // Mock the Settings model (default export) - must be defined before import
-jest.mock('@/models/Settings', () => ({
+jest.mock('@lodgeflow/database/models/Settings', () => ({
   __esModule: true,
   default: {
     findOne: jest.fn(),
@@ -32,7 +32,7 @@ jest.mock('@/lib/api-utils', () => ({
 
 // Import after mocks are set up
 import { GET, PUT } from '@/app/api/settings/route';
-import Settings from '@/models/Settings';
+import Settings from '@lodgeflow/database/models/Settings';
 
 const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
   typeof connectToDatabase

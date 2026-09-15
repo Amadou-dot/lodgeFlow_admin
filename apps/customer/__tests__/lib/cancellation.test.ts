@@ -3,8 +3,8 @@ import {
   getCancellationDeadlines,
   formatCancellationPolicy,
 } from '@/lib/cancellation';
-import type { IBooking } from '@/models/Booking';
-import type { ISettings } from '@/models/Settings';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
+import type { ISettings } from '@lodgeflow/database/models/Settings';
 
 // Helper to create mock booking
 function createMockBooking(overrides: Partial<IBooking> = {}): IBooking {

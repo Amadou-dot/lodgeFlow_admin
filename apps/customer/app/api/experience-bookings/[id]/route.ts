@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, ExperienceBooking } from '@/models';
+import { connectDB, ExperienceBooking } from '@lodgeflow/database';
 import type { ApiResponse } from '@/types';
 
 type Params = Promise<{ id: string }>;

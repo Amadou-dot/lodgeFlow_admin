@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
-import { Booking, Settings, connectDB } from '@/models';
+import { Booking, Settings, connectDB } from '@lodgeflow/database';
 import {
   calculateRefund,
   getCancellationDeadlines,

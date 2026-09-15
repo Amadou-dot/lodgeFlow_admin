@@ -1,4 +1,6 @@
-jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('@lodgeflow/database/mongodb', () =>
+  jest.fn().mockResolvedValue(undefined)
+);
 
 jest.mock('@clerk/backend', () => ({
   createClerkClient: jest.fn(),
@@ -8,7 +10,7 @@ jest.mock('@faker-js/faker', () => ({
   faker: {},
 }));
 
-jest.mock('@/models', () => ({
+jest.mock('@lodgeflow/database', () => ({
   Cabin: {
     deleteMany: jest.fn().mockResolvedValue({ acknowledged: true }),
     insertMany: jest.fn().mockResolvedValue([{ _id: 'cabin_1' }]),
@@ -34,7 +36,7 @@ jest.mock('@/models', () => ({
 import { createClerkClient } from '@clerk/backend';
 
 import { diningData, experienceData } from '@/lib/data/seed-data';
-import connectDB from '@/lib/mongodb';
+import connectDB from '@lodgeflow/database/mongodb';
 import { GET } from '@/app/api/cron/seed/route';
 
 const mockConnectDB = connectDB as jest.MockedFunction<typeof connectDB>;

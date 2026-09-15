@@ -8,7 +8,7 @@ import {
 } from '@/lib/api-utils';
 import { logger } from '@/lib/logger';
 import { createDiningSchema, updateDiningSchema } from '@/lib/validations';
-import { connectDB, Dining } from '@/models';
+import { connectDB, Dining } from '@lodgeflow/database';
 import type { DiningQueryFilter, MongoSortOrder } from '@/types/api';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';

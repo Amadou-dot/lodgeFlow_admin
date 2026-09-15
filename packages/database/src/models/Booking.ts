@@ -1,8 +1,4 @@
-import {
-  BOOKING_STATUSES,
-  PAYMENT_METHODS,
-  REFUND_STATUSES,
-} from '@/lib/config';
+import { BOOKING_STATUSES, PAYMENT_METHODS, REFUND_STATUSES } from '../config';
 import { differenceInCalendarDays } from 'date-fns';
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
@@ -209,9 +205,13 @@ const BookingSchema: Schema = new Schema(
 );
 
 // Indexes for better query performance
-BookingSchema.index({ cabin: 1, checkInDate: 1, checkOutDate: 1 });
+BookingSchema.index(
+  { cabin: 1, checkInDate: 1, checkOutDate: 1 },
+  { name: 'cabin_1_checkInDate_1_checkOutDate_1' }
+);
 BookingSchema.index({ customer: 1, createdAt: -1 });
 BookingSchema.index({ status: 1 });
+BookingSchema.index({ status: 1, checkInDate: 1 });
 BookingSchema.index({ checkInDate: 1 });
 BookingSchema.index({ checkOutDate: 1 });
 BookingSchema.index({ isPaid: 1 });

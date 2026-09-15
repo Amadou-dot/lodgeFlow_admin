@@ -3,10 +3,10 @@ import mongoose from 'mongoose';
 import {
   CabinBookingLockTimeoutError,
   withCabinBookingLock,
-} from '@/lib/cabin-booking-lock';
+} from '@lodgeflow/database/cabin-booking-lock';
 import CabinBookingLock, {
   type ICabinBookingLock,
-} from '@/models/CabinBookingLock';
+} from '../../../../../packages/database/src/models/CabinBookingLock';
 
 // `models/CabinBookingLock.ts` keeps its Mongoose model private so no
 // caller can bypass the acquire/release protocol (issue #126). These

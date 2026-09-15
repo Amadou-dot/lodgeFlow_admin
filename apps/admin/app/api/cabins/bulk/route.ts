@@ -5,7 +5,7 @@ import {
   requireApiAuth,
 } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
-import { Booking, Cabin } from '@/models';
+import { Booking, Cabin } from '@lodgeflow/database';
 import { NextRequest } from 'next/server';
 
 const MAX_BULK_ITEMS = 50;

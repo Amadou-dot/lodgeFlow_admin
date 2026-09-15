@@ -1,8 +1,8 @@
-import type { IBooking } from '@/models/Booking';
-import type { ICabin } from '@/models/Cabin';
-import type { IDining } from '@/models/Dining';
-import type { IExperience } from '@/models/Experience';
-import type { ISettings } from '@/models/Settings';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
+import type { ICabin } from '@lodgeflow/database/models/Cabin';
+import type { IDining } from '@lodgeflow/database/models/Dining';
+import type { IExperience } from '@lodgeflow/database/models/Experience';
+import type { ISettings } from '@lodgeflow/database/models/Settings';
 import { SVGProps } from 'react';
 import type {
   ClerkUser,

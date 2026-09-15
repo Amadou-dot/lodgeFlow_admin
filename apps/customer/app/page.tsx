@@ -7,7 +7,7 @@ import { Phone, Mail } from 'lucide-react';
 
 import { siteConfig } from '@/config/site';
 import { siteToLodgingBusiness } from '@/lib/seo/jsonLd';
-import { connectDB, Cabin } from '@/models';
+import { connectDB, Cabin } from '@lodgeflow/database';
 import {
   HeroSection,
   SectionHeader,

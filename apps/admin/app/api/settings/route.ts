@@ -14,7 +14,7 @@ import {
 import { isMongooseValidationError } from '@/types/errors';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { Settings } from '../../../models';
+import { Settings } from '@lodgeflow/database';
 
 const DEFAULT_SETTINGS = {
   ...settingsData,

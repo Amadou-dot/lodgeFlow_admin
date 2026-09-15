@@ -10,7 +10,7 @@ import connectDB from '@/lib/mongodb';
 import { isDiscountValid, updateCabinSchema } from '@/lib/validations';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
-import { Cabin } from '../../../../models';
+import { Cabin } from '@lodgeflow/database';
 
 export async function GET(
   _req: NextRequest,

@@ -16,7 +16,7 @@ import {
 import type { CabinQueryFilter, MongoSortOrder } from '@/types/api';
 import { isMongooseValidationError } from '@/types/errors';
 import { NextRequest } from 'next/server';
-import { Cabin } from '../../../models';
+import { Cabin } from '@lodgeflow/database';
 
 export async function GET(request: NextRequest) {
   // Require authentication

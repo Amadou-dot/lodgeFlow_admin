@@ -1,0 +1,42 @@
+{
+  "name": "@lodgeflow/database",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./models/ExperienceBooking": "./src/models/ExperienceBooking.ts",
+    "./models/Dining": "./src/models/Dining.ts",
+    "./models/Booking": "./src/models/Booking.ts",
+    "./models/Settings": "./src/models/Settings.ts",
+    "./models/Cabin": "./src/models/Cabin.ts",
+    "./models/DiningReservation": "./src/models/DiningReservation.ts",
+    "./models/ProcessedStripeEvent": "./src/models/ProcessedStripeEvent.ts",
+    "./models/Experience": "./src/models/Experience.ts",
+    "./config": "./src/config.ts",
+    "./mongodb": "./src/mongodb.ts",
+    "./logger": "./src/logger.ts",
+    "./booking-pricing": "./src/booking-pricing.ts",
+    "./cabin-booking-lock": "./src/cabin-booking-lock.ts",
+    "./settings-defaults": "./src/settings-defaults.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "tsx --test tests/*.test.ts",
+    "audit": "tsx scripts/audit.ts"
+  },
+  "dependencies": {
+    "mongoose": "^8.21.0",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.29",
+    "typescript": "5.9.3",
+    "tsx": "^4.21.0",
+    "mongodb-memory-server": "^11.0.1",
+    "eslint": "9.39.2",
+    "@eslint/js": "^9.39.2",
+    "@typescript-eslint/parser": "8.53.0",
+    "@typescript-eslint/eslint-plugin": "8.53.0"
+  }
+}
