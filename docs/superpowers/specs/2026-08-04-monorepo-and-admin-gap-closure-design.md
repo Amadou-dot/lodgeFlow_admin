@@ -1,5 +1,30 @@
 # LodgeFlow: Monorepo Consolidation & Admin Gap Closure
 
+## Delivery status — completed
+
+The monorepo and all six roadmap steps are deployed and verified. The implementation
+plans linked below supersede earlier proposals where the work uncovered a better
+approach. In particular, the owner authorized replacement demo data and chose
+application-owned staff roles instead of Clerk's paid custom-role feature.
+
+| Step | Delivered work | Verification |
+| --- | --- | --- |
+| 1 | Monorepo, Vercel project roots, preserved customer history/issues | [Skeleton plan](../plans/2026-08-04-monorepo-skeleton.md) |
+| 2 | Shared database, receipt accounting, booking/capacity transactions, coherent demo data, Stripe test settlement/refunds | [Database plan](../plans/2026-09-14-shared-database.md) |
+| 3 | Application-owned staff roles, trusted organization, server permissions | [Staff roles](../plans/2026-09-14-application-staff-roles.md), [PR 146](https://github.com/Amadou-dot/lodgeFlow_admin/pull/146) |
+| 4 | Staff audit history, redacted changes, manager/admin read access | [Audit plan](../plans/2026-09-14-staff-audit-log.md), [PR 147](https://github.com/Amadou-dot/lodgeFlow_admin/pull/147) |
+| 5–6 | Unified reservation inbox, native status operations, three occupancy calendars | [Operations plan](../plans/2026-09-14-reservations-operations.md), [PR 148](https://github.com/Amadou-dot/lodgeFlow_admin/pull/148) |
+
+All 1,148 tests pass, both applications and the shared package build, and deployed
+Preview/Production tests passed. Temporary test identities and reservations are
+removed; 500 coherent demo bookings and the two original administrators remain.
+
+Remaining boundaries are intentional: Stripe is configured in test mode; dining and
+experience payment collection/refunds remain the preserved unfinished customer work;
+audit history is best-effort staff history rather than a transactional financial ledger.
+
+---
+
 **Date:** 2026-08-04
 **Status:** Approved design, ready for implementation planning
 
@@ -105,7 +130,7 @@ and manage; and hardening applied once applies everywhere.
 ### Non-goals
 
 - **Stripe refunds and the admin-side webhook.** Deferred by explicit decision. The audit action
-  vocabulary includes `refund.issue` and `payment.record` from day one so this is a later
+  vocabulary includes `refund.record` and `payment.record` from day one so this is a later
   addition, not a redesign.
 - **Drag-to-reschedule on the calendar.** Moving a booking requires re-running overlap detection
   under the cabin lock, recomputing pricing, and resolving what happens to a paid deposit when
@@ -369,11 +394,11 @@ refund. Customer webhooks are outside this staff-only audit scope.
 No TTL — unlike `ProcessedStripeEvent`, audit records persist.
 
 **Action vocabulary:** `booking.status_change`, `booking.cancel`, `booking.reprice`,
-`payment.record`, `refund.issue`, `dining_reservation.status_change`,
+`payment.record`, `refund.record`, `dining_reservation.status_change`,
 `experience_booking.status_change`, `cabin.create`, `cabin.update`, `cabin.delete`,
 `settings.update`, `staff.role_change`.
 
-`refund.issue` and `payment.record` are included now despite Stripe being out of scope, so
+`refund.record` and `payment.record` are included now despite Stripe being out of scope, so
 wiring the webhook later is an addition rather than a redesign.
 
 **Recording is explicit**, via a `recordAudit()` helper called from each mutation route — not
@@ -530,13 +555,13 @@ project supports it.
    directories repointed at `apps/*`.
 2. **`packages/database`.** The largest and riskiest step. It contains six distinct pieces of
    work, and is a semantic merge rather than a file move:
-   - **2a. Schema reconciliation** — resolve every divergence in the table above, drop and
-     recreate the conflicting indexes under explicit names, write tests against the merged
+   - **2a. Schema reconciliation** — resolve every divergence in the table above, retain compatible
+     existing indexes and migrate only conflicts under explicit names, write tests against the merged
      schema. Reconcile deposit-due versus payments-received semantics across both apps and
      the existing customer payment webhook before adopting shared balance calculations.
    - **2b. Data audit** — read-only script checking existing documents against the merged
-     stricter schema and payment evidence; backfill verified violations and report ambiguous
-     payment records for reconciliation. Plan index/data rollout so old app instances cannot
+     stricter schema and payment evidence; replace the authorized demo data with coherent
+     receipts and shared pricing after validation. Plan index/data rollout so old app instances cannot
      recreate conflicting indexes or write incompatible documents during deployment.
    - **2c. Extraction** — models, `connectDB` (admin's configured version), enums from both
      apps' `lib/config.ts`, `logger`, `DB_CONFIG`, `withCabinBookingLock()`,
@@ -560,7 +585,7 @@ project supports it.
    as received and stale checkout cannot settle a repriced booking incorrectly, dining concurrency
    tests prove capacity cannot be exceeded, and the admin builds with no `RESEND_API_KEY` set
    anywhere — verified by a CI run that does not supply one.
-3. **Permission layer.** Clerk roles, permission matrix, `requireApiAuth({ permission })`,
+3. **Permission layer.** Application-owned staff roles, permission matrix, `requireApiAuth({ permission })`,
    updated call sites, conditional sidebar.
 4. **Audit log.** Model, `recordAudit()` helper, `/audit` page.
 5. **Reservations inbox.** Union read endpoint, three write routes, list and detail UI.

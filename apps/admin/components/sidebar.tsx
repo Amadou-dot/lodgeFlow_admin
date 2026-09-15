@@ -77,7 +77,7 @@ export const Sidebar = () => {
         </Link>
       </div>
 
-      <nav className='flex-1 px-4 py-4'>
+      <nav className='flex-1 min-h-0 overflow-y-auto px-4 py-4'>
         <ul className='space-y-2'>
           {sidebarItems
             .filter(item =>
