@@ -52,7 +52,7 @@ shared database). Formatting and lint pass.
 - [x] MongoDB integration coverage for union semantics, date boundaries, per-seating
   capacity, uncapped experiences, native transitions, and concurrent edits.
 - [x] Production builds and deployed preview checks.
-- [ ] Merge, verify production pages/APIs, and remove all temporary fixtures.
+- [x] Merge, verify production pages/APIs, and remove all temporary fixtures.
 
 Paid dining/experience cancellations remain blocked pending their future payment and
 refund implementation (preserved customer work). This release does not add payment
@@ -67,3 +67,27 @@ Staff detail/status APIs returned 200; a stale status edit returned 409; dining 
 and experience cancellation released their capacity. Matching audit events were verified.
 Both temporary reservation records were removed. Follow-up fixes correct the dining
 `isAvailable` label and route unsigned admin home visits to sign-in.
+
+## Production verification and completion
+
+PR 148 merged as `d07c607`. Both production deployments are Ready:
+
+- Admin: `lodgeflowadmin-5ckbfruot-asecklabs.vercel.app`
+- Customer: `lodgeflow-3badyk3cy-asecklabs.vercel.app`
+
+The complete cross-app reservation test passed again on production: guest creates,
+union reads, calendar counts, native transitions, stale-update rejection, capacity
+release, and audit events. Browser checks loaded the reservations inbox, dining
+detail, and all three calendar views on `admin.lodgeflow.app`. The final Preview
+returned 307 to `/sign-in` for an unsigned request to the admin root.
+
+All temporary cabin/dining/experience records, application staff assignments, and the
+isolated Clerk account were removed. Two original application administrators remain,
+along with 500 coherent cabin demo bookings, 15 cabins, 14 dining listings, and eight
+experiences. Dining/experience reservation collections are empty again. Fourteen audit
+events from the verified temporary operations remain intentionally as history.
+
+The shared-data audit reports zero schema failures, inconsistent balances, overlapping
+stays, missing cabin references, or invalid receipts; the overlap index is valid.
+Steps 5 and 6 are complete. A final sidebar layout adjustment makes the expanded menu
+scroll inside its available height on short screens.

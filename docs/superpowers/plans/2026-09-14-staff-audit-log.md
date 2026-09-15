@@ -39,7 +39,7 @@ history, readable by managers and administrators through `audit:read`.
 - [x] Formatting, lint, and all 1,139 tests pass (988 admin, 135 customer, 16 database).
 - [x] Build both apps and the shared package.
 - [x] Verify deployed preview with an isolated temporary resource and staff account.
-- [ ] Merge, verify production, and clean up the temporary resource/account.
+- [x] Merge, verify production, and clean up the temporary resource/account.
 
 ## Deployment verification
 
@@ -50,4 +50,5 @@ checks for front-desk denial, manager access, cabin create/update/delete events,
 exact $100 → $125 price diffs, redaction, and no-op/invalid updates producing no
 event. The production audit page also loaded successfully in a browser. Temporary
 cabins were removed; their audit events remain as history. The isolated test identity
-is retained only for the immediately following reservations/calendar verification.
+was retained through reservations/calendar verification and then removed. Fourteen
+audit events from the temporary operations remain as durable test history.
