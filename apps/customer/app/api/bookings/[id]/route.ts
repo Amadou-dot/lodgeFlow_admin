@@ -116,9 +116,9 @@ export async function PATCH(
       validation.data
     );
 
-    const response: ApiResponse<any> = {
+    const response: ApiResponse<BookingDetail> = {
       success: true,
-      data: updatedBooking,
+      data: serializeBookingDetail(updatedBooking),
       message: 'Booking updated successfully',
     };
 

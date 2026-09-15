@@ -61,22 +61,6 @@ export interface UpdateCabinData extends Partial<CreateCabinData> {
   _id: string;
 }
 
-export interface CreateBookingData {
-  cabinId: string;
-  checkInDate: Date;
-  checkOutDate: Date;
-  numGuests: number;
-  extras?: {
-    hasBreakfast?: boolean;
-    hasPets?: boolean;
-    hasParking?: boolean;
-    hasEarlyCheckIn?: boolean;
-    hasLateCheckOut?: boolean;
-  };
-  specialRequests?: string[];
-  observations?: string;
-}
-
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;

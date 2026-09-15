@@ -83,10 +83,9 @@ All unqualified implementation paths above are within `apps/customer`.
   wire distinction; serializers do not add defaults, fabricate receipts or change
   money units. Keep this exception at the existing transport boundary; new domain
   operations should use one absence representation.
-- Remaining same-flow work: mutation response/input DTOs, cancellation/confirmation
-  email payloads, checkout population, and refund-estimate date DTOs. The editor
-  still submits dates/observations that its existing PATCH schema strips; address
-  that UX/API mismatch in a separately tested validation slice.
+- Subsequent same-flow work: create/PATCH boundaries are addressed in slice 2
+  below. Cancellation/confirmation email payloads, checkout population and
+  refund-estimate date DTOs remain open.
 
 Characterization: `scripts/http-smoke/run.mjs` compares full response JSON against
 real hydrated and lean Mongoose results, including raw legacy rows, null populated
@@ -96,6 +95,37 @@ against the new serializers. Focused serializer, hook and UI tests accompany the
 slice. Final command and commit evidence is recorded on tracking issue #150.
 The candidate JSON remains the original baseline snapshot; this section records
 slice dispositions without claiming every match in an affected file is resolved.
+
+## Phase 1 slice 2: customer booking creation and updates
+
+- **T01 further migrated:** `useCreateBooking` and `useUpdateBooking` return plain
+  `BookingDetail` JSON. POST/PATCH reuse the characterized detail serializer.
+  Shared `customer-bookings.ts` annotates population at the actual queries.
+  `addBookingPayment` now accepts only the booking fields it reads/writes so
+  populated bookings remain valid callers; payment logic is unchanged. Database
+  operations, pricing, locking and persisted values are unchanged.
+- `CreateBookingRequest` derives payload fields from the existing Zod schema with
+  explicit string dates. `BookingForm` preserves the previous UTC serialization
+  while constructing JSON inputs directly. The unused `CreateBookingData` type
+  is removed. PATCH callers use `UpdateBookingDetailsInput`, not `Partial<Booking>`.
+- **Related bug fixed:** the booking editor no longer presents date/observation
+  controls whose changes the server silently discarded. It clearly edits guest
+  count and submits only `numGuests`. The API's existing allowlist remains intact;
+  special requests/extras remain supported at the API without adding UI features.
+- Mutation fixtures use checked response/input shapes. Hook tests preserve create
+  and update cache invalidations, including no invalidation on failure. The editor
+  regression was verified against original code before the fix.
+- HTTP tests characterize complete create/PATCH JSON envelopes against real
+  populated documents, prove ignored fields remain ignored, and cover auth,
+  invalid input/capacity, missing IDs and database write failure without unintended
+  writes/provider calls. The expanded gate passes against original `bddff06`
+  runtime and the refactored routes.
+
+Remaining work: `Booking`/`PopulatedBooking` aliases in cancellation and existing
+email flows, cancellation response and refund-estimate DTOs, checkout population,
+plus unrelated resource boundaries. This slice does not alter provider behavior,
+receipt accounting or add #136/#139 scope. Final command and named-commit CI
+results are maintained on tracker #150; Phase 1 is not complete.
 
 ## Triage rules for subsequent slices
 

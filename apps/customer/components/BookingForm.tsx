@@ -2,7 +2,7 @@ import { subtitle, title } from '@/components/primitives';
 import { useCreateBooking } from '@/hooks/useBooking';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSettings } from '@/hooks/useSettings';
-import { CreateBookingData } from '@/types';
+import type { CreateBookingRequest } from '@/lib/validations/booking';
 import { useUser } from '@clerk/nextjs';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
@@ -142,10 +142,10 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
       return;
     }
 
-    const bookingData: CreateBookingData = {
+    const bookingData: CreateBookingRequest = {
       cabinId: cabin._id,
-      checkInDate: new Date(dateRange.start.toString()),
-      checkOutDate: new Date(dateRange.end.toString()),
+      checkInDate: new Date(dateRange.start.toString()).toISOString(),
+      checkOutDate: new Date(dateRange.end.toString()).toISOString(),
       numGuests: parseInt(numberOfGuests, 10),
       extras,
       specialRequests,

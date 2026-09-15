@@ -88,3 +88,10 @@ export type UpdateBookingDetailsInput = z.infer<
   typeof updateBookingDetailsSchema
 >;
 export type PatchBookingInput = z.infer<typeof patchBookingSchema>;
+
+/** JSON request dates are ISO strings; the server schema converts them to Date.
+ * Keep defaults optional at the transport boundary through z.input. */
+export type CreateBookingRequest = Omit<
+  z.input<typeof createBookingSchema>,
+  'checkInDate' | 'checkOutDate'
+> & { checkInDate: string; checkOutDate: string };

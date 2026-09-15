@@ -1,3 +1,6 @@
+import { serializeBookingDetail } from '@/lib/serializers/booking-read';
+import type { BookingDetail } from '@/types/booking-read';
+import type { ApiResponse } from '@/types';
 import {
   connectDB,
   createCustomerBooking,
@@ -31,10 +34,12 @@ export async function POST(request: NextRequest) {
       ...validation.data,
       customerId: userId,
     });
-    return NextResponse.json(
-      { success: true, data: booking, message: 'Booking created successfully' },
-      { status: 201 }
-    );
+    const response: ApiResponse<BookingDetail> = {
+      success: true,
+      data: serializeBookingDetail(booking),
+      message: 'Booking created successfully',
+    };
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     if (
       error instanceof BookingRuleError ||
