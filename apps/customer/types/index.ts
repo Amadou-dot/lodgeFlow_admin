@@ -212,43 +212,13 @@ export type {
   PaginationParams,
 } from '@/lib/validations/query-params';
 
-// Cancellation and refund types
-export type CancellationPolicy = 'flexible' | 'moderate' | 'strict';
-export type RefundStatus =
-  'none' | 'pending' | 'processing' | 'partial' | 'full' | 'failed';
-export type RefundType = 'full' | 'partial' | 'none';
-
-export interface RefundEstimate {
-  refundPercentage: number;
-  refundAmount: number;
-  refundType: RefundType;
-  reason: string;
-  daysUntilCheckIn: number;
-  policy: CancellationPolicy;
-}
-
-export interface CancellationDeadlines {
-  fullRefundDeadline: Date | null;
-  partialRefundDeadline: Date | null;
-  partialRefundPercentage: number;
-  policy: CancellationPolicy;
-}
-
-export interface RefundEstimateResponse {
-  estimate: RefundEstimate;
-  deadlines: CancellationDeadlines;
-  policyDescription: string;
-  canCancel: boolean;
-  cancelNotAllowedReason?: string;
-}
-
-export interface CancellationResponse {
-  booking: PopulatedBooking;
-  refund: {
-    amount: number;
-    type: RefundType;
-    status: RefundStatus;
-    reason: string;
-    error?: string;
-  };
-}
+// Cancellation and refund JSON transport types.
+export type {
+  CancellationPolicy,
+  RefundStatus,
+  RefundType,
+  RefundEstimate,
+  CancellationDeadlines,
+  RefundEstimateResponse,
+  CancellationResponse,
+} from './cancellation';

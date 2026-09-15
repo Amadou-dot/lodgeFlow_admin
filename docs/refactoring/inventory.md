@@ -127,6 +127,45 @@ plus unrelated resource boundaries. This slice does not alter provider behavior,
 receipt accounting or add #136/#139 scope. Final command and named-commit CI
 results are maintained on tracker #150; Phase 1 is not complete.
 
+## Phase 1 slice 3: cancellation and refund estimates
+
+- Cancellation responses use `BookingDetail | null` with an explicit refund DTO;
+  refund-estimate deadline DTOs contain ISO strings/null, while domain calculations
+  retain Dates. Existing import paths reexport the transport types.
+- DELETE population is typed at the query. Its cancellation email dependency now
+  accepts only customer identity, stay Dates, total price and cabin name; the
+  fake `PopulatedBooking` cast is removed without changing sender or send behavior.
+- `calculateRefund` takes only its booking/settings field dependencies. Arithmetic
+  fixtures are plain checked inputs instead of double-cast Mongoose documents.
+- **Related fixes:** foreign refund estimates return the same 404 as missing
+  bookings; active checkout reports `canCancel: false` with the existing DELETE
+  guard reason. Policy estimates, amounts, terminal-status responses and timezone
+  calculations remain unchanged. Both bugs reproduce against original `ea57bd1`.
+- Route/hook tests and HTTP assertions cover deadline JSON, eligibility, ownership,
+  full cancellation response booking JSON, received-money refund limits, retries
+  and provider failures. Remaining payment/welcome email model aliases, checkout
+  population and other resource boundaries remain future slices.
+
+## Phase 5 readiness decision: existing sender repair (#132)
+
+A read-only check found ten existing `emails.send` sites using
+`LodgeFlow <onboarding@resend.dev>`: admin `app/api/send/{confirm,welcome}`,
+customer `app/api/send/{confirm,payment-confirm,welcome,dining-confirm,experience-confirm}`,
+both customer `lib/email.ts` functions and `lib/reservation-confirmation-email.ts`.
+The app-local environments have provider-key and origin variables, but no sender
+mailbox configuration. Only variable names/presence were inspected for this record.
+
+`lodgeflow.app` domain verification is already confirmed by the user. The mailbox
+is still needed; unrelated contact-address literals do not select a sender.
+Preserve the existing `LodgeFlow` display name unless directed otherwise. Before
+activation, provision the selected sender in both deployed app environments and
+obtain an approved test recipient/environment for an existing send path. Delivery
+verification must distinguish provider acceptance from actual inbox receipt.
+Do not merge a newly required sender setting before provisioning it, or existing
+sends would fail. No live provider calls or sends were performed by this review;
+#132 remains open. This decision blocks provider activation, not unrelated Phase 1
+refactoring. #136/#139 remain excluded.
+
 ## Triage rules for subsequent slices
 
 1. Pick a confirmed item and inspect its listed candidates/callers on current HEAD.

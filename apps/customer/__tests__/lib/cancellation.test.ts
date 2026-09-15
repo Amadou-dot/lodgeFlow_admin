@@ -6,39 +6,27 @@ import {
 import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { ISettings } from '@lodgeflow/database/models/Settings';
 
-// Helper to create mock booking
-function createMockBooking(overrides: Partial<IBooking> = {}): IBooking {
+// Plain calculation inputs; these fixtures do not pretend to be documents.
+type BookingFixture = Pick<
+  IBooking,
+  | 'checkInDate'
+  | 'amountPaid'
+  | 'refundAmount'
+  | 'totalPrice'
+  | 'isPaid'
+  | 'depositPaid'
+  | 'depositAmount'
+>;
+function createMockBooking(
+  overrides: Partial<BookingFixture> = {}
+): BookingFixture {
   return {
-    _id: 'booking123',
-    cabin: 'cabin123',
-    customer: 'user123',
     checkInDate: new Date('2026-02-15'),
-    checkOutDate: new Date('2026-02-18'),
-    numNights: 3,
-    numGuests: 2,
-    status: 'confirmed',
-    cabinPrice: 300,
-    extrasPrice: 50,
     totalPrice: 350,
     isPaid: true,
     depositPaid: false,
     depositAmount: 87.5,
-    paymentMethod: 'online',
-    extras: {
-      hasBreakfast: false,
-      breakfastPrice: 0,
-      hasPets: false,
-      petFee: 0,
-      hasParking: false,
-      parkingFee: 0,
-      hasEarlyCheckIn: false,
-      earlyCheckInFee: 0,
-      hasLateCheckOut: false,
-      lateCheckOutFee: 0,
-    },
-    specialRequests: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    refundAmount: 0,
     amountPaid:
       overrides.isPaid === false
         ? overrides.depositPaid
@@ -46,34 +34,12 @@ function createMockBooking(overrides: Partial<IBooking> = {}): IBooking {
           : 0
         : (overrides.totalPrice ?? 350),
     ...overrides,
-  } as unknown as IBooking;
+  };
 }
-
-// Helper to create mock settings
 function createMockSettings(
-  policy: 'flexible' | 'moderate' | 'strict'
-): ISettings {
-  return {
-    cancellationPolicy: policy,
-    minBookingLength: 1,
-    maxBookingLength: 30,
-    maxGuestsPerBooking: 8,
-    breakfastPrice: 15,
-    checkInTime: '15:00',
-    checkOutTime: '11:00',
-    requireDeposit: true,
-    depositPercentage: 25,
-    allowPets: true,
-    petFee: 20,
-    smokingAllowed: false,
-    earlyCheckInFee: 50,
-    lateCheckOutFee: 50,
-    wifiIncluded: true,
-    parkingIncluded: false,
-    parkingFee: 10,
-    currency: 'USD',
-    timezone: 'UTC',
-  } as unknown as ISettings;
+  policy: ISettings['cancellationPolicy']
+): Pick<ISettings, 'cancellationPolicy'> {
+  return { cancellationPolicy: policy };
 }
 
 describe('calculateRefund', () => {

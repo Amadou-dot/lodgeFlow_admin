@@ -43,6 +43,8 @@ const { default: StaffAccess } =
   await import('../../packages/database/src/models/StaffAccess.ts');
 const { settingsData } =
   await import('../../packages/database/src/settings-defaults.ts');
+const { calculateRefund, getCancellationDeadlines, formatCancellationPolicy } =
+  await import('../../apps/customer/lib/cancellation.ts');
 const workspace = await mkdtemp(path.join(tmpdir(), 'lodgeflow-http-smoke-'));
 const secret = randomUUID();
 const clerk = createClerkFixture({
@@ -896,6 +898,24 @@ try {
   assert.equal(persisted.checkoutToken, quoteToken);
   assert.equal(persisted.payments.length, 0);
   assert.equal(sessions.size, 1);
+  const beforePendingEstimate = JSON.stringify(persisted);
+  const callsBeforePendingEstimate = calls.length;
+  const pendingEstimate = await request({
+    origin: customer,
+    route: `${detailRoute}/refund-estimate`,
+    identity: 'customer',
+    status: 200,
+  });
+  assert.equal(pendingEstimate.data.canCancel, false);
+  assert.equal(
+    pendingEstimate.data.cancelNotAllowedReason,
+    'Checkout is active; complete or expire it before cancelling'
+  );
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforePendingEstimate
+  );
+  assert.equal(calls.length, callsBeforePendingEstimate);
   const creations = calls.filter(call => call.route === '/stripe/create');
   assert.equal(creations.length, 2);
   assert.equal(
@@ -1036,6 +1056,61 @@ try {
     'PASS existing customer welcome/payment email failures and retries preserve receipts'
   );
   const beforeCancel = JSON.stringify(await Booking.findById(bookingId).lean());
+  const estimateRoute = `${detailRoute}/refund-estimate`;
+  const estimate = await request({
+    origin: customer,
+    route: estimateRoute,
+    identity: 'customer',
+    status: 200,
+  });
+  const estimateBooking = await Booking.findById(bookingId);
+  const estimateSettings = await Settings.findOne();
+  assert.deepEqual(estimate, {
+    success: true,
+    data: {
+      estimate: calculateRefund(estimateBooking, estimateSettings),
+      deadlines: JSON.parse(
+        JSON.stringify(
+          getCancellationDeadlines(
+            estimateBooking.checkInDate,
+            estimateSettings.cancellationPolicy
+          )
+        )
+      ),
+      policyDescription: formatCancellationPolicy(
+        estimateSettings.cancellationPolicy
+      ),
+      canCancel: true,
+    },
+  });
+  assert.equal(estimate.data.estimate.refundAmount, 75);
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: estimateRoute,
+  });
+  const callsBeforeEstimateDenials = calls.length;
+  for (const route of [
+    estimateRoute,
+    `/api/bookings/${new mongoose.Types.ObjectId()}/refund-estimate`,
+  ]) {
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route,
+        identity: 'foreign',
+        status: 404,
+      }),
+      {
+        success: false,
+        error: 'Booking not found',
+      }
+    );
+  }
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforeCancel
+  );
+  assert.equal(calls.length, callsBeforeEstimateDenials);
   const refundCallsBefore = calls.filter(
     call => call.route === '/stripe/refund'
   ).length;
@@ -1070,6 +1145,22 @@ try {
     'Injected Stripe failure'
   );
   assert.equal(pendingCancellation.data.refund.amount, 75);
+  assert.deepEqual(
+    pendingCancellation.data.booking,
+    JSON.parse(
+      JSON.stringify(await Booking.findById(bookingId).populate('cabin'))
+    )
+  );
+  const cancelledEstimate = await request({
+    origin: customer,
+    route: estimateRoute,
+    identity: 'customer',
+    status: 200,
+  });
+  assert.equal(cancelledEstimate.data.canCancel, false);
+  assert.equal(cancelledEstimate.data.estimate.refundAmount, 0);
+  assert.equal(cancelledEstimate.data.deadlines.fullRefundDeadline, null);
+  assert.equal(cancelledEstimate.data.deadlines.partialRefundDeadline, null);
   persisted = await Booking.findById(bookingId).lean();
   assert.equal(persisted.refundAmount ?? 0, 0);
   assert.equal(persisted.cancellationRefunds[0].amount, 75);
@@ -1083,6 +1174,12 @@ try {
   });
   assert.equal(recoveredCancellation.data.refund.status, 'pending');
   assert.equal(recoveredCancellation.data.refund.error, undefined);
+  assert.deepEqual(
+    recoveredCancellation.data.booking,
+    JSON.parse(
+      JSON.stringify(await Booking.findById(bookingId).populate('cabin'))
+    )
+  );
   await request({
     origin: customer,
     route: detailRoute,

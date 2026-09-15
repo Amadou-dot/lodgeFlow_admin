@@ -8,15 +8,8 @@ import {
   formatCancellationPolicy,
 } from '@/lib/cancellation';
 import type { ApiResponse } from '@/types';
-import type { RefundEstimate, CancellationDeadlines } from '@/lib/cancellation';
-
-interface RefundEstimateResponse {
-  estimate: RefundEstimate;
-  deadlines: CancellationDeadlines;
-  policyDescription: string;
-  canCancel: boolean;
-  cancelNotAllowedReason?: string;
-}
+import type { RefundEstimateResponse } from '@/types/cancellation';
+import { serializeCancellationDeadlines } from '@/lib/serializers/cancellation';
 
 export async function GET(
   request: NextRequest,
@@ -45,8 +38,8 @@ export async function GET(
     // Verify ownership
     if (booking.customer !== userId) {
       return NextResponse.json(
-        { success: false, error: 'Not authorized to view this booking' },
-        { status: 403 }
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
       );
     }
 
@@ -100,9 +93,15 @@ export async function GET(
       success: true,
       data: {
         estimate,
-        deadlines,
+        deadlines: serializeCancellationDeadlines(deadlines),
         policyDescription,
-        canCancel: true,
+        canCancel: !booking.checkoutPending,
+        ...(booking.checkoutPending
+          ? {
+              cancelNotAllowedReason:
+                'Checkout is active; complete or expire it before cancelling',
+            }
+          : {}),
       },
     });
   } catch (error) {

@@ -1,3 +1,8 @@
+import type {
+  ApiResponse,
+  CancellationResponse,
+  RefundEstimateResponse,
+} from '@/types';
 import type { BookingHistoryItem, BookingDetail } from '@/types/booking-read';
 import { renderHook, waitFor } from '@testing-library/react';
 import {
@@ -6,6 +11,7 @@ import {
   useBookingById,
   useUpdateBooking,
   useCancelBooking,
+  useRefundEstimate,
 } from '@/hooks/useBooking';
 import { createTestQueryClient } from '@/__tests__/shared/test-utils';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -343,16 +349,46 @@ describe('useCancelBooking', () => {
   });
 
   it('cancels a booking successfully', async () => {
-    const mockResponse = { data: { _id: '1', status: 'cancelled' } };
+    const mockResponse = {
+      success: true,
+      message: 'Booking cancelled successfully',
+      data: {
+        booking: {
+          ...historyBooking({ id: '1', status: 'cancelled' }),
+          cabin: null,
+          id: '1',
+        },
+        refund: {
+          amount: 75,
+          type: 'full',
+          status: 'pending',
+          reason: 'Full refund - cancelled 5 or more days before check-in',
+        },
+      },
+    } satisfies ApiResponse<CancellationResponse>;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
     });
 
-    const { result } = renderHook(() => useCancelBooking(), { wrapper });
+    const queryClient = createTestQueryClient();
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCancelBooking(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
 
-    await result.current.mutateAsync({ bookingId: '1' });
+    const response = await result.current.mutateAsync({ bookingId: '1' });
+    expect(response).toEqual(mockResponse);
+    expect(invalidate.mock.calls).toEqual([
+      [{ queryKey: ['bookings-history'] }],
+      [{ queryKey: ['bookings'] }],
+      [{ queryKey: ['refund-estimate', '1'] }],
+    ]);
 
     expect(global.fetch).toHaveBeenCalledWith('/api/bookings/1', {
       body: JSON.stringify({ reason: undefined }),
@@ -385,5 +421,69 @@ describe('useCancelBooking', () => {
     await expect(
       result.current.mutateAsync({ bookingId: '1' })
     ).rejects.toThrow('Failed to cancel booking');
+  });
+});
+
+describe('useRefundEstimate', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('returns JSON deadline strings and nulls without claiming document dates', async () => {
+    const estimate = {
+      estimate: {
+        refundPercentage: 100,
+        refundAmount: 75,
+        refundType: 'full',
+        reason: 'Full refund',
+        daysUntilCheckIn: 14,
+        policy: 'flexible',
+      },
+      deadlines: {
+        fullRefundDeadline: '2030-01-01T00:00:00.000Z',
+        partialRefundDeadline: null,
+        partialRefundPercentage: 0,
+        policy: 'flexible',
+      },
+      policyDescription: 'Full refund up to 24 hours before check-in',
+      canCancel: true,
+    } satisfies RefundEstimateResponse;
+    const response = {
+      success: true,
+      data: estimate,
+    } satisfies ApiResponse<RefundEstimateResponse>;
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => response,
+    });
+    const { result } = renderHook(() => useRefundEstimate('1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(estimate);
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/bookings/1/refund-estimate'
+    );
+  });
+
+  it('does not fetch without a booking ID', () => {
+    const { result } = renderHook(() => useRefundEstimate(''), { wrapper });
+    expect(result.current.data).toBeUndefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('reports a 404 without returning a cancellable estimate', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ success: false, error: 'Booking not found' }),
+    });
+    const { result } = renderHook(() => useRefundEstimate('1'), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe(
+      'Failed to fetch refund estimate'
+    );
+    expect(result.current.data).toBeUndefined();
   });
 });

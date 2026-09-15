@@ -1,16 +1,13 @@
-import { IBooking } from '@lodgeflow/database/models/Booking';
-import { ISettings } from '@lodgeflow/database/models/Settings';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
+import type { ISettings } from '@lodgeflow/database/models/Settings';
+import type { CancellationPolicy, RefundEstimate } from '@/types/cancellation';
+export type { CancellationPolicy, RefundEstimate } from '@/types/cancellation';
 
-export type CancellationPolicy = 'flexible' | 'moderate' | 'strict';
-
-export interface RefundEstimate {
-  refundPercentage: number;
-  refundAmount: number;
-  refundType: 'full' | 'partial' | 'none';
-  reason: string;
-  daysUntilCheckIn: number;
-  policy: CancellationPolicy;
-}
+export type RefundBooking = Pick<
+  IBooking,
+  'checkInDate' | 'amountPaid' | 'refundAmount'
+>;
+export type RefundSettings = Pick<ISettings, 'cancellationPolicy'>;
 
 export interface CancellationDeadlines {
   fullRefundDeadline: Date | null;
@@ -37,8 +34,8 @@ function getDaysUntilCheckIn(
 }
 
 export function calculateRefund(
-  booking: IBooking,
-  settings: ISettings,
+  booking: RefundBooking,
+  settings: RefundSettings,
   cancellationDate: Date = new Date()
 ): RefundEstimate {
   const policy = settings.cancellationPolicy;
