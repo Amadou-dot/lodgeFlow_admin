@@ -51,9 +51,19 @@ shared database). Formatting and lint pass.
 - [x] Cabin, dining, and experience month calendars with server range clamp.
 - [x] MongoDB integration coverage for union semantics, date boundaries, per-seating
   capacity, uncapped experiences, native transitions, and concurrent edits.
-- [ ] Production builds and deployed preview checks.
+- [x] Production builds and deployed preview checks.
 - [ ] Merge, verify production pages/APIs, and remove all temporary fixtures.
 
 Paid dining/experience cancellations remain blocked pending their future payment and
 refund implementation (preserved customer work). This release does not add payment
 collection to those products.
+
+## Preview evidence
+
+At `1019ba2`, admin preview `lodgeflowadmin-g8ir9e5fm-asecklabs.vercel.app` is Ready.
+An isolated user created dining and experience reservations through the production
+customer APIs (both 201). Both appeared in the admin union inbox and capacity calendars.
+Staff detail/status APIs returned 200; a stale status edit returned 409; dining no-show
+and experience cancellation released their capacity. Matching audit events were verified.
+Both temporary reservation records were removed. Follow-up fixes correct the dining
+`isAvailable` label and route unsigned admin home visits to sign-in.

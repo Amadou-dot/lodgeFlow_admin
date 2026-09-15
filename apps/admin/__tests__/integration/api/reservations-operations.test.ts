@@ -221,6 +221,7 @@ it('counts dining by seating time and experiences by UTC day, preserving uncappe
     },
   ]);
   const dining = await capacityCalendar('dining', day, new Date('2030-06-02'));
+  expect(dining.resources[0]).toMatchObject({ isAvailable: true });
   expect(dining.usage.map(row => [row._id.time, row.used])).toEqual([
     ['12:00', 3],
     ['19:00', 4],

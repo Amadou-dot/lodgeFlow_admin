@@ -500,6 +500,7 @@ its client lazily inside the authenticated, rate-limited send handlers, so
 Optional:
 ```bash
 CLERK_API_CONCURRENT_LIMIT=3   # Clerk batch fetch concurrency (default: 3)
+LODGEFLOW_STAFF_ORG_ID=org_... # Trusted staff organization; application roles live in MongoDB
 TESTING_AUTH_BYPASS=true       # Server-only auth bypass (dev only)
 NEXT_PUBLIC_TESTING=true       # Client UX bypass for AuthGuard (dev only)
 

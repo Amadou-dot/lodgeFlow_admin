@@ -10,7 +10,9 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const access = await requireApiAuth({ permission: 'bookings:read' });
-  if (!access.authenticated) redirect('/unauthorized');
+  if (!access.authenticated) {
+    redirect(access.error?.status === 401 ? '/sign-in' : '/unauthorized');
+  }
   return (
     <AuthGuard>
       <div className='flex h-screen'>

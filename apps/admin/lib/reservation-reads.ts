@@ -232,11 +232,11 @@ export async function capacityCalendar(
   const resources =
     kind === 'dining'
       ? await Dining.find({})
-          .select('name maxPeople available servingTime')
+          .select('name maxPeople isAvailable servingTime')
           .sort({ name: 1 })
           .lean()
       : await Experience.find({})
-          .select('name maxParticipants available')
+          .select('name maxParticipants')
           .sort({ name: 1 })
           .lean();
   const usage = await model.aggregate(pipeline);

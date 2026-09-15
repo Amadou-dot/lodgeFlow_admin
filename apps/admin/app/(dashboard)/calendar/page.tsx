@@ -6,7 +6,7 @@ interface Resource {
   _id: string;
   name: string;
   status?: string;
-  available?: boolean;
+  isAvailable?: boolean;
   maxPeople?: number;
   maxParticipants?: number;
 }
@@ -282,7 +282,7 @@ export default function CalendarPage() {
                         </div>
                       )}
                       {((resource.status && resource.status !== 'active') ||
-                        resource.available === false) && (
+                        resource.isAvailable === false) && (
                         <div className='font-normal text-xs'>
                           Unavailable for new bookings
                         </div>
