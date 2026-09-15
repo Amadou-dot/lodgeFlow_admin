@@ -44,9 +44,14 @@ Payment accounting and capacity hardening are shared by both apps. See the
 ## Staff operations
 
 The admin app uses Clerk for sign-in and organization membership, with application
-roles stored in MongoDB. Set `LODGEFLOW_STAFF_ORG_ID` and follow the
+roles stored in MongoDB. Set `LODGEFLOW_STAFF_ORG_ID` in
+`apps/admin/.env.local` for local development (and in each deployed admin
+environment), using an organization from the same Clerk instance as the configured
+keys. Restart the development server after changing it. Then follow the
 [one-time administrator bootstrap](docs/superpowers/plans/2026-09-14-application-staff-roles.md).
-Clerk custom roles and a Clerk subscription upgrade are not required.
+A Clerk organization administrator also needs a MongoDB staff assignment; the
+Clerk Admin badge alone does not grant application access. Clerk custom roles and
+a Clerk subscription upgrade are not required.
 
 - `/staff` — administrator-managed front desk, manager, and administrator assignments.
 - `/audit` — permission-scoped staff history with redacted changes.

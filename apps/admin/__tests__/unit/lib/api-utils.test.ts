@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { resolveStaffRole } from '@/lib/staff-access';
 jest.mock('@/lib/staff-access', () => ({
   resolveStaffRole: jest.fn().mockResolvedValue(null),
@@ -112,6 +113,33 @@ describe('api-utils', () => {
   });
 
   describe('createErrorResponse', () => {
+    it.each([400, 401, 403, 404, 409, 429])(
+      'does not log expected %i responses as server errors',
+      status => {
+        jest.mocked(logger.error).mockClear();
+        jest.mocked(logger.info).mockClear();
+        expect(createErrorResponse('Request rejected', status).status).toBe(
+          status
+        );
+        expect(logger.error).not.toHaveBeenCalled();
+        expect(logger.info).toHaveBeenCalledWith(
+          'API request rejected',
+          expect.objectContaining({ status })
+        );
+      }
+    );
+
+    it('still logs server failures as errors', () => {
+      jest.mocked(logger.error).mockClear();
+      const error = new Error('Database unavailable');
+      createErrorResponse(error, 503);
+      expect(logger.error).toHaveBeenCalledWith(
+        'API Error',
+        error,
+        expect.objectContaining({ status: 503 })
+      );
+    });
+
     it('returns error response with string', async () => {
       const response = createErrorResponse('Something went wrong');
       const body = await response.json();

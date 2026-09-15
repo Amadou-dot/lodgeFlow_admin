@@ -1,4 +1,14 @@
 'use client';
+import {
+  OperationsPage,
+  OperationsSelect,
+  OperationsLoading,
+  OperationsError,
+  OperationsPagination,
+} from '@/components/OperationsPage';
+import { Card, CardBody } from '@heroui/card';
+import { Input } from '@heroui/input';
+import { Chip } from '@heroui/chip';
 import { useEffect, useState } from 'react';
 type Event = {
   _id: string;
@@ -54,116 +64,119 @@ export default function AuditPage() {
     return () => controller.abort();
   }, [filters, page]);
   return (
-    <section className='space-y-6'>
-      <h1 className='text-2xl font-semibold'>Audit history</h1>
-      <p>
-        Staff changes to bookings, payments, cabins, settings, and access. Dates
-        are filtered in UTC.
-      </p>
-      <div className='flex flex-wrap gap-3'>
-        {(['actor', 'resourceId', 'from', 'to'] as const).map(key => (
-          <label key={key} className='flex flex-col gap-1 text-sm'>
-            {
-              {
-                actor: 'Staff user ID',
-                resourceId: 'Resource ID',
-                from: 'From',
-                to: 'Through',
-              }[key]
-            }
-            <input
-              className='rounded border bg-background p-2'
+    <OperationsPage
+      title='Audit history'
+      description='Review staff changes to bookings, payments, cabins, settings, and access. Date filters use UTC.'
+    >
+      <Card>
+        <CardBody className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4'>
+          {(['actor', 'resourceId', 'from', 'to'] as const).map(key => (
+            <Input
+              key={key}
+              label={
+                {
+                  actor: 'Staff user ID',
+                  resourceId: 'Resource ID',
+                  from: 'From',
+                  to: 'Through',
+                }[key]
+              }
+              size='sm'
+              variant='bordered'
               type={key === 'from' || key === 'to' ? 'date' : 'text'}
               value={filters[key]}
-              onChange={e => {
-                setFilters({ ...filters, [key]: e.target.value });
+              onValueChange={value => {
+                setFilters({ ...filters, [key]: value });
                 setPage(1);
               }}
             />
-          </label>
-        ))}
-        <label className='flex flex-col gap-1 text-sm'>
-          Action
-          <select
-            className='rounded border bg-background p-2'
+          ))}
+          <OperationsSelect
+            label='Action'
             value={filters.action}
-            onChange={e => {
-              setFilters({ ...filters, action: e.target.value });
+            onChange={value => {
+              setFilters({ ...filters, action: value });
               setPage(1);
             }}
-          >
-            <option value=''>All actions</option>
-            {data.actions.map(action => (
-              <option key={action}>{action}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      {error && (
-        <p role='alert' className='text-danger'>
-          {error}
-        </p>
-      )}
+            options={[
+              { value: '', label: 'All actions' },
+              ...data.actions.map(action => ({ value: action, label: action })),
+            ]}
+          />
+        </CardBody>
+      </Card>
+      <OperationsError message={error} />
       {loading ? (
-        <p>Loading history…</p>
+        <OperationsLoading label='Loading history…' />
       ) : (
         !error && (
           <>
             <p className='text-sm'>{data.total} events</p>
-            {!data.events.length && <p>No events match these filters.</p>}
+            {!data.events.length && (
+              <Card className='bg-default-50'>
+                <CardBody className='text-center py-16 text-default-600'>
+                  No events match these filters.
+                </CardBody>
+              </Card>
+            )}
             <div className='space-y-3'>
               {data.events.map(event => (
-                <article
+                <Card
+                  as='article'
                   key={event._id}
-                  className='rounded-lg border border-default-200 p-4 space-y-2'
+                  className='border border-divider'
                 >
-                  <div className='flex flex-wrap justify-between gap-2'>
-                    <strong>{event.action}</strong>
-                    <time>{new Date(event.createdAt).toLocaleString()}</time>
-                  </div>
-                  <p className='text-sm break-all'>
-                    {event.actor} ({event.actorRole}) · {event.resourceType}:{' '}
-                    {event.resourceId}
-                  </p>
-                  <dl className='text-sm'>
-                    {Object.keys(event.after).map(field => (
-                      <div
-                        className='grid gap-2 md:grid-cols-3 border-t border-default-100 py-2'
-                        key={field}
+                  <CardBody className='space-y-3 p-5'>
+                    <div className='flex flex-wrap justify-between gap-2'>
+                      <Chip size='sm' variant='flat' color='primary'>
+                        {event.action}
+                      </Chip>
+                      <time
+                        className='text-sm text-default-500'
+                        dateTime={event.createdAt}
                       >
-                        <dt className='font-medium'>{field}</dt>
-                        <dd className='break-all'>
-                          {JSON.stringify(event.before[field])}
-                        </dd>
-                        <dd className='break-all'>
-                          {JSON.stringify(event.after[field])}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </article>
+                        {new Date(event.createdAt).toLocaleString()}
+                      </time>
+                    </div>
+                    <p className='text-sm break-all'>
+                      {event.actor} ({event.actorRole}) · {event.resourceType}:{' '}
+                      {event.resourceId}
+                    </p>
+                    <dl className='text-sm'>
+                      {Object.keys(event.after).map(field => (
+                        <div
+                          className='grid gap-2 md:grid-cols-3 border-t border-default-100 py-2'
+                          key={field}
+                        >
+                          <dt className='font-medium'>{field}</dt>
+                          <dd className='break-all'>
+                            <span className='text-default-500 mr-2'>
+                              Before:
+                            </span>
+                            {JSON.stringify(event.before[field]) ?? '—'}
+                          </dd>
+                          <dd className='break-all'>
+                            <span className='text-default-500 mr-2'>
+                              After:
+                            </span>
+                            {JSON.stringify(event.after[field]) ?? '—'}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </CardBody>
+                </Card>
               ))}
             </div>
           </>
         )
       )}
-      <div className='flex items-center gap-4'>
-        <button
-          className='rounded border px-3 py-2 disabled:opacity-40'
-          disabled={loading || page <= 1}
-          onClick={() => setPage(page - 1)}
-        >
-          Previous
-        </button>
-        <span>Page {page}</span>
-        <button
-          className='rounded border px-3 py-2 disabled:opacity-40'
-          disabled={loading || page * 25 >= data.total}
-          onClick={() => setPage(page + 1)}
-        >
-          Next
-        </button>
-      </div>
-    </section>
+      <OperationsPagination
+        page={page}
+        total={data.total}
+        loading={loading}
+        onChange={setPage}
+      />
+    </OperationsPage>
   );
 }

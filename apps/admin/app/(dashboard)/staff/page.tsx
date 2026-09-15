@@ -1,12 +1,28 @@
 'use client';
+import {
+  OperationsPage,
+  OperationsSelect,
+  OperationsError,
+} from '@/components/OperationsPage';
+import { Card, CardBody } from '@heroui/card';
 import { useEffect, useState } from 'react';
 import { useStaffAccess } from '@/components/AuthGuard';
+import {
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@heroui/table';
+import { Spinner } from '@heroui/spinner';
 import type { StaffRole } from '@/lib/permissions';
 type Member = { userId: string; name: string; role: StaffRole | null };
 export default function StaffPage() {
   const access = useStaffAccess();
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   async function load() {
     const response = await fetch('/api/staff', { cache: 'no-store' });
@@ -15,7 +31,9 @@ export default function StaffPage() {
     setMembers(result.data);
   }
   useEffect(() => {
-    load().catch(e => setError(e.message));
+    load()
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
   async function change(member: Member, role: string) {
     setBusy(true);
@@ -37,54 +55,73 @@ export default function StaffPage() {
     }
   }
   return (
-    <section className='space-y-6'>
-      <h1 className='text-2xl font-semibold'>Staff access</h1>
-      <p>
-        Assign access to members of the LodgeFlow organization. Front desk staff
-        manage bookings; managers also manage catalogs, settings, and refunds.
-        Administrators manage staff access.
-      </p>
-      <p className='text-sm text-default-500'>
-        Add new organization members in Clerk, then assign their access here.
-        Your own access cannot be changed from this page.
-      </p>
-      {error && (
-        <p role='alert' className='text-danger'>
-          {error}
-        </p>
-      )}
-      <table className='w-full text-left'>
-        <thead>
-          <tr>
-            <th className='p-3'>Member</th>
-            <th className='p-3'>Access</th>
-          </tr>
-        </thead>
-        <tbody>
+    <OperationsPage
+      title='Staff access'
+      description='Manage organization roles and permissions for your team.'
+    >
+      <Card>
+        <CardBody className='gap-3 p-5'>
+          <h2 className='font-semibold'>Organization access</h2>
+          <p className='text-sm text-default-600'>
+            Front desk staff manage bookings. Managers also manage catalogs,
+            settings, and refunds. Administrators manage staff access.
+          </p>
+          <p className='text-sm text-default-500'>
+            Add new organization members in Clerk, then assign their access
+            here. Your own access cannot be changed from this page.
+          </p>
+        </CardBody>
+      </Card>
+      <OperationsError message={error} />
+      <Table
+        aria-label='Staff access'
+        classNames={{
+          wrapper: 'border border-divider',
+          th: 'bg-default-100 text-default-600',
+          td: 'py-3',
+        }}
+      >
+        <TableHeader>
+          <TableColumn>Member</TableColumn>
+          <TableColumn>Access</TableColumn>
+        </TableHeader>
+        <TableBody
+          isLoading={loading}
+          loadingContent={<Spinner label='Loading staff…' />}
+          emptyContent={
+            error
+              ? 'Staff could not be loaded.'
+              : 'No organization members found.'
+          }
+        >
           {members.map(member => (
-            <tr key={member.userId} className='border-t border-default-200'>
-              <td className='p-3'>
+            <TableRow
+              key={member.userId}
+              className='border-t border-default-200'
+            >
+              <TableCell className='p-3'>
                 {member.name || member.userId}
                 {member.userId === access?.userId ? ' (you)' : ''}
-              </td>
-              <td className='p-3'>
-                <select
-                  aria-label={`Access for ${member.name || member.userId}`}
+              </TableCell>
+              <TableCell className='p-3'>
+                <OperationsSelect
+                  label={`Access for ${member.name || member.userId}`}
                   value={member.role ?? ''}
-                  disabled={busy || member.userId === access?.userId}
-                  onChange={e => void change(member, e.target.value)}
-                  className='rounded border bg-background p-2'
-                >
-                  <option value=''>No staff access</option>
-                  <option value='front_desk'>Front desk</option>
-                  <option value='manager'>Manager</option>
-                  <option value='admin'>Administrator</option>
-                </select>
-              </td>
-            </tr>
+                  isDisabled={busy || member.userId === access?.userId}
+                  className='min-w-48 max-w-xs'
+                  onChange={value => void change(member, value)}
+                  options={[
+                    { value: '', label: 'No staff access' },
+                    { value: 'front_desk', label: 'Front desk' },
+                    { value: 'manager', label: 'Manager' },
+                    { value: 'admin', label: 'Administrator' },
+                  ]}
+                />
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </section>
+        </TableBody>
+      </Table>
+    </OperationsPage>
   );
 }

@@ -1,4 +1,12 @@
 'use client';
+import {
+  OperationsPage,
+  OperationsSelect,
+  OperationsLoading,
+  OperationsError,
+} from '@/components/OperationsPage';
+import { Button } from '@heroui/button';
+import { Card, CardBody } from '@heroui/card';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { utcDate } from '@/lib/reservation-options';
@@ -190,41 +198,44 @@ export default function CalendarPage() {
     );
   }
   return (
-    <section className='space-y-6'>
-      <div className='flex justify-between gap-3'>
-        <h1 className='text-2xl font-semibold'>Occupancy calendar</h1>
-        <Link className='text-primary underline' href='/reservations'>
+    <OperationsPage
+      title='Occupancy calendar'
+      description='View availability and reservations across your cabins, dining, and experiences.'
+      action={
+        <Button as={Link} href='/reservations' color='primary' variant='flat'>
           Reservations inbox
-        </Link>
-      </div>
-      <div className='flex flex-wrap items-center gap-3'>
-        <button className='rounded border px-3 py-2' onClick={() => move(-1)}>
-          Previous month
-        </button>
-        <h2 className='text-xl'>
-          {month.toLocaleDateString(undefined, {
-            month: 'long',
-            year: 'numeric',
-            timeZone: 'UTC',
-          })}
-        </h2>
-        <button className='rounded border px-3 py-2' onClick={() => move(1)}>
-          Next month
-        </button>
-        <label className='ml-auto'>
-          View{' '}
-          <select
-            className='border rounded bg-background p-2'
+        </Button>
+      }
+    >
+      <Card>
+        <CardBody className='flex flex-col sm:flex-row flex-wrap items-center gap-3'>
+          <Button variant='bordered' size='sm' onPress={() => move(-1)}>
+            Previous month
+          </Button>
+          <h2 className='text-xl'>
+            {month.toLocaleDateString(undefined, {
+              month: 'long',
+              year: 'numeric',
+              timeZone: 'UTC',
+            })}
+          </h2>
+          <Button variant='bordered' size='sm' onPress={() => move(1)}>
+            Next month
+          </Button>
+          <OperationsSelect
+            label='View'
             value={kind}
-            onChange={e => setKind(e.target.value as typeof kind)}
-          >
-            <option value='cabins'>Cabins</option>
-            <option value='dining'>Dining</option>
-            <option value='experiences'>Experiences</option>
-          </select>
-        </label>
-      </div>
-      <p className='text-sm'>
+            onChange={value => setKind(value as typeof kind)}
+            className='w-full sm:w-48 sm:ml-auto'
+            options={[
+              { value: 'cabins', label: 'Cabins' },
+              { value: 'dining', label: 'Dining' },
+              { value: 'experiences', label: 'Experiences' },
+            ]}
+          />
+        </CardBody>
+      </Card>
+      <p className='text-sm text-default-600'>
         {kind === 'cabins'
           ? 'Stays occupy check-in through the night before checkout. Click a stay to open its booking.'
           : kind === 'dining'
@@ -241,24 +252,21 @@ export default function CalendarPage() {
           ))}
         </div>
       )}
-      {error && (
-        <p role='alert' className='text-danger'>
-          {error}
-        </p>
-      )}
+      <OperationsError message={error} />
       {loading ? (
-        <p>Loading calendar…</p>
+        <OperationsLoading label='Loading calendar…' />
       ) : (
         data &&
         !error && (
-          <div className='overflow-auto rounded border border-default-200'>
+          <div className='overflow-auto rounded-large border border-divider bg-content1 p-4 shadow-small'>
             <table
+              aria-label='Occupancy calendar'
               className='w-full table-fixed text-left'
               style={{ minWidth: 180 + days.length * 90 }}
             >
-              <thead>
+              <thead className='bg-default-100 text-default-600'>
                 <tr>
-                  <th className='sticky left-0 z-10 w-44 bg-background p-3'>
+                  <th className='sticky left-0 z-10 w-44 bg-content1 p-3'>
                     Listing
                   </th>
                   {days.map(day => (
@@ -274,7 +282,7 @@ export default function CalendarPage() {
               <tbody>
                 {data.resources.map(resource => (
                   <tr key={resource._id}>
-                    <th className='sticky left-0 z-10 bg-background border border-default-200 p-3 text-sm'>
+                    <th className='sticky left-0 z-10 bg-content1 border border-default-200 p-3 text-sm'>
                       {resource.name}
                       {kind === 'dining' && (
                         <div className='font-normal text-xs'>
@@ -299,6 +307,6 @@ export default function CalendarPage() {
           </div>
         )
       )}
-    </section>
+    </OperationsPage>
   );
 }

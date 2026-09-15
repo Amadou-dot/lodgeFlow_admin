@@ -79,11 +79,18 @@ export function createErrorResponse(
 ): NextResponse<ApiErrorResponse> {
   const errorMessage = error instanceof Error ? error.message : error;
 
-  logger.error('API Error', error instanceof Error ? error : undefined, {
-    status,
-    message: errorMessage,
-    details,
-  });
+  const context = { status, message: errorMessage, details };
+  if (status >= 500) {
+    logger.error(
+      'API Error',
+      error instanceof Error ? error : undefined,
+      context
+    );
+  } else {
+    // Expected denials and invalid requests are not server failures. In a
+    // server layout, console.error also triggers Next's development overlay.
+    logger.info('API request rejected', context);
+  }
 
   const response: ApiErrorResponse = {
     success: false,

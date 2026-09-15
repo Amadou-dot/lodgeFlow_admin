@@ -37,12 +37,28 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   return <ClerkAuthGuard>{children}</ClerkAuthGuard>;
 }
 function ClerkAuthGuard({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn, orgId, userId } = useAuth();
+  const { isLoaded, isSignedIn, orgId, userId, sessionId } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [access, setAccess] = useState<Access | null>(null);
+  const [verified, setVerified] = useState<{
+    access: Access;
+    userId: typeof userId;
+    orgId: typeof orgId;
+    sessionId: typeof sessionId;
+  } | null>(null);
+  // Never reuse permissions across users, organizations, or sessions.
+  const access =
+    isLoaded &&
+    isSignedIn &&
+    verified?.userId === userId &&
+    verified?.orgId === orgId &&
+    verified?.sessionId === sessionId
+      ? verified?.access
+      : null;
   useEffect(() => {
-    setAccess(null);
+    setVerified(null);
+  }, [isLoaded, isSignedIn, orgId, userId, sessionId]);
+  useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
       router.replace('/sign-in');
@@ -53,15 +69,23 @@ function ClerkAuthGuard({ children }: { children: React.ReactNode }) {
       .then(async response => {
         if (!response.ok) throw new Error('Staff access denied');
         const { data } = await response.json();
-        if (!data.permissions.includes(pagePermission(pathname)))
-          throw new Error('Page access denied');
-        if (!controller.signal.aborted) setAccess(data);
+        if (!controller.signal.aborted)
+          setVerified({ access: data, userId, orgId, sessionId });
       })
       .catch(() => {
-        if (!controller.signal.aborted) router.replace('/unauthorized');
+        if (!controller.signal.aborted) {
+          setVerified(null);
+          router.replace('/unauthorized');
+        }
       });
     return () => controller.abort();
-  }, [isLoaded, isSignedIn, orgId, userId, pathname, router]);
+  }, [isLoaded, isSignedIn, orgId, userId, sessionId, pathname, router]);
+  // Route checks run immediately using verified permissions while the server
+  // revalidates in the background, without unmounting the dashboard shell.
+  useEffect(() => {
+    if (access && !access.permissions.includes(pagePermission(pathname)))
+      router.replace('/unauthorized');
+  }, [access, pathname, router]);
   if (
     !access ||
     !isSignedIn ||

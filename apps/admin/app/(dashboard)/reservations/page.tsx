@@ -1,4 +1,25 @@
 'use client';
+import {
+  OperationsPage,
+  OperationsSelect,
+  OperationsLoading,
+  OperationsError,
+  OperationsPagination,
+} from '@/components/OperationsPage';
+import { Button } from '@heroui/button';
+import { Card, CardBody } from '@heroui/card';
+import { Input } from '@heroui/input';
+import { Chip } from '@heroui/chip';
+import {
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@heroui/table';
+import { formatCurrency } from '@/utils/utilityFunctions';
+import { getStatusColor } from '@/utils/bookingUtils';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -57,166 +78,163 @@ export default function ReservationsPage() {
     setPage(1);
   };
   return (
-    <section className='space-y-6'>
-      <div className='flex justify-between gap-3'>
-        <h1 className='text-2xl font-semibold'>Reservations</h1>
-        <Link className='text-primary underline' href='/calendar'>
+    <OperationsPage
+      title='Reservations'
+      description='Manage cabin stays, dining seatings, and experiences. Reservation dates use UTC.'
+      action={
+        <Button as={Link} href='/calendar' color='primary' variant='flat'>
           Occupancy calendar
-        </Link>
-      </div>
-      <p>
-        Cabin stays, dining seatings, and experiences in one list. Reservation
-        dates use UTC.
-      </p>
-      <div className='flex flex-wrap gap-3'>
-        <label className='flex flex-col gap-1'>
-          Type
-          <select
-            className='border rounded bg-background p-2'
+        </Button>
+      }
+    >
+      <Card>
+        <CardBody className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <OperationsSelect
+            label='Type'
             value={filters.type}
-            onChange={e => setFilter('type', e.target.value)}
-          >
-            <option value=''>All types</option>
-            {RESERVATION_TYPES.map(type => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-        </label>
-        <label className='flex flex-col gap-1'>
-          Status group
-          <select
-            className='border rounded bg-background p-2'
+            onChange={value => setFilter('type', value)}
+            options={[
+              { value: '', label: 'All types' },
+              ...RESERVATION_TYPES.map(type => ({
+                value: type,
+                label: type.charAt(0).toUpperCase() + type.slice(1),
+              })),
+            ]}
+          />
+          <OperationsSelect
+            label='Status group'
             value={filters.lifecycle}
-            onChange={e => setFilter('lifecycle', e.target.value)}
-          >
-            <option value=''>All statuses</option>
-            {LIFECYCLES.map(status => (
-              <option key={status} value={status}>
-                {status.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className='flex flex-col gap-1'>
-          From
-          <input
-            className='border rounded bg-background p-2'
+            onChange={value => setFilter('lifecycle', value)}
+            options={[
+              { value: '', label: 'All statuses' },
+              ...LIFECYCLES.map(status => ({
+                value: status,
+                label: status.replace('_', ' '),
+              })),
+            ]}
+          />
+          <Input
+            label='From'
             type='date'
+            size='sm'
+            variant='bordered'
             value={filters.from}
-            onChange={e => setFilter('from', e.target.value)}
+            onValueChange={value => setFilter('from', value)}
           />
-        </label>
-        <label className='flex flex-col gap-1'>
-          Before
-          <input
-            className='border rounded bg-background p-2'
+          <Input
+            label='Before'
             type='date'
+            size='sm'
+            variant='bordered'
             value={filters.to}
-            onChange={e => setFilter('to', e.target.value)}
+            onValueChange={value => setFilter('to', value)}
           />
-        </label>
-      </div>
+        </CardBody>
+      </Card>
       {filters.resourceId && (
-        <button
-          className='text-primary underline'
-          onClick={() => setFilter('resourceId', '')}
+        <Button
+          color='primary'
+          variant='light'
+          onPress={() => setFilter('resourceId', '')}
         >
           Clear selected listing filter
-        </button>
+        </Button>
       )}
-      {error && (
-        <p role='alert' className='text-danger'>
-          {error}
-        </p>
-      )}
+      <OperationsError message={error} />
       {loading ? (
-        <p>Loading reservations…</p>
+        <OperationsLoading label='Loading reservations…' />
       ) : (
         !error && (
           <>
             <p className='text-sm'>{data.total} reservations</p>
             <div className='overflow-x-auto'>
-              <table className='w-full text-left text-sm'>
-                <thead>
-                  <tr>
-                    {[
-                      'Date / time',
-                      'Type',
-                      'Reservation',
-                      'Guest',
-                      'Party',
-                      'Status',
-                      'Payment',
-                    ].map(label => (
-                      <th className='p-3' key={label}>
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
+              <Table
+                aria-label='Reservations'
+                classNames={{
+                  wrapper: 'border border-divider',
+                  th: 'bg-default-100 text-default-600',
+                  td: 'py-3',
+                }}
+              >
+                <TableHeader>
+                  {[
+                    'Date / time',
+                    'Type',
+                    'Reservation',
+                    'Guest',
+                    'Party',
+                    'Status',
+                    'Payment',
+                  ].map(label => (
+                    <TableColumn key={label}>{label}</TableColumn>
+                  ))}
+                </TableHeader>
+                <TableBody emptyContent='No reservations match these filters.'>
                   {data.rows.map(row => (
-                    <tr
+                    <TableRow
                       className='border-t border-default-200'
                       key={row.type + ':' + row._id}
                     >
-                      <td className='p-3 whitespace-nowrap'>
+                      <TableCell className='p-3 whitespace-nowrap'>
                         {utcDate(row.date)}
                         {row.endDate && <> – {utcDate(row.endDate)}</>}
                         {row.time && <div>{row.time}</div>}
-                      </td>
-                      <td className='p-3 capitalize'>{row.type}</td>
-                      <td className='p-3'>
+                      </TableCell>
+                      <TableCell className='p-3 capitalize'>
+                        {row.type}
+                      </TableCell>
+                      <TableCell className='p-3'>
                         <Link
-                          className='text-primary underline'
+                          className='text-primary hover:underline font-medium'
                           href={reservationHref(row.type, row._id)}
                         >
                           {row.resourceName}
                         </Link>
-                      </td>
-                      <td className='p-3'>
+                      </TableCell>
+                      <TableCell className='p-3'>
                         <Link
                           href={'/guests/' + row.customer}
                           className='underline'
                         >
                           {row.customerName}
                         </Link>
-                      </td>
-                      <td className='p-3'>{row.partySize}</td>
-                      <td className='p-3'>{row.status}</td>
-                      <td className='p-3 whitespace-nowrap'>
-                        {new Intl.NumberFormat(undefined, {
-                          style: 'currency',
-                          currency: settings?.currency || 'USD',
-                        }).format(row.totalPrice)}
-                        <div>{row.isPaid ? 'Paid' : 'Balance due'}</div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className='p-3'>{row.partySize}</TableCell>
+                      <TableCell className='p-3'>
+                        <Chip
+                          size='sm'
+                          variant='flat'
+                          color={getStatusColor(row.status)}
+                        >
+                          {row.status}
+                        </Chip>
+                      </TableCell>
+                      <TableCell className='p-3 whitespace-nowrap'>
+                        {formatCurrency(row.totalPrice, settings?.currency)}
+                        <div className='mt-1'>
+                          <Chip
+                            size='sm'
+                            variant='flat'
+                            color={row.isPaid ? 'success' : 'warning'}
+                          >
+                            {row.isPaid ? 'Paid' : 'Balance due'}
+                          </Chip>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
-            {!data.rows.length && <p>No reservations match these filters.</p>}
           </>
         )
       )}
-      <div className='flex items-center gap-4'>
-        <button
-          className='rounded border px-3 py-2 disabled:opacity-40'
-          disabled={loading || page <= 1}
-          onClick={() => setPage(page - 1)}
-        >
-          Previous
-        </button>
-        <span>Page {page}</span>
-        <button
-          className='rounded border px-3 py-2 disabled:opacity-40'
-          disabled={loading || page * 25 >= data.total}
-          onClick={() => setPage(page + 1)}
-        >
-          Next
-        </button>
-      </div>
-    </section>
+      <OperationsPagination
+        page={page}
+        total={data.total}
+        loading={loading}
+        onChange={setPage}
+      />
+    </OperationsPage>
   );
 }
