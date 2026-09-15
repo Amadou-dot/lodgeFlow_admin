@@ -57,7 +57,7 @@ catalog edit/delete/create controls are disabled for front desk users.
 - [x] Implement membership checks, permission matrix, route enforcement, and staff UI.
 - [x] Test organization isolation, missing assignments, membership revocation, unique
   assignments, permission denials, self-change denial, and reciprocal admin revocation.
-- [ ] Final checks and Vercel preview verification.
+- [x] Final checks and Vercel preview verification.
 - [ ] Merge and verify production using an isolated staff account, then remove it.
 
 Bootstrap command (dry run by default; add `--apply` once after reviewing the count):
@@ -68,3 +68,17 @@ pnpm --filter @lodgeflow/database exec tsx --env-file=/path/to/private.env scrip
 
 Required private environment: `MONGODB_URI`, `CLERK_SECRET_KEY`,
 `LODGEFLOW_STAFF_ORG_ID`. Staff assignments survive the manual demo data reset.
+
+## Preview verification
+
+At `39da9cf`, all 1,133 tests pass (982 admin, 135 customer, 16 database),
+formatting/lint and all builds pass, and PR 146 CI is green. Both Vercel previews
+are Ready. The admin preview is `lodgeflowadmin-qpo917pl6-asecklabs.vercel.app`.
+
+An isolated Clerk account with only an ordinary `org:customer` membership verified
+that application roles control access: unassigned → 403; front desk → booking reads
+200 and catalog/settings/staff writes 403; manager → catalog/settings validation
+400 for deliberately invalid requests and staff access 403; administrator → staff
+read 200 and self-revocation 409. Deleting its application assignment returned 403
+with the same active Clerk session. No catalog or booking records were modified.
+The test identity remains only until the production verification completes.
