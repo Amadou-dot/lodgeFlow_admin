@@ -129,7 +129,7 @@ async function prepareApp(app) {
   const config = await readFile(configPath, 'utf8');
   await writeFile(
     configPath,
-    `${config}\n// Disposable harness configuration; source application config is untouched.\nconst originalWebpack = module.exports.webpack;\nmodule.exports.webpack = (config, options) => {\n config = originalWebpack ? originalWebpack(config, options) : config;\n config.resolve.alias = { ...config.resolve.alias, 'stripe$': path.join(__dirname, 'smoke-stripe.mjs'), '__smoke_actual_stripe__$': require.resolve('stripe'), 'resend$': path.join(__dirname, 'smoke-resend.mjs') };\n return config;\n};\n`
+    `${config}\n// Disposable harness configuration; source application config is untouched.\nconst originalWebpack = module.exports.webpack;\nmodule.exports.webpack = (config, options) => {\n config = originalWebpack ? originalWebpack(config, options) : config;\n config.resolve.alias = { ...config.resolve.alias, 'stripe$': path.join(__dirname, 'smoke-stripe.mjs'), '__smoke_actual_stripe__$': require.resolve('stripe'), 'resend$': path.join(__dirname, 'smoke-resend.mjs'), '__smoke_actual_resend__$': require.resolve('resend') };\n return config;\n};\n`
   );
   return target;
 }
@@ -284,6 +284,11 @@ try {
   await symlink(
     path.join(root, 'packages/database'),
     path.join(workspace, 'packages/database'),
+    'dir'
+  );
+  await symlink(
+    path.join(root, 'packages/email'),
+    path.join(workspace, 'packages/email'),
     'dir'
   );
   await symlink(
@@ -966,6 +971,10 @@ try {
   });
   assert.deepEqual(sentEmail, { id: 'email_smoke' });
   assert.equal(calls.at(-1).input.to, 'customer@example.invalid');
+  assert.equal(
+    calls.at(-1).input.from,
+    'LodgeFlow <notifications@lodgeflow.app>'
+  );
   console.log(
     'PASS existing confirmation email denial, provider failure, retry and no booking mutations'
   );
@@ -1019,6 +1028,7 @@ try {
   assert.equal(persisted.paymentConfirmationSentAt, undefined);
   assert.equal(persisted.checkoutPending, false);
   assert.equal(calls.at(-1).route, '/resend/send');
+  assert.equal(calls.at(-1).input.from, 'LodgeFlow <payments@lodgeflow.app>');
   console.log(
     'PASS real Stripe signature verification, duplicate settlement, email failure preserves durable receipt without delivery flag'
   );
@@ -1047,6 +1057,12 @@ try {
     });
     assert.deepEqual(sent, { id: 'email_smoke' });
     assert.equal(calls.at(-1).input.to, 'customer@example.invalid');
+    assert.equal(
+      calls.at(-1).input.from,
+      route === '/api/send/payment-confirm'
+        ? 'LodgeFlow <payments@lodgeflow.app>'
+        : 'LodgeFlow <notifications@lodgeflow.app>'
+    );
   }
   assert.equal(
     JSON.stringify(await Booking.findById(bookingId).lean()),
@@ -1315,11 +1331,22 @@ try {
     });
     assert.deepEqual(sent, { id: 'email_smoke' });
     assert.equal(calls.at(-1).input.to, 'customer@example.invalid');
+    assert.equal(
+      calls.at(-1).input.from,
+      'LodgeFlow <notifications@lodgeflow.app>'
+    );
   }
   console.log(
     'PASS existing admin email authorization, failure and success contracts'
   );
 
+  for (const call of calls.filter(call => call.route === '/resend/send')) {
+    assert.equal(typeof call.input.html, 'string');
+    assert.ok(
+      call.input.html.length > 100,
+      'Email template must render content'
+    );
+  }
   completed = true;
   console.log(
     'HTTP smoke passed (real Clerk SDK verifies local signed sessions; application authorization and database are real; hosted login is not exercised).'

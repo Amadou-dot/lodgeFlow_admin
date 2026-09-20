@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 
 import { DiningReservationConfirmationEmail } from '@/components/EmailTemplates';
@@ -55,7 +56,9 @@ export async function POST(request: Request) {
     }
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({
+        kind: reservation.totalPrice > 0 ? 'payment' : 'notification',
+      }),
       react: DiningReservationConfirmationEmail({
         date: reservation.date.toISOString(),
         diningData: reservation.dining,

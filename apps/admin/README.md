@@ -49,6 +49,7 @@ run from the repository root is equivalent to `pnpm dev` run from `apps/admin`,
 as in the steps below.
 
 ### Prerequisites
+
 - Node.js 22 — this repo's CI and Vercel project both run Node 22.x; the true
   floor is Node ≥ 20.9.0, which `next@16.2.10` declares in its own
   `engines.node` (`node_modules/next/package.json`)
@@ -73,9 +74,11 @@ cd apps/admin
 ### Database Setup
 
 **MongoDB Atlas (Recommended)**
+
 1. Create a free account at [MongoDB Atlas](https://mongodb.com/atlas)
 2. Create a cluster and get your connection string
 3. Add to `.env.local`:
+
 ```env
 MONGODB_URI=mongodb+srv://username:password@cluster.xxxxx.mongodb.net/lodgeflow
 SEED_SECRET=replace-with-a-long-random-secret
@@ -89,7 +92,15 @@ This is a minimal example for connecting to a database — `pnpm dev` and
 [`CLAUDE.md`](./CLAUDE.md#environment-variables-required) for the full list of
 required and optional environment variables.
 
+Existing emails default to `LodgeFlow <payments@lodgeflow.app>` for payment/refund
+messages and `LodgeFlow <notifications@lodgeflow.app>` otherwise. Optional server-only
+`LODGEFLOW_PAYMENT_EMAIL_FROM` and `LODGEFLOW_NOTIFICATION_EMAIL_FROM` override the
+mailbox in `.env.local` or deployment configuration. Supply a single mailbox, not a
+display name; empty or malformed values fail at send time. Both apps share these
+settings through `@lodgeflow/email`.
+
 **Local MongoDB**
+
 1. Install [MongoDB Community Server](https://www.mongodb.com/try/download/community)
 2. Start the MongoDB service
 3. Use the default local configuration

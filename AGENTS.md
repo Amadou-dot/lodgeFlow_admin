@@ -48,6 +48,7 @@ plan and existing-issue triage; issues #136 and #139 are outside that effort.
 | `apps/customer`                | Public browsing, customer reservations, checkout, Stripe webhook                    |
 | `packages/database/src/models` | Shared Mongoose schemas and model interfaces                                        |
 | `packages/database/src`        | Shared pricing, receipts, settlement, capacity, booking locks, connection and enums |
+| `packages/email/src`           | Shared typed, validated sender selection for existing emails                        |
 | `docs`                         | API/operations documentation, issue and PR templates, historical plans              |
 
 - Both apps use Next.js 16 App Router, React 18, TypeScript, HeroUI v2,
@@ -62,7 +63,7 @@ plan and existing-issue triage; issues #136 and #139 are outside that effort.
 - Keep database and provider runtime code on the server. Use `import type` for
   type-only dependencies. Client components should consume explicit serializable
   data shapes, not Mongoose documents.
-- Both Next configs transpile `@lodgeflow/database` and trace from the workspace
+- Both Next configs transpile `@lodgeflow/database` and `@lodgeflow/email` and trace from the workspace
   root. Preserve this configuration when moving shared code.
 
 ## Code style and type safety
@@ -234,6 +235,7 @@ incompatible duplicate date-picker types.
 | Admin without MongoDB tests               | `pnpm --filter @lodgeflow/admin test:fast`                                                          |
 | Admin integration tests                   | `pnpm --filter @lodgeflow/admin test:integration`                                                   |
 | Customer tests                            | `pnpm --filter @lodgeflow/customer test`                                                            |
+| Email sender tests                        | `pnpm --filter @lodgeflow/email test`                                                               |
 | Database tests                            | `pnpm --filter @lodgeflow/database test`                                                            |
 | One Jest subset                           | `pnpm --filter @lodgeflow/admin exec jest --selectProjects unit --testPathPatterns=booking-pricing` |
 | Workspace format/lint/tests               | `pnpm ci:check`                                                                                     |
@@ -243,7 +245,7 @@ incompatible duplicate date-picker types.
 
 - App `lint` scripts use `--fix`; use `exec eslint .` for verification.
   Root `ci:check` is read-only but **does not include builds**. CI runs formatting,
-  read-only lint, tests, and build separately for admin, customer, and database.
+  read-only lint, tests, and build separately for admin, customer, database, and email.
 - Run `pnpm test:http` for the isolated HTTP gate as well. It starts disposable
   app copies and MongoDB, uses real Clerk signature verification against local
   test identities, and controls external payment/email responses. See
@@ -285,6 +287,19 @@ incompatible duplicate date-picker types.
   commands. The cron endpoint requires `SEED_SECRET` bearer authentication even
   though it is exempt from Clerk. Do not run seeding, bootstrap, backfills, live
   Settings edits, or provider mutations without explicit scope and a known target.
+- Existing sends resolve `getEmailSender({ kind })` from `@lodgeflow/email` at the
+  send boundary. `payment` defaults to `LodgeFlow <payments@lodgeflow.app>`;
+  `notification` defaults to `LodgeFlow <notifications@lodgeflow.app>`. Optional
+  server-only `LODGEFLOW_PAYMENT_EMAIL_FROM` / `LODGEFLOW_NOTIFICATION_EMAIL_FROM`
+  override only the mailbox, not the display name. Missing overrides use defaults;
+  empty/malformed values throw `EmailSenderConfigurationError` without echoing them.
+- Payment receipts and cancellation/refund notices use `payment`. Dining/experience
+  confirmations use `payment` for positive totals and `notification` for free
+  reservations, consistently across manual and post-settlement sends. Generic cabin
+  confirmations and welcome emails use `notification`. Preserve triggers/recipients.
+- Both apps directly depend on `@react-email/render`: Resend's React email path
+  requires this optional peer at runtime. The HTTP gate exercises actual SDK
+  rendering with intercepted transport; it does not prove live inbox delivery.
 - Use the existing server logger. Preserve lazy provider setup and optional Redis
   handling. Admin rate limiting/cache can fall back to process-local state; that
   fallback is not a distributed correctness mechanism for reservations/payments.
@@ -305,7 +320,7 @@ Checked against source/configuration on 2026-09-15; reverify when touching an ar
 | `depositAmount` accumulates payments and is always frozen on update  | `booking-payments.ts`, `models/Booking.ts`, and admin booking routes separate required deposit from receipts and permit unpaid repricing. |
 | `ProcessedStripeEvent` is unexported/unused; webhook work is absent  | Exported in `packages/database/src/index.ts`; used by `apps/customer/app/api/payments/webhook/route.ts`.                                  |
 | Staff organization configuration is optional for normal admin access | `apps/admin/lib/staff-access.ts` fails closed without it.                                                                                 |
-| CI covers only both apps; quality script is the entire gate          | `.github/workflows/ci.yml` also covers database and runs builds.                                                                          |
+| CI covers only both apps; quality script is the entire gate          | `.github/workflows/ci.yml` also covers database/email and runs builds.                                                                    |
 | Cast plain component fixtures through `unknown` into Mongoose models | Refactor props/DTOs and use typed fixture builders; do not perpetuate that customer `CLAUDE.md` advice.                                   |
 | Every route returns the same `ApiResponse<T>`                        | Response declarations differ, and webhook responses have their own contract. Inspect route and caller before normalization.               |
 | Seed the database to validate ordinary changes                       | Seeding resets data. Use isolated test infrastructure for routine verification.                                                           |

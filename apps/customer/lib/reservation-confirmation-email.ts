@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { clerkClient } from '@clerk/nextjs/server';
 import { DiningReservation, ExperienceBooking } from '@lodgeflow/database';
 import {
@@ -56,7 +57,9 @@ export async function sendReservationConfirmation({
         });
   const result = await getResend().emails.send(
     {
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({
+        kind: row.totalPrice > 0 ? 'payment' : 'notification',
+      }),
       to: email,
       subject: `${kind === 'dining' ? 'Dining Reservation' : 'Experience Booking'} Confirmation - LodgeFlow`,
       react,

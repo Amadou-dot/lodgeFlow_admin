@@ -19,6 +19,7 @@ const customJestConfig = {
     '**/?(*.)+(spec|test).{js,jsx,ts,tsx}',
   ],
   moduleNameMapper: {
+    '^@lodgeflow/email$': '<rootDir>/../../packages/email/src/index.ts',
     '^@lodgeflow/database$': '<rootDir>/../../packages/database/src/index.ts',
     '^@lodgeflow/database/(.*)$': '<rootDir>/../../packages/database/src/$1',
     '^@/(.*)$': '<rootDir>/$1',

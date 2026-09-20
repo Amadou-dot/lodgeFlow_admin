@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 
 import { PaymentConfirmationEmail } from '@/components/EmailTemplates';
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     const isDeposit = !booking.isPaid;
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({ kind: 'payment' }),
       react: PaymentConfirmationEmail({
         amountPaid: safeAmountPaid,
         bookingData: booking,

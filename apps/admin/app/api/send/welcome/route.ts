@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { createRateLimitResponse, requireApiAuth } from '@/lib/api-utils';
 import {
   checkRateLimit,
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({ kind: 'notification' }),
       to: email,
       subject: 'Welcome to LodgeFlow',
       react: WelcomeEmail({ firstName }),

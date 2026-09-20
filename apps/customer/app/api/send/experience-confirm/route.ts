@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 
 import { ExperienceBookingConfirmationEmail } from '@/components/EmailTemplates';
@@ -55,7 +56,9 @@ export async function POST(request: Request) {
     }
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({
+        kind: booking.totalPrice > 0 ? 'payment' : 'notification',
+      }),
       react: ExperienceBookingConfirmationEmail({
         bookingId: booking._id.toString(),
         date: booking.date.toISOString(),
