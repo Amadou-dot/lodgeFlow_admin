@@ -26,6 +26,8 @@ Memory Server binary download. No application credentials are required.
 - Shared Mongoose schemas, pricing, booking lock, checkout quote writes, payment
   settlement, settings writes and audit persistence against disposable MongoDB.
 - The real Stripe webhook signature verifier, with locally signed payloads.
+- The installed Resend SDK and `@react-email/render` template rendering, with
+  transport intercepted before live delivery.
 
 Hosted Clerk login, browser cookies/session refresh, and production identity
 configuration are not exercised. This is real SDK token verification against a
@@ -40,15 +42,21 @@ environment uses an explicit allowlist plus throwaway configuration. Database an
 provider URLs always come from local fixtures; app `.env.local` cannot redirect
 this test toward production.
 
-Only copied Next configs alias Stripe and Resend to doubles. The doubles record
-calls and return deterministic success/failure responses through a loopback
-control server. Unsupported operations fail. They cannot make live sends or
-charges. Stripe signature verification still uses the installed real SDK.
+Only copied Next configs alias Stripe and Resend to controlled fixtures. Stripe
+operations return deterministic responses while signature verification uses the
+installed SDK. The Resend fixture subclasses the installed SDK and intercepts its
+`post` transport: React rendering remains real, so a missing renderer or template
+failure cannot be hidden by a no-op send double. Email payloads are recorded and
+return controlled success/failure through the loopback server. Unsupported
+operations fail. These email/payment paths cannot make live sends or charges.
 
 Production link assertions use `https://lodgeflow.app`; admin configuration uses
 `https://admin.lodgeflow.app`. HTTP requests themselves use local origins. Resend's
-already-configured production domain needs no setup for this test; sender repair
-and live delivery verification remain Phase 5/#132 work.
+already-configured production domain needs no setup for this test. Sender selection
+uses `@lodgeflow/email` and the approved payment/notification defaults. Live provider
+acceptance and inbox receipt remain separate Phase 5/#132 checks; local success is
+not evidence of delivery. See [the inventory](inventory.md#phase-5-implementation-existing-sender-repair-132)
+for the separately authorized live checks and their limits.
 
 ## Failure detection and cleanup
 
@@ -79,3 +87,12 @@ existing suites reused by Phase 0C. This bounded gate does not claim all routes 
 all production provider behavior are covered. The existing full suite and build
 jobs remain required. A local pass does not establish a named-commit CI pass;
 record the workflow run after these changes are committed and pushed.
+
+## Sender repair verification (2026-09-20)
+
+`pnpm test:http` passed with actual SDK rendering and intercepted transport.
+`pnpm ci:check` passed formatting/lint and 1,207 tests: admin 1,014, customer 165,
+database 25 and email 3. Separately authorized live welcome/payment-confirm route
+checks were accepted by Resend and reported `delivered`; those checks used
+synthetic identity/booking dependencies and do not prove the deployed application
+flow. User inbox confirmation and deployed-SHA verification remain pending.

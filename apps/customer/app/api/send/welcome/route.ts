@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 
 import { WelcomeEmail } from '@/components/EmailTemplates';
@@ -24,7 +25,7 @@ export async function POST() {
     }
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({ kind: 'notification' }),
       react: WelcomeEmail({ firstName }),
       subject: 'Welcome to LodgeFlow',
       to: email,

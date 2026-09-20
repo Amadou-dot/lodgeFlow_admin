@@ -1,3 +1,4 @@
+import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 import { clerkClient } from '@clerk/nextjs/server';
 
@@ -43,7 +44,7 @@ export async function sendPaymentConfirmationEmail(
     }
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({ kind: 'payment' }),
       to: email,
       subject: `Payment Confirmation - ${cabin.name}`,
       react: PaymentConfirmationEmail({
@@ -114,7 +115,7 @@ export async function sendCancellationConfirmationEmail(
         : `You will receive a ${refundType} refund of $${refundAmount.toFixed(2)}.`;
 
     const { data, error } = await getResend().emails.send({
-      from: 'LodgeFlow <onboarding@resend.dev>',
+      from: getEmailSender({ kind: 'payment' }),
       to: email,
       subject: `Booking Cancellation Confirmed - ${cabin.name}`,
       html: `
