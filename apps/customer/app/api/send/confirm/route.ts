@@ -3,7 +3,11 @@ import { getResend } from '@/lib/resend';
 
 import { BookingConfirmationEmail } from '@/components/EmailTemplates';
 import { Booking, connectDB } from '@lodgeflow/database';
-import type { PopulatedBooking } from '@/types';
+import type { BookingEmailCabin } from '@/types/booking-email';
+import {
+  serializeBookingEmailBooking,
+  serializeBookingEmailCabin,
+} from '@/lib/serializers/booking-email';
 import { auth, currentUser } from '@clerk/nextjs/server';
 
 function validateEmail(email: string): boolean {
@@ -29,9 +33,9 @@ export async function POST(request: Request) {
 
     await connectDB();
 
-    const booking = (await Booking.findById(bookingId).populate(
-      'cabin'
-    )) as unknown as PopulatedBooking | null;
+    const booking = await Booking.findById(bookingId).populate<{
+      cabin: BookingEmailCabin | null;
+    }>('cabin');
     if (!booking) {
       return Response.json({ error: 'Booking not found' }, { status: 404 });
     }
@@ -41,6 +45,10 @@ export async function POST(request: Request) {
         { error: 'Not authorized to send this confirmation' },
         { status: 403 }
       );
+    }
+
+    if (!booking.cabin) {
+      return Response.json({ error: 'Cabin not found' }, { status: 404 });
     }
 
     const user = await currentUser();
@@ -54,8 +62,8 @@ export async function POST(request: Request) {
     const { data, error } = await getResend().emails.send({
       from: getEmailSender({ kind: 'notification' }),
       react: BookingConfirmationEmail({
-        bookingData: booking,
-        cabinData: booking.cabin,
+        bookingData: serializeBookingEmailBooking(booking),
+        cabinData: serializeBookingEmailCabin(booking.cabin),
         firstName,
       }),
       subject: 'Booking Confirmation',

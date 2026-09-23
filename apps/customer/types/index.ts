@@ -27,18 +27,6 @@ export type Dining = IDining & { _id: string };
 export type ExperienceBooking = IExperienceBooking;
 export type DiningReservation = IDiningReservation;
 
-// Extended types for populated models (used in API responses)
-export interface PopulatedBooking extends Omit<
-  IBooking,
-  'cabin' | 'customer' | 'checkInDate' | 'checkOutDate'
-> {
-  cabin: ICabin;
-  customer: string; // Clerk user ID
-  checkInDate: string | Date;
-  checkOutDate: string | Date;
-  cabinName?: string;
-}
-
 // API request types
 export interface CreateCabinData {
   name: string;
