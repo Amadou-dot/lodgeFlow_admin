@@ -3,7 +3,8 @@ import { getResend } from '@/lib/resend';
 
 import { PaymentConfirmationEmail } from '@/components/EmailTemplates';
 import { Booking, connectDB } from '@lodgeflow/database';
-import type { PopulatedBooking } from '@/types';
+import type { PaymentEmailCabin } from '@/types/payment-email';
+import { serializePaymentEmailBooking } from '@/lib/serializers/payment-email';
 import { auth, currentUser } from '@clerk/nextjs/server';
 
 function validateEmail(email: string): boolean {
@@ -29,9 +30,9 @@ export async function POST(request: Request) {
 
     await connectDB();
 
-    const booking = (await Booking.findById(bookingId).populate(
-      'cabin'
-    )) as unknown as PopulatedBooking | null;
+    const booking = await Booking.findById(bookingId).populate<{
+      cabin: PaymentEmailCabin | null;
+    }>('cabin');
     if (!booking) {
       return Response.json({ error: 'Booking not found' }, { status: 404 });
     }
@@ -41,6 +42,10 @@ export async function POST(request: Request) {
         { error: 'Not authorized to send this confirmation' },
         { status: 403 }
       );
+    }
+
+    if (!booking.cabin) {
+      return Response.json({ error: 'Cabin not found' }, { status: 404 });
     }
 
     const user = await currentUser();
@@ -64,10 +69,10 @@ export async function POST(request: Request) {
       from: getEmailSender({ kind: 'payment' }),
       react: PaymentConfirmationEmail({
         amountPaid: safeAmountPaid,
-        bookingData: booking,
-        cabinData: booking.cabin,
+        bookingData: serializePaymentEmailBooking(booking),
+        cabinData: { name: booking.cabin.name },
         firstName,
-        isDeposit: isDeposit || false,
+        isDeposit,
       }),
       subject: 'Payment Confirmation - LodgeFlow',
       to: `${email}`,

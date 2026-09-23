@@ -45,6 +45,7 @@ import { POST as experience } from '@/app/api/send/experience-confirm/route';
 import { sendReservationConfirmation } from '@/lib/reservation-confirmation-email';
 import { sendCancellationConfirmationEmail } from '@/lib/email';
 import { EmailSenderConfigurationError } from '@lodgeflow/email';
+import { Types } from 'mongoose';
 
 const originalPayment = process.env.LODGEFLOW_PAYMENT_EMAIL_FROM;
 const originalNotification = process.env.LODGEFLOW_NOTIFICATION_EMAIL_FROM;
@@ -65,11 +66,14 @@ afterEach(() => {
 });
 function row(totalPrice: number) {
   return {
-    _id: 'booking',
+    _id: new Types.ObjectId('507f1f77bcf86cd7994390ab'),
     customer: 'customer',
     date: new Date('2030-01-01'),
+    checkInDate: new Date('2030-01-01'),
+    checkOutDate: new Date('2030-01-03'),
     isPaid: true,
     totalPrice,
+    remainingAmount: 0,
     payments: [{ amount: totalPrice }],
     cabin: {},
     dining: {},

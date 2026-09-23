@@ -1071,6 +1071,115 @@ try {
   console.log(
     'PASS existing customer welcome/payment email failures and retries preserve receipts'
   );
+
+  const multiPayment = await Booking.create({
+    cabin: cabin._id,
+    customer: 'smoke_customer',
+    checkInDate: new Date('2030-09-01T15:00:00.000Z'),
+    checkOutDate: new Date('2030-09-04T15:00:00.000Z'),
+    numGuests: 1,
+    cabinPrice: 300.5,
+    totalPrice: 300.5,
+    payments: [
+      {
+        id: 'receipt_first',
+        amount: 25,
+        method: 'cash',
+        receivedAt: new Date(),
+      },
+      {
+        id: 'receipt_latest',
+        amount: 75.25,
+        method: 'cash',
+        receivedAt: new Date(),
+      },
+    ],
+  });
+  const multiPaymentId = String(multiPayment._id);
+  assert.equal(multiPayment.remainingAmount, 200.25);
+  const beforeMultiEmail = JSON.stringify(
+    await Booking.findById(multiPaymentId).lean()
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/send/payment-confirm',
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: multiPaymentId, amountPaid: 999, isDeposit: false },
+      status: 200,
+    }),
+    { id: 'email_smoke' }
+  );
+  const paymentEmail = calls.at(-1).input;
+  assert.equal(paymentEmail.to, 'customer@example.invalid');
+  assert.equal(paymentEmail.subject, 'Payment Confirmation - LodgeFlow');
+  const paymentText = paymentEmail.html.replace(/<[^>]+>/g, '');
+  assert.match(paymentText, /Amount Paid:\$75\.25/);
+  assert.match(paymentText, /Payment Type:Deposit/);
+  assert.match(paymentText, /Remaining Balance:\$200\.25/);
+  assert.equal(
+    JSON.stringify(await Booking.findById(multiPaymentId).lean()),
+    beforeMultiEmail
+  );
+
+  multiPayment.cabin = new mongoose.Types.ObjectId();
+  multiPayment.checkoutPending = true;
+  multiPayment.checkoutToken = 'missing-cabin-quote';
+  multiPayment.checkoutAmount = 50;
+  multiPayment.checkoutTotalPrice = multiPayment.totalPrice;
+  multiPayment.checkoutCurrency = 'usd';
+  await multiPayment.save();
+  const beforeMissingCabin = JSON.stringify(
+    await Booking.findById(multiPaymentId).lean()
+  );
+  const callsBeforeMissingCabin = calls.length;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/send/payment-confirm',
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: multiPaymentId },
+      status: 404,
+    }),
+    { error: 'Cabin not found' }
+  );
+  assert.equal(
+    JSON.stringify(await Booking.findById(multiPaymentId).lean()),
+    beforeMissingCabin
+  );
+  const missingCabinEvent = {
+    ...event,
+    id: 'evt_missing_cabin',
+    data: {
+      object: {
+        ...event.data.object,
+        id: 'cs_missing_cabin',
+        amount_total: 5000,
+        payment_intent: 'pi_missing_cabin',
+        metadata: {
+          bookingId: multiPaymentId,
+          quoteToken: 'missing-cabin-quote',
+          isDeposit: 'true',
+        },
+      },
+    },
+  };
+  assert.deepEqual(await webhook(missingCabinEvent), { received: true });
+  assert.deepEqual(await webhook(missingCabinEvent), { received: true });
+  const settledMissingCabin = await Booking.findById(multiPaymentId).lean();
+  assert.equal(settledMissingCabin.payments.length, 3);
+  assert.equal(settledMissingCabin.amountPaid, 150.25);
+  assert.equal(settledMissingCabin.remainingAmount, 150.25);
+  assert.equal(settledMissingCabin.checkoutPending, false);
+  assert.equal(settledMissingCabin.paymentConfirmationSentAt, undefined);
+  assert.equal(calls.length, callsBeforeMissingCabin);
+  await Booking.deleteOne({ _id: multiPayment._id });
+  console.log(
+    'PASS payment email receipt balance, missing cabin denial and durable webhook settlement'
+  );
+
   const beforeCancel = JSON.stringify(await Booking.findById(bookingId).lean());
   const estimateRoute = `${detailRoute}/refund-estimate`;
   const estimate = await request({

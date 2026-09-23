@@ -1,4 +1,8 @@
 import type { Cabin, Experience, PopulatedBooking } from '@/types';
+import type {
+  PaymentEmailBooking,
+  PaymentEmailCabin,
+} from '@/types/payment-email';
 
 interface EmailTemplateProps {
   firstName: string;
@@ -11,8 +15,8 @@ interface BookingEmailTemplateProps {
 }
 
 interface PaymentEmailTemplateProps {
-  bookingData: PopulatedBooking;
-  cabinData: Cabin;
+  bookingData: PaymentEmailBooking;
+  cabinData: PaymentEmailCabin;
   firstName: string;
   amountPaid: number;
   isDeposit: boolean;
@@ -417,7 +421,7 @@ export function PaymentConfirmationEmail({
   amountPaid,
   isDeposit,
 }: PaymentEmailTemplateProps) {
-  const formatDate = (date: string | Date) => {
+  const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       day: 'numeric',
       month: 'long',
@@ -459,7 +463,7 @@ export function PaymentConfirmationEmail({
             <div style={emailStyles.row}>
               <span style={emailStyles.label}>Remaining Balance:</span>
               <span style={emailStyles.value}>
-                {formatPrice(bookingData.totalPrice - amountPaid)}
+                {formatPrice(bookingData.remainingAmount)}
               </span>
             </div>
           )}
@@ -470,7 +474,7 @@ export function PaymentConfirmationEmail({
           <div style={emailStyles.row}>
             <span style={emailStyles.label}>Booking ID:</span>
             <span style={emailStyles.value}>
-              #{bookingData._id.toString().slice(-8).toUpperCase()}
+              #{bookingData._id.slice(-8).toUpperCase()}
             </span>
           </div>
           <div style={emailStyles.row}>
