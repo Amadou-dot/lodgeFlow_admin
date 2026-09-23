@@ -83,8 +83,10 @@ Current execution status (2026-09-23): Phase 0 completed in
 `3223bd566d2d424b517a196e4dadfbfffff964e7`; its app/database CI, HTTP smoke gate
 and both previews passed. Phase 1 booking read, mutation and cancellation slices
 merged in PRs #152–#154. Sender repair #132 completed in PR #155 with production
-and user inbox evidence. Phase 1 continues with payment email boundaries; the
-milestone remains open. See the inventory's slice sections for remaining work.
+and user inbox evidence. Payment email boundaries merged in PR #156, with both
+production deployments Ready at `79b8d25` and all five main CI jobs passing.
+Phase 1 continues with generic cabin confirmation inputs; the milestone remains
+open. See the inventory's slice sections for remaining work.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

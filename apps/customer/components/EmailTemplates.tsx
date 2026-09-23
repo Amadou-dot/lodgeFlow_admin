@@ -1,4 +1,8 @@
-import type { Cabin, Experience, PopulatedBooking } from '@/types';
+import type { Experience } from '@/types';
+import type {
+  BookingEmailBooking,
+  BookingEmailCabin,
+} from '@/types/booking-email';
 import type {
   PaymentEmailBooking,
   PaymentEmailCabin,
@@ -9,8 +13,8 @@ interface EmailTemplateProps {
 }
 
 interface BookingEmailTemplateProps {
-  bookingData: PopulatedBooking;
-  cabinData: Cabin;
+  bookingData: BookingEmailBooking;
+  cabinData: BookingEmailCabin;
   firstName: string;
 }
 
@@ -183,7 +187,7 @@ export function BookingConfirmationEmail({
   cabinData,
   firstName,
 }: BookingEmailTemplateProps) {
-  const formatDate = (date: string | Date) => {
+  const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       day: 'numeric',
       month: 'long',
@@ -240,7 +244,7 @@ export function BookingConfirmationEmail({
           <div style={emailStyles.row}>
             <span style={emailStyles.label}>Booking ID:</span>
             <span style={emailStyles.value}>
-              #{bookingData._id.toString().slice(-8).toUpperCase()}
+              #{bookingData._id.slice(-8).toUpperCase()}
             </span>
           </div>
           <div style={emailStyles.row}>
@@ -314,7 +318,7 @@ export function BookingConfirmationEmail({
               Cabin ({bookingData.numNights} nights):
             </span>
             <span style={emailStyles.value}>
-              {formatPrice(bookingData.cabinPrice)}
+              {formatPrice(bookingData.cabinSubtotal)}
             </span>
           </div>
 

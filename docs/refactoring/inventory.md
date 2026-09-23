@@ -34,31 +34,31 @@ rather than treating counts as the completion gate.
 
 ## Confirmed work, ownership and bounded next steps
 
-| ID  | Source / symbol                                                                                                  | Rule or observed mismatch                                                                    | Phase    | Next action and validation                                                                                                                                      |
-| --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and payment emails use explicit inputs. Generic confirmation, checkout and other resources remain.   |
-| T02 | `apps/customer/app/api/bookings/[id]/route.ts`: `GET`                                                            | `ApiResponse<any>` returns a populated document without an explicit DTO contract.            | 1        | Complete in PR #152: explicit detail DTO/serializer with owner/missing/foreign, ID/date and missing-cabin coverage.                                             |
-| T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Narrow/serialize the populated cabin explicitly and test a missing reference without creating a checkout.                                                       |
-| T04 | `apps/customer/app/api/payments/webhook/route.ts`: confirmation payload                                          | Double cast converts a populated booking to the UI/email type.                               | 1        | Implemented in Phase 1 slice 4 below: explicit payment email inputs, nullable cabin population and preserved settlement/delivery boundaries.                    |
-| T05 | `apps/admin/types/api.ts` and `apps/admin/types/index.ts`                                                        | Query/aggregation/transport types coexist; serialization contracts need per-flow separation. | 1        | Begin with booking output and its actual callers; test IDs, dates and null references. Do not rewrite every reporting query in one PR.                          |
-| T06 | `packages/database/src/models/*`: nine `Document`-extending interfaces                                           | Persistence interfaces are re-exported across app boundaries.                                | 1        | Keep persistence behavior tested; add lean/populate/DTO types as each consumer migrates. Inheritance alone is not slated for deletion.                          |
-| T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Replace with checked input/DTO builders or real documents according to each test's responsibility; preserve behavioral assertions.                              |
-| T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                    |
-| T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Validate cached payloads and normalize dates once; retain deleted-user negative cache and transient-failure semantics.                                          |
-| F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Named options object, migrate both apps/model hooks, retain accounting regression results.                                                                      |
-| F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                |
-| F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Named identity inputs; verify membership removal, missing assignment and wrong-organization denials.                                                            |
-| F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                     |
-| V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                               |
-| V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.         |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Consolidate within one flow at a time; characterize statuses/body shapes and keep webhook acknowledgements explicit.                                            |
-| M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                      |
-| M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                           |
-| M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                    |
-| S01 | `apps/admin/hooks/useBookingForm.ts` and booking UI hooks/components                                             | Local derived price/form state and SWR/mutation invalidation require coordinated review.     | 4        | Identify redundant state and exclusive workflow states in one form; test error/retry/cache refresh. Independent extras booleans remain valid options.           |
-| E01 | Both apps' existing send routes and customer email helpers                                                       | Ten sender sites migrated to validated `@lodgeflow/email` configuration.                     | 5 / #132 | Complete in PR #155 / merge `9a9c296`: tests, both production deployments, Resend delivery and user inbox confirmation verified. No #139 features.              |
-| O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Resolve candidate findings by symbol and add appropriate targeted checks after the code passes; do not blanket-disable diagnostics or rewrite every script now. |
-| D01 | Both `CLAUDE.md` files                                                                                           | Stale model paths, deposit accounting, fixture cast advice, domains and CI description.      | 0A       | Corrected in this Phase 0 tree against source; final format/read-through verification required before review completion.                                        |
+| ID  | Source / symbol                                                                                                  | Rule or observed mismatch                                                                    | Phase    | Next action and validation                                                                                                                                                          |
+| --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and cabin emails use explicit inputs; `PopulatedBooking` is removed. Checkout/catalog and other resource aliases remain. |
+| T02 | `apps/customer/app/api/bookings/[id]/route.ts`: `GET`                                                            | `ApiResponse<any>` returns a populated document without an explicit DTO contract.            | 1        | Complete in PR #152: explicit detail DTO/serializer with owner/missing/foreign, ID/date and missing-cabin coverage.                                                                 |
+| T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Narrow/serialize the populated cabin explicitly and test a missing reference without creating a checkout.                                                                           |
+| T04 | `apps/customer/app/api/payments/webhook/route.ts`: confirmation payload                                          | Double cast converts a populated booking to the UI/email type.                               | 1        | Implemented in Phase 1 slice 4 below: explicit payment email inputs, nullable cabin population and preserved settlement/delivery boundaries.                                        |
+| T05 | `apps/admin/types/api.ts` and `apps/admin/types/index.ts`                                                        | Query/aggregation/transport types coexist; serialization contracts need per-flow separation. | 1        | Begin with booking output and its actual callers; test IDs, dates and null references. Do not rewrite every reporting query in one PR.                                              |
+| T06 | `packages/database/src/models/*`: nine `Document`-extending interfaces                                           | Persistence interfaces are re-exported across app boundaries.                                | 1        | Keep persistence behavior tested; add lean/populate/DTO types as each consumer migrates. Inheritance alone is not slated for deletion.                                              |
+| T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Replace with checked input/DTO builders or real documents according to each test's responsibility; preserve behavioral assertions.                                                  |
+| T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
+| T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Validate cached payloads and normalize dates once; retain deleted-user negative cache and transient-failure semantics.                                                              |
+| F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Named options object, migrate both apps/model hooks, retain accounting regression results.                                                                                          |
+| F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
+| F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Named identity inputs; verify membership removal, missing assignment and wrong-organization denials.                                                                                |
+| F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                                         |
+| V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
+| V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Consolidate within one flow at a time; characterize statuses/body shapes and keep webhook acknowledgements explicit.                                                                |
+| M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
+| M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
+| M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
+| S01 | `apps/admin/hooks/useBookingForm.ts` and booking UI hooks/components                                             | Local derived price/form state and SWR/mutation invalidation require coordinated review.     | 4        | Identify redundant state and exclusive workflow states in one form; test error/retry/cache refresh. Independent extras booleans remain valid options.                               |
+| E01 | Both apps' existing send routes and customer email helpers                                                       | Ten sender sites migrated to validated `@lodgeflow/email` configuration.                     | 5 / #132 | Complete in PR #155 / merge `9a9c296`: tests, both production deployments, Resend delivery and user inbox confirmation verified. No #139 features.                                  |
+| O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Resolve candidate findings by symbol and add appropriate targeted checks after the code passes; do not blanket-disable diagnostics or rewrite every script now.                     |
+| D01 | Both `CLAUDE.md` files                                                                                           | Stale model paths, deposit accounting, fixture cast advice, domains and CI description.      | 0A       | Corrected in this Phase 0 tree against source; final format/read-through verification required before review completion.                                                            |
 
 ## Phase 1 slice 1: customer cabin booking reads
 
@@ -71,8 +71,9 @@ All unqualified implementation paths above are within `apps/customer`.
   Its existing hydrated virtuals and full populated cabin remain intact.
 - **T01 partially implemented:** history/detail read hooks and their booking-page
   consumers use plain JSON types. History retains its lean selected cabin shape;
-  missing populated cabins remain null. `Booking`, `Cabin` and `PopulatedBooking`
-  aliases in `types/index.ts` remain debt for mutation, catalog and email slices.
+  missing populated cabins remain null. Subsequent slices migrate mutations and
+  cabin emails and remove `PopulatedBooking`. Remaining `Booking`/`Cabin` aliases
+  in `types/index.ts` need per-flow review.
 - History query `any` and cabin booking-page read casts are removed. Other resource
   tabs in the same page remain separate slices; no #136/#139 work is included.
 - The edit guest limit now reads `cabin.capacity`; `maxCapacity` was not a schema
@@ -121,9 +122,8 @@ slice dispositions without claiming every match in an affected file is resolved.
   writes/provider calls. The expanded gate passes against original `bddff06`
   runtime and the refactored routes.
 
-Subsequent slices completed cancellation/refund-estimate DTOs and payment email
-inputs. Generic cabin confirmation, checkout population and unrelated resource
-boundaries remain. This slice does not alter provider behavior,
+Subsequent slices completed cancellation/refund-estimate DTOs and cabin email
+inputs. Checkout population and unrelated resource boundaries remain. This slice does not alter provider behavior,
 receipt accounting or add #136/#139 scope. Final command and named-commit CI
 results are maintained on tracker #150; Phase 1 is not complete.
 
@@ -143,9 +143,8 @@ results are maintained on tracker #150; Phase 1 is not complete.
   calculations remain unchanged. Both bugs reproduce against original `ea57bd1`.
 - Route/hook tests and HTTP assertions cover deadline JSON, eligibility, ownership,
   full cancellation response booking JSON, received-money refund limits, retries
-  and provider failures. Payment email inputs are addressed in slice 4; generic
-  cabin confirmation, checkout population and other resource boundaries remain
-  future slices.
+  and provider failures. Payment and generic cabin email inputs are addressed in
+  slices 4–5; checkout population and other resource boundaries remain future slices.
 
 ## Phase 1 slice 4: customer cabin payment email inputs
 
@@ -175,11 +174,50 @@ results are maintained on tracker #150; Phase 1 is not complete.
   CI's public Clerk key without app/provider credentials. Installation retains the
   baseline optional Sharp build warning; builds pass. Hosted login and live
   delivery were not rerun for this slice.
-- Remaining boundaries: `app/api/send/confirm/route.ts`, `BookingConfirmationEmail`
-  and `types/index.ts` still use `PopulatedBooking`; checkout cabin population and
-  other resource flows remain separate slices. Phase 2 owns manual email request
+- Subsequent slice 5 migrates generic cabin confirmation and removes
+  `PopulatedBooking`. Checkout cabin population and other resource flows remain
+  separate slices. Phase 2 owns manual email request
   validation and legacy raw provider/error response contracts (V03). Phase 5 still
   needs its remaining origin/contract review; closing #132 did not finish it.
+
+## Phase 1 slice 5: generic cabin confirmation email inputs
+
+- `app/api/send/confirm/route.ts` uses typed nullable cabin population and the
+  explicit booking/cabin serializers in `lib/serializers/booking-email.ts`.
+  `BookingConfirmationEmail` consumes `types/booking-email.ts` with string IDs,
+  ISO timestamps and only rendered stay, cabin, pricing and extras fields.
+  Nested extras and amenities are copied into plain inputs without documents.
+- Removed the last `PopulatedBooking` consumer and its obsolete declaration in
+  `types/index.ts`. The existing `useSendConfirmationEmail` caller retains its
+  booking-ID request and message-ID/error response handling; no UI or trigger
+  changes were needed.
+- Preserved notification sender selection, first-email recipient, Guest fallback,
+  subject, date display, plural guests, cabin details, all five extras, pricing,
+  required deposit versus received-money balance, auth/ownership and retry behavior.
+  Request validation and legacy raw provider/error envelopes remain Phase 2/V03.
+- **Related fixes:** a deleted cabin returns `Cabin not found`/404 before rendering
+  or dispatching a confirmation. The regression fails with 500 before the fix;
+  ownership denial still runs first and returns the existing 403. Neither success,
+  provider failure/retry nor missing cabin changes booking state.
+- The HTTP gate also reproduced a mislabeled subtotal: a three-night $300 stay
+  showed `Cabin (3 nights): $100`because persisted`cabinPrice`is nightly.
+Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
+  no storage values, quote calculation, rounding or current catalog prices change.
+  A focused regression covers multiple nights and a changed catalog price.
+- Twelve characterization cases pass before runtime edits. Route rendering and
+  serializer tests cover all rendered fields, branches, sender overrides, failures,
+  explicit allowlists, real hydrated defaults and detached nested data. The HTTP
+  gate checks actual SDK-rendered content and missing-cabin no-send/no-write effects.
+- Validation on 2026-09-23: 60 focused checks pass; `pnpm ci:check` passes
+  formatting, lint and 1,250 tests (admin 1,014; customer 208; database 25; email 3).
+  Both app TypeScript checks, the expanded `pnpm test:http`, frozen installation
+  and clean app/shared production builds pass. Builds use CI's public Clerk key
+  without app/provider credentials; the baseline optional Sharp install warning
+  remains non-blocking. Hosted login and live delivery were not exercised.
+- Next boundaries: `app/api/payments/create-checkout/route.ts` still casts its
+  populated cabin, and experience confirmation/resource interfaces retain model
+  aliases. Keep checkout quote/idempotency behavior and missing-reference handling
+  in its own slice; do not expand into #136/#139.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

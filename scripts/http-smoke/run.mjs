@@ -623,6 +623,26 @@ try {
   assert.equal(orphanHistory.data.length, 1);
   assert.equal(orphanHistory.data[0]._id, String(orphan._id));
   assert.equal(orphanHistory.data[0].cabin, null);
+  const orphanBeforeEmail = JSON.stringify(
+    await Booking.findById(orphan._id).lean()
+  );
+  const callsBeforeOrphanEmail = calls.length;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/send/confirm',
+      identity: 'foreign',
+      method: 'POST',
+      body: { bookingId: String(orphan._id) },
+      status: 404,
+    }),
+    { error: 'Cabin not found' }
+  );
+  assert.equal(calls.length, callsBeforeOrphanEmail);
+  assert.equal(
+    JSON.stringify(await Booking.findById(orphan._id).lean()),
+    orphanBeforeEmail
+  );
   await Booking.deleteOne({ _id: orphan._id });
   // Legacy rows predate receipt/checkout fields; lean reads must not add defaults.
   const legacyBooking = {
@@ -975,8 +995,23 @@ try {
     calls.at(-1).input.from,
     'LodgeFlow <notifications@lodgeflow.app>'
   );
+  assert.equal(calls.at(-1).input.subject, 'Booking Confirmation');
+  const confirmationText = calls.at(-1).input.html.replace(/<[^>]+>/g, '');
+  assert.ok(confirmationText.includes(`#${bookingId.slice(-8).toUpperCase()}`));
+  assert.ok(confirmationText.includes(`Cabin:${cabin.name}`));
+  assert.match(confirmationText, /Nightly Rate:\$100\.00/);
+  assert.match(confirmationText, /Cabin \(3 nights\):\$300\.00/);
+  assert.match(confirmationText, /Extras Subtotal:\$0\.00/);
+  assert.match(confirmationText, /Total:\$300\.00/);
+  assert.match(confirmationText, /Required Deposit:\$75\.00/);
+  assert.match(confirmationText, /Remaining Balance:\$300\.00/);
+  assert.ok(!confirmationText.includes('Add-ons:'));
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforeEmail
+  );
   console.log(
-    'PASS existing confirmation email denial, provider failure, retry and no booking mutations'
+    'PASS confirmation email rendering, missing cabin/ownership denial, provider retry and no booking mutations'
   );
 
   emailFailure = true;
