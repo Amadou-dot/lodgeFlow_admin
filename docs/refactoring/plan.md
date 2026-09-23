@@ -53,14 +53,14 @@ Verified on 2026-09-15 against local and GitHub `main` at
 `07670932f0b8349fa826802a6ee27f20b3501908`. GitHub had no open PRs at review time.
 Recheck state and source before implementation or closure.
 
-| Issue                                                                                    | Verified evidence                                                                                                                                                                                                                                                                                                                      | Planned disposition                                                                                                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#132](https://github.com/Amadou-dot/lodgeFlow_admin/issues/132) sandbox sender          | Ten existing send sites now use `@lodgeflow/email` and the user-approved domain mailboxes. Both apps include the renderer required by Resend's React email path. Live welcome/payment route checks were accepted and reported delivered by Resend on 2026-09-20; user inbox confirmation and deployed-SHA verification remain pending. | Phase 5: centralize and validate sender configuration for existing email flows. The user confirms `lodgeflow.app` is already set up in Resend. Reuse that domain and keep open until the configured sender works through existing send paths; code cleanup alone is insufficient. |
-| [#133](https://github.com/Amadou-dot/lodgeFlow_admin/issues/133) workflow formatting     | Both named, tracked workflow files pass installed Prettier 3.9.6 with the root configuration.                                                                                                                                                                                                                                          | Phase 0A: recheck at implementation HEAD, then close with evidence if still resolved. Do not reformat files unnecessarily.                                                                                                                                                        |
-| [#134](https://github.com/Amadou-dot/lodgeFlow_admin/issues/134) missing lockfile        | `pnpm-lock.yaml` is tracked; the workspace overrides `@internationalized/date` to 3.12.2; the lock resolves that version; CI uses frozen installation and builds all three packages.                                                                                                                                                   | Phase 0A: verify a clean frozen install and both app builds, then close with evidence. Do not recreate the lockfile or upgrade dependencies.                                                                                                                                      |
-| [#135](https://github.com/Amadou-dot/lodgeFlow_admin/issues/135) checkout ownership leak | Customer cabin checkout queries `Booking.findOne({ _id: bookingId, customer: userId })` and returns `Booking not found`/404 when absent. The reported 403 branch is gone.                                                                                                                                                              | Phase 0C: add/verify a route regression for foreign and missing booking IDs returning identical responses, without provider calls or writes, then close.                                                                                                                          |
-| [#136](https://github.com/Amadou-dot/lodgeFlow_admin/issues/136) dining coverage         | Excluded by user direction.                                                                                                                                                                                                                                                                                                            | Leave outside the milestone.                                                                                                                                                                                                                                                      |
-| [#139](https://github.com/Amadou-dot/lodgeFlow_admin/issues/139) notification system     | Excluded by user direction.                                                                                                                                                                                                                                                                                                            | Leave outside the milestone; #132 repairs existing senders only.                                                                                                                                                                                                                  |
+| Issue                                                                                    | Verified evidence                                                                                                                                                                                                                                                                                                                                                                                  | Planned disposition                                                                                                                                             |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#132](https://github.com/Amadou-dot/lodgeFlow_admin/issues/132) sandbox sender          | Ten existing send sites now use `@lodgeflow/email` and the user-approved domain mailboxes. Both apps include the renderer required by Resend's React email path. Live welcome/payment route checks were accepted and reported delivered by Resend on 2026-09-20; the user confirmed both messages arrived, and both production deployments were verified at merge `9a9c296`. Issue #132 is closed. | Completed in PR #155, including delivery and deployed-SHA evidence on #132. Continue the remaining Phase 5 origin/contract review separately; no #139 features. |
+| [#133](https://github.com/Amadou-dot/lodgeFlow_admin/issues/133) workflow formatting     | Both named, tracked workflow files pass installed Prettier 3.9.6 with the root configuration.                                                                                                                                                                                                                                                                                                      | Phase 0A: recheck at implementation HEAD, then close with evidence if still resolved. Do not reformat files unnecessarily.                                      |
+| [#134](https://github.com/Amadou-dot/lodgeFlow_admin/issues/134) missing lockfile        | `pnpm-lock.yaml` is tracked; the workspace overrides `@internationalized/date` to 3.12.2; the lock resolves that version; CI uses frozen installation and builds all three packages.                                                                                                                                                                                                               | Phase 0A: verify a clean frozen install and both app builds, then close with evidence. Do not recreate the lockfile or upgrade dependencies.                    |
+| [#135](https://github.com/Amadou-dot/lodgeFlow_admin/issues/135) checkout ownership leak | Customer cabin checkout queries `Booking.findOne({ _id: bookingId, customer: userId })` and returns `Booking not found`/404 when absent. The reported 403 branch is gone.                                                                                                                                                                                                                          | Phase 0C: add/verify a route regression for foreign and missing booking IDs returning identical responses, without provider calls or writes, then close.        |
+| [#136](https://github.com/Amadou-dot/lodgeFlow_admin/issues/136) dining coverage         | Excluded by user direction.                                                                                                                                                                                                                                                                                                                                                                        | Leave outside the milestone.                                                                                                                                    |
+| [#139](https://github.com/Amadou-dot/lodgeFlow_admin/issues/139) notification system     | Excluded by user direction.                                                                                                                                                                                                                                                                                                                                                                        | Leave outside the milestone; #132 repairs existing senders only.                                                                                                |
 
 No issue is considered completed solely because it is assigned to this milestone.
 The initial planning review did not run application suites. A subsequent API
@@ -77,6 +77,14 @@ CI evidence are maintained on [tracking issue #150](https://github.com/Amadou-do
 Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
+
+Current execution status (2026-09-23): Phase 0 completed in
+[PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151), merge
+`3223bd566d2d424b517a196e4dadfbfffff964e7`; its app/database CI, HTTP smoke gate
+and both previews passed. Phase 1 booking read, mutation and cancellation slices
+merged in PRs #152–#154. Sender repair #132 completed in PR #155 with production
+and user inbox evidence. Phase 1 continues with payment email boundaries; the
+milestone remains open. See the inventory's slice sections for remaining work.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next
@@ -102,10 +110,10 @@ Dependencies: none. Existing issues: #133, #134.
 
 Acceptance:
 
-- [ ] Baseline results and environment blockers are recorded without weakening checks.
-- [ ] Each confirmed debt item has an owning phase and a bounded next action.
-- [ ] #133/#134 are either closed with verification evidence or have specific remaining work recorded.
-- [ ] Both apps' documentation uses the correct customer/admin domains.
+- [x] Baseline results and environment blockers are recorded without weakening checks.
+- [x] Each confirmed debt item has an owning phase and a bounded next action.
+- [x] #133/#134 are either closed with verification evidence or have specific remaining work recorded.
+- [x] Both apps' documentation uses the correct customer/admin domains.
 
 ### Phase 0B — Isolated HTTP smoke harness
 
@@ -129,12 +137,12 @@ before substantive refactoring; inventory work can continue alongside it.
 
 Acceptance:
 
-- [ ] A documented command starts isolated dependencies and both apps, exercises requests over HTTP, and cleans up reliably.
-- [ ] Each smoke case asserts the expected status, JSON/envelope or explicitly expected redirect, and relevant persisted effects.
-- [ ] Unexpected redirects, non-JSON responses, timeouts, wrong response bodies and incorrect writes fail the CI job.
-- [ ] Deliberately injecting a response failure or timeout proves the harness gate fails rather than silently passing.
-- [ ] Authentication coverage and any mocked boundaries are explicit; dummy credentials, bypass mode or server readiness alone cannot satisfy the authenticated smoke cases.
-- [ ] The harness passes on a named commit in CI; outstanding environment or credential blockers remain open gate items.
+- [x] A documented command starts isolated dependencies and both apps, exercises requests over HTTP, and cleans up reliably.
+- [x] Each smoke case asserts the expected status, JSON/envelope or explicitly expected redirect, and relevant persisted effects.
+- [x] Unexpected redirects, non-JSON responses, timeouts, wrong response bodies and incorrect writes fail the CI job.
+- [x] Deliberately injecting a response failure or timeout proves the harness gate fails rather than silently passing.
+- [x] Authentication coverage and any mocked boundaries are explicit; dummy credentials, bypass mode or server readiness alone cannot satisfy the authenticated smoke cases.
+- [x] The harness passes on a named commit in CI; outstanding environment or credential blockers remain open gate items.
 
 ### Phase 0C — High-risk behavior and failure coverage
 
@@ -160,11 +168,11 @@ Dependencies: Phase 0B and baseline inventory. Existing issue: #135.
 
 Acceptance:
 
-- [ ] Every priority route/method has mapped success and applicable denial/failure cases with observable assertions.
-- [ ] Checkout ownership, receipt retry/refund limits and existing email failure handling have passing regressions.
-- [ ] Tests verify failed requests have no unintended database/provider side effects and cannot return false success.
-- [ ] The priority suites and HTTP smoke gate pass in CI before Phase 1 or Phase 5 implementation begins.
-- [ ] Remaining lower-risk gaps have owning refactoring slices; no blanket percentage threshold substitutes for the listed outcomes.
+- [x] Every priority route/method has mapped success and applicable denial/failure cases with observable assertions.
+- [x] Checkout ownership, receipt retry/refund limits and existing email failure handling have passing regressions.
+- [x] Tests verify failed requests have no unintended database/provider side effects and cannot return false success.
+- [x] The priority suites and HTTP smoke gate pass in CI before Phase 1 or Phase 5 implementation begins.
+- [x] Remaining lower-risk gaps have owning refactoring slices; no blanket percentage threshold substitutes for the listed outcomes.
 
 ### Phase 1 — Separate persistence, transport, and UI types
 
@@ -278,8 +286,10 @@ This phase can proceed independently of unrelated UI refactors.
   Live checks on 2026-09-20 invoked existing customer welcome/payment-confirm
   handlers with synthetic identity/booking dependencies and actual templates plus
   Resend. Both sends were accepted; provider readback reported `delivered` for both.
-  Phase 5 remains active pending user inbox confirmation and deployed-SHA
-  verification. The approved private test recipient is not recorded here.
+  The user confirmed both messages arrived and the welcome email rendered correctly.
+  Both production deployments were Ready at merge `9a9c296` with the correct app
+  roots and domains. Issue #132 is closed; Phase 5 remains active for the separate
+  origin/contract review. The approved private test recipient is not recorded here.
 - Preserve existing templates, recipients, send triggers, and retry semantics.
 
 Local verification on 2026-09-20: `pnpm ci:check` passed 1,207 tests (admin 1,014,
@@ -290,10 +300,10 @@ isolated production app builds and shared package builds also passed.
 
 Acceptance:
 
-- [ ] Existing production send paths use centralized validated configuration, not hardcoded sandbox senders.
+- [x] Existing production send paths use centralized validated configuration, not hardcoded sandbox senders.
 - [ ] Tests cover missing/invalid configuration, sender reuse, provider failure and correct customer/staff link origins.
 - [x] Builds still work without Stripe/Resend secrets (clean isolated app builds and shared package builds passed on 2026-09-20).
-- [ ] #132 closes after existing send paths use the configured `lodgeflow.app` sender and delivery is validated; no #139 features are added.
+- [x] #132 closes after existing send paths use the configured `lodgeflow.app` sender and delivery is validated; no #139 features are added.
 
 ### Phase 6 — Remaining debt and milestone verification
 

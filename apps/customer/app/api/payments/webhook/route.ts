@@ -11,7 +11,8 @@ import {
   roundMoney,
 } from '@lodgeflow/database';
 import { sendPaymentConfirmationEmail } from '@/lib/email';
-import type { PopulatedBooking } from '@/types';
+import type { PaymentEmailCabin } from '@/types/payment-email';
+import { serializePaymentEmailBooking } from '@/lib/serializers/payment-email';
 import { getStripe } from '@/lib/stripe';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
@@ -83,21 +84,24 @@ export async function POST(request: NextRequest) {
               : (session.payment_intent?.id ?? ''),
         });
         if (result.changed && result.booking) {
-          const booking = await result.booking.populate('cabin');
-          const populated = booking as unknown as PopulatedBooking;
+          const booking = await result.booking.populate<{
+            cabin: PaymentEmailCabin | null;
+          }>('cabin');
           // Email is best-effort; durable receipt accounting has already succeeded.
           try {
-            const email = await sendPaymentConfirmationEmail({
-              booking: populated,
-              cabin: populated.cabin,
-              amountPaid: (session.amount_total ?? 0) / 100,
-              isDeposit: session.metadata.isDeposit === 'true',
-            });
-            if (email.success)
-              await Booking.updateOne(
-                { _id: booking._id },
-                { $set: { paymentConfirmationSentAt: new Date() } }
-              );
+            if (booking.cabin) {
+              const email = await sendPaymentConfirmationEmail({
+                booking: serializePaymentEmailBooking(booking),
+                cabin: { name: booking.cabin.name },
+                amountPaid: (session.amount_total ?? 0) / 100,
+                isDeposit: session.metadata.isDeposit === 'true',
+              });
+              if (email.success)
+                await Booking.updateOne(
+                  { _id: booking._id },
+                  { $set: { paymentConfirmationSentAt: new Date() } }
+                );
+            }
           } catch (error) {
             console.error('Payment confirmation email failed:', error);
           }

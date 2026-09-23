@@ -3,7 +3,10 @@ import { getResend } from '@/lib/resend';
 import { clerkClient } from '@clerk/nextjs/server';
 
 import { PaymentConfirmationEmail } from '@/components/EmailTemplates';
-import type { PopulatedBooking, Cabin } from '@/types';
+import type {
+  PaymentEmailBooking,
+  PaymentEmailCabin,
+} from '@/types/payment-email';
 
 function validateEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -11,8 +14,8 @@ function validateEmail(email: string): boolean {
 }
 
 export interface SendPaymentConfirmationParams {
-  booking: PopulatedBooking;
-  cabin: Cabin;
+  booking: PaymentEmailBooking;
+  cabin: PaymentEmailCabin;
   amountPaid: number;
   isDeposit: boolean;
 }
@@ -31,7 +34,7 @@ export async function sendPaymentConfirmationEmail(
   try {
     // Get user info from Clerk
     const clerk = await clerkClient();
-    const user = await clerk.users.getUser(booking.customer as string);
+    const user = await clerk.users.getUser(booking.customer);
 
     const email = user.emailAddresses?.[0]?.emailAddress;
     const firstName = user.firstName || 'Guest';
