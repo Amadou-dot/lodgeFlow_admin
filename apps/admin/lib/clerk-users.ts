@@ -4,10 +4,11 @@ import type {
   CustomerPrivateMetadata,
   CustomerPublicMetadata,
 } from '@/types';
-import { clerkClient, User } from '@clerk/nextjs/server';
+import { clerkClient, type User } from '@clerk/nextjs/server';
 
 import { logger } from '@/lib/logger';
 import { getRedisClient, REDIS_KEY_PREFIX } from '@/lib/redis';
+import { customerCacheEntrySchema } from '@/lib/validations/customer-cache';
 
 // In-memory cache for Clerk user data. Only used when Upstash is not
 // configured — see lib/redis.ts for why per-instance state is not enough in
@@ -22,42 +23,29 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 100; // Minimum 100ms between requests
 
-/**
- * Redis-serialized cache entry. The `Customer | null` payload is wrapped in an
- * object so a cached "user does not exist" (`null`) stays distinguishable from
- * a cache miss (Redis returns `null` for an absent key).
- */
-interface CachedCustomerEntry {
-  data: Customer | null;
-}
-
 function userCacheKey(userId: string): string {
   return `${REDIS_KEY_PREFIX}:clerk-user:${userId}`;
 }
 
-/**
- * JSON has no Date type, so every `Date` field survives the Redis round trip as
- * an ISO string. Rehydrate them to keep the cached `Customer` shape identical
- * to a freshly converted one.
- */
-function reviveCustomerDates(customer: Customer): Customer {
-  const toDate = (value: unknown): Date | null =>
-    value == null ? null : new Date(value as string);
+function entryToCustomer({
+  entry,
+  userId,
+}: {
+  entry: unknown;
+  userId: string;
+}): Customer | null | undefined {
+  if (entry === null) return undefined;
 
-  return {
-    ...customer,
-    created_at: toDate(customer.created_at) as Date,
-    updated_at: toDate(customer.updated_at) as Date,
-    last_sign_in_at: toDate(customer.last_sign_in_at),
-    last_active_at: toDate(customer.last_active_at) as Date,
-    lastBookingDate: customer.lastBookingDate
-      ? new Date(customer.lastBookingDate)
-      : undefined,
-  };
-}
+  const parsed = customerCacheEntrySchema.safeParse(entry);
+  if (
+    !parsed.success ||
+    (parsed.data.data !== null && parsed.data.data.id !== userId)
+  ) {
+    logger.warn('Invalid customer cache entry, treating as miss', { userId });
+    return undefined;
+  }
 
-function entryToCustomer(entry: CachedCustomerEntry): Customer | null {
-  return entry.data ? reviveCustomerDates(entry.data) : null;
+  return parsed.data.data;
 }
 
 /**
@@ -74,8 +62,8 @@ async function getCachedUser(
 
   if (redis) {
     try {
-      const entry = await redis.get<CachedCustomerEntry>(userCacheKey(userId));
-      return entry ? entryToCustomer(entry) : undefined;
+      const entry = await redis.get<unknown>(userCacheKey(userId));
+      return entryToCustomer({ entry, userId });
     } catch (error) {
       logger.error('Redis user cache read failed, treating as miss', error, {
         userId,
@@ -107,12 +95,11 @@ async function getCachedUsers(
 
   if (redis) {
     try {
-      const entries = await redis.mget<(CachedCustomerEntry | null)[]>(
-        ...userIds.map(userCacheKey)
-      );
+      const entries = await redis.mget<unknown[]>(...userIds.map(userCacheKey));
 
-      entries.forEach((entry, index) => {
-        if (entry) results.set(userIds[index], entryToCustomer(entry));
+      userIds.forEach((userId, index) => {
+        const customer = entryToCustomer({ entry: entries[index], userId });
+        if (customer !== undefined) results.set(userId, customer);
       });
 
       return results;
@@ -142,7 +129,7 @@ async function setCachedUser(
 
   if (redis) {
     try {
-      await redis.set<CachedCustomerEntry>(
+      await redis.set(
         userCacheKey(userId),
         { data: user },
         { px: CACHE_DURATION }
