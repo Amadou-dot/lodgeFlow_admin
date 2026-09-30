@@ -78,15 +78,19 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-09-23): Phase 0 completed in
+Current execution status (2026-09-30): Phase 0 completed in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151), merge
 `3223bd566d2d424b517a196e4dadfbfffff964e7`; its app/database CI, HTTP smoke gate
 and both previews passed. Phase 1 booking read, mutation and cancellation slices
 merged in PRs #152–#154. Sender repair #132 completed in PR #155 with production
 and user inbox evidence. Payment email boundaries merged in PR #156, with both
 production deployments Ready at `79b8d25` and all five main CI jobs passing.
-Phase 1 continues with generic cabin confirmation inputs; the milestone remains
-open. See the inventory's slice sections for remaining work.
+Generic cabin confirmation inputs merged in PR #157, with both production
+deployments verified Ready at `b4459cd` on 2026-09-23 and all five main CI jobs
+passing. Phase 1 has five merged slices. The sixth slice implements checkout
+populated-cabin typing and missing-reference handling; its local validation and
+remaining experience/catalog/admin boundaries are recorded in the inventory.
+The milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

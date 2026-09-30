@@ -643,6 +643,47 @@ try {
     JSON.stringify(await Booking.findById(orphan._id).lean()),
     orphanBeforeEmail
   );
+  for (const quote of [
+    { checkoutPending: false },
+    {
+      checkoutPending: true,
+      checkoutToken: 'orphan-quote',
+      checkoutAmount: 25,
+      checkoutTotalPrice: 100,
+      checkoutCurrency: 'usd',
+    },
+    { checkoutPending: true, stripeSessionId: 'cs_orphan' },
+  ]) {
+    await Booking.updateOne({ _id: orphan._id }, { $set: quote });
+    const beforeCheckout = JSON.stringify(
+      await Booking.findById(orphan._id).lean()
+    );
+    const callsBeforeCheckout = calls.length;
+    for (const attempt of [
+      { identity: 'customer', error: 'Booking not found' },
+      { identity: 'foreign', error: 'Cabin not found' },
+    ]) {
+      assert.deepEqual(
+        await request({
+          origin: customer,
+          route: '/api/payments/create-checkout',
+          identity: attempt.identity,
+          method: 'POST',
+          body: { bookingId: String(orphan._id) },
+          status: 404,
+        }),
+        { success: false, error: attempt.error }
+      );
+      assert.equal(
+        JSON.stringify(await Booking.findById(orphan._id).lean()),
+        beforeCheckout
+      );
+      assert.equal(calls.length, callsBeforeCheckout);
+    }
+  }
+  console.log(
+    'PASS missing-cabin checkout denial preserves new/existing quotes with no provider calls'
+  );
   await Booking.deleteOne({ _id: orphan._id });
   // Legacy rows predate receipt/checkout fields; lean reads must not add defaults.
   const legacyBooking = {
@@ -910,6 +951,9 @@ try {
     success: true,
     data: { url: 'https://checkout.stripe.invalid/smoke' },
   });
+  const beforeCheckoutRetry = JSON.stringify(
+    await Booking.findById(bookingId).lean()
+  );
   const retry = await request({
     origin: customer,
     route: '/api/payments/create-checkout',
@@ -920,6 +964,7 @@ try {
   });
   assert.deepEqual(retry, checkout);
   persisted = await Booking.findById(bookingId).lean();
+  assert.equal(JSON.stringify(persisted), beforeCheckoutRetry);
   assert.equal(persisted.checkoutToken, quoteToken);
   assert.equal(persisted.payments.length, 0);
   assert.equal(sessions.size, 1);
@@ -947,11 +992,31 @@ try {
     creations[0].options.idempotencyKey,
     creations[1].options.idempotencyKey
   );
-  assert.equal(creations[1].input.line_items[0].price_data.unit_amount, 7500);
-  assert.match(
-    creations[1].input.success_url,
-    /^https:\/\/lodgeflow\.app\/payments\/success\?/
-  );
+  assert.deepEqual(creations[1].input, {
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          unit_amount: 7500,
+          product_data: { name: 'Smoke Cabin', description: 'Booking deposit' },
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      bookingId,
+      userId: 'smoke_customer',
+      isDeposit: 'true',
+      quoteToken,
+    },
+    payment_intent_data: {
+      metadata: { bookingId, userId: 'smoke_customer', quoteToken },
+    },
+    success_url: `https://lodgeflow.app/payments/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
+    cancel_url: `https://lodgeflow.app/payments/cancel?booking_id=${bookingId}`,
+  });
   console.log(
     'PASS checkout provider failure, retained quote, retry/idempotency, customer return origin'
   );
