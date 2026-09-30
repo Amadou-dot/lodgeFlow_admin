@@ -51,7 +51,7 @@ rather than treating counts as the completion gate.
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                                         |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Consolidate within one flow at a time; characterize statuses/body shapes and keep webhook acknowledgements explicit.                                                                |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slice 1: validated requests and safe errors for three migrated customer confirmations. Continue per flow; preserve webhook acknowledgements.                                                                |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -194,7 +194,7 @@ results are maintained on tracker #150; Phase 1 is not complete.
 - Preserved notification sender selection, first-email recipient, Guest fallback,
   subject, date display, plural guests, cabin details, all five extras, pricing,
   required deposit versus received-money balance, auth/ownership and retry behavior.
-  Request validation and legacy raw provider/error envelopes remain Phase 2/V03.
+  Request validation and safe errors are addressed in Phase 2 slice 1 below.
 - **Related fixes:** a deleted cabin returns `Cabin not found`/404 before rendering
   or dispatching a confirmation. The regression fails with 500 before the fix;
   ownership denial still runs first and returns the existing 403. Neither success,
@@ -294,10 +294,49 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   and all app/shared builds pass. Build inputs use CI's public Clerk key without
   app/provider credentials. Existing optional Sharp install warnings and expected
   missing-MongoDB prerender fallbacks remain non-blocking. Hosted login and live
-  provider delivery were not exercised. Remote CI/deployment verification is pending.
+  provider delivery were not exercised.
+- Delivered in [PR #159](https://github.com/Amadou-dot/lodgeFlow_admin/pull/159),
+  reviewed `50903a8`, merged as `0ec23d4`. All five
+  [PR CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36766407060)
+  and [main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36766670826)
+  pass. Both previews and production deployments are Ready at the respective exact
+  SHAs. Configured app roots and deployment build routes match; production aliases
+  are `lodgeflow.app` / `www.lodgeflow.app` and `admin.lodgeflow.app`.
 - Remaining Phase 1 work includes customer catalog/resource aliases in
-  `types/index.ts` and admin booking DTOs (T05). Manual email request validation
-  and legacy raw errors remain Phase 2/V03. No #136/#139 scope is added.
+  `types/index.ts` and admin booking DTOs (T05). The three migrated manual
+  confirmation request/error boundaries are addressed below. No #136/#139 scope is added.
+
+## Phase 2 slice 1: manual customer confirmation request/error boundaries
+
+- `lib/validations/confirmation-email.ts` parses unknown request bodies using
+  Zod and derives the input type. `app/api/send/{confirm,payment-confirm,
+  experience-confirm}/route.ts` authenticate before parsing and validate before
+  database access. IDs must be 24 hexadecimal characters; extra fields remain
+  ignored. `useSendConfirmationEmail` constructs the schema-derived request.
+- **Related fixes:** malformed JSON now returns `Invalid JSON body`/400;
+  non-object bodies return `Invalid request body`/400; malformed IDs and operator
+  objects return `Invalid booking ID`/400. Missing IDs retain their existing 400.
+  These cases previously escaped handlers, reached database queries or produced
+  misleading responses. No database/provider calls occur for rejected input.
+- Unexpected authentication/database/identity/provider failures now return
+  `{ error: 'Failed to send confirmation email' }`/500 and use the existing server
+  logger. This deliberately replaces raw provider/error objects in those three
+  routes. Successful provider-ID responses and ownership/missing-resource/receipt/
+  unpaid denials, senders, recipients and retry behavior are preserved.
+- Twelve new characterization cases pass before runtime edits; all 48 new boundary
+  regressions fail before and pass after. Existing rendered-content suites and two
+  hook cases retain success/error/retry behavior. The expanded HTTP gate verifies
+  malformed JSON/bodies/IDs, injected database and provider failures, safe envelopes,
+  unchanged bookings and no provider effects for validation/database failures.
+- Local validation on 2026-09-30: 120 focused tests pass; `pnpm ci:check` passes
+  formatting, lint and 1,364 tests (admin 1,014; customer 322; database 25; email 3).
+  Both app type checks, `pnpm test:http`, clean frozen install and all app/shared
+  builds pass. Runtime/test files match validated build inputs. No hosted login or
+  live provider delivery; existing optional Sharp and missing-MongoDB build warnings
+  remain non-blocking. Remote CI and deployment verification are pending.
+- Remaining V03 work includes customer `app/api/send/{welcome,dining-confirm}`,
+  admin send routes and checkout validation/errors. Catalog/resource/admin DTOs
+  remain Phase 1; receipt accounting and settlement delivery are unchanged.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

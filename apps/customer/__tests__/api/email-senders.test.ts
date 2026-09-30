@@ -91,7 +91,10 @@ function useRow(totalPrice: number) {
 function request() {
   return new Request('http://localhost/api/send', {
     method: 'POST',
-    body: JSON.stringify({ bookingId: 'booking', reservationId: 'booking' }),
+    body: JSON.stringify({
+      bookingId: '507f1f77bcf86cd7994390ab',
+      reservationId: 'booking',
+    }),
   });
 }
 

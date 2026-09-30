@@ -1,3 +1,5 @@
+import { logger } from '@lodgeflow/database/logger';
+import { readBookingConfirmationRequest } from '@/lib/validations/confirmation-email';
 import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 
@@ -16,20 +18,19 @@ function validateEmail(email: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  const { bookingId } = await request.json();
-
   try {
-    if (!bookingId) {
+    const { userId } = await auth();
+    if (!userId) {
       return Response.json(
-        { error: 'Booking ID is required' },
-        { status: 400 }
+        { error: 'Authentication required' },
+        { status: 401 }
       );
     }
+
+    const input = await readBookingConfirmationRequest(request);
+    if (!input.success)
+      return Response.json({ error: input.error }, { status: 400 });
+    const { bookingId } = input.data;
 
     await connectDB();
 
@@ -78,11 +79,23 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return Response.json({ error }, { status: 500 });
+      logger.error('Confirmation provider rejected the send', error, {
+        route: 'experience-confirm',
+      });
+      return Response.json(
+        { error: 'Failed to send confirmation email' },
+        { status: 500 }
+      );
     }
 
     return Response.json(data);
-  } catch (error) {
-    return Response.json({ error }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('Confirmation request failed', error, {
+      route: 'experience-confirm',
+    });
+    return Response.json(
+      { error: 'Failed to send confirmation email' },
+      { status: 500 }
+    );
   }
 }
