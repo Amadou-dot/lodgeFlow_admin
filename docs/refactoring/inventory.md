@@ -49,6 +49,7 @@ rather than treating counts as the completion gate.
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Named identity inputs; verify membership removal, missing assignment and wrong-organization denials.                                                                                |
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                                         |
+| F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slice 1: validated requests and safe errors for three migrated customer confirmations. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -367,7 +368,39 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   install and all app/shared builds pass. All six runtime/script calls use one
   object; runtime/test inputs match the validated build. No hosted login, live
   providers, seeding or live audit. Existing optional Sharp/missing-MongoDB build
-  warnings remain non-blocking. Remote CI and deployment verification are pending.
+  warnings remain non-blocking.
+- Delivered in [PR #161](https://github.com/Amadou-dot/lodgeFlow_admin/pull/161),
+  reviewed `5f44055`, merged as `bf57e71`. All five
+  [PR CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36769174761)
+  and [main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36769414531)
+  pass. Both previews and production deployments are Ready at the exact respective
+  SHAs, with matching configured roots, built routes and production domains.
+
+## Phase 2 slice 3: named customer booking update inputs (F05)
+
+- `updateCustomerBooking({ bookingId, customerId, updates })` replaces adjacent
+  identity strings. Its only runtime caller, customer `PATCH /api/bookings/[id]`,
+  passes the route booking ID, server-authenticated customer ID and parsed updates
+  explicitly. All test callers migrate; the positional signature is removed.
+- Traced the operation through shared Booking/Cabin/Settings models, server
+  pricing, the PATCH serializer, `useUpdateBooking` and `app/bookings/page.tsx`.
+  The existing `BookingDetail` response, error mapping, editable fields and
+  booking/history cache invalidation are unchanged; no UI changes are required.
+- The existing six database payment/domain cases plus three new characterization
+  cases pass before the signature change. New assertions cover invalid/missing/
+  foreign identities returning the same 404 without writes, checked-in/checked-out/
+  cancelled bookings denying updates without writes, and permitted paid special
+  requests retaining the saved quote and receipt accounting. Existing cases protect
+  capacity, unpaid pricing, checkout/paid repricing guards and optimistic saves.
+- Local validation on 2026-09-30: all nine focused database cases pass before and
+  after; `pnpm ci:check` passes formatting, lint and 1,375 tests (admin 1,014;
+  customer 322; database 36; email 3). Both app type checks, database type check,
+  `pnpm test:http`, clean frozen install and all app/shared builds pass. Runtime/
+  test files match the validated build inputs. Existing optional Sharp and absent-
+  MongoDB build warnings remain non-blocking; no hosted login or live providers.
+  Remote CI and deployment verification are pending.
+- Other customer query error/validation normalization, catalog/admin DTOs and
+  reservation helper APIs remain separate slices; no #136/#139 scope is added.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

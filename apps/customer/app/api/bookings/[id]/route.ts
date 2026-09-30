@@ -110,11 +110,11 @@ export async function PATCH(
       return validationErrorResponse(validation.error);
     }
 
-    const updatedBooking = await updateCustomerBooking(
-      id,
-      userId,
-      validation.data
-    );
+    const updatedBooking = await updateCustomerBooking({
+      bookingId: id,
+      customerId: userId,
+      updates: validation.data,
+    });
 
     const response: ApiResponse<BookingDetail> = {
       success: true,
