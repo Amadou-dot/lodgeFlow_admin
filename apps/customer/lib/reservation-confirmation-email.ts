@@ -1,11 +1,36 @@
 import { getEmailSender } from '@lodgeflow/email';
 import { clerkClient } from '@clerk/nextjs/server';
 import { DiningReservation, ExperienceBooking } from '@lodgeflow/database';
+import type { IDiningReservation } from '@lodgeflow/database';
+import type { ComponentProps } from 'react';
 import {
   DiningReservationConfirmationEmail,
   ExperienceBookingConfirmationEmail,
 } from '@/components/EmailTemplates';
 import { getResend } from './resend';
+import {
+  serializeExperienceEmailBooking,
+  serializeExperienceEmailExperience,
+  type ExperienceConfirmationRecord,
+} from './serializers/experience-email';
+
+type DiningEmailData = ComponentProps<
+  typeof DiningReservationConfirmationEmail
+>['diningData'];
+
+type DiningConfirmationRecord = Pick<
+  IDiningReservation,
+  | 'customer'
+  | 'date'
+  | 'time'
+  | 'numGuests'
+  | 'totalPrice'
+  | 'occasion'
+  | 'tablePreference'
+  | 'isPaid'
+  | 'status'
+  | 'paymentConfirmationSentAt'
+> & { dining: DiningEmailData | null };
 
 /** Called after durable payment settlement; webhook retries recover failed delivery. */
 export async function sendReservationConfirmation({
@@ -15,17 +40,28 @@ export async function sendReservationConfirmation({
   kind: 'dining' | 'experience';
   id: string;
 }) {
-  const Model = kind === 'dining' ? DiningReservation : ExperienceBooking;
-  const row = await Model.findById(id).populate(
-    kind === 'dining' ? 'dining' : 'experience'
-  );
+  const reservation =
+    kind === 'dining'
+      ? {
+          kind,
+          row: await DiningReservation.findById(id)
+            .populate('dining')
+            .lean<DiningConfirmationRecord | null>(),
+        }
+      : {
+          kind,
+          row: await ExperienceBooking.findById(id)
+            .populate('experience')
+            .lean<ExperienceConfirmationRecord | null>(),
+        };
   if (
-    !row ||
-    !row.isPaid ||
-    row.paymentConfirmationSentAt ||
-    row.status === 'cancelled'
+    !reservation.row ||
+    !reservation.row.isPaid ||
+    reservation.row.paymentConfirmationSentAt ||
+    reservation.row.status === 'cancelled'
   )
     return;
+  const row = reservation.row;
   const user = await (await clerkClient()).users.getUser(row.customer);
   const email =
     user.emailAddresses.find(
@@ -34,26 +70,24 @@ export async function sendReservationConfirmation({
   if (!email) throw new Error('Customer has no email address');
   const firstName = user.firstName || 'Guest';
   const react =
-    kind === 'dining'
+    reservation.kind === 'dining'
       ? DiningReservationConfirmationEmail({
           reservationId: id,
-          date: row.date.toISOString(),
-          diningData: row.dining,
+          date: reservation.row.date.toISOString(),
+          diningData: requireDiningReference(reservation.row.dining),
           firstName,
-          numGuests: row.numGuests,
-          occasion: row.occasion,
-          tablePreference: row.tablePreference,
-          time: row.time,
-          totalPrice: row.totalPrice,
+          numGuests: reservation.row.numGuests,
+          occasion: reservation.row.occasion,
+          tablePreference: reservation.row.tablePreference,
+          time: reservation.row.time,
+          totalPrice: reservation.row.totalPrice,
         })
       : ExperienceBookingConfirmationEmail({
-          bookingId: id,
-          date: row.date.toISOString(),
-          experienceData: row.experience,
+          ...serializeExperienceEmailBooking(reservation.row),
+          experienceData: serializeExperienceEmailExperience(
+            reservation.row.experience
+          ),
           firstName,
-          numParticipants: row.numParticipants,
-          timeSlot: row.timeSlot,
-          totalPrice: row.totalPrice,
         });
   const result = await getResend().emails.send(
     {
@@ -67,8 +101,17 @@ export async function sendReservationConfirmation({
     { idempotencyKey: `reservation-confirmation:${kind}:${id}` }
   );
   if (result.error) throw new Error(result.error.message);
+  const Model = kind === 'dining' ? DiningReservation : ExperienceBooking;
   await Model.updateOne(
     { _id: id },
     { $set: { paymentConfirmationSentAt: new Date() }, $inc: { __v: 1 } }
   );
+}
+
+function requireDiningReference(
+  dining: DiningEmailData | null
+): DiningEmailData {
+  // Preserve the existing retryable failure for a deleted dining reference.
+  if (!dining) throw new TypeError('Dining item not found');
+  return dining;
 }

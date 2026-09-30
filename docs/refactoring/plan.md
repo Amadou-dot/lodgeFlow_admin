@@ -87,10 +87,13 @@ and user inbox evidence. Payment email boundaries merged in PR #156, with both
 production deployments Ready at `79b8d25` and all five main CI jobs passing.
 Generic cabin confirmation inputs merged in PR #157, with both production
 deployments verified Ready at `b4459cd` on 2026-09-23 and all five main CI jobs
-passing. Phase 1 has five merged slices. The sixth slice implements checkout
-populated-cabin typing and missing-reference handling; its local validation and
-remaining experience/catalog/admin boundaries are recorded in the inventory.
-The milestone remains open.
+passing. Checkout population and missing-reference handling merged in PR #158 as
+`80a2cc9`, with all five main CI jobs passing and both production deployments
+verified Ready at that SHA. Phase 1 has six merged slices; experience-confirmation
+email inputs are implemented locally with 1,302 tests, both app type checks,
+the expanded HTTP gate and clean builds passing. That seventh slice awaits PR CI
+and deployment verification. The inventory records validation and remaining
+catalog/resource/admin boundaries; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

@@ -1,4 +1,7 @@
-import type { Experience } from '@/types';
+import type {
+  ExperienceEmailBooking,
+  ExperienceEmailExperience,
+} from '@/types/experience-email';
 import type {
   BookingEmailBooking,
   BookingEmailCabin,
@@ -26,14 +29,9 @@ interface PaymentEmailTemplateProps {
   isDeposit: boolean;
 }
 
-interface ExperienceBookingEmailProps {
-  experienceData: Experience;
+interface ExperienceBookingEmailProps extends ExperienceEmailBooking {
+  experienceData: ExperienceEmailExperience;
   firstName: string;
-  date: string;
-  numParticipants: number;
-  totalPrice: number;
-  bookingId: string;
-  timeSlot?: string;
 }
 
 interface DiningReservationEmailProps {

@@ -249,12 +249,55 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   key and no app/provider credentials. Changed runtime/test files match those
   build inputs. The existing optional Sharp install warning remains non-blocking;
   database-dependent prerender fallbacks log the deliberately absent MongoDB URI.
-  Remote CI/deployment, hosted login and live provider operations were not run
-  for this slice.
-- Remaining boundaries: customer `app/api/send/experience-confirm/route.ts`,
-  `types/index.ts` catalog/resource aliases and admin booking DTOs (T05).
+  Hosted login and live provider operations were not run for this slice.
+- Delivered in [PR #158](https://github.com/Amadou-dot/lodgeFlow_admin/pull/158),
+  reviewed `953f0c9`, merged as `80a2cc9` on 2026-09-30. All five
+  [PR CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36762984859)
+  and [main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36763670779)
+  pass. Both previews and production deployments are Ready at their respective
+  exact SHAs. Configured roots are `apps/customer` and `apps/admin`; deployment
+  build logs confirm the matching app routes. Production aliases are `lodgeflow.app`
+  / `www.lodgeflow.app` and `admin.lodgeflow.app`.
+- Experience confirmation is addressed in slice 7 below. Remaining boundaries:
+  customer `types/index.ts` catalog/resource aliases and admin booking DTOs (T05).
   Checkout request validation/error normalization remains Phase 2/V03; money
   constructors/conversions remain Phase 3/M03. Phase 1 and the milestone remain open.
+
+## Phase 1 slice 7: experience confirmation email inputs
+
+- `types/experience-email.ts` and `lib/serializers/experience-email.ts` define
+  explicit rendered fields, string IDs and ISO dates. The manual confirmation
+  route and post-settlement helper use typed, nullable populated lean records;
+  `ExperienceBookingConfirmationEmail` no longer accepts the catalog model alias.
+  Arrays are copied, and omitted legacy arrays retain empty-section behavior.
+- **Related fix:** the manual route returns `Experience not found`/404 for an
+  owned, payable booking whose experience was deleted, before provider calls or
+  writes. Existing 403 ownership and 409 unpaid denials still take precedence.
+  Twenty-two characterization cases passed before runtime changes; the missing
+  reference regression failed with the previous 500 and passes after the fix.
+- Preserved rendered content and saved totals, paid/free sender selection,
+  manual first-email and settlement primary-email selection, Guest fallback,
+  provider response envelopes, triggers and idempotency keys. No UI caller or
+  request contract changed. The shared helper retains dining rendering and guards.
+- Experience settlement still returns a retryable 500 when confirmation fails,
+  including a missing experience. One durable receipt remains; delivery and
+  processed-event markers are absent until a successful retry. This is distinct
+  from the cabin webhook's existing acknowledgement behavior. Duplicate events
+  after success neither resend nor add a receipt.
+- HTTP coverage exercises actual SDK rendering, primary versus first recipients,
+  paid/free confirmations, sparse catalog rows, auth/ownership/unpaid denial,
+  failed delivery/retry, missing-reference recovery, receipt idempotency and the
+  dining branch of the shared helper against disposable MongoDB.
+- Local validation on 2026-09-30: 51 focused checks pass; `pnpm ci:check` passes
+  formatting, read-only lint and 1,302 tests (admin 1,014; customer 260; database 25;
+  email 3). Both app `tsc --noEmit` checks, `pnpm test:http`, a clean frozen install
+  and all app/shared builds pass. Build inputs use CI's public Clerk key without
+  app/provider credentials. Existing optional Sharp install warnings and expected
+  missing-MongoDB prerender fallbacks remain non-blocking. Hosted login and live
+  provider delivery were not exercised. Remote CI/deployment verification is pending.
+- Remaining Phase 1 work includes customer catalog/resource aliases in
+  `types/index.ts` and admin booking DTOs (T05). Manual email request validation
+  and legacy raw errors remain Phase 2/V03. No #136/#139 scope is added.
 
 ## Phase 5 implementation: existing sender repair (#132)
 
