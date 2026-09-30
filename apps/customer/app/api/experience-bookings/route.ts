@@ -27,11 +27,11 @@ export async function POST(request: NextRequest) {
     if (!validation.success) return validationErrorResponse(validation.error);
     await connectDB();
     const { experienceId, ...selection } = validation.data;
-    const data = await createExperienceReservation(
-      experienceId,
-      userId,
-      selection
-    );
+    const data = await createExperienceReservation({
+      experienceId: experienceId,
+      customerId: userId,
+      selection: selection,
+    });
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
     if (error instanceof ReservationRuleError)

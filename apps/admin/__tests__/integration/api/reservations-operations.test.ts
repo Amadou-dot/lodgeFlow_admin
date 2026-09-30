@@ -284,11 +284,11 @@ it('clamps calendar ranges and rejects invalid or reversed windows', async () =>
 });
 it('enforces native transitions, stale-state checks, strict payloads, and audit events', async () => {
   const f = await fixtures();
-  const reservation = await createDiningReservation(
-    String(f.dining._id),
-    'user_guest',
-    { date: day, time: '19:00', numGuests: 2 }
-  );
+  const reservation = await createDiningReservation({
+    diningId: String(f.dining._id),
+    customerId: 'user_guest',
+    selection: { date: day, time: '19:00', numGuests: 2 },
+  });
   const id = String(reservation!._id);
   expect(
     (
@@ -341,11 +341,11 @@ it('enforces native transitions, stale-state checks, strict payloads, and audit 
     'confirmed',
     'no-show',
   ]);
-  const exp = await createExperienceReservation(
-    String(f.experience._id),
-    'user_guest',
-    { date: day, numParticipants: 2 }
-  );
+  const exp = await createExperienceReservation({
+    experienceId: String(f.experience._id),
+    customerId: 'user_guest',
+    selection: { date: day, numParticipants: 2 },
+  });
   expect(
     (
       await patchExperience(
@@ -357,10 +357,14 @@ it('enforces native transitions, stale-state checks, strict payloads, and audit 
 });
 it('releases capacity with the shared transaction and rejects competing stale status edits', async () => {
   const f = await fixtures();
-  const reservation = await createDiningReservation(String(f.dining._id), 'a', {
-    date: day,
-    time: '19:00',
-    numGuests: 4,
+  const reservation = await createDiningReservation({
+    diningId: String(f.dining._id),
+    customerId: 'a',
+    selection: {
+      date: day,
+      time: '19:00',
+      numGuests: 4,
+    },
   });
   const id = String(reservation!._id);
   const results = await Promise.allSettled([
@@ -374,10 +378,14 @@ it('releases capacity with the shared transaction and rejects competing stale st
   if (current.status === 'confirmed')
     await transitionCapacityReservation('dining', id, 'confirmed', 'no-show');
   await expect(
-    createDiningReservation(String(f.dining._id), 'b', {
-      date: day,
-      time: '19:00',
-      numGuests: 4,
+    createDiningReservation({
+      diningId: String(f.dining._id),
+      customerId: 'b',
+      selection: {
+        date: day,
+        time: '19:00',
+        numGuests: 4,
+      },
     })
   ).resolves.toBeTruthy();
 });
@@ -443,10 +451,14 @@ it('records partial payments with refund permissions and allows cancellation aft
   const { recordReservationReceipt, updateDiningReservation } =
     await import('@lodgeflow/database');
   const f = await fixtures();
-  const row = await createDiningReservation(String(f.dining._id), 'guest', {
-    date: day,
-    time: '19:00',
-    numGuests: 2,
+  const row = await createDiningReservation({
+    diningId: String(f.dining._id),
+    customerId: 'guest',
+    selection: {
+      date: day,
+      time: '19:00',
+      numGuests: 2,
+    },
   });
   const id = String(row!._id);
   const payload = {
@@ -464,7 +476,12 @@ it('records partial payments with refund permissions and allows cancellation aft
     await AuditLog.countDocuments({ resourceId: id, action: 'payment.record' })
   ).toBe(1);
   await expect(
-    updateDiningReservation(id, 'guest', { numGuests: 3 })
+    updateDiningReservation({
+      reservationId: id,
+      customerId: 'guest',
+      action: 'update',
+      updates: { numGuests: 3 },
+    })
   ).rejects.toMatchObject({ status: 409 });
   await expect(
     transitionCapacityReservation('dining', id, 'pending', 'cancelled')

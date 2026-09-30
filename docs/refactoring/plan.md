@@ -86,15 +86,15 @@ boundaries, plus validated cached customer payloads. Phase 2 has eleven merged
 slices (PRs #160–#163, #165–#166 and #169–#173), covering request validation, named
 helper inputs, unused pagination cleanup, public cabin visibility and booking
 status actions. Sender repair #132 completed separately in PR #155 with production
-and user inbox evidence. The latest merge,
-[PR #173](https://github.com/Amadou-dot/lodgeFlow_admin/pull/173) at `c6d79a0`,
-has both production apps verified Ready at that SHA. Its five PR CI jobs passed;
-main CI passed four jobs but exposed an order-dependent cache test fixture in the
-admin job. Repairing that gate takes priority before the next Phase 2 slice:
-named guest reservation helper inputs and tagged update/cancel operations.
-Other resource/admin DTOs, money and UI work remain open. The inventory and
-tracker retain per-slice validation and delivery evidence; the milestone remains
-open.
+and user inbox evidence. Booking status actions shipped in
+[PR #173](https://github.com/Amadou-dot/lodgeFlow_admin/pull/173). Its main CI run
+exposed an order-dependent cache fixture; the test-only repair in
+[PR #174](https://github.com/Amadou-dot/lodgeFlow_admin/pull/174) merged at `911fcae`
+with all five main CI jobs passing and both production apps verified Ready at that
+SHA. Phase 2 continues with named guest reservation helper inputs and tagged
+update/cancel operations. Other resource/admin DTOs, staff/catalog operations,
+money and UI work remain open. The inventory and tracker retain per-slice
+validation and delivery evidence; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next
