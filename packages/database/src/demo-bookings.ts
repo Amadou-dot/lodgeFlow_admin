@@ -72,7 +72,11 @@ export function buildDemoBookings(
         : [];
     return {
       ...pricing,
-      ...paymentSummary(pricing.totalPrice, depositAmount, payments),
+      ...paymentSummary({
+        totalPrice: pricing.totalPrice,
+        depositAmount,
+        payments,
+      }),
       cabin: cabin._id,
       customer: customers[index % customers.length],
       checkInDate,

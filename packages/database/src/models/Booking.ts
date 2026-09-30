@@ -276,7 +276,11 @@ BookingSchema.pre('validate', function (this: IBooking) {
   }
   Object.assign(
     this,
-    paymentSummary(this.totalPrice, this.depositAmount, this.payments)
+    paymentSummary({
+      totalPrice: this.totalPrice,
+      depositAmount: this.depositAmount,
+      payments: this.payments,
+    })
   );
 });
 
