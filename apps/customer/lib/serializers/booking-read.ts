@@ -1,8 +1,16 @@
+import {
+  serializeCabinSummary,
+  serializeCabinDetail,
+  type CabinSummarySource as HistoryCabinSource,
+  type CabinDetailSource as DetailCabinSource,
+} from './cabin-read';
+export type {
+  CabinSummarySource as HistoryCabinSource,
+  CabinDetailSource as DetailCabinSource,
+} from './cabin-read';
 import { Types } from 'mongoose';
 import type {
   BookingReadFields,
-  BookingHistoryCabin,
-  BookingDetailCabin,
   BookingHistoryItem,
   BookingDetail,
   BookingPaymentStatus,
@@ -34,14 +42,6 @@ export type BookingReadSource = Omit<
 } & { [Key in RequiredDateKey]: Date } & {
   [Key in OptionalDateKey]?: Date | null;
 };
-
-export type HistoryCabinSource = Omit<BookingHistoryCabin, '_id'> & {
-  _id: Types.ObjectId;
-};
-export type DetailCabinSource = Omit<
-  BookingDetailCabin,
-  '_id' | 'id' | 'createdAt' | 'updatedAt'
-> & { _id: Types.ObjectId; createdAt?: Date | null; updatedAt?: Date | null };
 
 function objectId(value: unknown): string {
   if (!(value instanceof Types.ObjectId))
@@ -147,30 +147,12 @@ function bookingFields(booking: BookingReadSource): BookingReadFields {
   };
 }
 
-function historyCabin(cabin: HistoryCabinSource): BookingHistoryCabin {
-  return {
-    _id: objectId(cabin._id),
-    name: cabin.name,
-    image: cabin.image,
-    images: cabin.images,
-    capacity: cabin.capacity,
-    price: cabin.price,
-    discount: cabin.discount,
-    description: cabin.description,
-    status: cabin.status,
-    bedrooms: cabin.bedrooms,
-    bathrooms: cabin.bathrooms,
-    size: cabin.size,
-    minNights: cabin.minNights,
-  };
-}
-
 export function serializeBookingHistory(
   booking: BookingReadSource & { cabin: HistoryCabinSource | null }
 ): BookingHistoryItem {
   return {
     ...bookingFields(booking),
-    cabin: booking.cabin === null ? null : historyCabin(booking.cabin),
+    cabin: booking.cabin === null ? null : serializeCabinSummary(booking.cabin),
   };
 }
 
@@ -187,18 +169,6 @@ export function serializeBookingDetail(
     id: objectId(booking._id),
     durationText: booking.durationText,
     paymentStatus: booking.paymentStatus,
-    cabin:
-      cabin === null
-        ? null
-        : {
-            ...historyCabin(cabin),
-            id: objectId(cabin._id),
-            amenities: cabin.amenities,
-            extraGuestFee: cabin.extraGuestFee,
-            discountedPrice: cabin.discountedPrice,
-            createdAt: optionalDate(cabin.createdAt),
-            updatedAt: optionalDate(cabin.updatedAt),
-            __v: cabin.__v,
-          },
+    cabin: cabin === null ? null : serializeCabinDetail(cabin),
   };
 }

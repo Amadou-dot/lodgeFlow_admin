@@ -1,7 +1,7 @@
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CabinMobileTabs from '@/components/CabinMobileTabs';
-import type { Cabin } from '@/types';
 
 jest.mock('@/components/CabinDetails', () => ({
   CabinDescriptionSection: () => (
@@ -22,7 +22,7 @@ jest.mock('@/components/BookingForm', () => {
   };
 });
 
-const mockCabin = {
+const mockCabin = createCabinFixture({
   _id: 'cabin-123',
   name: 'Test Cabin',
   price: 200,
@@ -31,7 +31,7 @@ const mockCabin = {
   discount: 0,
   description: 'A test cabin.',
   amenities: ['WiFi'],
-} as unknown as Cabin;
+});
 
 const mockBookingCabin = {
   _id: 'cabin-123',

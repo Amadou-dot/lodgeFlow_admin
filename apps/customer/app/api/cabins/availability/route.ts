@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Booking, Cabin } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
 import type { ApiResponse, AvailableCabin, AvailabilityQuery } from '@/types';
+import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
       });
 
       const availableCabin: AvailableCabin = {
-        ...cabin.toObject(),
+        ...serializeCabinDetail(cabin),
         isAvailable: conflictingBookings.length === 0,
         conflictingBookings: conflictingBookings.map(b => b._id.toString()),
       };
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error checking availability:', error);
+    logger.error('Error checking availability', error);
 
     const response: ApiResponse<never> = {
       success: false,

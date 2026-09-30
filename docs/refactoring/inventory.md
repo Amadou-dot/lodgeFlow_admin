@@ -36,7 +36,7 @@ rather than treating counts as the completion gate.
 
 | ID  | Source / symbol                                                                                                  | Rule or observed mismatch                                                                    | Phase    | Next action and validation                                                                                                                                                          |
 | --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and cabin emails use explicit inputs; `PopulatedBooking` is removed. Catalog and other resource aliases remain. |
+| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and cabin emails use explicit inputs; `PopulatedBooking` is removed. Cabin catalog migration is recorded in slice 10; other resource aliases remain. |
 | T02 | `apps/customer/app/api/bookings/[id]/route.ts`: `GET`                                                            | `ApiResponse<any>` returns a populated document without an explicit DTO contract.            | 1        | Complete in PR #152: explicit detail DTO/serializer with owner/missing/foreign, ID/date and missing-cabin coverage.                                                                 |
 | T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Implemented in Phase 1 slice 6 below: nullable cabin population, missing-reference denial and characterized quote/session behavior.                                                                           |
 | T04 | `apps/customer/app/api/payments/webhook/route.ts`: confirmation payload                                          | Double cast converts a populated booking to the UI/email type.                               | 1        | Implemented in Phase 1 slice 4 below: explicit payment email inputs, nullable cabin population and preserved settlement/delivery boundaries.                                        |
@@ -373,12 +373,58 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   customer 356; database 36; email 3). Expanded HTTP smoke, clean frozen installation
   and all app/shared builds pass. All seven runtime/test files match validated
   build inputs. Existing optional Sharp and absent-MongoDB build warnings remain
-  non-blocking; remote delivery gates are pending.
+  non-blocking.
 - HTTP also checks receipt-backed amounts and ISO timestamps after the existing
   webhook settlement scenario. Hosted login and live provider operations remain
   outside this gate.
 - Remaining catalog/resource/admin DTOs and broader request families are separate
   slices; #136/#139 remain excluded.
+
+- Delivered in PR #167, reviewed `ed699b51e33e1933aa080968225c2f0072f89517`,
+  merged `b74e0670a1b5101847bc50f4c3c8fa889926de86`. All five PR CI jobs
+  (`36782922813`) and main CI jobs (`36783233130`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
+
+## Phase 1 slice 10: customer cabin catalog JSON boundaries
+
+- Move the already-characterized cabin JSON fields and source types out of the
+  booking module into `types/cabin-read.ts` and `lib/serializers/cabin-read.ts`.
+  Booking history/detail reuse the same projections. Catalog list/detail,
+  server-rendered loaders and availability output now serialize explicit DTOs;
+  client `Cabin`/`AvailableCabin` types no longer inherit Mongoose documents.
+- Preserve IDs, ISO dates, hydrated defaults, price/discount virtuals, optional
+  fields and legacy null/omission behavior. Serializers clone primitive arrays
+  and omit undefined optional keys so server-rendered props match the prior JSON
+  round trip. The shared Cabin model export is typed, with its ObjectId and
+  existing discounted-price virtual declared; schemas/storage are unchanged.
+- Remove the unused `hooks/useCabin.ts` after a complete caller/re-export search.
+  Five component fixture files and list-hook fixtures use checked JSON builders;
+  seven double casts and one `any` fixture are removed. Existing component layout,
+  positive filters, regex search, price sorting and query/cache keys are preserved.
+- **Related fixes:** the server detail loader now applies the API's existing
+  inactive/maintenance denial; invalid detail IDs are rejected before DB access
+  (API 400, page-loader null). Explicit zero-price bounds are retained across the
+  API query, list hook and URL-driven client filter. Unexpected read failures use
+  the server logger with existing safe API/page fallbacks.
+- Before runtime changes: 15 new characterization cases pass; seven regressions
+  fail across route/loaders/hook/listing. HTTP independently reproduces the
+  inactive page's 200 after its API returns 404. The initial invalid image-domain
+  fixture was corrected before collecting that evidence; image config is unchanged.
+- After migration, 94 focused cases, both app type checks, the database build and
+  expanded HTTP gate pass. HTTP compares complete list/detail/availability JSON,
+  verifies inactive-page 404/noindex, checks zero-price/invalid-ID errors, and
+  confirms available/occupied results without changing cabin/booking records or
+  provider counts. `pnpm ci:check` passes formatting, read-only lint and 1,465 tests
+  (admin 1,048; customer 378; database 36; email 3). Clean frozen installation and
+  all app/shared builds pass. Existing optional Sharp and absent-MongoDB build
+  warnings remain non-blocking; remote delivery gates are pending.
+- Remaining cabin debt: `app/page.tsx:getFeaturedCabins` and
+  `app/api/cabins/availability/route.ts` still lack the active-catalog filter; take
+  a focused visibility follow-up with HTTP regressions. Availability request
+  parsing/date types, calendar endpoint inputs, client sorting assertions and
+  icon-map types remain separate responsibilities. Pricing, overlap calculation,
+  booking writes and their locks are unchanged. No #136/#139 scope is added.
 
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 

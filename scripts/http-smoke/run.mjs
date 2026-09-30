@@ -440,6 +440,95 @@ try {
     publicCabins.data.map(row => row._id),
     [String(cabin._id)]
   );
+  const cabinSnapshot = JSON.stringify(await Cabin.findById(cabin._id).lean());
+  assert.deepEqual(publicCabins.data, JSON.parse(JSON.stringify([cabin])));
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: `/api/cabins/${cabin._id}`,
+      status: 200,
+    }),
+    { success: true, data: JSON.parse(JSON.stringify(cabin)) }
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/cabins/availability',
+      method: 'POST',
+      body: {
+        checkInDate: '2030-06-01',
+        checkOutDate: '2030-06-04',
+        guests: 4,
+      },
+      status: 200,
+    }),
+    {
+      success: true,
+      data: [
+        {
+          ...JSON.parse(JSON.stringify(cabin)),
+          isAvailable: true,
+          conflictingBookings: [],
+        },
+      ],
+    }
+  );
+  assert.equal(
+    JSON.stringify(await Cabin.findById(cabin._id).lean()),
+    cabinSnapshot
+  );
+  assert.equal(calls.length, 0);
+  console.log(
+    'PASS cabin list/detail/availability JSON preserves IDs, dates, defaults and virtuals'
+  );
+  const inactiveCabin = await Cabin.create({
+    name: 'Inactive Cabin Fixture',
+    image: 'https://images.unsplash.com/lodgeflow-smoke-inactive.jpg',
+    capacity: 4,
+    price: 120,
+    discount: 0,
+    description: 'This cabin is not publicly bookable',
+    status: 'inactive',
+    amenities: [],
+  });
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: `/api/cabins/${inactiveCabin._id}`,
+      status: 404,
+    }),
+    { success: false, error: 'Cabin not found' }
+  );
+  const inactivePage = await fetch(`${customer}/cabins/${inactiveCabin._id}`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(60000),
+  });
+  const inactiveHtml = await inactivePage.text();
+  assert.equal(inactivePage.status, 404, 'inactive cabin page must return 404');
+  assert.match(inactiveHtml, /noindex/);
+  assert.equal(inactiveHtml.includes('Inactive Cabin Fixture'), false);
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/cabins?maxPrice=0',
+      status: 200,
+    }),
+    { success: true, data: [] }
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/cabins/invalid',
+      status: 400,
+    }),
+    { success: false, error: 'Invalid cabin ID' }
+  );
+  await Cabin.deleteOne({ _id: inactiveCabin._id });
+  assert.equal(
+    JSON.stringify(await Cabin.findById(cabin._id).lean()),
+    cabinSnapshot
+  );
+  assert.equal(calls.length, 0);
   console.log('PASS public customer catalog through proxy and route');
   await mongoose.connection.db.admin().command({
     configureFailPoint: 'failCommand',
@@ -532,6 +621,35 @@ try {
   assert.equal(persisted.totalPrice, 300);
   assert.equal(persisted.depositAmount, 75);
   assert.equal(persisted.payments.length, 0);
+  const beforeOccupiedAvailability = JSON.stringify(persisted);
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/cabins/availability',
+      method: 'POST',
+      body: {
+        checkInDate: '2030-06-01',
+        checkOutDate: '2030-06-04',
+        guests: 4,
+      },
+      status: 200,
+    }),
+    {
+      success: true,
+      data: [
+        {
+          ...JSON.parse(JSON.stringify(cabin)),
+          isAvailable: false,
+          conflictingBookings: [bookingId],
+        },
+      ],
+    }
+  );
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforeOccupiedAvailability
+  );
+  assert.equal(calls.length, 0);
   const conflict = await request({
     origin: customer,
     route: '/api/bookings',

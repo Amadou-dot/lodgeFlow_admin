@@ -1,7 +1,8 @@
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { render, screen } from '@/__tests__/shared/test-utils';
 import CabinCard from '@/components/CabinCard';
 
-const mockCabin = {
+const mockCabin = createCabinFixture({
   _id: '1',
   name: 'Mountain View Cabin',
   description: 'A beautiful cabin with stunning mountain views',
@@ -10,7 +11,7 @@ const mockCabin = {
   capacity: 4,
   image: '/images/cabin1.jpg',
   amenities: ['WiFi', 'Kitchen', 'Fireplace', 'Hot Tub', 'Parking'],
-} as any;
+});
 
 describe('CabinCard', () => {
   it('renders cabin information correctly', () => {
