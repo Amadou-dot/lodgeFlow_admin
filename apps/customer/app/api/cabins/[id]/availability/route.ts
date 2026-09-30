@@ -34,11 +34,11 @@ export async function GET(
     const queryEndDate = endDate ? new Date(endDate) : defaultEnd;
 
     // Find all bookings that overlap with the query date range
-    const bookings = await Booking.findOverlapping(
+    const bookings = await Booking.findOverlapping({
       cabinId,
-      queryStartDate,
-      queryEndDate
-    );
+      checkInDate: queryStartDate,
+      checkOutDate: queryEndDate,
+    });
 
     // Create array of unavailable date ranges
     const unavailableDates = bookings.map(booking => ({

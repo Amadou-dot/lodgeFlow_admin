@@ -440,12 +440,12 @@ The live `Settings` collection contains business rules and pricing. Use explicit
 The `Booking` model includes overlap detection. Always check for conflicts:
 
 ```typescript
-const overlapping = await Booking.findOverlapping(
-  cabinId,
-  checkInDate,
-  checkOutDate,
-  excludeBookingId
-);
+const overlapping = await Booking.findOverlapping({
+  cabinId, // database ID string
+  checkInDate, // validated Date
+  checkOutDate, // validated Date
+  excludeBookingId, // optional database ID string
+});
 if (overlapping.length > 0) {
   // Handle conflict
 }
@@ -467,7 +467,7 @@ go through the same lock:
 import { withCabinBookingLock } from '@/lib/cabin-booking-lock';
 
 const result = await withCabinBookingLock(cabinId, async () => {
-  const overlapping = await Booking.findOverlapping(cabinId, checkInDate, checkOutDate);
+  const overlapping = await Booking.findOverlapping({ cabinId, checkInDate, checkOutDate });
   if (overlapping.length > 0) return { ok: false as const };
   const booking = await Booking.create({ ... });
   return { ok: true as const, booking };

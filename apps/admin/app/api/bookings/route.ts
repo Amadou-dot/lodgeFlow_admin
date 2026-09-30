@@ -15,7 +15,6 @@ import {
   parsePagination,
   requireApiAuth,
 } from '@/lib/api-utils';
-import mongoose from 'mongoose';
 import {
   BookingPricingError,
   calculateBookingPricing,
@@ -330,11 +329,11 @@ export async function POST(request: NextRequest) {
     const lockResult = await withCabinBookingLock<LockedWriteResult<IBooking>>(
       validationResult.data.cabin,
       async () => {
-        const overlapping = await Booking.findOverlapping(
-          validationResult.data.cabin,
+        const overlapping = await Booking.findOverlapping({
+          cabinId: validationResult.data.cabin,
           checkInDate,
-          checkOutDate
-        );
+          checkOutDate,
+        });
         if (overlapping.length > 0) {
           return { ok: false };
         }
@@ -794,12 +793,12 @@ export async function PUT(request: NextRequest) {
       const lockResult = await withCabinBookingLock<
         LockedWriteResult<IBooking | null>
       >(cabinId, async () => {
-        const overlapping = await Booking.findOverlapping(
-          cabinId,
-          checkIn,
-          checkOut,
-          new mongoose.Types.ObjectId(_id)
-        );
+        const overlapping = await Booking.findOverlapping({
+          cabinId: cabinId.toString(),
+          checkInDate: checkIn,
+          checkOutDate: checkOut,
+          excludeBookingId: _id,
+        });
         if (overlapping.length > 0) {
           return { ok: false };
         }

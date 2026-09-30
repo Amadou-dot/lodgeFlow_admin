@@ -50,6 +50,7 @@ rather than treating counts as the completion gate.
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Partially addressed in Phase 2 slice 5: unused pagination builders removed after caller review. Booking-table status callbacks remain a separate slice.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
+| F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1 and 6: validated requests for three migrated customer confirmations and cabin checkout. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -660,9 +661,43 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   customer 379; database 36; email 3). Clean frozen installation and all app/shared
   builds pass; all four runtime/test files match validated inputs. Existing optional
   Sharp and absent-MongoDB build warnings remain non-blocking. Remote delivery
-  gates are pending. Availability request validation/date types, calendar request
-  parsing, other resource/admin DTOs and money/UI work
-  remain separate slices. #136/#139 remain excluded.
+  gates are recorded below. Availability request validation/date types, calendar
+  request parsing, other resource/admin DTOs and money/UI work remain separate
+  slices. #136/#139 remain excluded.
+- Delivered in PR #169: reviewed `d862a5ef4fccebd3ebe623ba2497c86b41460c22`,
+  merged `28b0da6a72866ddaa9342a04cf2c0463fceee965`. All five PR CI jobs
+  (`36786112913`) and main CI jobs (`36786459376`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
+
+
+## Phase 2 slice 8: named booking overlap inputs (F06)
+
+- `packages/database/src/models/Booking.ts:findOverlapping` accepts a named
+  `BookingOverlapInput` with database ID strings and validated `Date` values.
+  Migrated all four runtime callers: customer booking creation, admin creation
+  and update, and the public cabin calendar. Removed the unused document
+  `overlaps` method after checking source, scripts and tests for consumers.
+- Preserved strict overlap comparisons (adjacent stays do not conflict), every
+  non-cancelled status, cabin filtering, optional self-exclusion, hydrated results
+  and read-only behavior. Admin/customer writes still check availability inside
+  their existing cabin locks; no lock, pricing, receipt or persistence changes.
+- Added three real-MongoDB characterization tests before changing the helper;
+  these and all 24 existing booking-model tests passed on the positional contract.
+  After migration, the three shared tests and 62 model/booking-route integration
+  tests pass. Expanded HTTP smoke checks the calendar's existing date-only ranges
+  against a real booking, alongside availability reads and unchanged stored data.
+- `pnpm ci:check` passes formatting, read-only lint and 1,469 tests (admin 1,048;
+  customer 379; database 39; email 3). Both app type checks, the shared database
+  build, a targeted TypeScript check of the migrated admin model test, expanded
+  HTTP smoke, clean frozen installation and all app/shared builds pass. All seven
+  runtime/test inputs match the clean build snapshot. Existing optional Sharp,
+  absent-MongoDB and dynamic-render build diagnostics remain non-blocking; remote
+  delivery gates follow.
+- Calendar and availability request parsing remain separate validation work in
+  `apps/customer/app/api/cabins/[id]/availability/route.ts` and
+  `apps/customer/app/api/cabins/availability/route.ts`. This slice preserves their
+  current request and response contracts. #136/#139 remain excluded.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

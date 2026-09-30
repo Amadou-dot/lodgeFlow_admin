@@ -742,6 +742,21 @@ try {
       ],
     }
   );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: `/api/cabins/${cabin._id}/availability?startDate=2030-06-01&endDate=2030-07-01`,
+      status: 200,
+    }),
+    {
+      success: true,
+      data: {
+        cabinId: String(cabin._id),
+        unavailableDates: [{ start: '2030-06-01', end: '2030-06-04' }],
+        queryRange: { start: '2030-06-01', end: '2030-07-01' },
+      },
+    }
+  );
   assert.equal(
     JSON.stringify(await Booking.findById(bookingId).lean()),
     beforeOccupiedAvailability
