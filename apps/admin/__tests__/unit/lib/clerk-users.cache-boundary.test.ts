@@ -192,20 +192,34 @@ describe('customer cache characterization', () => {
     expect(mockGetUser).toHaveBeenCalledTimes(2);
   });
 
-  test('counts batch transient errors while preserving deleted-user caching', async () => {
-    mockGetUser
-      .mockRejectedValueOnce({ status: 404 })
-      .mockRejectedValueOnce({ status: 500 });
-    const result = await getClerkUsersBatch(['user_gone', 'user_flaky']);
-    expect(result.errors).toBe(1);
-    expect(Array.from(result.users.values())).toEqual([null, null]);
-    expect(mockSet).toHaveBeenCalledTimes(1);
-    expect(mockSet).toHaveBeenCalledWith(
-      'lodgeflow:clerk-user:user_gone',
-      { data: null },
-      { px: 300000 }
-    );
-  });
+  test.each([
+    ['user_gone', 'user_flaky'],
+    ['user_flaky', 'user_gone'],
+  ])(
+    'caches only deleted users in batch order %s, %s',
+    async (first, second) => {
+      jest.useFakeTimers();
+      // Concurrent requests may reach Clerk in either order after rate limiting.
+      mockGetUser.mockImplementation(async id => {
+        throw { status: id === 'user_gone' ? 404 : 500 };
+      });
+      try {
+        const pending = getClerkUsersBatch([first, second]);
+        await jest.runAllTimersAsync();
+        const result = await pending;
+        expect(result.errors).toBe(1);
+        expect(Array.from(result.users.values())).toEqual([null, null]);
+        expect(mockSet).toHaveBeenCalledTimes(1);
+        expect(mockSet).toHaveBeenCalledWith(
+          'lodgeflow:clerk-user:user_gone',
+          { data: null },
+          { px: 300000 }
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  );
 });
 
 const malformedEntries: { name: string; entry: unknown }[] = [

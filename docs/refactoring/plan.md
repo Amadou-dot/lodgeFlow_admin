@@ -82,17 +82,19 @@ Current execution status (2026-09-30): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has ten merged
-slices (PRs #160–#163, #165–#166 and #169–#172), covering request validation, named
-helper inputs, unused pagination cleanup and public cabin visibility. Sender
-repair #132 completed separately in PR #155 with production and user inbox
-evidence. The latest merge,
-[PR #172](https://github.com/Amadou-dot/lodgeFlow_admin/pull/172) at `2a4ef2f`,
-has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with named booking-table status callbacks and correcting
-the existing check-in action to match the API transition rules. Other resource/admin DTOs,
-operations, money and UI work remain open. The inventory and tracker retain
-per-slice validation and delivery evidence; the milestone remains open.
+boundaries, plus validated cached customer payloads. Phase 2 has eleven merged
+slices (PRs #160–#163, #165–#166 and #169–#173), covering request validation, named
+helper inputs, unused pagination cleanup, public cabin visibility and booking
+status actions. Sender repair #132 completed separately in PR #155 with production
+and user inbox evidence. The latest merge,
+[PR #173](https://github.com/Amadou-dot/lodgeFlow_admin/pull/173) at `c6d79a0`,
+has both production apps verified Ready at that SHA. Its five PR CI jobs passed;
+main CI passed four jobs but exposed an order-dependent cache test fixture in the
+admin job. Repairing that gate takes priority before the next Phase 2 slice:
+named guest reservation helper inputs and tagged update/cancel operations.
+Other resource/admin DTOs, money and UI work remain open. The inventory and
+tracker retain per-slice validation and delivery evidence; the milestone remains
+open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

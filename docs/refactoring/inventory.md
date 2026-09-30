@@ -805,6 +805,27 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   behavior. They do not claim browser layout, hosted login or live provider proof.
   Full admin booking DTOs and other state/menu policy work remain separate slices.
 
+## Cache test reliability follow-up (T09)
+
+PR #173's main CI run `36790525172` exposed an order-dependent fixture in
+`apps/admin/__tests__/unit/lib/clerk-users.cache-boundary.test.ts`: two concurrent
+Clerk lookups used sequential 404/500 mock responses. The requests can arrive in
+either order after rate limiting, so the test could cache the wrong fixture ID
+without any application defect. The other four main CI jobs passed, and both
+production apps were verified Ready at merge `c6d79a0` with the expected app roots,
+built routes and aliases.
+
+- Assign mock failures by requested user ID and exercise both batch orders with
+  controlled timers. Preserve the assertion that only the deleted user is cached
+  and that the transient error is counted. No production code changed.
+- The reversed-order case failed before the fixture correction (25 other cache
+  checks passed). All 67 Clerk/cache checks pass after correction; admin and
+  changed-test type checks pass. `pnpm ci:check` passes formatting, read-only lint
+  and 1,548 tests (admin 1,065/customer 441/database 39/email 3).
+- HTTP and clean builds passed for #173's unchanged runtime. This test-only
+  follow-up does not repeat those local checks; PR CI runs all five jobs.
+- F02 guest reservation helper work remains next after this gate is repaired.
+
 ## Phase 5 implementation: existing sender repair (#132)
 
 All ten existing `emails.send` sites now resolve senders through `@lodgeflow/email`:
