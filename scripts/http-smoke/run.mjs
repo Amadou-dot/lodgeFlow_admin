@@ -757,6 +757,41 @@ try {
       },
     }
   );
+  for (const body of [
+    null,
+    { checkInDate: 'invalid', checkOutDate: '2030-06-04', guests: 4 },
+    { checkInDate: 1900000000000, checkOutDate: '2030-06-04', guests: 4 },
+    {
+      checkInDate: '2030-06-01',
+      checkOutDate: '2030-06-04',
+      guests: { $gt: 0 },
+    },
+    { checkInDate: '2030-06-01', checkOutDate: '2030-06-04', guests: 1.5 },
+  ]) {
+    const invalidAvailability = await request({
+      origin: customer,
+      route: '/api/cabins/availability',
+      method: 'POST',
+      body,
+      status: 400,
+    });
+    assert.equal(invalidAvailability.success, false);
+    assert.equal(typeof invalidAvailability.error, 'string');
+  }
+  const malformedAvailability = await fetch(
+    `${customer}/api/cabins/availability`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{',
+      signal: AbortSignal.timeout(60000),
+    }
+  );
+  assert.equal(malformedAvailability.status, 400);
+  assert.deepEqual(await malformedAvailability.json(), {
+    success: false,
+    error: 'Invalid JSON body',
+  });
   assert.equal(
     JSON.stringify(await Booking.findById(bookingId).lean()),
     beforeOccupiedAvailability

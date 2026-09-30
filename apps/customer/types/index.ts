@@ -56,13 +56,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-// Cabin availability check
-export interface AvailabilityQuery {
-  checkInDate: Date;
-  checkOutDate: Date;
-  guests: number;
-}
-
 export interface AvailableCabin extends CabinDetail {
   isAvailable: boolean;
   conflictingBookings: string[];

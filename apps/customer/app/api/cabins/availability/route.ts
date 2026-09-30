@@ -1,34 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Booking, Cabin } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
-import type { ApiResponse, AvailableCabin, AvailabilityQuery } from '@/types';
+import type { ApiResponse, AvailableCabin } from '@/types';
 import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
+import { cabinAvailabilitySchema } from '@/lib/validations/cabin';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await readJsonRequestBody(request);
+    if (!body.success)
+      return NextResponse.json(
+        { success: false, error: body.error },
+        { status: 400 }
+      );
+    const input = cabinAvailabilitySchema.safeParse(body.data);
+    if (!input.success) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: input.error.issues[0]?.message || 'Invalid availability request',
+      };
+      return NextResponse.json(response, { status: 400 });
+    }
+    const { checkInDate: checkIn, checkOutDate: checkOut, guests } = input.data;
     await connectDB();
-
-    const body: AvailabilityQuery = await request.json();
-    const { checkInDate, checkOutDate, guests } = body;
-
-    if (!checkInDate || !checkOutDate || !guests) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Missing required fields: checkInDate, checkOutDate, guests',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
-
-    const checkIn = new Date(checkInDate);
-    const checkOut = new Date(checkOutDate);
-
-    if (checkIn >= checkOut) {
-      const response: ApiResponse<never> = {
-        success: false,
-        error: 'Check-out date must be after check-in date',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
 
     // Only the active public catalog can be offered for a new stay.
     const cabins = await Cabin.find({
@@ -66,7 +61,7 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error checking availability', error);
 
     const response: ApiResponse<never> = {

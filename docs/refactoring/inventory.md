@@ -53,7 +53,7 @@ rather than treating counts as the completion gate.
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1 and 6: validated requests for three migrated customer confirmations and cabin checkout. Continue per flow; preserve webhook acknowledgements.                                                                |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -693,11 +693,46 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   HTTP smoke, clean frozen installation and all app/shared builds pass. All seven
   runtime/test inputs match the clean build snapshot. Existing optional Sharp,
   absent-MongoDB and dynamic-render build diagnostics remain non-blocking; remote
-  delivery gates follow.
+  delivery gates are recorded below.
+- Delivered in PR #170: reviewed `06f5e97eb00e4504b9e09a89472b8500cc671195`,
+  merged `7f263c373d46d8bcfd36ec28e585b85148b9bda1`. All five PR CI jobs
+  (`36787430829`) and main CI jobs (`36787622549`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
 - Calendar and availability request parsing remain separate validation work in
   `apps/customer/app/api/cabins/[id]/availability/route.ts` and
   `apps/customer/app/api/cabins/availability/route.ts`. This slice preserves their
   current request and response contracts. #136/#139 remain excluded.
+
+
+## Phase 2 slice 9: public availability request boundary
+
+- `apps/customer/lib/validations/cabin.ts:cabinAvailabilitySchema` validates
+  unknown search JSON, converts string dates once, enforces a positive integer
+  guest count and attaches the date-order rule to `checkOutDate`. Removed the
+  unused `AvailabilityQuery` declaration that claimed JSON contained `Date`s.
+- `app/api/cabins/availability/route.ts` now uses the shared JSON parser and the
+  schema before connecting or querying. Malformed JSON, non-object bodies,
+  invalid date/guest types and unparseable dates return safe 400 responses.
+  Body-stream and unexpected database failures retain the logged, safe 500.
+- Preserved active-only cabin selection, capacity/price ordering, exact time and
+  offset semantics, strict overlap comparisons, conflict identifiers and complete
+  serialized cabin output. Existing missing-field and date-order messages remain;
+  unknown payload fields do not affect queries. No booking/provider writes occur.
+- Before changes, 13 new characterization cases pass and 22 regressions fail.
+  The real HTTP gate independently reproduces null JSON returning 500. After the
+  change, all 55 availability/catalog tests and customer type checking pass.
+  Expanded HTTP cases cover null/malformed JSON, invalid dates, numeric date input,
+  operator-shaped/fractional guest counts, and unchanged booking/provider state.
+- `pnpm ci:check` passes formatting, read-only lint and 1,504 tests (admin 1,048;
+  customer 414; database 39; email 3). Expanded HTTP smoke, customer type checking,
+  clean frozen installation and all app/shared builds pass. All five runtime/test
+  inputs match the clean build snapshot. Existing optional Sharp, absent-MongoDB
+  and dynamic-render diagnostics remain non-blocking; remote delivery gates follow.
+- Calendar path/query parsing remains separate work in
+  `apps/customer/app/api/cabins/[id]/availability/route.ts`; its six-month defaults,
+  date-only output and both UI consumers need their own characterization.
+  #136/#139 remain excluded.
 
 ## Phase 5 implementation: existing sender repair (#132)
 
