@@ -52,7 +52,7 @@ rather than treating counts as the completion gate.
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slice 1: validated requests and safe errors for three migrated customer confirmations. Continue per flow; preserve webhook acknowledgements.                                                                |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1 and 6: validated requests for three migrated customer confirmations and cabin checkout. Continue per flow; preserve webhook acknowledgements.                                                                |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -502,9 +502,51 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   checking, HTTP smoke, clean frozen installation and all app/shared builds pass.
   Runtime/test files match validated build inputs. Interrupted full gates were
   rerun after temporary logs were lost. Existing optional Sharp and absent-MongoDB
-  build warnings remain non-blocking; remote delivery gates are pending.
+  build warnings remain non-blocking.
+- Delivered in PR #165, reviewed `ca44521b3ef99d82d9a7f86bebeff9a3eb6e9143`,
+  merged `8e752de1dcab9ce2be8c9360b2527671625fbba3`. All five PR CI jobs
+  (`36780171843`) and main CI jobs (`36780455638`) pass. Both exact-SHA previews
+  and production deployments are Ready, with matching configured roots, built
+  routes and production aliases.
 - The booking-table status callback family remains F04 debt. Consolidating live
   response contracts belongs to its own characterized resource slice.
+
+## Phase 2 slice 6: cabin checkout request boundary
+
+- `apps/customer/app/api/payments/create-checkout/route.ts` validates unknown
+  parsed JSON with `lib/validations/checkout.ts`. The only accepted identifier is
+  a 24-character hexadecimal string. Authentication precedes body parsing, and
+  invalid requests return before connecting to MongoDB or accessing Stripe.
+  `useCreateCheckoutSession` constructs the schema-derived request type.
+- **Related fixes:** malformed JSON and null request bodies return 400 instead of
+  500. Numeric values previously accepted by Mongoose's ObjectId check are rejected
+  before lookup/reservation. Preserve `Invalid booking ID` for invalid body/ID
+  shapes, the success/error envelope, uppercase IDs and ignored extra fields.
+- Extract the existing confirmation JSON reader to `lib/validations/request-body.ts`
+  for reuse. Stream errors remain unexpected server failures, including stream
+  errors that happen to be SyntaxErrors; only local JSON parsing maps syntax errors
+  to 400. Checkout uses the server logger and retains its safe unexpected-error
+  message. The three confirmation routes retain their existing error messages.
+- Preserved owner scoping and identical missing/foreign 404s, persisted quotes,
+  server-calculated deposit/balance, session reuse, Stripe metadata/URLs/idempotency,
+  retry behavior and payment/history cache invalidation. The payment button and
+  payment-status read interface are unchanged.
+- Before runtime changes, 37 focused cases pass (13 newly added), including real
+  React Query hook success/failure/retry behavior. All six input regressions fail.
+  The HTTP gate independently reproduces the null-body 500. After the change,
+  154 focused checkout/confirmation/hook tests and customer type checking pass.
+- Local validation on 2026-09-30: `pnpm ci:check` passes formatting, read-only lint
+  and 1,428 tests (admin 1,048; customer 341; database 36; email 3). Customer type
+  checking, expanded HTTP smoke, clean frozen installation and all app/shared
+  builds pass. All eight runtime/test inputs match the validated build snapshot.
+  Existing optional Sharp and absent-MongoDB build warnings remain non-blocking;
+  remote delivery gates are pending.
+- HTTP checks invalid JSON and body/ID types with unchanged booking records and
+  payment/email call counts. Hosted login and live provider operations remain
+  outside this gate.
+- Customer payment-status DTO/date types in `app/api/payments/[bookingId]/route.ts`
+  and `hooks/usePayment.ts`, other request families and money unit conversions
+  remain separate slices. No #136/#139 scope is added.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

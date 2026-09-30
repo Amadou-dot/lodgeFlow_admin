@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readJsonRequestBody } from './request-body';
 
 export const bookingConfirmationSchema = z.object(
   {
@@ -25,17 +26,10 @@ type ConfirmationRequestResult =
 export async function readBookingConfirmationRequest(
   request: Request
 ): Promise<ConfirmationRequestResult> {
-  const text = await request.text();
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch (error: unknown) {
-    if (error instanceof SyntaxError)
-      return { success: false, error: 'Invalid JSON body' };
-    throw error;
-  }
+  const body = await readJsonRequestBody(request);
+  if (!body.success) return body;
 
-  const result = bookingConfirmationSchema.safeParse(body);
+  const result = bookingConfirmationSchema.safeParse(body.data);
   if (!result.success)
     return { success: false, error: result.error.issues[0].message };
   return { success: true, data: result.data };

@@ -84,12 +84,13 @@ Phase 1 has eight merged slices (PRs #152–#154, #156–#159 and #164), coverin
 booking reads/mutations/cancellation, cabin and experience email inputs, checkout
 population, and validated cached customer payloads/dates. Sender repair #132
 completed separately in PR #155 with production and user inbox evidence. Phase 2
-has four merged slices (PRs #160–#163): confirmation request validation/safe errors and named payment summary,
-customer booking update and staff identity inputs. The latest merge,
-[PR #164](https://github.com/Amadou-dot/lodgeFlow_admin/pull/164) at `1fdd52a`,
+has five merged slices (PRs #160–#163 and #165): confirmation request validation/safe errors and named payment summary,
+customer booking update and staff identity inputs, plus unused pagination cleanup.
+The latest merge,
+[PR #165](https://github.com/Amadou-dot/lodgeFlow_admin/pull/165) at `8e752de`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues by removing F04's unused pagination response builders;
-active route pagination shapes and the shared query parser are preserved.
+SHA. Phase 2 continues with checkout JSON/booking-ID validation before database
+access, preserving authentication order, ownership, quotes and payment behavior.
 Catalog/resource/admin DTOs and the remaining operations, money and UI work are
 still open. The inventory and tracker retain per-slice validation and delivery
 evidence; the milestone remains open.
