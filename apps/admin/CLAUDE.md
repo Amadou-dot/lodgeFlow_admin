@@ -530,9 +530,11 @@ State** above). Two details matter when touching this cache:
 - The payload is wrapped as `{ data: Customer | null }` so a cached "user was deleted" (`null`)
   stays distinguishable from a cache miss (Redis returns `null` for an absent key). Only a
   genuine 404 is cached as `null`; transient 429/5xx errors are never cached.
-- JSON has no `Date`, so `reviveCustomerDates()` rehydrates `created_at`, `updated_at`,
-  `last_sign_in_at`, `last_active_at`, and `lastBookingDate` on every Redis read. Add any new
-  `Date` field on `Customer` to that function.
+- `lib/validations/customer-cache.ts` validates unknown Redis payloads and converts ISO
+  strings for `created_at`, `updated_at`, `last_sign_in_at`, `last_active_at` and
+  `lastBookingDate` to Dates. Malformed entries and mismatched user IDs are cache misses;
+  good batch entries remain usable. Update the schema when adding a cached field.
+  Broader Clerk metadata validation and customer API/UI date types remain separate debt.
 
 The 100 ms `MIN_REQUEST_INTERVAL` throttle in `waitForRateLimit()` is still per-instance by
 design — it paces this process's own Clerk calls, and moving it to Redis would add a round trip

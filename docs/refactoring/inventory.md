@@ -44,7 +44,7 @@ rather than treating counts as the completion gate.
 | T06 | `packages/database/src/models/*`: nine `Document`-extending interfaces                                           | Persistence interfaces are re-exported across app boundaries.                                | 1        | Keep persistence behavior tested; add lean/populate/DTO types as each consumer migrates. Inheritance alone is not slated for deletion.                                              |
 | T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Replace with checked input/DTO builders or real documents according to each test's responsibility; preserve behavioral assertions.                                                  |
 | T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
-| T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Validate cached payloads and normalize dates once; retain deleted-user negative cache and transient-failure semantics.                                                              |
+| T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Implemented in Phase 1 slice 8: validated unknown cache payloads and dates, per-entry misses for malformed data, preserved negative cache and transient failures.                                                              |
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
@@ -307,6 +307,42 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   `types/index.ts` and admin booking DTOs (T05). The three migrated manual
   confirmation request/error boundaries are addressed below. No #136/#139 scope is added.
 
+## Phase 1 slice 8: validated customer cache boundary (T09)
+
+- `apps/admin/lib/validations/customer-cache.ts` parses unknown Redis entries,
+  validates the known customer shape and converts validated ISO timestamp strings
+  to server-side Dates. `clerk-users.ts` removes the asserted JSON-as-Customer shape
+  and `reviveCustomerDates` casts. The same parser serves single and batch reads;
+  a positive hit must match the requested Clerk user ID. Extra fields are stripped.
+- **Related fix:** malformed wrappers, invalid fields/timestamps and mismatched
+  identities are misses rather than false deleted users or invalid customer data.
+  Valid entries before and after a malformed batch item remain hits. Warning logs
+  contain only the requested user ID, without the cached payload or validation data.
+- Preserved the JSON write envelope and five-minute TTL, explicit `{ data: null }`
+  negative hits, genuine 404 caching, transient failure propagation/counting and
+  retry behavior, in-memory fallback, invalidation and provider call pacing. No
+  routes, hooks, customer page fields, persisted records or authorization change.
+- Six new characterization cases pass against the original reader; all 18 initial
+  regressions fail before runtime changes and pass afterward. Tests use narrow
+  mocked SDK inputs and schema-derived cached JSON fixtures without type escapes.
+  Coverage includes complete metadata/dates, sparse nullable fields, mixed batches,
+  unknown-field removal and retry after invalid cache plus transient failure.
+- Broader customer response/UI date types remain in `types/clerk.ts`,
+  `types/api.ts`, `hooks/useCustomers.ts` and guest components. Clerk metadata
+  producer validation also remains: `extractMetadata`, `createCompleteCustomer`
+  and `updateCompleteCustomer` still assert metadata shapes, and request schemas
+  in `lib/validations/customer.ts` differ from those shapes. Invalid cached metadata
+  now causes a fresh lookup; this slice does not normalize provider metadata.
+- Local validation on 2026-09-30: `pnpm ci:check` passes formatting, read-only lint
+  and 1,415 tests (admin 1,054; customer 322; database 36; email 3). Both app type
+  checks and a dedicated new-test type check pass. `pnpm test:http`, clean frozen
+  installation and all app/shared builds pass; runtime/test files match the
+  validated build snapshot. Existing optional Sharp and absent-MongoDB build
+  warnings remain non-blocking. Remote delivery gates are pending.
+- The HTTP gate exercises existing routes with the in-memory fallback. Malformed
+  Redis entries use controlled unit dependencies, not a hosted Redis instance.
+  Hosted login and live provider operations were not exercised.
+
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 
 - `lib/validations/confirmation-email.ts` parses unknown request bodies using
@@ -434,7 +470,12 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   inputs. The HTTP gate covers actual route/proxy organization, membership,
   assignment, permission and audit behavior using controlled Clerk identities.
   Hosted login/live provider operations were not run. Existing optional Sharp and
-  absent-MongoDB build warnings remain non-blocking; remote delivery gates are pending.
+  absent-MongoDB build warnings remain non-blocking.
+- Delivered in PR #163, reviewed `52c456168c9557a64bfeb8f949a16374ec37b6a5`,
+  merged `cee2226fb22cb6ff646c851829fefbb57f91f60e`. All five PR CI jobs
+  (`36772338049`) and main CI jobs (`36772643284`) pass. Both exact-SHA previews
+  and production deployments are Ready, with matching configured app roots,
+  built routes and production aliases.
 - Remaining Phase 1 staff/audit DTO and cache work, staff request validation and
   other helper families stay separate; this slice changes no permission or role.
 

@@ -78,29 +78,21 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-09-30): Phase 0 completed in
-[PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151), merge
-`3223bd566d2d424b517a196e4dadfbfffff964e7`; its app/database CI, HTTP smoke gate
-and both previews passed. Phase 1 booking read, mutation and cancellation slices
-merged in PRs #152–#154. Sender repair #132 completed in PR #155 with production
-and user inbox evidence. Payment email boundaries merged in PR #156, with both
-production deployments Ready at `79b8d25` and all five main CI jobs passing.
-Generic cabin confirmation inputs merged in PR #157, with both production
-deployments verified Ready at `b4459cd` on 2026-09-23 and all five main CI jobs
-passing. Checkout population and missing-reference handling merged in PR #158 as
-`80a2cc9`, with all five main CI jobs passing and both production deployments
-verified Ready at that SHA. Experience-confirmation inputs merged in PR #159 as
-`0ec23d4`, with all five main CI jobs passing and both production apps verified
-Ready at that SHA. Phase 1 has seven merged slices; catalog/resource/admin
-boundaries remain. Phase 2 request validation and safe confirmation errors merged
-in PR #160 as `9d35897`; all five main CI jobs pass and both production deployments
-are verified Ready at that SHA. Named `paymentSummary` inputs (F01) merged in
-PR #161 as `bf57e71`, with all five main CI jobs passing and both production apps
-verified Ready. Named customer booking update inputs (F05) merged in PR #162 as
-`dc9b593`, with all five main CI jobs passing and both production apps verified
-Ready. Phase 2 continues with F03's named staff identity inputs and a single null
-representation for an absent active organization. Authorization rules are
-preserved. The inventory records scope and validation; the milestone remains open.
+Current execution status (2026-09-30): Phase 0 is complete in
+[PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
+Phase 1 has seven merged slices (PRs #152–#154 and #156–#159), covering customer
+booking reads/mutations/cancellation, cabin and experience email inputs, and
+checkout population. Sender repair #132 completed separately in PR #155 with
+production and user inbox evidence. Phase 2 has four merged slices (PRs
+#160–#163): confirmation request validation/safe errors and named payment summary,
+customer booking update and staff identity inputs. The latest merge,
+[PR #163](https://github.com/Amadou-dot/lodgeFlow_admin/pull/163) at `cee2226`,
+has all five main CI jobs passing and both production apps verified Ready at that
+SHA. Phase 1 continues with T09's cached customer payload/date boundary; invalid
+cache entries become misses while deleted-user caching and transient-failure
+behavior are preserved. Catalog/resource/admin DTOs and the remaining operations,
+money and UI work are still open. The inventory and tracker retain per-slice
+validation and delivery evidence; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next
