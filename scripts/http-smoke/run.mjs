@@ -900,6 +900,65 @@ try {
     'PASS booking detail ownership and allowlisted update persistence'
   );
 
+  const beforeInvalidCheckout = JSON.stringify(
+    await Booking.find().sort({ _id: 1 }).lean()
+  );
+  const callsBeforeInvalidCheckout = calls.length;
+  for (const body of [
+    null,
+    [],
+    true,
+    'booking',
+    {},
+    { bookingId: 0 },
+    { bookingId: 42 },
+    { bookingId: { $ne: null } },
+  ]) {
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route: '/api/payments/create-checkout',
+        identity: 'customer',
+        method: 'POST',
+        body,
+        status: 400,
+      }),
+      { success: false, error: 'Invalid booking ID' }
+    );
+  }
+  for (const body of ['', '{']) {
+    const response = await fetch(`${customer}/api/payments/create-checkout`, {
+      method: 'POST',
+      headers: { ...identity('customer'), 'content-type': 'application/json' },
+      body,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(60000),
+    });
+    assert.equal(response.status, 400);
+    assert.match(
+      response.headers.get('content-type') ?? '',
+      /application\/json/
+    );
+    assert.deepEqual(await response.json(), {
+      success: false,
+      error: 'Invalid JSON body',
+    });
+  }
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: '/api/payments/create-checkout',
+    method: 'POST',
+    body: { bookingId },
+  });
+  assert.equal(calls.length, callsBeforeInvalidCheckout);
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    beforeInvalidCheckout
+  );
+  console.log(
+    'PASS checkout JSON/ID validation and unchanged bookings/provider calls'
+  );
+
   const beforeForeign = JSON.stringify(
     await Booking.findById(bookingId).lean()
   );

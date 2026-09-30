@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { ApiResponse } from '@/types';
+import type { CreateCheckoutInput } from '@/lib/validations/checkout';
 
 interface PaymentStatusData {
   isPaid: boolean;
@@ -21,8 +22,9 @@ export const useCreateCheckoutSession = () => {
 
   return useMutation({
     mutationFn: async (bookingId: string): Promise<{ url: string }> => {
+      const body: CreateCheckoutInput = { bookingId };
       const response = await fetch('/api/payments/create-checkout', {
-        body: JSON.stringify({ bookingId }),
+        body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });

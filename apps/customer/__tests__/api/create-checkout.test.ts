@@ -486,3 +486,119 @@ describe('missing cabin regression', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
+
+function rawRequest(body: string) {
+  return new NextRequest('http://localhost/api/payments/create-checkout', {
+    method: 'POST',
+    body,
+  });
+}
+
+describe('checkout input characterization', () => {
+  test.each([
+    new Error('Request stream unavailable'),
+    new SyntaxError('Request stream unavailable'),
+  ])('keeps body-stream failures as safe server errors: %s', async failure => {
+    const input = new NextRequest(
+      'http://localhost/api/payments/create-checkout',
+      {
+        method: 'POST',
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(failure);
+          },
+        }),
+        duplex: 'half',
+      }
+    );
+    const response = await POST(input);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Failed to create checkout session',
+    });
+    expect(mockConnect).not.toHaveBeenCalled();
+    expectNoWritesOrProviderCalls();
+  });
+  test.each(['{', 'null'])('auth denial precedes parsing %s', async body => {
+    mockAuth.mockResolvedValue({ userId: null });
+    const response = await POST(rawRequest(body));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Authentication required',
+    });
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockFindOne).not.toHaveBeenCalled();
+    expectNoWritesOrProviderCalls();
+  });
+
+  test('preserves uppercase hexadecimal IDs and ignores client-supplied pricing fields', async () => {
+    const uppercaseId = bookingId.toUpperCase();
+    const response = await POST(
+      request({ bookingId: uppercaseId, amount: 1, customer: 'foreign' })
+    );
+    expect(response.status).toBe(200);
+    expect(mockFindOne).toHaveBeenCalledWith({
+      _id: uppercaseId,
+      customer: 'customer',
+    });
+    expect(await response.json()).toEqual({
+      success: true,
+      data: { url: session.url },
+    });
+    expect(
+      mockCreateSession.mock.calls[0][0].line_items?.[0].price_data?.unit_amount
+    ).toBe(5025);
+  });
+
+  test.each([
+    '[]',
+    'true',
+    '"booking"',
+    '42',
+    '{"bookingId":null}',
+    '{"bookingId":""}',
+  ])('retains the invalid-ID response for %s', async body => {
+    const response = await POST(rawRequest(body));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Invalid booking ID',
+    });
+    expect(mockConnect).not.toHaveBeenCalled();
+    expectNoWritesOrProviderCalls();
+  });
+});
+
+describe('checkout input regressions', () => {
+  test.each(['', '{', '{"bookingId":'])(
+    'rejects malformed JSON %j before database or provider access',
+    async body => {
+      const response = await POST(rawRequest(body));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Invalid JSON body',
+      });
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(mockFindOne).not.toHaveBeenCalled();
+      expectNoWritesOrProviderCalls();
+    }
+  );
+
+  test.each(['null', '{"bookingId":0}', '{"bookingId":42}'])(
+    'rejects non-object bodies and non-string IDs in %s',
+    async body => {
+      const response = await POST(rawRequest(body));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Invalid booking ID',
+      });
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(mockFindOne).not.toHaveBeenCalled();
+      expectNoWritesOrProviderCalls();
+    }
+  );
+});

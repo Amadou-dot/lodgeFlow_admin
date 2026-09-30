@@ -1,9 +1,11 @@
 import { randomUUID } from 'crypto';
-import mongoose from 'mongoose';
 import { Booking, connectDB, Settings, roundMoney } from '@lodgeflow/database';
 import type { ICabin } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
 import { getStripe } from '@/lib/stripe';
 import { normalizeBaseUrl } from '@/lib/url';
+import { createCheckoutSchema } from '@/lib/validations/checkout';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -16,9 +18,11 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return errorResponse('Authentication required', 401);
-    const { bookingId } = await request.json();
-    if (!mongoose.isValidObjectId(bookingId))
-      return errorResponse('Invalid booking ID', 400);
+    const body = await readJsonRequestBody(request);
+    if (!body.success) return errorResponse(body.error, 400);
+    const input = createCheckoutSchema.safeParse(body.data);
+    if (!input.success) return errorResponse('Invalid booking ID', 400);
+    const { bookingId } = input.data;
     await connectDB();
     let booking = await Booking.findOne({
       _id: bookingId,
@@ -136,8 +140,8 @@ export async function POST(request: NextRequest) {
       { $set: { stripeSessionId: session.id }, $inc: { __v: 1 } }
     );
     return NextResponse.json({ success: true, data: { url: session.url } });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
+  } catch (error: unknown) {
+    logger.error('Error creating checkout session', error);
     return errorResponse('Failed to create checkout session', 500);
   }
 }
