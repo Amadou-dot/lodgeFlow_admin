@@ -94,9 +94,11 @@ verified Ready at that SHA. Experience-confirmation inputs merged in PR #159 as
 Ready at that SHA. Phase 1 has seven merged slices; catalog/resource/admin
 boundaries remain. Phase 2 request validation and safe confirmation errors merged
 in PR #160 as `9d35897`; all five main CI jobs pass and both production deployments
-are verified Ready at that SHA. Phase 2 continues with F01's named
-`paymentSummary` inputs across all six callers, preserving receipt calculations
-and numeric units. The inventory records scope and validation; the milestone remains open.
+are verified Ready at that SHA. Named `paymentSummary` inputs (F01) merged in
+PR #161 as `bf57e71`, with all five main CI jobs passing and both production apps
+verified Ready. Phase 2 continues with named booking/customer identity inputs for
+`updateCustomerBooking`; the existing mutation response and accounting contracts
+are preserved. The inventory records scope and validation; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

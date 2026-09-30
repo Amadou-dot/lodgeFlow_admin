@@ -10,6 +10,7 @@ import {
   settleCheckoutPayment,
   createCustomerBooking,
   updateCustomerBooking,
+  BookingRuleError,
   buildDemoBookings,
 } from '../src';
 let server: MongoMemoryServer;
@@ -81,18 +82,38 @@ test('customer updates enforce ownership, capacity, pricing, and block paid or p
   const booking = await createCustomerBooking(await selection());
   const id = String(booking._id);
   await assert.rejects(
-    updateCustomerBooking(id, 'someone-else', { numGuests: 2 })
+    updateCustomerBooking({
+      bookingId: id,
+      customerId: 'someone-else',
+      updates: { numGuests: 2 },
+    })
   );
-  await assert.rejects(updateCustomerBooking(id, 'customer', { numGuests: 5 }));
-  const updated = await updateCustomerBooking(id, 'customer', {
-    numGuests: 3,
-    extras: { hasBreakfast: true },
+  await assert.rejects(
+    updateCustomerBooking({
+      bookingId: id,
+      customerId: 'customer',
+      updates: { numGuests: 5 },
+    })
+  );
+  const updated = await updateCustomerBooking({
+    bookingId: id,
+    customerId: 'customer',
+    updates: {
+      numGuests: 3,
+      extras: { hasBreakfast: true },
+    },
   });
   assert.equal(updated.totalPrice, 855);
   assert.equal(updated.depositAmount, 214);
   updated.checkoutPending = true;
   await updated.save();
-  await assert.rejects(updateCustomerBooking(id, 'customer', { numGuests: 2 }));
+  await assert.rejects(
+    updateCustomerBooking({
+      bookingId: id,
+      customerId: 'customer',
+      updates: { numGuests: 2 },
+    })
+  );
   updated.checkoutPending = false;
   addBookingPayment(updated, {
     id: 'cash',
@@ -101,9 +122,19 @@ test('customer updates enforce ownership, capacity, pricing, and block paid or p
     receivedAt: new Date(),
   });
   await updated.save();
-  await assert.rejects(updateCustomerBooking(id, 'customer', { numGuests: 2 }));
-  await updateCustomerBooking(id, 'customer', {
-    specialRequests: ['Extra towels'],
+  await assert.rejects(
+    updateCustomerBooking({
+      bookingId: id,
+      customerId: 'customer',
+      updates: { numGuests: 2 },
+    })
+  );
+  await updateCustomerBooking({
+    bookingId: id,
+    customerId: 'customer',
+    updates: {
+      specialRequests: ['Extra towels'],
+    },
   });
 });
 test('concurrent duplicate Stripe deliveries record one receipt and reject mismatched quotes', async () => {
@@ -171,4 +202,86 @@ test('500 demo reservations have consistent prices, receipts, dates, and no over
     );
     if (i) assert.ok(inputs[i].checkInDate >= inputs[i - 1].checkOutDate);
   }
+});
+
+test('customer update conceals invalid, missing and foreign identities without writes', async () => {
+  const booking = await createCustomerBooking(await selection());
+  const bookingId = String(booking._id);
+  const before = JSON.stringify(await Booking.findById(bookingId).lean());
+  for (const attempt of [
+    { id: 'invalid-id', customerId: 'customer' },
+    { id: String(new mongoose.Types.ObjectId()), customerId: 'customer' },
+    { id: bookingId, customerId: 'foreign' },
+  ]) {
+    await assert.rejects(
+      updateCustomerBooking({
+        bookingId: attempt.id,
+        customerId: attempt.customerId,
+        updates: { numGuests: 2 },
+      }),
+      (error: unknown) =>
+        error instanceof BookingRuleError &&
+        error.status === 404 &&
+        error.message === 'Booking not found'
+    );
+    assert.equal(
+      JSON.stringify(await Booking.findById(bookingId).lean()),
+      before
+    );
+  }
+});
+
+test('customer update rejects terminal statuses without changing persisted data', async () => {
+  const booking = await createCustomerBooking(await selection());
+  const bookingId = String(booking._id);
+  for (const status of ['checked-in', 'checked-out', 'cancelled'] as const) {
+    booking.status = status;
+    await booking.save();
+    const before = JSON.stringify(await Booking.findById(bookingId).lean());
+    await assert.rejects(
+      updateCustomerBooking({
+        bookingId: bookingId,
+        customerId: 'customer',
+        updates: { specialRequests: ['Extra towels'] },
+      }),
+      (error: unknown) =>
+        error instanceof BookingRuleError &&
+        error.status === 400 &&
+        error.message === 'This booking can no longer be modified'
+    );
+    assert.equal(
+      JSON.stringify(await Booking.findById(bookingId).lean()),
+      before
+    );
+  }
+});
+
+test('paid customer updates permit special requests while preserving quote and receipt accounting', async () => {
+  const booking = await createCustomerBooking(await selection());
+  addBookingPayment(booking, {
+    id: 'full-payment',
+    amount: booking.totalPrice,
+    method: 'cash',
+    receivedAt: new Date('2030-05-01'),
+  });
+  await booking.save();
+  const bookingId = String(booking._id);
+  const before = await Booking.findById(bookingId).lean();
+  assert.ok(before);
+  await updateCustomerBooking({
+    bookingId: bookingId,
+    customerId: 'customer',
+    updates: { specialRequests: ['Extra towels'] },
+  });
+  const after = await Booking.findById(bookingId).lean();
+  assert.ok(after);
+  assert.deepEqual(after.specialRequests, ['Extra towels']);
+  assert.deepEqual(after.payments, before.payments);
+  assert.equal(after.customer, before.customer);
+  assert.equal(after.totalPrice, before.totalPrice);
+  assert.equal(after.depositAmount, before.depositAmount);
+  assert.equal(after.amountPaid, before.amountPaid);
+  assert.equal(after.remainingAmount, before.remainingAmount);
+  assert.equal(after.isPaid, true);
+  assert.equal(after.depositPaid, true);
 });

@@ -98,18 +98,25 @@ export async function createCustomerBooking(input: BookingSelection) {
   });
 }
 
-export async function updateCustomerBooking(
-  id: string,
-  customerId: string,
+export async function updateCustomerBooking({
+  bookingId,
+  customerId,
+  updates,
+}: {
+  bookingId: string;
+  customerId: string;
   updates: {
     numGuests?: number;
     extras?: BookingPricingExtrasSelection;
     specialRequests?: string[];
-  }
-) {
-  if (!mongoose.isValidObjectId(id))
+  };
+}) {
+  if (!mongoose.isValidObjectId(bookingId))
     throw new BookingRuleError('Booking not found', 404);
-  const booking = await Booking.findOne({ _id: id, customer: customerId });
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    customer: customerId,
+  });
   if (!booking) throw new BookingRuleError('Booking not found', 404);
   if (!['unconfirmed', 'confirmed'].includes(booking.status))
     throw new BookingRuleError('This booking can no longer be modified');
