@@ -30,10 +30,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(response, { status: 400 });
     }
 
-    // Find cabins that can accommodate the guests
-    const cabins = await Cabin.find({ capacity: { $gte: guests } }).sort({
-      price: 1,
-    });
+    // Only the active public catalog can be offered for a new stay.
+    const cabins = await Cabin.find({
+      status: 'active',
+      capacity: { $gte: guests },
+    }).sort({ price: 1 });
 
     // Check availability for each cabin
     const availabilityPromises = cabins.map(async cabin => {

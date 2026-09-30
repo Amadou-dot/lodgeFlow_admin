@@ -8,6 +8,7 @@ import { Phone, Mail } from 'lucide-react';
 import { siteConfig } from '@/config/site';
 import { siteToLodgingBusiness } from '@/lib/seo/jsonLd';
 import { connectDB, Cabin } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
 import {
   HeroSection,
   SectionHeader,
@@ -18,10 +19,12 @@ import {
 async function getFeaturedCabins() {
   try {
     await connectDB();
-    const cabins = await Cabin.find({}).limit(3).sort({ price: 1 });
+    const cabins = await Cabin.find({ status: 'active' })
+      .limit(3)
+      .sort({ price: 1 });
     return cabins;
   } catch (error) {
-    console.error('Error fetching featured cabins:', error);
+    logger.error('Error fetching featured cabins', error);
     return [];
   }
 }
@@ -96,7 +99,7 @@ export default async function Home() {
         />
 
         <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-          {featuredCabins.map((cabin: any) => {
+          {featuredCabins.map(cabin => {
             const effectivePrice = cabin.price - (cabin.discount || 0);
             const hasDiscount = cabin.discount > 0;
 
