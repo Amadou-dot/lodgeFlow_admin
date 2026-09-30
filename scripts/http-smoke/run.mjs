@@ -37,6 +37,16 @@ const { default: Cabin } =
   await import('../../packages/database/src/models/Cabin.ts');
 const { default: Booking } =
   await import('../../packages/database/src/models/Booking.ts');
+const { Experience } =
+  await import('../../packages/database/src/models/Experience.ts');
+const { default: ExperienceBooking } =
+  await import('../../packages/database/src/models/ExperienceBooking.ts');
+const { default: ProcessedStripeEvent } =
+  await import('../../packages/database/src/models/ProcessedStripeEvent.ts');
+const { default: Dining } =
+  await import('../../packages/database/src/models/Dining.ts');
+const { default: DiningReservation } =
+  await import('../../packages/database/src/models/DiningReservation.ts');
 const { default: Settings } =
   await import('../../packages/database/src/models/Settings.ts');
 const { default: StaffAccess } =
@@ -1547,6 +1557,404 @@ try {
   }
   console.log(
     'PASS existing admin email authorization, failure and success contracts'
+  );
+
+  const experienceFields = {
+    name: 'Smoke Kayak',
+    price: 37.5,
+    duration: '2 hours',
+    difficulty: 'Easy',
+    category: 'Water',
+    description: 'Isolated experience fixture',
+    image: 'https://example.invalid/kayak.jpg',
+    includes: ['Guide', 'Safety gear'],
+    available: ['Monday'],
+    ctaText: 'Book now',
+    location: 'North dock',
+    whatToBring: ['Water', 'Sunscreen'],
+  };
+  const experience = await Experience.create(experienceFields);
+  const experienceBooking = await ExperienceBooking.create({
+    experience: experience._id,
+    customer: 'smoke_customer',
+    date: new Date('2030-06-03T15:00:00Z'),
+    timeSlot: '15:00',
+    numParticipants: 2,
+    totalPrice: 75,
+    checkout: {
+      token: 'experience-quote',
+      amountCents: 7500,
+      currency: 'usd',
+      sessionId: 'cs_experience_smoke',
+      pending: true,
+      createdAt: new Date(),
+    },
+  });
+  const experienceId = String(experienceBooking._id);
+  const experienceRoute = '/api/send/experience-confirm';
+  const beforeExperience = JSON.stringify(
+    await ExperienceBooking.findById(experienceId).lean()
+  );
+  const callsBeforeExperience = calls.length;
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: experienceRoute,
+    method: 'POST',
+    body: { bookingId: experienceId },
+  });
+  for (const attempt of [
+    {
+      identity: 'foreign',
+      status: 403,
+      error: 'Not authorized to send this confirmation',
+    },
+    {
+      identity: 'customer',
+      status: 409,
+      error: 'Payment is required before confirmation',
+    },
+  ]) {
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route: experienceRoute,
+        method: 'POST',
+        body: { bookingId: experienceId },
+        identity: attempt.identity,
+        status: attempt.status,
+      }),
+      { error: attempt.error }
+    );
+  }
+  assert.equal(calls.length, callsBeforeExperience);
+  assert.equal(
+    JSON.stringify(await ExperienceBooking.findById(experienceId).lean()),
+    beforeExperience
+  );
+  const experienceEvent = {
+    id: 'evt_experience_paid',
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_experience_smoke',
+        payment_status: 'paid',
+        amount_total: 7500,
+        currency: 'usd',
+        payment_intent: 'pi_experience_smoke',
+        metadata: {
+          reservationKind: 'experience',
+          reservationId: experienceId,
+          quoteToken: 'experience-quote',
+        },
+      },
+    },
+  };
+  const reservationWebhook = async ({ payload, status }) =>
+    expectJson({
+      url: `${customer}/api/payments/webhook`,
+      method: 'POST',
+      body: payload,
+      status,
+      headers: {
+        'stripe-signature': signingStripe.webhooks.generateTestHeaderString({
+          payload: JSON.stringify(payload),
+          secret: webhookSecret,
+        }),
+      },
+    });
+  emailFailure = true;
+  assert.deepEqual(
+    await reservationWebhook({ payload: experienceEvent, status: 500 }),
+    { error: 'Webhook processing failed' }
+  );
+  let experiencePaid = await ExperienceBooking.findById(experienceId).lean();
+  assert.equal(experiencePaid.isPaid, true);
+  assert.equal(experiencePaid.receipts.length, 1);
+  assert.equal(experiencePaid.receipts[0].amountCents, 7500);
+  assert.equal(experiencePaid.checkout.pending, false);
+  assert.equal(experiencePaid.paymentConfirmationSentAt, undefined);
+  assert.equal(
+    await ProcessedStripeEvent.exists({ eventId: experienceEvent.id }),
+    null
+  );
+  const experienceReceipts = JSON.stringify(experiencePaid.receipts);
+  const failedExperienceSend = calls.at(-1);
+  emailFailure = false;
+  assert.deepEqual(
+    await reservationWebhook({ payload: experienceEvent, status: 200 }),
+    { received: true }
+  );
+  const successfulExperienceSend = calls.at(-1);
+  assert.deepEqual(
+    successfulExperienceSend.options,
+    failedExperienceSend.options
+  );
+  assert.equal(successfulExperienceSend.input.to, 'customer@example.invalid');
+  assert.equal(
+    successfulExperienceSend.input.from,
+    'LodgeFlow <payments@lodgeflow.app>'
+  );
+  assert.equal(
+    successfulExperienceSend.input.subject,
+    'Experience Booking Confirmation - LodgeFlow'
+  );
+  const experienceText = successfulExperienceSend.input.html.replace(
+    /<[^>]+>/g,
+    ''
+  );
+  for (const expected of [
+    'Smoke Kayak',
+    'Monday, June 3, 2030',
+    '15:00',
+    '2 hours',
+    'North dock',
+    '$37.50',
+    '$75.00',
+    'Guide',
+    'Safety gear',
+    'Water',
+    'Sunscreen',
+  ])
+    assert.ok(
+      experienceText.includes(expected),
+      `Missing experience email content: ${expected}`
+    );
+  experiencePaid = await ExperienceBooking.findById(experienceId).lean();
+  assert.equal(JSON.stringify(experiencePaid.receipts), experienceReceipts);
+  assert.ok(experiencePaid.paymentConfirmationSentAt instanceof Date);
+  const afterExperienceDelivery = JSON.stringify(experiencePaid);
+  const callsAfterExperienceDelivery = calls.length;
+  assert.deepEqual(
+    await reservationWebhook({ payload: experienceEvent, status: 200 }),
+    { received: true }
+  );
+  assert.equal(calls.length, callsAfterExperienceDelivery);
+  assert.equal(
+    JSON.stringify(await ExperienceBooking.findById(experienceId).lean()),
+    afterExperienceDelivery
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: experienceRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: experienceId },
+      status: 200,
+    }),
+    { id: 'email_smoke' }
+  );
+  assert.equal(
+    JSON.stringify(await ExperienceBooking.findById(experienceId).lean()),
+    afterExperienceDelivery
+  );
+
+  const freeExperience = await Experience.create({
+    ...experienceFields,
+    name: 'Free walk',
+    price: 0,
+  });
+  const freeExperienceBooking = await ExperienceBooking.create({
+    experience: freeExperience._id,
+    customer: 'smoke_customer',
+    date: new Date('2030-06-03'),
+    numParticipants: 1,
+    totalPrice: 0,
+    isPaid: false,
+  });
+  // Sparse legacy catalog rows omit arrays that hydrated reads used to default.
+  await Experience.collection.updateOne(
+    { _id: freeExperience._id },
+    { $unset: { includes: '', whatToBring: '', location: '' } }
+  );
+  const freeExperienceBefore = JSON.stringify(
+    await ExperienceBooking.findById(freeExperienceBooking._id).lean()
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: experienceRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: String(freeExperienceBooking._id) },
+      status: 200,
+    }),
+    { id: 'email_smoke' }
+  );
+  assert.equal(
+    calls.at(-1).input.from,
+    'LodgeFlow <notifications@lodgeflow.app>'
+  );
+  const freeExperienceText = calls.at(-1).input.html.replace(/<[^>]+>/g, '');
+  assert.ok(freeExperienceText.includes('$0.00 x 1 participant:'));
+  for (const omitted of [
+    'Time:',
+    'Location:',
+    "What's Included",
+    'What to Bring',
+  ])
+    assert.ok(!freeExperienceText.includes(omitted));
+  assert.equal(
+    JSON.stringify(
+      await ExperienceBooking.findById(freeExperienceBooking._id).lean()
+    ),
+    freeExperienceBefore
+  );
+
+  const missingExperienceId = new mongoose.Types.ObjectId();
+  const missingExperienceBooking = await ExperienceBooking.create({
+    experience: missingExperienceId,
+    customer: 'smoke_customer',
+    date: new Date('2030-06-03'),
+    numParticipants: 1,
+    totalPrice: 37.5,
+    checkout: {
+      token: 'missing-experience-quote',
+      amountCents: 3750,
+      currency: 'usd',
+      sessionId: 'cs_missing_experience',
+      pending: true,
+      createdAt: new Date(),
+    },
+  });
+  const missingExperienceEvent = {
+    id: 'evt_missing_experience',
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_missing_experience',
+        payment_status: 'paid',
+        amount_total: 3750,
+        currency: 'usd',
+        payment_intent: 'pi_missing_experience',
+        metadata: {
+          reservationKind: 'experience',
+          reservationId: String(missingExperienceBooking._id),
+          quoteToken: 'missing-experience-quote',
+        },
+      },
+    },
+  };
+  const callsBeforeMissingExperience = calls.length;
+  for (let retry = 0; retry < 2; retry++) {
+    assert.deepEqual(
+      await reservationWebhook({
+        payload: missingExperienceEvent,
+        status: 500,
+      }),
+      { error: 'Webhook processing failed' }
+    );
+    const row = await ExperienceBooking.findById(
+      missingExperienceBooking._id
+    ).lean();
+    assert.equal(row.receipts.length, 1);
+    assert.equal(row.isPaid, true);
+    assert.equal(row.paymentConfirmationSentAt, undefined);
+    assert.equal(
+      await ProcessedStripeEvent.exists({ eventId: missingExperienceEvent.id }),
+      null
+    );
+  }
+  const missingExperienceBefore = JSON.stringify(
+    await ExperienceBooking.findById(missingExperienceBooking._id).lean()
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: experienceRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: String(missingExperienceBooking._id) },
+      status: 404,
+    }),
+    { error: 'Experience not found' }
+  );
+  assert.equal(
+    JSON.stringify(
+      await ExperienceBooking.findById(missingExperienceBooking._id).lean()
+    ),
+    missingExperienceBefore
+  );
+  assert.equal(calls.length, callsBeforeMissingExperience);
+  await Experience.create({ ...experienceFields, _id: missingExperienceId });
+  assert.deepEqual(
+    await reservationWebhook({ payload: missingExperienceEvent, status: 200 }),
+    { received: true }
+  );
+  const recoveredExperience = await ExperienceBooking.findById(
+    missingExperienceBooking._id
+  ).lean();
+  assert.equal(recoveredExperience.receipts.length, 1);
+  assert.ok(recoveredExperience.paymentConfirmationSentAt instanceof Date);
+  console.log(
+    'PASS experience confirmation rendering, paid/free senders, ownership, durable settlement and missing-reference retry recovery'
+  );
+
+  const dining = await Dining.create({
+    name: 'Smoke Dinner',
+    description: 'Email boundary fixture',
+    type: 'menu',
+    mealType: 'dinner',
+    price: 30,
+    servingTime: { start: '17:00', end: '21:00' },
+    maxPeople: 8,
+    category: 'regular',
+    image: 'https://example.invalid/dinner.jpg',
+  });
+  const diningReservation = await DiningReservation.create({
+    dining: dining._id,
+    customer: 'smoke_customer',
+    date: new Date('2030-06-03'),
+    time: '18:00',
+    numGuests: 2,
+    totalPrice: 60,
+    checkout: {
+      token: 'dining-email-quote',
+      amountCents: 6000,
+      currency: 'usd',
+      sessionId: 'cs_dining_email',
+      pending: true,
+      createdAt: new Date(),
+    },
+  });
+  await DiningReservation.collection.updateOne(
+    { _id: diningReservation._id },
+    { $unset: { tablePreference: '' } }
+  );
+  const diningEmailEvent = {
+    id: 'evt_dining_email',
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_dining_email',
+        payment_status: 'paid',
+        amount_total: 6000,
+        currency: 'usd',
+        payment_intent: 'pi_dining_email',
+        metadata: {
+          reservationKind: 'dining',
+          reservationId: String(diningReservation._id),
+          quoteToken: 'dining-email-quote',
+        },
+      },
+    },
+  };
+  assert.deepEqual(
+    await reservationWebhook({ payload: diningEmailEvent, status: 200 }),
+    { received: true }
+  );
+  const diningEmailText = calls.at(-1).input.html.replace(/<[^>]+>/g, '');
+  for (const expected of ['Smoke Dinner', '18:00', '$60.00', '17:00 - 21:00'])
+    assert.ok(diningEmailText.includes(expected));
+  assert.ok(!diningEmailText.includes('Table Preference:'));
+  assert.equal(calls.at(-1).input.from, 'LodgeFlow <payments@lodgeflow.app>');
+  const diningDelivered = await DiningReservation.findById(
+    diningReservation._id
+  ).lean();
+  assert.equal(diningDelivered.receipts.length, 1);
+  assert.ok(diningDelivered.paymentConfirmationSentAt instanceof Date);
+  console.log(
+    'PASS shared confirmation helper retains dining rendering and delivery accounting'
   );
 
   for (const call of calls.filter(call => call.route === '/resend/send')) {

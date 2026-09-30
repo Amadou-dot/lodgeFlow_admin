@@ -3,6 +3,11 @@ import { getResend } from '@/lib/resend';
 
 import { ExperienceBookingConfirmationEmail } from '@/components/EmailTemplates';
 import { connectDB, ExperienceBooking } from '@lodgeflow/database';
+import {
+  serializeExperienceEmailBooking,
+  serializeExperienceEmailExperience,
+  type ExperienceConfirmationRecord,
+} from '@/lib/serializers/experience-email';
 import { auth, currentUser } from '@clerk/nextjs/server';
 
 function validateEmail(email: string): boolean {
@@ -28,8 +33,9 @@ export async function POST(request: Request) {
 
     await connectDB();
 
-    const booking =
-      await ExperienceBooking.findById(bookingId).populate('experience');
+    const booking = await ExperienceBooking.findById(bookingId)
+      .populate('experience')
+      .lean<ExperienceConfirmationRecord | null>();
     if (!booking) {
       return Response.json({ error: 'Booking not found' }, { status: 404 });
     }
@@ -47,6 +53,9 @@ export async function POST(request: Request) {
         { status: 409 }
       );
 
+    if (!booking.experience)
+      return Response.json({ error: 'Experience not found' }, { status: 404 });
+
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
     const firstName = user?.firstName || 'Guest';
@@ -60,13 +69,9 @@ export async function POST(request: Request) {
         kind: booking.totalPrice > 0 ? 'payment' : 'notification',
       }),
       react: ExperienceBookingConfirmationEmail({
-        bookingId: booking._id.toString(),
-        date: booking.date.toISOString(),
-        experienceData: booking.experience,
+        ...serializeExperienceEmailBooking(booking),
+        experienceData: serializeExperienceEmailExperience(booking.experience),
         firstName,
-        numParticipants: booking.numParticipants,
-        timeSlot: booking.timeSlot,
-        totalPrice: booking.totalPrice,
       }),
       subject: 'Experience Booking Confirmation - LodgeFlow',
       to: `${email}`,

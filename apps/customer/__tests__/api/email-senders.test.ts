@@ -81,7 +81,12 @@ function row(totalPrice: number) {
   };
 }
 function useRow(totalPrice: number) {
-  mockFindById.mockReturnValue({ populate: async () => row(totalPrice) });
+  mockFindById.mockReturnValue({
+    populate: () => {
+      const result = Promise.resolve(row(totalPrice));
+      return Object.assign(result, { lean: () => result });
+    },
+  });
 }
 function request() {
   return new Request('http://localhost/api/send', {
