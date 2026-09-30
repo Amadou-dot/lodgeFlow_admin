@@ -24,3 +24,27 @@ export const cabinAvailabilitySchema = z
     message: 'Check-out date must be after check-in date',
     path: ['checkOutDate'],
   });
+
+const calendarQueryDate = z
+  .string()
+  .pipe(z.coerce.date({ error: 'Invalid availability date' }));
+
+export const cabinCalendarQuerySchema = z
+  .object({
+    startDate: calendarQueryDate.optional(),
+    endDate: calendarQueryDate.optional(),
+  })
+  .transform(({ startDate, endDate }) => {
+    const defaultStart = new Date();
+    const defaultEnd = new Date();
+    // Preserve calendar-month rollover and the server's existing timezone rules.
+    defaultEnd.setMonth(defaultEnd.getMonth() + 6);
+    return {
+      startDate: startDate ?? defaultStart,
+      endDate: endDate ?? defaultEnd,
+    };
+  })
+  .refine(input => input.endDate > input.startDate, {
+    message: 'End date must be after start date',
+    path: ['endDate'],
+  });

@@ -757,6 +757,20 @@ try {
       },
     }
   );
+  for (const route of [
+    '/api/cabins/invalid/availability',
+    `/api/cabins/${cabin._id}/availability?startDate=invalid`,
+    `/api/cabins/${cabin._id}/availability?startDate=2030-06-04&endDate=2030-06-01`,
+    `/api/cabins/${cabin._id}/availability?startDate=2030-06-01&endDate=2030-06-01`,
+  ]) {
+    const invalidCalendar = await request({
+      origin: customer,
+      route,
+      status: 400,
+    });
+    assert.equal(invalidCalendar.success, false);
+    assert.equal(typeof invalidCalendar.error, 'string');
+  }
   for (const body of [
     null,
     { checkInDate: 'invalid', checkOutDate: '2030-06-04', guests: 4 },
