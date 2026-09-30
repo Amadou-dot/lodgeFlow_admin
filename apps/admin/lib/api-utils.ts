@@ -149,7 +149,10 @@ export async function requireApiAuth(
       };
     }
 
-    const role = await resolveStaffRole(userId, orgId);
+    const role = await resolveStaffRole({
+      userId: userId,
+      activeOrganizationId: orgId ?? null,
+    });
     if (!role || !hasPermission(role, options.permission)) {
       return {
         authenticated: false,

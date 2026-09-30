@@ -68,7 +68,10 @@ export async function PUT(request: Request) {
     const organizationId = staffOrganizationId()!;
     if (
       body.role !== null &&
-      !(await isOrganizationMember(organizationId, body.userId))
+      !(await isOrganizationMember({
+        organizationId: organizationId,
+        userId: body.userId,
+      }))
     ) {
       return createErrorResponse(
         'The user must belong to the LodgeFlow organization',
