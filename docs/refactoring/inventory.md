@@ -36,9 +36,9 @@ rather than treating counts as the completion gate.
 
 | ID  | Source / symbol                                                                                                  | Rule or observed mismatch                                                                    | Phase    | Next action and validation                                                                                                                                                          |
 | --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and cabin emails use explicit inputs; `PopulatedBooking` is removed. Checkout/catalog and other resource aliases remain. |
+| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and cabin emails use explicit inputs; `PopulatedBooking` is removed. Catalog and other resource aliases remain. |
 | T02 | `apps/customer/app/api/bookings/[id]/route.ts`: `GET`                                                            | `ApiResponse<any>` returns a populated document without an explicit DTO contract.            | 1        | Complete in PR #152: explicit detail DTO/serializer with owner/missing/foreign, ID/date and missing-cabin coverage.                                                                 |
-| T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Narrow/serialize the populated cabin explicitly and test a missing reference without creating a checkout.                                                                           |
+| T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Implemented in Phase 1 slice 6 below: nullable cabin population, missing-reference denial and characterized quote/session behavior.                                                                           |
 | T04 | `apps/customer/app/api/payments/webhook/route.ts`: confirmation payload                                          | Double cast converts a populated booking to the UI/email type.                               | 1        | Implemented in Phase 1 slice 4 below: explicit payment email inputs, nullable cabin population and preserved settlement/delivery boundaries.                                        |
 | T05 | `apps/admin/types/api.ts` and `apps/admin/types/index.ts`                                                        | Query/aggregation/transport types coexist; serialization contracts need per-flow separation. | 1        | Begin with booking output and its actual callers; test IDs, dates and null references. Do not rewrite every reporting query in one PR.                                              |
 | T06 | `packages/database/src/models/*`: nine `Document`-extending interfaces                                           | Persistence interfaces are re-exported across app boundaries.                                | 1        | Keep persistence behavior tested; add lean/populate/DTO types as each consumer migrates. Inheritance alone is not slated for deletion.                                              |
@@ -214,10 +214,47 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   and clean app/shared production builds pass. Builds use CI's public Clerk key
   without app/provider credentials; the baseline optional Sharp install warning
   remains non-blocking. Hosted login and live delivery were not exercised.
-- Next boundaries: `app/api/payments/create-checkout/route.ts` still casts its
-  populated cabin, and experience confirmation/resource interfaces retain model
-  aliases. Keep checkout quote/idempotency behavior and missing-reference handling
-  in its own slice; do not expand into #136/#139.
+- Checkout population is addressed in slice 6 below. Experience confirmation
+  and resource interfaces retain model aliases; do not expand into #136/#139.
+
+## Phase 1 slice 6: customer checkout cabin population
+
+- `app/api/payments/create-checkout/route.ts` uses the same explicit nullable
+  cabin population type for the owner-scoped lookup and quote reservation result.
+  Only the cabin's name crosses into the Stripe payload; the double cast is removed.
+- **Related fix:** an owned payable booking with a missing cabin returns
+  `{ success: false, error: 'Cabin not found' }`/404 before quote writes or Stripe
+  calls. This also denies reopening an existing session for a deleted cabin,
+  leaving its quote/session fields intact. Missing/foreign bookings still return
+  the identical `Booking not found`/404; paid/cancelled bookings retain their 400.
+- If the cabin disappears between lookup and reservation population, the handler
+  returns the same cabin 404 without creating a Stripe session. The already-written
+  quote is retained, just as after a provider failure; this branch is not a
+  no-write guarantee or an atomic constraint against later catalog deletion.
+- Preserved deposit/balance selection, currency/cents conversion, full Stripe
+  metadata/return URLs, quote version contention, open/expired/completing sessions,
+  provider retry keys, and the success/error envelopes. `hooks/usePayment.ts` and
+  `components/PaymentButton.tsx` keep their existing response/error handling and
+  cache invalidation; no caller changes were required.
+- Before runtime edits, 20 characterization cases passed and all four missing-cabin
+  regressions failed. The real HTTP gate also reproduced the null-cabin 500.
+  After the fix, all 24 focused cases, both app TypeScript checks and the expanded
+  HTTP gate pass. HTTP asserts owner/foreign missing-cabin denial without writes or
+  provider calls for new, retained and session-backed quotes, the complete valid
+  Stripe payload, and an unchanged booking when reusing an open session.
+- Local validation on 2026-09-30: `pnpm ci:check` passes formatting, read-only
+  lint and 1,274 tests (admin 1,014; customer 232; database 25; email 3).
+  Both app `tsc --noEmit` checks and `pnpm test:http` pass. A clean temporary copy
+  passes `pnpm install --frozen-lockfile` and `pnpm build` with CI's public Clerk
+  key and no app/provider credentials. Changed runtime/test files match those
+  build inputs. The existing optional Sharp install warning remains non-blocking;
+  database-dependent prerender fallbacks log the deliberately absent MongoDB URI.
+  Remote CI/deployment, hosted login and live provider operations were not run
+  for this slice.
+- Remaining boundaries: customer `app/api/send/experience-confirm/route.ts`,
+  `types/index.ts` catalog/resource aliases and admin booking DTOs (T05).
+  Checkout request validation/error normalization remains Phase 2/V03; money
+  constructors/conversions remain Phase 3/M03. Phase 1 and the milestone remain open.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

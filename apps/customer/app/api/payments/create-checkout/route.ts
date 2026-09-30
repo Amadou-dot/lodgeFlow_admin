@@ -1,10 +1,13 @@
 import { randomUUID } from 'crypto';
 import mongoose from 'mongoose';
 import { Booking, connectDB, Settings, roundMoney } from '@lodgeflow/database';
+import type { ICabin } from '@lodgeflow/database';
 import { getStripe } from '@/lib/stripe';
 import { normalizeBaseUrl } from '@/lib/url';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+
+type CheckoutPopulation = { cabin: Pick<ICabin, 'name'> | null };
 
 const errorResponse = (error: string, status: number) =>
   NextResponse.json({ success: false, error }, { status });
@@ -20,10 +23,11 @@ export async function POST(request: NextRequest) {
     let booking = await Booking.findOne({
       _id: bookingId,
       customer: userId,
-    }).populate('cabin');
+    }).populate<CheckoutPopulation>('cabin');
     if (!booking) return errorResponse('Booking not found', 404);
     if (booking.isPaid || booking.status === 'cancelled')
       return errorResponse('Booking is not payable', 400);
+    if (!booking.cabin) return errorResponse('Cabin not found', 404);
     const settings = await Settings.getSettings();
     const stripe = getStripe();
     if (booking.checkoutPending && booking.stripeSessionId) {
@@ -73,17 +77,20 @@ export async function POST(request: NextRequest) {
           $inc: { __v: 1 },
         },
         { new: true }
-      ).populate('cabin');
+      ).populate<CheckoutPopulation>('cabin');
       if (!reserved)
         return errorResponse('Booking changed; refresh and try again', 409);
       booking = reserved;
     }
+    // Population runs again after reservation; the cabin may have disappeared.
+    // Retain the reserved quote, as with provider failure, without creating a session.
+    const cabin = booking.cabin;
+    if (!cabin) return errorResponse('Cabin not found', 404);
     // Retain the quote token on failures: retrying the same Stripe idempotency key
     // recovers a session whose creation succeeded before a connection was lost.
     const baseUrl = normalizeBaseUrl(
       process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
     );
-    const cabin = booking.cabin as unknown as { name: string };
     const isDeposit = booking.amountPaid < booking.depositAmount;
     const session = await stripe.checkout.sessions.create(
       {
