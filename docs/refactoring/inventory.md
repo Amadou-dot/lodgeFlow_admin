@@ -418,13 +418,19 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   provider counts. `pnpm ci:check` passes formatting, read-only lint and 1,465 tests
   (admin 1,048; customer 378; database 36; email 3). Clean frozen installation and
   all app/shared builds pass. Existing optional Sharp and absent-MongoDB build
-  warnings remain non-blocking; remote delivery gates are pending.
+  warnings remain non-blocking.
 - Remaining cabin debt: `app/page.tsx:getFeaturedCabins` and
   `app/api/cabins/availability/route.ts` still lack the active-catalog filter; take
   a focused visibility follow-up with HTTP regressions. Availability request
   parsing/date types, calendar endpoint inputs, client sorting assertions and
   icon-map types remain separate responsibilities. Pricing, overlap calculation,
   booking writes and their locks are unchanged. No #136/#139 scope is added.
+
+- Delivered in PR #168: reviewed `b0cabe92a193d47ea0546bf55cad1d2ee5ca986a`,
+  merged `4af083475fe4937be6deaf762b1272212aa1e5c8`. All five PR CI jobs
+  (`36785129808`) and main CI jobs (`36785374090`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
 
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 
@@ -630,6 +636,33 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
 - Customer payment-status DTO/date types in `app/api/payments/[bookingId]/route.ts`
   and `hooks/usePayment.ts`, other request families and money unit conversions
   remain separate slices. No #136/#139 scope is added.
+
+## Phase 2 slice 7: public cabin catalog visibility
+
+- `apps/customer/app/page.tsx:getFeaturedCabins` and
+  `app/api/cabins/availability/route.ts` now select `status: active`, matching the
+  existing catalog list, detail, calendar and sitemap rules. This fixes inactive
+  and maintenance cabins appearing in public homepage cards/availability results.
+- Preserve the homepage's three-card limit, price ordering, display arithmetic
+  and empty-catalog fallback. Remove its query-result `any` annotation using the
+  typed Cabin model and log unexpected failures through the server logger.
+  Availability retains capacity/overlap predicates, date semantics, response
+  DTOs and conflict identifiers. No booking or catalog data is changed by reads.
+- Before changes, all 19 existing catalog tests pass and the new active-selection
+  regression fails. The HTTP gate independently reproduces the homepage rendering
+  an inactive fixture; active detail rendering and inactive calendar 404s pass.
+  After changes, all 20 focused cases, customer type checking and HTTP smoke pass.
+- Expanded HTTP checks both inactive and maintenance fixtures across homepage and
+  availability, active detail rendering/structured data, the homepage's safe
+  database-failure fallback, and unchanged catalog/provider state. These checks
+  run through real Next server rendering with controlled local dependencies.
+- `pnpm ci:check` passes formatting, read-only lint and 1,466 tests (admin 1,048;
+  customer 379; database 36; email 3). Clean frozen installation and all app/shared
+  builds pass; all four runtime/test files match validated inputs. Existing optional
+  Sharp and absent-MongoDB build warnings remain non-blocking. Remote delivery
+  gates are pending. Availability request validation/date types, calendar request
+  parsing, other resource/admin DTOs and money/UI work
+  remain separate slices. #136/#139 remain excluded.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

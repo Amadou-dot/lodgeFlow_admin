@@ -328,7 +328,7 @@ try {
   await Settings.create(settingsData);
   const cabin = await Cabin.create({
     name: 'Smoke Cabin',
-    image: 'https://example.invalid/cabin.jpg',
+    image: 'https://images.unsplash.com/lodgeflow-smoke-cabin.jpg',
     capacity: 4,
     price: 100,
     discount: 0,
@@ -491,6 +491,101 @@ try {
     status: 'inactive',
     amenities: [],
   });
+  const maintenanceCabin = await Cabin.create({
+    name: 'Maintenance Cabin Fixture',
+    image: 'https://images.unsplash.com/lodgeflow-smoke-maintenance.jpg',
+    capacity: 4,
+    price: 130,
+    discount: 0,
+    description: 'Unavailable during maintenance',
+    status: 'maintenance',
+    amenities: [],
+  });
+  const catalogBeforeVisibility = JSON.stringify(
+    await Cabin.find().sort({ _id: 1 }).lean()
+  );
+  for (const hiddenCabin of [inactiveCabin, maintenanceCabin]) {
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route: `/api/cabins/${hiddenCabin._id}/availability`,
+        status: 404,
+      }),
+      { success: false, error: 'Cabin not found' }
+    );
+  }
+  const activePage = await fetch(`${customer}/cabins/${cabin._id}`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(60000),
+  });
+  assert.equal(activePage.status, 200);
+  const activeHtml = await activePage.text();
+  assert.ok(activeHtml.includes('Smoke Cabin'));
+  assert.match(activeHtml, /application\/ld\+json/);
+  const homePage = await fetch(`${customer}/`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(60000),
+  });
+  assert.equal(homePage.status, 200);
+  const homeHtml = await homePage.text();
+  assert.ok(homeHtml.includes('Smoke Cabin'));
+  assert.equal(
+    homeHtml.includes('Inactive Cabin Fixture'),
+    false,
+    'homepage must omit inactive cabins'
+  );
+  assert.equal(
+    homeHtml.includes('Maintenance Cabin Fixture'),
+    false,
+    'homepage must omit maintenance cabins'
+  );
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/cabins/availability',
+      method: 'POST',
+      body: {
+        checkInDate: '2030-06-01',
+        checkOutDate: '2030-06-04',
+        guests: 4,
+      },
+      status: 200,
+    }),
+    {
+      success: true,
+      data: [
+        {
+          ...JSON.parse(JSON.stringify(cabin)),
+          isAvailable: true,
+          conflictingBookings: [],
+        },
+      ],
+    }
+  );
+  await mongoose.connection.db.admin().command({
+    configureFailPoint: 'failCommand',
+    mode: { times: 1 },
+    data: { failCommands: ['find'], errorCode: 2 },
+  });
+  const failedHome = await fetch(`${customer}/`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(60000),
+  });
+  assert.equal(failedHome.status, 200);
+  const failedHomeHtml = await failedHome.text();
+  assert.equal(failedHomeHtml.includes('Smoke Cabin'), false);
+  assert.equal(failedHomeHtml.includes('failCommand'), false);
+  await mongoose.connection.db
+    .admin()
+    .command({ configureFailPoint: 'failCommand', mode: 'off' });
+  assert.equal(
+    JSON.stringify(await Cabin.find().sort({ _id: 1 }).lean()),
+    catalogBeforeVisibility
+  );
+  assert.equal(calls.length, 0);
+  console.log(
+    'PASS public homepage/availability visibility, active page rendering and safe homepage failure'
+  );
   assert.deepEqual(
     await request({
       origin: customer,
@@ -523,7 +618,9 @@ try {
     }),
     { success: false, error: 'Invalid cabin ID' }
   );
-  await Cabin.deleteOne({ _id: inactiveCabin._id });
+  await Cabin.deleteMany({
+    _id: { $in: [inactiveCabin._id, maintenanceCabin._id] },
+  });
   assert.equal(
     JSON.stringify(await Cabin.findById(cabin._id).lean()),
     cabinSnapshot

@@ -263,6 +263,19 @@ describe('cabin catalog characterization', () => {
 });
 
 describe('cabin catalog regressions', () => {
+  test('availability selects only the active cabin catalog', async () => {
+    const response = await availability({
+      checkInDate: '2030-06-01',
+      checkOutDate: '2030-06-04',
+      guests: 4,
+    });
+    expect(response.status).toBe(200);
+    expect(mockFind).toHaveBeenCalledWith({
+      status: 'active',
+      capacity: { $gte: 4 },
+    });
+  });
+
   test('applies an explicit zero price limit', async () => {
     expect((await listing('?minPrice=0&maxPrice=0')).status).toBe(200);
     expect(mockFind).toHaveBeenCalledWith({
