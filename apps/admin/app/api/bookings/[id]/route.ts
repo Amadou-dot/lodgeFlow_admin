@@ -151,12 +151,14 @@ export async function PATCH(req: Request, { params }: IdParam) {
     }
 
     // Reject cancellation/refund fields on non-cancelled bookings
-    const cancellationFields = [
-      'cancellationReason',
-      'refundStatus',
-      'refundAmount',
-      'refundedAt',
-    ].filter(f => (updateData as Record<string, unknown>)[f] !== undefined);
+    const cancellationFields = (
+      [
+        'cancellationReason',
+        'refundStatus',
+        'refundAmount',
+        'refundedAt',
+      ] as const
+    ).filter(field => updateData[field] !== undefined);
     if (cancellationFields.length > 0 && booking.status !== 'cancelled') {
       return createErrorResponse(
         `Cannot set ${cancellationFields.join(', ')} on a booking with status '${booking.status}'. The booking must be cancelled first.`,
