@@ -80,18 +80,18 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 
 Current execution status (2026-09-30): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
-Phase 1 has eight merged slices (PRs #152–#154, #156–#159 and #164), covering customer
+Phase 1 has nine merged slices (PRs #152–#154, #156–#159, #164 and #167), covering customer
 booking reads/mutations/cancellation, cabin and experience email inputs, checkout
-population, and validated cached customer payloads/dates. Sender repair #132
+population, payment-status reads, and validated cached customer payloads/dates. Sender repair #132
 completed separately in PR #155 with production and user inbox evidence. Phase 2
 has six merged slices (PRs #160–#163, #165–#166): confirmation/checkout request
 validation and safe errors, named payment summary/customer update/staff identity
 inputs, and unused pagination cleanup. The latest merge,
-[PR #166](https://github.com/Amadou-dot/lodgeFlow_admin/pull/166) at `cc7bbeb`,
+[PR #167](https://github.com/Amadou-dot/lodgeFlow_admin/pull/167) at `b74e067`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. The next Phase 1 slice covers the customer payment-status JSON projection,
-its unused hook and path-ID validation, preserving ownership and stored payment
-values. Catalog/resource/admin DTOs and the remaining operations, money and UI
+SHA. Phase 1 continues with the customer cabin catalog: JSON serializers across
+API/server-rendered reads and typed UI fixtures, with focused visibility/ID/filter
+regressions. Other resource/admin DTOs and the remaining operations, money and UI
 work are still open. The inventory and tracker retain per-slice validation and
 delivery evidence; the milestone remains open.
 

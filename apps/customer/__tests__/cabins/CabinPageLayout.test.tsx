@@ -1,6 +1,6 @@
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { render, screen } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
-import type { Cabin } from '@/types';
 import CabinDetailClient from '@/components/CabinDetailClient';
 import { useUser } from '@clerk/nextjs';
 
@@ -105,7 +105,7 @@ jest.mock('@/components/Breadcrumb', () => {
 });
 
 describe('Enhanced Cabin Page - Issue #17', () => {
-  const mockCabin = {
+  const mockCabin = createCabinFixture({
     _id: 'cabin-123',
     name: 'Mountain View Cabin',
     description: 'A beautiful cabin with all amenities',
@@ -115,9 +115,7 @@ describe('Enhanced Cabin Page - Issue #17', () => {
     image: '/cabin.jpg',
     images: ['/cabin.jpg', '/cabin2.jpg'],
     amenities: ['WiFi', 'Kitchen'],
-    checkInTime: '15:00',
-    checkOutTime: '11:00',
-  } as unknown as Cabin;
+  });
 
   const mockUser = {
     firstName: 'John',

@@ -1,6 +1,6 @@
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { render, screen } from '@testing-library/react';
 import CabinDetails from '@/components/CabinDetails';
-import type { Cabin } from '@/types';
 
 // Mock useSettings hook
 jest.mock('@/hooks/useSettings', () => ({
@@ -16,8 +16,7 @@ jest.mock('@/hooks/useSettings', () => ({
   }),
 }));
 
-// Mock cabin data — cast since UI components only consume a subset of ICabin
-const mockCabin = {
+const mockCabin = createCabinFixture({
   _id: '1',
   name: 'Luxury Mountain Cabin',
   price: 250,
@@ -27,7 +26,7 @@ const mockCabin = {
   description:
     'A beautiful mountain cabin with stunning views and modern amenities.',
   amenities: ['WiFi', 'Kitchen', 'Parking', 'Hot Tub', 'Mountain View'],
-} as unknown as Cabin;
+});
 
 describe('CabinDetails Component', () => {
   it('renders cabin description', () => {
@@ -73,7 +72,7 @@ describe('CabinDetails Component', () => {
     const cabinNoAmenities = {
       ...mockCabin,
       amenities: [],
-    } as unknown as Cabin;
+    };
 
     render(<CabinDetails cabin={cabinNoAmenities} />);
 
@@ -91,7 +90,7 @@ describe('CabinDetails Component', () => {
     const singleGuestCabin = {
       ...mockCabin,
       capacity: 1,
-    } as unknown as Cabin;
+    };
 
     render(<CabinDetails cabin={singleGuestCabin} />);
 

@@ -67,8 +67,9 @@ Custom hooks in `hooks/` use React Query to fetch from internal API routes. API 
 
 - `app/api/` - API routes: bookings, cabins, dining, dining-reservations, experiences, experience-bookings, payments, settings, send (email)
 - `packages/database/src/models/` (repo root) - Mongoose schemas: Booking, Cabin, Dining, DiningReservation, Experience, ExperienceBooking, ProcessedStripeEvent, Settings
-- `hooks/` - React Query hooks matching API resources (useCabin, useBooking, etc.)
-- `types/index.ts` - Centralized TypeScript types, re-exports model interfaces
+- `hooks/` - React Query hooks matching API resources (useCabins, useBooking, etc.)
+- `types/index.ts` - DTO aliases for migrated flows; remaining model aliases are refactoring debt
+- `types/cabin-read.ts`, `types/booking-read.ts` - Explicit JSON read contracts for migrated cabin/booking flows
 - `components/ui/` - Reusable UI components
 - `lib/validations/` - Zod schemas validated at API boundaries (booking, dining-reservation, experience-booking)
 

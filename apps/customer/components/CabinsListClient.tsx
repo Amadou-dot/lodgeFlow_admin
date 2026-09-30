@@ -31,8 +31,10 @@ export default function CabinsListClient({
 
   const filtered = initialCabins.filter(c => {
     if (filters.capacity && c.capacity < filters.capacity) return false;
-    if (filters.minPrice && c.price < filters.minPrice) return false;
-    if (filters.maxPrice && c.price > filters.maxPrice) return false;
+    if (filters.minPrice !== undefined && c.price < filters.minPrice)
+      return false;
+    if (filters.maxPrice !== undefined && c.price > filters.maxPrice)
+      return false;
     if (searchTerm) {
       const needle = searchTerm.toLowerCase();
       const hay =

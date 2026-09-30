@@ -1,4 +1,12 @@
 import type {
+  CabinSummary as BookingHistoryCabin,
+  CabinDetail as BookingDetailCabin,
+} from './cabin-read';
+export type {
+  CabinSummary as BookingHistoryCabin,
+  CabinDetail as BookingDetailCabin,
+} from './cabin-read';
+import type {
   BOOKING_STATUSES,
   PAYMENT_METHODS,
   REFUND_STATUSES,
@@ -6,34 +14,6 @@ import type {
 
 /** Verified legacy transport exception: reads retain persisted nulls and omission.
  * These DTOs describe the existing wire contract; serializers must not normalize it. */
-
-/** JSON fields selected by the history route. A deleted cabin is null. */
-export interface BookingHistoryCabin {
-  _id: string;
-  name: string;
-  image: string;
-  images: string[];
-  capacity: number;
-  price: number;
-  discount: number;
-  description: string;
-  status: 'active' | 'maintenance' | 'inactive';
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  size?: number | null;
-  minNights?: number | null;
-}
-
-/** The detail route populates the complete cabin and serializes its virtuals. */
-export interface BookingDetailCabin extends BookingHistoryCabin {
-  id: string;
-  amenities: string[];
-  extraGuestFee?: number;
-  discountedPrice?: number;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  __v?: number | null;
-}
 
 export interface BookingReadFields {
   _id: string;

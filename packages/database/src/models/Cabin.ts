@@ -1,7 +1,10 @@
 import { CABIN_STATUSES } from '../config';
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+import type { Document, Model, Types } from 'mongoose';
 
 export interface ICabin extends Document {
+  _id: Types.ObjectId;
+  readonly discountedPrice: number;
   name: string;
   image: string;
   images: string[];
@@ -143,5 +146,5 @@ CabinSchema.virtual('discountedPrice').get(function (this: ICabin) {
 CabinSchema.set('toJSON', { virtuals: true });
 CabinSchema.set('toObject', { virtuals: true });
 
-export default mongoose.models.Cabin ||
+export default (mongoose.models.Cabin as Model<ICabin> | undefined) ||
   mongoose.model<ICabin>('Cabin', CabinSchema);

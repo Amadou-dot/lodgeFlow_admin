@@ -1,3 +1,4 @@
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useCabins } from '@/hooks/useCabins';
 import { createTestQueryClient } from '@/__tests__/shared/test-utils';
@@ -18,10 +19,35 @@ describe('useCabins', () => {
     jest.resetAllMocks();
   });
 
+  it('sends explicit zero price bounds', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: [] }),
+    } satisfies Pick<Response, 'ok' | 'json'>);
+    const { result } = renderHook(
+      () => useCabins({ minPrice: 0, maxPrice: 0 }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith('/api/cabins?minPrice=0&maxPrice=0');
+  });
+
   it('fetches all cabins without parameters', async () => {
     const mockCabins = [
-      { _id: '1', name: 'Cabin 1', maxCapacity: 4, regularPrice: 200 },
-      { _id: '2', name: 'Cabin 2', maxCapacity: 2, regularPrice: 150 },
+      createCabinFixture({
+        _id: '1',
+        name: 'Cabin 1',
+        capacity: 4,
+        price: 200,
+      }),
+      createCabinFixture({
+        _id: '2',
+        name: 'Cabin 2',
+        capacity: 2,
+        price: 150,
+      }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -39,7 +65,12 @@ describe('useCabins', () => {
 
   it('fetches cabins with capacity filter', async () => {
     const mockCabins = [
-      { _id: '1', name: 'Large Cabin', maxCapacity: 4, regularPrice: 200 },
+      createCabinFixture({
+        _id: '1',
+        name: 'Large Cabin',
+        capacity: 4,
+        price: 200,
+      }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -58,7 +89,7 @@ describe('useCabins', () => {
 
   it('fetches cabins with price range filters', async () => {
     const mockCabins = [
-      { _id: '1', name: 'Mid-Range Cabin', regularPrice: 175 },
+      createCabinFixture({ _id: '1', name: 'Mid-Range Cabin', price: 175 }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -80,7 +111,7 @@ describe('useCabins', () => {
 
   it('fetches cabins with availability filter', async () => {
     const mockCabins = [
-      { _id: '1', name: 'Available Cabin', regularPrice: 200 },
+      createCabinFixture({ _id: '1', name: 'Available Cabin', price: 200 }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -98,7 +129,9 @@ describe('useCabins', () => {
   });
 
   it('fetches cabins with search query', async () => {
-    const mockCabins = [{ _id: '1', name: 'Luxury Suite', regularPrice: 300 }];
+    const mockCabins = [
+      createCabinFixture({ _id: '1', name: 'Luxury Suite', price: 300 }),
+    ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -115,7 +148,9 @@ describe('useCabins', () => {
   });
 
   it('fetches cabins with multiple filters', async () => {
-    const mockCabins = [{ _id: '1', name: 'Perfect Match', regularPrice: 180 }];
+    const mockCabins = [
+      createCabinFixture({ _id: '1', name: 'Perfect Match', price: 180 }),
+    ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,

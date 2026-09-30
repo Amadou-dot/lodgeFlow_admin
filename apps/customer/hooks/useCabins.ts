@@ -8,9 +8,9 @@ const fetchCabins = async (
 
   if (params.capacity)
     searchParams.append('capacity', params.capacity.toString());
-  if (params.minPrice)
+  if (params.minPrice !== undefined)
     searchParams.append('minPrice', params.minPrice.toString());
-  if (params.maxPrice)
+  if (params.maxPrice !== undefined)
     searchParams.append('maxPrice', params.maxPrice.toString());
   if (params.available !== undefined)
     searchParams.append('available', params.available.toString());

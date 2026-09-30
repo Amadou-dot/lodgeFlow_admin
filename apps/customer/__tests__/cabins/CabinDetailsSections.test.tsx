@@ -1,3 +1,4 @@
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { render, screen } from '@testing-library/react';
 import {
   CabinDescriptionSection,
@@ -5,13 +6,12 @@ import {
   CabinInfoSection,
   CabinHouseRulesSection,
 } from '@/components/CabinDetails';
-import type { Cabin } from '@/types';
 
 jest.mock('@/hooks/useSettings', () => ({
   useSettings: () => ({ data: null, isLoading: false }),
 }));
 
-const mockCabin = {
+const mockCabin = createCabinFixture({
   _id: '1',
   name: 'Test Cabin',
   price: 200,
@@ -20,7 +20,7 @@ const mockCabin = {
   discount: 0,
   description: 'A beautiful mountain cabin.',
   amenities: ['WiFi', 'Kitchen'],
-} as unknown as Cabin;
+});
 
 describe('CabinDescriptionSection', () => {
   it('renders description heading and text', () => {
@@ -39,9 +39,7 @@ describe('CabinAmenitiesSection', () => {
 
   it('renders nothing when amenities array is empty', () => {
     const { container } = render(
-      <CabinAmenitiesSection
-        cabin={{ ...mockCabin, amenities: [] } as unknown as Cabin}
-      />
+      <CabinAmenitiesSection cabin={{ ...mockCabin, amenities: [] }} />
     );
     expect(container.firstChild).toBeNull();
   });

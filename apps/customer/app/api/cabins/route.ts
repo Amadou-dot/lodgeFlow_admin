@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { connectDB, Cabin } from '@lodgeflow/database';
+import type { ICabin } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
+import type { FilterQuery } from 'mongoose';
 import type { ApiResponse, Cabin as CabinType } from '@/types';
+import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
 import { cabinQuerySchema } from '@/lib/validations';
 import {
   validateRequest,
@@ -26,16 +30,17 @@ export async function GET(request: NextRequest) {
     const { capacity, minPrice, maxPrice, search } = validation.data;
 
     // Build query — only show active cabins to guests
-    const query: any = { status: 'active' };
+    const query: FilterQuery<ICabin> = { status: 'active' };
 
     if (capacity) {
       query.capacity = { $gte: capacity };
     }
 
-    if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = minPrice;
-      if (maxPrice) query.price.$lte = maxPrice;
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.price = {
+        ...(minPrice !== undefined ? { $gte: minPrice } : {}),
+        ...(maxPrice !== undefined ? { $lte: maxPrice } : {}),
+      };
     }
 
     // Text search functionality
@@ -51,12 +56,12 @@ export async function GET(request: NextRequest) {
 
     const response: ApiResponse<CabinType[]> = {
       success: true,
-      data: cabins,
+      data: cabins.map(serializeCabinDetail),
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching cabins:', error);
+    logger.error('Error fetching cabins', error);
 
     const response: ApiResponse<never> = {
       success: false,

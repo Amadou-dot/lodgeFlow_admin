@@ -2,7 +2,7 @@ import type {
   IBooking,
   IBookingModel,
 } from '@lodgeflow/database/models/Booking';
-import type { ICabin } from '@lodgeflow/database/models/Cabin';
+import type { CabinDetail } from './cabin-read';
 import type { IDining } from '@lodgeflow/database/models/Dining';
 import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
 import type { IExperience } from '@lodgeflow/database/models/Experience';
@@ -19,7 +19,7 @@ export type IconSvgProps = SVGProps<SVGSVGElement> & {
 };
 
 // Re-export model types for easier importing
-export type Cabin = ICabin;
+export type Cabin = CabinDetail;
 export type Booking = IBooking;
 export type Settings = ISettings;
 export type Experience = IExperience;
@@ -63,9 +63,9 @@ export interface AvailabilityQuery {
   guests: number;
 }
 
-export interface AvailableCabin extends ICabin {
+export interface AvailableCabin extends CabinDetail {
   isAvailable: boolean;
-  conflictingBookings?: string[];
+  conflictingBookings: string[];
 }
 
 // Cabin query parameters

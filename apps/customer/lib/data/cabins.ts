@@ -1,7 +1,10 @@
 import { cache } from 'react';
 
 import { Cabin, connectDB } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
 import type { Cabin as CabinType } from '@/types';
+import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
+import { cabinIdSchema } from '@/lib/validations/cabin';
 
 /**
  * Fetch a single active cabin by id. Wrapped in React cache() so the page
@@ -12,16 +15,15 @@ import type { Cabin as CabinType } from '@/types';
  */
 export const getCabinById = cache(
   async (id: string): Promise<CabinType | null> => {
-    if (!id || typeof id !== 'string') return null;
+    const input = cabinIdSchema.safeParse(id);
+    if (!input.success) return null;
     try {
       await connectDB();
-      const doc = await Cabin.findById(id);
-      if (!doc) return null;
-      // JSON.parse(JSON.stringify(...)) preserves virtuals (toJSON: { virtuals: true })
-      // and converts ObjectId to string. .lean() would skip virtuals.
-      return JSON.parse(JSON.stringify(doc));
+      const doc = await Cabin.findById(input.data);
+      if (!doc || (doc.status && doc.status !== 'active')) return null;
+      return serializeCabinDetail(doc);
     } catch (error) {
-      console.error(`getCabinById(${id}): failed`, error);
+      logger.error('getCabinById: failed', error, { cabinId: input.data });
       return null;
     }
   }
@@ -37,9 +39,9 @@ export const getAllActiveCabinsForListing = cache(
     try {
       await connectDB();
       const docs = await Cabin.find({ status: 'active' }).sort({ price: 1 });
-      return JSON.parse(JSON.stringify(docs));
+      return docs.map(serializeCabinDetail);
     } catch (error) {
-      console.error('getAllActiveCabinsForListing: failed', error);
+      logger.error('getAllActiveCabinsForListing: failed', error);
       return [];
     }
   }
