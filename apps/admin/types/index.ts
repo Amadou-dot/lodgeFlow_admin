@@ -54,8 +54,9 @@ export interface RecentBooking {
 // Extended types for populated models (used in API responses)
 export interface PopulatedBooking extends Omit<
   IBooking,
-  'cabin' | 'customer' | 'checkInDate' | 'checkOutDate'
+  '_id' | 'cabin' | 'customer' | 'checkInDate' | 'checkOutDate'
 > {
+  _id: string;
   cabin: ICabin;
   customer: Customer; // Updated to use new Customer type from Clerk
   checkInDate: string | Date; // API returns string, but might be Date in some contexts

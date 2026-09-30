@@ -1,6 +1,7 @@
 'use client';
 
-import type { PopulatedBooking } from '@/types';
+import type { BookingStatus } from '@/lib/config';
+import type { BookingStatusChangeHandler } from '@/types/booking-actions';
 import { Button } from '@heroui/button';
 import {
   Dropdown,
@@ -10,21 +11,26 @@ import {
 } from '@heroui/dropdown';
 import { MoreVertical } from 'lucide-react';
 
-interface BookingActionsMenuProps {
-  booking: PopulatedBooking;
-  onStatusChange?: (bookingId: string, newStatus: string) => void;
-  onViewDetails?: (booking: PopulatedBooking) => void;
-  onEdit?: (booking: PopulatedBooking) => void;
-  onDelete?: (booking: PopulatedBooking) => void;
+interface BookingActionData {
+  _id: string;
+  status: BookingStatus;
 }
 
-export default function BookingActionsMenu({
+interface BookingActionsMenuProps<TBooking extends BookingActionData> {
+  booking: TBooking;
+  onStatusChange?: BookingStatusChangeHandler;
+  onViewDetails?: (booking: TBooking) => void;
+  onEdit?: (booking: TBooking) => void;
+  onDelete?: (booking: TBooking) => void;
+}
+
+export default function BookingActionsMenu<TBooking extends BookingActionData>({
   booking,
   onStatusChange,
   onViewDetails,
   onEdit,
   onDelete,
-}: BookingActionsMenuProps) {
+}: BookingActionsMenuProps<TBooking>) {
   const menuItems = [];
 
   if (onViewDetails) {
@@ -43,11 +49,13 @@ export default function BookingActionsMenu({
     );
   }
 
-  if (onStatusChange && booking.status === 'unconfirmed') {
+  if (onStatusChange && booking.status === 'confirmed') {
     menuItems.push(
       <DropdownItem
         key='checkin'
-        onPress={() => onStatusChange(booking._id.toString(), 'checked-in')}
+        onPress={() =>
+          onStatusChange({ bookingId: booking._id, status: 'checked-in' })
+        }
       >
         Check In
       </DropdownItem>
@@ -58,7 +66,9 @@ export default function BookingActionsMenu({
     menuItems.push(
       <DropdownItem
         key='checkout'
-        onPress={() => onStatusChange(booking._id.toString(), 'checked-out')}
+        onPress={() =>
+          onStatusChange({ bookingId: booking._id, status: 'checked-out' })
+        }
       >
         Check Out
       </DropdownItem>
@@ -71,7 +81,9 @@ export default function BookingActionsMenu({
         key='cancel'
         className='text-danger'
         color='danger'
-        onPress={() => onStatusChange(booking._id.toString(), 'cancelled')}
+        onPress={() =>
+          onStatusChange({ bookingId: booking._id, status: 'cancelled' })
+        }
       >
         Cancel Booking
       </DropdownItem>

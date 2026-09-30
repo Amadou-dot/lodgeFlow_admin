@@ -18,6 +18,7 @@ import type {
   PopulatedBooking,
   BookingsFilters as BookingsFiltersType,
 } from '@/types';
+import type { BookingStatusChange } from '@/types/booking-actions';
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
 import { addToast } from '@heroui/toast';
@@ -112,7 +113,10 @@ function BookingsContent() {
     resetFilters();
   };
 
-  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+  const handleStatusChange = async ({
+    bookingId,
+    status,
+  }: BookingStatusChange) => {
     const booking = bookingsData?.bookings.find(
       b => b._id.toString() === bookingId
     );
@@ -120,12 +124,7 @@ function BookingsContent() {
       try {
         await updateBooking.mutateAsync({
           _id: booking._id.toString(),
-          status: newStatus as
-            | 'unconfirmed'
-            | 'confirmed'
-            | 'checked-in'
-            | 'checked-out'
-            | 'cancelled',
+          status,
         });
         // Manually revalidate SWR data
         mutate();
