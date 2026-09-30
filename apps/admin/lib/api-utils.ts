@@ -330,18 +330,6 @@ export function createValidationErrorResponse(error: import('zod').ZodError) {
 }
 
 /**
- * Pagination metadata interface
- */
-export interface PaginationMeta {
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-  limit: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
-}
-
-/**
  * Parse pagination parameters from URL search params
  * Enforces min/max limits and defaults
  */
@@ -361,40 +349,4 @@ export function parsePagination(searchParams: URLSearchParams): {
   const skip = (page - 1) * limit;
 
   return { page, limit, skip };
-}
-
-/**
- * Build pagination metadata for API responses
- */
-export function buildPaginationMeta(
-  total: number,
-  page: number,
-  limit: number
-): PaginationMeta {
-  const totalPages = Math.ceil(total / limit);
-  return {
-    currentPage: page,
-    totalPages,
-    totalItems: total,
-    limit,
-    hasNextPage: page < totalPages,
-    hasPrevPage: page > 1,
-  };
-}
-
-/**
- * Create a paginated success response
- * Combines data with pagination metadata
- */
-export function createPaginatedResponse<T>(
-  data: T[],
-  total: number,
-  page: number,
-  limit: number
-) {
-  return NextResponse.json({
-    success: true,
-    data,
-    pagination: buildPaginationMeta(total, page, limit),
-  });
 }

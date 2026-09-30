@@ -17,8 +17,6 @@ import {
   parsePagination,
   parseIntParam,
   sanitizeUpdatePayload,
-  buildPaginationMeta,
-  createPaginatedResponse,
   createValidationErrorResponse,
   requireApiAuth,
   HTTP_STATUS,
@@ -450,63 +448,6 @@ describe('api-utils', () => {
 
     it('falls back for non-numeric strings', () => {
       expect(parseIntParam('abc', 7)).toBe(7);
-    });
-  });
-
-  describe('buildPaginationMeta', () => {
-    it('calculates pagination metadata', () => {
-      const meta = buildPaginationMeta(50, 2, 10);
-
-      expect(meta.currentPage).toBe(2);
-      expect(meta.totalPages).toBe(5);
-      expect(meta.totalItems).toBe(50);
-      expect(meta.limit).toBe(10);
-      expect(meta.hasNextPage).toBe(true);
-      expect(meta.hasPrevPage).toBe(true);
-    });
-
-    it('first page has no prev', () => {
-      const meta = buildPaginationMeta(50, 1, 10);
-
-      expect(meta.hasPrevPage).toBe(false);
-      expect(meta.hasNextPage).toBe(true);
-    });
-
-    it('last page has no next', () => {
-      const meta = buildPaginationMeta(50, 5, 10);
-
-      expect(meta.hasNextPage).toBe(false);
-      expect(meta.hasPrevPage).toBe(true);
-    });
-
-    it('single page has neither prev nor next', () => {
-      const meta = buildPaginationMeta(5, 1, 10);
-
-      expect(meta.totalPages).toBe(1);
-      expect(meta.hasNextPage).toBe(false);
-      expect(meta.hasPrevPage).toBe(false);
-    });
-
-    it('handles zero items', () => {
-      const meta = buildPaginationMeta(0, 1, 10);
-
-      expect(meta.totalPages).toBe(0);
-      expect(meta.hasNextPage).toBe(false);
-      expect(meta.hasPrevPage).toBe(false);
-    });
-  });
-
-  describe('createPaginatedResponse', () => {
-    it('combines data with pagination metadata', async () => {
-      const data = [{ id: 1 }, { id: 2 }];
-      const response = createPaginatedResponse(data, 50, 1, 10);
-      const body = await response.json();
-
-      expect(body.success).toBe(true);
-      expect(body.data).toEqual(data);
-      expect(body.pagination.totalItems).toBe(50);
-      expect(body.pagination.currentPage).toBe(1);
-      expect(body.pagination.limit).toBe(10);
     });
   });
 

@@ -315,7 +315,7 @@ const data = validationResult.data;
 - `createSuccessResponse()` / `createErrorResponse()` — Standardized responses
 - `createValidationErrorResponse()` / `formatZodErrors()` — Zod error formatting
 - `createRateLimitResponse()` — 429 responses with `Retry-After` header
-- `parsePagination()` / `buildPaginationMeta()` / `createPaginatedResponse()` — Pagination helpers
+- `parsePagination()` — Pagination parsing with defaults and bounds; routes retain their resource-specific response fields
 - `sanitizeUpdatePayload()` — Strip Mongo operator keys (`$...`), dotted keys, `_id`, `__v` from PATCH/PUT bodies (not a pricing guard — see "Booking Pricing Is Always Server-Computed" below)
 - `escapeRegex()` — Escape user input before building Mongo regex queries (prevents regex injection)
 - `HTTP_STATUS` — Named status code constants
