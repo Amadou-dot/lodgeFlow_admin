@@ -48,7 +48,7 @@ rather than treating counts as the completion gate.
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
-| F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                                         |
+| F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Partially addressed in Phase 2 slice 5: unused pagination builders removed after caller review. Booking-table status callbacks remain a separate slice.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
@@ -338,7 +338,12 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   checks and a dedicated new-test type check pass. `pnpm test:http`, clean frozen
   installation and all app/shared builds pass; runtime/test files match the
   validated build snapshot. Existing optional Sharp and absent-MongoDB build
-  warnings remain non-blocking. Remote delivery gates are pending.
+  warnings remain non-blocking.
+- Delivered in PR #164, reviewed `e3a1b059ec7a529fa72c80afdeca56b3300abb8c`,
+  merged `1fdd52aff1fa8b6ab3c903daba898b63cec8cb48`. All five PR CI jobs
+  (`36773886286`) and main CI jobs (`36774132724`) pass. Exact-SHA previews and
+  both production deployments are Ready; configured roots, built routes and
+  production aliases are verified.
 - The HTTP gate exercises existing routes with the in-memory fallback. Malformed
   Redis entries use controlled unit dependencies, not a hosted Redis instance.
   Hosted login and live provider operations were not exercised.
@@ -478,6 +483,28 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   built routes and production aliases.
 - Remaining Phase 1 staff/audit DTO and cache work, staff request validation and
   other helper families stay separate; this slice changes no permission or role.
+
+## Phase 2 slice 5: remove unused pagination builders (F04)
+
+- Caller and export review confirmed `buildPaginationMeta`, `createPaginatedResponse`
+  and their `PaginationMeta` interface had no runtime consumers. Remove these
+  unused exports and their six tests rather than maintaining an unused positional
+  API. The historical inventory snapshot still records the original symbols.
+- Retain `parsePagination`, its six behavior tests and all route/hook coverage.
+  Booking responses use `totalBookings`; customer responses use `totalCustomers`.
+  No routes are migrated to the obsolete `totalItems` envelope. Authorization,
+  default/clamped page sizes, query keys and resource response shapes are unchanged.
+- Before cleanup, 120 focused unit, booking integration and customer-hook tests
+  pass; 114 remain and pass after removing the six obsolete tests. Active behavior
+  already has characterization coverage, so no new tests accompany this removal.
+- Local validation on 2026-09-30: `pnpm ci:check` passes formatting, read-only lint
+  and 1,409 tests (admin 1,048; customer 322; database 36; email 3). Admin type
+  checking, HTTP smoke, clean frozen installation and all app/shared builds pass.
+  Runtime/test files match validated build inputs. Interrupted full gates were
+  rerun after temporary logs were lost. Existing optional Sharp and absent-MongoDB
+  build warnings remain non-blocking; remote delivery gates are pending.
+- The booking-table status callback family remains F04 debt. Consolidating live
+  response contracts belongs to its own characterized resource slice.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

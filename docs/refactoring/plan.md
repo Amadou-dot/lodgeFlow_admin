@@ -80,19 +80,19 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 
 Current execution status (2026-09-30): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
-Phase 1 has seven merged slices (PRs #152–#154 and #156–#159), covering customer
-booking reads/mutations/cancellation, cabin and experience email inputs, and
-checkout population. Sender repair #132 completed separately in PR #155 with
-production and user inbox evidence. Phase 2 has four merged slices (PRs
-#160–#163): confirmation request validation/safe errors and named payment summary,
+Phase 1 has eight merged slices (PRs #152–#154, #156–#159 and #164), covering customer
+booking reads/mutations/cancellation, cabin and experience email inputs, checkout
+population, and validated cached customer payloads/dates. Sender repair #132
+completed separately in PR #155 with production and user inbox evidence. Phase 2
+has four merged slices (PRs #160–#163): confirmation request validation/safe errors and named payment summary,
 customer booking update and staff identity inputs. The latest merge,
-[PR #163](https://github.com/Amadou-dot/lodgeFlow_admin/pull/163) at `cee2226`,
+[PR #164](https://github.com/Amadou-dot/lodgeFlow_admin/pull/164) at `1fdd52a`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 1 continues with T09's cached customer payload/date boundary; invalid
-cache entries become misses while deleted-user caching and transient-failure
-behavior are preserved. Catalog/resource/admin DTOs and the remaining operations,
-money and UI work are still open. The inventory and tracker retain per-slice
-validation and delivery evidence; the milestone remains open.
+SHA. Phase 2 continues by removing F04's unused pagination response builders;
+active route pagination shapes and the shared query parser are preserved.
+Catalog/resource/admin DTOs and the remaining operations, money and UI work are
+still open. The inventory and tracker retain per-slice validation and delivery
+evidence; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next
