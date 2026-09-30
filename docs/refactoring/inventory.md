@@ -46,11 +46,12 @@ rather than treating counts as the completion gate.
 | T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
 | T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Implemented in Phase 1 slice 8: validated unknown cache payloads and dates, per-entry misses for malformed data, preserved negative cache and transient failures.                                                              |
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
-| F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
+| F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Implemented in Phase 2 slice 12: named guest create inputs and tagged update/cancel operations at all callers, with owner/payment/terminal guards and catalog transaction writes preserved.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Implemented in Phase 2 slices 5 and 11: unused pagination builders removed; named booking-table status inputs, string JSON IDs and checked action-menu data replace ambiguous callback signatures.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
+| F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Follow the admin catalog/status callers in a separate named-input slice; preserve capacity transactions, expected-state checks and audit attribution. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -805,6 +806,46 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   behavior. They do not claim browser layout, hosted login or live provider proof.
   Full admin booking DTOs and other state/menu policy work remain separate slices.
 
+## Phase 2 slice 12: named guest reservation operations (F02)
+
+- `createDiningReservation` / `createExperienceReservation` take named listing ID,
+  Clerk customer ID and selection inputs. `updateDiningReservation` /
+  `updateExperienceReservation` require a tagged `update` or `cancel` operation;
+  cancellation cannot include an updates object.
+- Migrate the four customer route files, both route adapters' internal operation
+  switches, shared capacity tests and admin reservation integration callers.
+  HTTP payloads, Zod allowlists/defaults, status codes, errors, populated JSON and
+  success messages are unchanged. DELETE still ignores its request body.
+- Preserve both ownership lookups, terminal/paid/receipt/checkout/refund guards,
+  saved selections, price calculation and receipt state. Capacity check/write
+  stays inside the same transaction with the catalog `reservationVersion` write
+  and session propagation. Dining retains date/seating capacity; experience
+  retains daily capacity with descriptive time slots.
+- Before runtime edits: 22 route and 13 replica-set operation/capacity tests pass,
+  along with database/customer type checks and expanded `pnpm test:http`.
+  The eight new domain cases cover owner/missing denial, unpaid repricing,
+  cancellation, protected states, receipt preservation and no-write rollback.
+  Existing competing create/move/capacity-reduction tests remain in place.
+- HTTP adds real guest POST/PATCH/DELETE flows for both resources, including
+  server identity, trusted price/status, foreign/missing 404s, preserved fields,
+  rejected repeated cancellation and catalog rollback, without provider calls.
+  Hosted login and live Stripe/Resend operations are not exercised.
+- After migration: 47 database tests, 22 customer route tests and 11 admin
+  reservation integration tests pass. Both app checks, database build, the
+  migrated admin test type check and compile-only contradictory-input checks
+  pass. `pnpm ci:check` passes formatting/read-only lint and 1,578 tests (admin
+  1,065/customer 463/database 47/email 3); expanded `pnpm test:http` also passes.
+- Clean frozen installation and all builds pass in an isolated credential-free
+  copy using CI's public Clerk key; ten runtime/test files match the build input.
+  Initial full-gate attempts hit `/tmp` inode exhaustion; removing this task's
+  obsolete disposable build copies resolved it. Successful checks above ran
+  afterward. Existing optional Sharp, absent-MongoDB and dynamic-render build
+  diagnostics remain non-blocking. Remote delivery gates follow.
+- No schema, storage, rounding, UI or cache invalidation changes. Remaining
+  response DTOs and JSON/date validation are separate boundary slices; admin
+  catalog/status and private count helpers remain F07. This is focused protection
+  for the changed shared helpers, not #136's broad dining coverage program.
+
 ## Cache test reliability follow-up (T09)
 
 PR #173's main CI run `36790525172` exposed an order-dependent fixture in
@@ -824,7 +865,9 @@ built routes and aliases.
   and 1,548 tests (admin 1,065/customer 441/database 39/email 3).
 - HTTP and clean builds passed for #173's unchanged runtime. This test-only
   follow-up does not repeat those local checks; PR CI runs all five jobs.
-- F02 guest reservation helper work remains next after this gate is repaired.
+- Delivered in PR #174 at `911fcae`: all five PR/main CI jobs and exact-SHA
+  previews/production deployments pass, including HTTP and builds. F02 follows
+  in Phase 2 slice 12.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

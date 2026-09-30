@@ -125,11 +125,25 @@ async function checkDining(
   if (!reservation.isPaid && !reservation.receipts?.length)
     reservation.totalPrice = roundMoney(dining.price * reservation.numGuests);
 }
-export async function createDiningReservation(
-  diningId: string,
-  customer: string,
-  selection: DiningSelection
-) {
+type ReservationChange<Selection> =
+  | { action: 'update'; updates: Partial<Selection> }
+  | { action: 'cancel'; updates?: never };
+
+export interface CreateDiningReservationInput {
+  diningId: string;
+  customerId: string;
+  selection: DiningSelection;
+}
+export type UpdateDiningReservationInput = {
+  reservationId: string;
+  customerId: string;
+} & ReservationChange<DiningSelection>;
+
+export async function createDiningReservation({
+  diningId,
+  customerId: customer,
+  selection,
+}: CreateDiningReservationInput) {
   const id = await withCatalog('dining', diningId, async (catalog, session) => {
     const reservation = new DiningReservation({
       ...selection,
@@ -145,11 +159,9 @@ export async function createDiningReservation(
   return DiningReservation.findById(id).populate('dining');
 }
 export async function updateDiningReservation(
-  id: string,
-  customer: string,
-  updates: Partial<DiningSelection>,
-  cancel = false
+  input: UpdateDiningReservationInput
 ) {
+  const { reservationId: id, customerId: customer } = input;
   requireId(id);
   const initial = await DiningReservation.findOne({ _id: id, customer });
   if (!initial) throw new ReservationRuleError('Reservation not found', 404);
@@ -168,7 +180,7 @@ export async function updateDiningReservation(
           'This reservation can no longer be changed'
         );
       if (
-        cancel &&
+        input.action === 'cancel' &&
         (reservationPaymentSummary(reservation).legacyPaid ||
           reservationPaymentSummary(reservation).refundableCents > 0)
       )
@@ -181,17 +193,17 @@ export async function updateDiningReservation(
         reservation.stripeRefund?.status === 'pending'
       )
         throw new ReservationRuleError('An online transaction is pending', 409);
-      if (cancel) reservation.status = 'cancelled';
+      if (input.action === 'cancel') reservation.status = 'cancelled';
       else {
         if (
           (reservation.isPaid || reservation.receipts?.length > 0) &&
-          ['date', 'time', 'numGuests'].some(key => key in updates)
+          ['date', 'time', 'numGuests'].some(key => key in input.updates)
         )
           throw new ReservationRuleError(
             'Paid reservations cannot be repriced or moved',
             409
           );
-        Object.assign(reservation, updates);
+        Object.assign(reservation, input.updates);
         await checkDining(catalog as IDining, reservation, session);
       }
       await reservation.save({ session });
@@ -233,11 +245,21 @@ async function checkExperience(
   if (!booking.isPaid && !booking.receipts?.length)
     booking.totalPrice = roundMoney(experience.price * booking.numParticipants);
 }
-export async function createExperienceReservation(
-  experienceId: string,
-  customer: string,
-  selection: ExperienceSelection
-) {
+export interface CreateExperienceReservationInput {
+  experienceId: string;
+  customerId: string;
+  selection: ExperienceSelection;
+}
+export type UpdateExperienceReservationInput = {
+  reservationId: string;
+  customerId: string;
+} & ReservationChange<ExperienceSelection>;
+
+export async function createExperienceReservation({
+  experienceId,
+  customerId: customer,
+  selection,
+}: CreateExperienceReservationInput) {
   const id = await withCatalog(
     'experience',
     experienceId,
@@ -257,11 +279,9 @@ export async function createExperienceReservation(
   return ExperienceBooking.findById(id).populate('experience');
 }
 export async function updateExperienceReservation(
-  id: string,
-  customer: string,
-  updates: Partial<ExperienceSelection>,
-  cancel = false
+  input: UpdateExperienceReservationInput
 ) {
+  const { reservationId: id, customerId: customer } = input;
   requireId(id);
   const initial = await ExperienceBooking.findOne({ _id: id, customer });
   if (!initial) throw new ReservationRuleError('Reservation not found', 404);
@@ -280,7 +300,7 @@ export async function updateExperienceReservation(
           'This reservation can no longer be changed'
         );
       if (
-        cancel &&
+        input.action === 'cancel' &&
         (reservationPaymentSummary(booking).legacyPaid ||
           reservationPaymentSummary(booking).refundableCents > 0)
       )
@@ -293,17 +313,19 @@ export async function updateExperienceReservation(
         booking.stripeRefund?.status === 'pending'
       )
         throw new ReservationRuleError('An online transaction is pending', 409);
-      if (cancel) booking.status = 'cancelled';
+      if (input.action === 'cancel') booking.status = 'cancelled';
       else {
         if (
           (booking.isPaid || booking.receipts?.length > 0) &&
-          ['date', 'timeSlot', 'numParticipants'].some(key => key in updates)
+          ['date', 'timeSlot', 'numParticipants'].some(
+            key => key in input.updates
+          )
         )
           throw new ReservationRuleError(
             'Paid reservations cannot be repriced or moved',
             409
           );
-        Object.assign(booking, updates);
+        Object.assign(booking, input.updates);
         await checkExperience(catalog as IExperience, booking, session);
       }
       await booking.save({ session });

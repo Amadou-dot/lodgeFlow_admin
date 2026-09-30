@@ -62,7 +62,15 @@ export async function GET(
   }
 }
 
-async function change(request: NextRequest, params: Params, cancel: boolean) {
+async function change({
+  request,
+  params,
+  action,
+}: {
+  request: NextRequest;
+  params: Params;
+  action: 'update' | 'cancel';
+}) {
   try {
     const { userId } = await auth();
     if (!userId)
@@ -71,7 +79,7 @@ async function change(request: NextRequest, params: Params, cancel: boolean) {
         { status: 401 }
       );
     const parsed = updateDiningDetailsSchema.safeParse(
-      cancel ? {} : await request.json()
+      action === 'cancel' ? {} : await request.json()
     );
     if (!parsed.success)
       return NextResponse.json(
@@ -80,13 +88,18 @@ async function change(request: NextRequest, params: Params, cancel: boolean) {
       );
     await connectDB();
     const { id } = await params;
-    const data = await updateDiningReservation(id, userId, parsed.data, cancel);
+    const data = await updateDiningReservation({
+      reservationId: id,
+      customerId: userId,
+      ...(action === 'cancel' ? { action } : { action, updates: parsed.data }),
+    });
     return NextResponse.json({
       success: true,
       data,
-      message: cancel
-        ? 'Reservation cancelled successfully'
-        : 'Reservation updated successfully',
+      message:
+        action === 'cancel'
+          ? 'Reservation cancelled successfully'
+          : 'Reservation updated successfully',
     });
   } catch (error) {
     if (error instanceof ReservationRuleError)
@@ -105,11 +118,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  return change(request, params, false);
+  return change({ request, params, action: 'update' });
 }
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  return change(request, params, true);
+  return change({ request, params, action: 'cancel' });
 }

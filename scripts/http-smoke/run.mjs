@@ -2016,6 +2016,172 @@ try {
     'PASS existing admin email authorization, failure and success contracts'
   );
 
+  const guestDining = await Dining.create({
+    name: 'Guest operation dinner',
+    description: 'Isolated mutation fixture',
+    type: 'menu',
+    mealType: 'dinner',
+    price: 25,
+    servingTime: { start: '17:00', end: '21:00' },
+    maxPeople: 4,
+    category: 'regular',
+    image: 'https://example.invalid/guest-dinner.jpg',
+  });
+  const guestExperience = await Experience.create({
+    name: 'Guest operation hike',
+    description: 'Isolated mutation fixture',
+    price: 37.5,
+    duration: '2 hours',
+    difficulty: 'Easy',
+    category: 'Outdoor',
+    image: 'https://example.invalid/guest-hike.jpg',
+    available: ['Monday'],
+    includes: [],
+    ctaText: 'Book now',
+    maxParticipants: 4,
+  });
+  for (const resource of [
+    {
+      kind: 'dining',
+      route: '/api/dining-reservations',
+      catalog: Dining,
+      model: DiningReservation,
+      listing: guestDining,
+      countKey: 'numGuests',
+      input: { diningId: String(guestDining._id), time: '18:00', numGuests: 2 },
+    },
+    {
+      kind: 'experience',
+      route: '/api/experience-bookings',
+      catalog: Experience,
+      model: ExperienceBooking,
+      listing: guestExperience,
+      countKey: 'numParticipants',
+      input: {
+        experienceId: String(guestExperience._id),
+        timeSlot: '18:00',
+        numParticipants: 2,
+      },
+    },
+  ]) {
+    const providerCount = calls.length;
+    const operationDate = '2030-07-01T18:00:00.000Z';
+    await expectAuthenticationRedirect({
+      origin: customer,
+      route: resource.route,
+      method: 'POST',
+      body: { ...resource.input, date: operationDate },
+    });
+    const saved = await request({
+      origin: customer,
+      route: resource.route,
+      identity: 'customer',
+      method: 'POST',
+      status: 201,
+      body: {
+        ...resource.input,
+        date: operationDate,
+        customer: 'smoke_foreign',
+        totalPrice: 0,
+        isPaid: true,
+        status: 'confirmed',
+      },
+    });
+    assert.equal(saved.success, true);
+    assert.equal(typeof saved.data._id, 'string');
+    assert.equal(saved.data[resource.kind]._id, String(resource.listing._id));
+    assert.equal(saved.data.customer, 'smoke_customer');
+    assert.equal(saved.data.date, operationDate);
+    assert.equal(saved.data.totalPrice, resource.listing.price * 2);
+    assert.equal(saved.data.status, 'pending');
+    assert.equal(saved.data.isPaid, false);
+    assert.deepEqual(saved.data.receipts, []);
+    const route = `${resource.route}/${saved.data._id}`;
+    const snapshot = async () =>
+      JSON.stringify(
+        await Promise.all([
+          resource.model.findById(saved.data._id).lean(),
+          resource.catalog
+            .findById(resource.listing._id)
+            .select('+reservationVersion')
+            .lean(),
+        ])
+      );
+    const beforeDenied = await snapshot();
+    for (const method of ['PATCH', 'DELETE']) {
+      for (const attempt of [
+        { route, identity: 'foreign' },
+        {
+          route: `${resource.route}/${new mongoose.Types.ObjectId()}`,
+          identity: 'customer',
+        },
+      ]) {
+        const denied = await request({
+          origin: customer,
+          ...attempt,
+          method,
+          status: 404,
+          body: { specialRequests: ['Denied'] },
+        });
+        assert.deepEqual(denied, {
+          success: false,
+          error: 'Reservation not found',
+        });
+      }
+    }
+    assert.equal(await snapshot(), beforeDenied);
+    const edited = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'PATCH',
+      status: 200,
+      body: {
+        [resource.countKey]: 3,
+        specialRequests: ['Window please'],
+        customer: 'smoke_foreign',
+        totalPrice: 0,
+      },
+    });
+    assert.equal(edited.message, 'Reservation updated successfully');
+    assert.equal(edited.data.customer, 'smoke_customer');
+    assert.equal(edited.data[resource.countKey], 3);
+    assert.equal(edited.data.totalPrice, resource.listing.price * 3);
+    assert.deepEqual(edited.data.specialRequests, ['Window please']);
+    const cancelled = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'DELETE',
+      status: 200,
+      body: { [resource.countKey]: 99, date: 'invalid' },
+    });
+    assert.equal(cancelled.message, 'Reservation cancelled successfully');
+    assert.equal(cancelled.data.status, 'cancelled');
+    assert.equal(cancelled.data[resource.countKey], 3);
+    assert.equal(cancelled.data.date, operationDate);
+    assert.equal(cancelled.data.totalPrice, resource.listing.price * 3);
+    assert.deepEqual(cancelled.data.specialRequests, ['Window please']);
+    assert.deepEqual(cancelled.data.receipts, []);
+    const beforeRepeat = await snapshot();
+    const repeated = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'DELETE',
+      status: 400,
+    });
+    assert.deepEqual(repeated, {
+      success: false,
+      error: 'This reservation can no longer be changed',
+    });
+    assert.equal(await snapshot(), beforeRepeat);
+    assert.equal(calls.length, providerCount);
+  }
+  console.log(
+    'PASS guest reservation create/update/cancel, owner filters, persisted selections and transaction rollback without provider calls'
+  );
+
   const experienceFields = {
     name: 'Smoke Kayak',
     price: 37.5,
