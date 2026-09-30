@@ -52,7 +52,7 @@ rather than treating counts as the completion gate.
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Follow the admin catalog/status callers in a separate named-input slice; preserve capacity transactions, expected-state checks and audit attribution. |
-| V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
+| V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
@@ -845,6 +845,30 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   response DTOs and JSON/date validation are separate boundary slices; admin
   catalog/status and private count helpers remain F07. This is focused protection
   for the changed shared helpers, not #136's broad dining coverage program.
+
+## Phase 2 slice 13: typed cancellation-field guards (V01)
+
+- Admin `PUT /api/bookings` and `PATCH /api/bookings/[id]` inspect typed literal
+  keys on their parsed Zod output, replacing both `Record<string, unknown>` casts.
+  The compiler now checks every field without erasing the input contract.
+- Preserve field order and presence checks (`!== undefined`, including empty
+  reasons and zero refunds), effective booking status and exact denial text.
+  PUT retains its five-field guard; PATCH retains its existing four-field guard
+  and separate handling of `cancelledAt`. No validation/accounting rule changes.
+- Before runtime edits: eight new real-MongoDB cases and 69 existing booking
+  PUT/PATCH integration cases pass. New cases assert ordered denial messages,
+  unchanged booking/audit snapshots and permitted cancelled-record metadata
+  updates with unchanged receipts. The new test also passes a separate type
+  check because admin's normal TypeScript configuration excludes tests.
+- After the typed-key change: `pnpm ci:check` passes formatting/read-only lint
+  and 1,586 tests (admin 1,073/customer 463/database 47/email 3). Admin/new-test
+  type checks, isolated HTTP, clean frozen installation and all builds pass.
+  All three runtime/test files match validated build inputs. Existing optional
+  Sharp, absent-MongoDB and dynamic-render diagnostics remain non-blocking.
+- Tests construct actual Mongoose documents with explicit fixture fields. The
+  shared `__tests__/setup/factories.ts` could not load its installed Faker ESM
+  dependency in this integration project; runner/dependency changes remain
+  separate O01 fixture debt. No application behavior was implicated.
 
 ## Cache test reliability follow-up (T09)
 

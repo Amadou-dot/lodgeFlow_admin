@@ -82,19 +82,18 @@ Current execution status (2026-09-30): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has eleven merged
-slices (PRs #160–#163, #165–#166 and #169–#173), covering request validation, named
-helper inputs, unused pagination cleanup, public cabin visibility and booking
-status actions. Sender repair #132 completed separately in PR #155 with production
-and user inbox evidence. Booking status actions shipped in
-[PR #173](https://github.com/Amadou-dot/lodgeFlow_admin/pull/173). Its main CI run
-exposed an order-dependent cache fixture; the test-only repair in
-[PR #174](https://github.com/Amadou-dot/lodgeFlow_admin/pull/174) merged at `911fcae`
-with all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with named guest reservation helper inputs and tagged
-update/cancel operations. Other resource/admin DTOs, staff/catalog operations,
-money and UI work remain open. The inventory and tracker retain per-slice
-validation and delivery evidence; the milestone remains open.
+boundaries, plus validated cached customer payloads. Phase 2 has twelve merged
+slices (PRs #160–#163, #165–#166, #169–#173 and #175), covering request validation,
+named helper inputs, unused pagination cleanup, public cabin visibility, booking
+status actions and guest reservation operations. Sender repair #132 completed
+separately in PR #155 with production and user inbox evidence; PR #174 repaired
+an order-dependent cache test fixture. The latest merge,
+[PR #175](https://github.com/Amadou-dot/lodgeFlow_admin/pull/175) at `60b7b73`,
+has all five main CI jobs passing and both production apps verified Ready at that
+SHA. Phase 2 continues with typed admin cancellation-field guards. Other
+resource/admin DTOs, staff/catalog operations, money and UI work remain open.
+The inventory and tracker retain per-slice validation and delivery evidence;
+the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

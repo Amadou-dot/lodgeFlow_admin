@@ -585,13 +585,15 @@ export async function PUT(request: NextRequest) {
       updateData.status !== 'cancelled' &&
       existingBooking.status !== 'cancelled'
     ) {
-      const cancellationFields = [
-        'refundStatus',
-        'refundAmount',
-        'refundedAt',
-        'cancellationReason',
-        'cancelledAt',
-      ].filter(f => (updateData as Record<string, unknown>)[f] !== undefined);
+      const cancellationFields = (
+        [
+          'refundStatus',
+          'refundAmount',
+          'refundedAt',
+          'cancellationReason',
+          'cancelledAt',
+        ] as const
+      ).filter(field => updateData[field] !== undefined);
       if (cancellationFields.length > 0) {
         return NextResponse.json(
           {
