@@ -47,7 +47,7 @@ rather than treating counts as the completion gate.
 | T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Validate cached payloads and normalize dates once; retain deleted-user negative cache and transient-failure semantics.                                                              |
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
-| F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Named identity inputs; verify membership removal, missing assignment and wrong-organization denials.                                                                                |
+| F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
@@ -398,9 +398,45 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   `pnpm test:http`, clean frozen install and all app/shared builds pass. Runtime/
   test files match the validated build inputs. Existing optional Sharp and absent-
   MongoDB build warnings remain non-blocking; no hosted login or live providers.
-  Remote CI and deployment verification are pending.
+- Delivered in [PR #162](https://github.com/Amadou-dot/lodgeFlow_admin/pull/162),
+  reviewed `d27017d`, merged as `dc9b593`. All five
+  [PR CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36770425926)
+  and [main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36770837180)
+  pass. Both exact-SHA previews and production deployments are Ready, with matching
+  configured app roots, built routes and production aliases.
 - Other customer query error/validation normalization, catalog/admin DTOs and
   reservation helper APIs remain separate slices; no #136/#139 scope is added.
+
+## Phase 2 slice 4: named staff identity inputs (F03)
+
+- `isOrganizationMember({ organizationId, userId })` and
+  `resolveStaffRole({ userId, activeOrganizationId })` remove adjacent identity
+  strings. All three runtime callers and the existing integration tests migrate.
+  `requireApiAuth` normalizes Clerk's absent organization to null; the internal
+  resolver accepts string or null, with no optional/undefined absence variant.
+- Preserved the configured-organization match, bounded fresh Clerk membership
+  lookup, exact member identity check, organization/user-scoped MongoDB assignment,
+  valid application roles and failure propagation. Default administrator-only
+  permissions, staff assignment/revocation transactions and response contracts
+  are unchanged. Neither Clerk role claims nor membership alone grant a role.
+- Fifteen new unit characterization cases pass before runtime changes. Narrow
+  provider/database fixtures cover requested identity, missing/wrong organization,
+  missing/unrelated member data, all application roles, absent/invalid assignment
+  and dependency failure. The new test file also passes a dedicated TypeScript
+  check; admin's standard app check still excludes legacy tests.
+- The 88 focused unit/integration cases pass after migration, including current
+  membership removal, permissions, assignment/revocation, reciprocal-admin
+  concurrency and denied refund writes.
+- Local validation on 2026-09-30: `pnpm ci:check` passes formatting, lint and 1,390
+  tests (admin 1,029; customer 322; database 36; email 3). Both app type checks,
+  the separate new-test type check, `pnpm test:http`, clean frozen install and
+  all app/shared builds pass. All five runtime/test files match validated build
+  inputs. The HTTP gate covers actual route/proxy organization, membership,
+  assignment, permission and audit behavior using controlled Clerk identities.
+  Hosted login/live provider operations were not run. Existing optional Sharp and
+  absent-MongoDB build warnings remain non-blocking; remote delivery gates are pending.
+- Remaining Phase 1 staff/audit DTO and cache work, staff request validation and
+  other helper families stay separate; this slice changes no permission or role.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

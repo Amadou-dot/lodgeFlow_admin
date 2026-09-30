@@ -66,18 +66,50 @@ afterEach(() => {
   delete process.env.LODGEFLOW_STAFF_ORG_ID;
 });
 it('requires the configured active organization and a local assignment', async () => {
-  expect(await resolveStaffRole('user_admin', organizationId)).toBe('admin');
-  expect(await resolveStaffRole('user_admin', 'org_unrelated')).toBeNull();
-  expect(await resolveStaffRole('user_admin', null)).toBeNull();
-  expect(await resolveStaffRole('user_guest', organizationId)).toBeNull();
+  expect(
+    await resolveStaffRole({
+      userId: 'user_admin',
+      activeOrganizationId: organizationId,
+    })
+  ).toBe('admin');
+  expect(
+    await resolveStaffRole({
+      userId: 'user_admin',
+      activeOrganizationId: 'org_unrelated',
+    })
+  ).toBeNull();
+  expect(
+    await resolveStaffRole({ userId: 'user_admin', activeOrganizationId: null })
+  ).toBeNull();
+  expect(
+    await resolveStaffRole({
+      userId: 'user_guest',
+      activeOrganizationId: organizationId,
+    })
+  ).toBeNull();
   delete process.env.LODGEFLOW_STAFF_ORG_ID;
-  expect(await resolveStaffRole('user_admin', organizationId)).toBeNull();
+  expect(
+    await resolveStaffRole({
+      userId: 'user_admin',
+      activeOrganizationId: organizationId,
+    })
+  ).toBeNull();
 });
 it('revokes access on membership removal and on assignment deletion', async () => {
   members = members.filter(id => id !== 'user_admin');
-  expect(await resolveStaffRole('user_admin', organizationId)).toBeNull();
+  expect(
+    await resolveStaffRole({
+      userId: 'user_admin',
+      activeOrganizationId: organizationId,
+    })
+  ).toBeNull();
   await StaffAccess.deleteOne({ userId: 'user_front' });
-  expect(await resolveStaffRole('user_front', organizationId)).toBeNull();
+  expect(
+    await resolveStaffRole({
+      userId: 'user_front',
+      activeOrganizationId: organizationId,
+    })
+  ).toBeNull();
 });
 it('fails closed if Clerk membership lookup fails', async () => {
   (clerkClient as unknown as jest.Mock).mockRejectedValue(new Error('offline'));
@@ -102,9 +134,19 @@ it('enforces permissions independently of Clerk role claims', async () => {
 });
 it('allows assignment and revocation, but rejects outsiders and self changes', async () => {
   expect((await PUT(request('user_guest', 'manager')))?.status).toBe(200);
-  expect(await resolveStaffRole('user_guest', organizationId)).toBe('manager');
+  expect(
+    await resolveStaffRole({
+      userId: 'user_guest',
+      activeOrganizationId: organizationId,
+    })
+  ).toBe('manager');
   expect((await PUT(request('user_guest', null)))?.status).toBe(200);
-  expect(await resolveStaffRole('user_guest', organizationId)).toBeNull();
+  expect(
+    await resolveStaffRole({
+      userId: 'user_guest',
+      activeOrganizationId: organizationId,
+    })
+  ).toBeNull();
   expect((await PUT(request('user_outsider', 'manager')))?.status).toBe(400);
   expect((await PUT(request('user_admin', null)))?.status).toBe(409);
   expect((await PUT(request('user_guest', 'org:admin')))?.status).toBe(400);
@@ -124,7 +166,12 @@ it('uniquely scopes assignments to organization and user', async () => {
     role: 'front_desk',
     updatedBy: 'x',
   });
-  expect(await resolveStaffRole('user_admin', organizationId)).toBe('admin');
+  expect(
+    await resolveStaffRole({
+      userId: 'user_admin',
+      activeOrganizationId: organizationId,
+    })
+  ).toBe('admin');
 });
 it('serializes reciprocal administrator revocations without removing both admins', async () => {
   // Simulate both requests having passed their membership checks before either write.
