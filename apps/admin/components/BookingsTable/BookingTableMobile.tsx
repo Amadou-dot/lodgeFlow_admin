@@ -1,13 +1,14 @@
 'use client';
 
 import type { PopulatedBooking } from '@/types';
+import type { BookingStatusChangeHandler } from '@/types/booking-actions';
 import { Card, CardBody } from '@heroui/card';
 import BookingCard from './BookingCard';
 
 interface BookingTableMobileProps {
   bookings: PopulatedBooking[];
   isLoading: boolean;
-  onStatusChange?: (bookingId: string, newStatus: string) => void;
+  onStatusChange?: BookingStatusChangeHandler;
   onViewDetails?: (booking: PopulatedBooking) => void;
   onEdit?: (booking: PopulatedBooking) => void;
   onDelete?: (booking: PopulatedBooking) => void;

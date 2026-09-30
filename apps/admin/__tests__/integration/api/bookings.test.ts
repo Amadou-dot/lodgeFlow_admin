@@ -93,7 +93,7 @@ describe('Bookings API Routes', () => {
   describe('GET /api/bookings', () => {
     it('returns paginated bookings', async () => {
       const cabin = await createTestCabin();
-      await createTestBooking(cabin._id);
+      const booking = await createTestBooking(cabin._id);
       await createTestBooking(cabin._id, {
         customer: 'user_test456',
         checkInDate: new Date('2027-07-01'),
@@ -130,6 +130,11 @@ describe('Bookings API Routes', () => {
       expect(response.status).toBe(200);
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(2);
+      expect(body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ _id: booking._id.toString() }),
+        ])
+      );
       expect(body.pagination.totalBookings).toBe(2);
     });
 

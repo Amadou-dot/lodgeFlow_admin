@@ -1,4 +1,5 @@
 import type { PopulatedBooking } from '@/types';
+import type { BookingStatusChangeHandler } from '@/types/booking-actions';
 import {
   formatBookingDates,
   getStatusColor,
@@ -11,7 +12,7 @@ import BookingActionsMenu from './BookingActionsMenu';
 
 interface BookingCardProps {
   booking: PopulatedBooking;
-  onStatusChange?: (bookingId: string, newStatus: string) => void;
+  onStatusChange?: BookingStatusChangeHandler;
   onViewDetails?: (booking: PopulatedBooking) => void;
   onEdit?: (booking: PopulatedBooking) => void;
   onDelete?: (booking: PopulatedBooking) => void;

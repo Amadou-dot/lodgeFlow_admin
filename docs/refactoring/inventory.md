@@ -48,7 +48,7 @@ rather than treating counts as the completion gate.
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
-| F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Partially addressed in Phase 2 slice 5: unused pagination builders removed after caller review. Booking-table status callbacks remain a separate slice.                                                         |
+| F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Implemented in Phase 2 slices 5 and 11: unused pagination builders removed; named booking-table status inputs, string JSON IDs and checked action-menu data replace ambiguous callback signatures.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Typed field construction with invalid cross-field payload tests; preserve paid/refund and state-dependent checks.                                                                   |
@@ -760,12 +760,50 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   customer 441; database 39; email 3). Customer type checking, expanded HTTP smoke,
   clean frozen installation and all app/shared builds pass. All four runtime/test
   files match validated build inputs. Existing optional Sharp, absent-MongoDB and
-  dynamic-render diagnostics remain non-blocking; remote delivery gates follow.
+  dynamic-render diagnostics remain non-blocking; delivery gates are below.
+- Delivered in PR #172: reviewed `0f498454e77ea0fbacec58ad20bcb0c369e7eb41`,
+  merged `2a4ef2f8054e890b306c5e5a20d2adc6d79de3c3`. All five PR CI jobs
+  (`36788834805`) and main CI jobs (`36789214346`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
 - The existing `useCabinAvailability` hook, `CabinAvailabilityPreview` and
   `BookingForm` consume the unchanged date-only range envelope. Their query keys,
   refresh timing, end-exclusive date disabling and UI behavior remain untouched.
   Broader component state/DTO cleanup remains separately tracked; #136/#139 stay
   excluded.
+
+
+## Phase 2 slice 11: named booking-table status actions (F04)
+
+- `apps/admin/types/booking-actions.ts` defines the named booking ID/status input
+  and callback, using the existing shared `BookingStatus` union. Migrated the
+  page handler and all six table component props; removed the page's unchecked
+  status cast. Request payloads, success/failure toasts and SWR refresh timing
+  retain their existing behavior; the mutation hook/cache keys are unchanged.
+- `BookingActionsMenu` now needs only a string ID and status, while retaining
+  each caller's complete record for view/edit/delete callbacks. The admin
+  `PopulatedBooking._id` declaration now matches its existing JSON string output;
+  the broader document/date/customer/cabin declarations remain T05 debt.
+- Related fix: show Check In for confirmed bookings, matching the existing API
+  transition matrix and detail-page action. The old unconfirmed-to-checked-in
+  action always failed server validation. Other menu visibility stays unchanged;
+  this slice adds no new action or reservation workflow.
+- Before runtime edits, 14 new menu/page characterization cases and 22 existing
+  mutation-hook cases pass; two check-in regressions fail. The initial fixture
+  type check exposes the menu's unnecessary document props. After migration,
+  51 focused menu/page/read-hook/mutation-hook cases, admin type checking and a
+  targeted check of both new UI test files pass without casts or disabled rules.
+- The 38 real-MongoDB booking API tests pass, including an explicit string-ID
+  response assertion. `pnpm ci:check` passes formatting, read-only lint and 1,547
+  tests (admin 1,064; customer 441; database 39; email 3). Expanded type checks,
+  HTTP smoke, clean frozen installation and all app/shared builds pass. All 12
+  runtime/test files match validated build inputs. Existing optional Sharp,
+  absent-MongoDB and dynamic-render diagnostics remain non-blocking; remote
+  delivery gates follow.
+- Component tests adapt HeroUI menu primitives to native buttons; they assert
+  callback identity, action availability, exact mutation input and refresh/error
+  behavior. They do not claim browser layout, hosted login or live provider proof.
+  Full admin booking DTOs and other state/menu policy work remain separate slices.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

@@ -1,6 +1,7 @@
 'use client';
 
 import type { PopulatedBooking } from '@/types';
+import type { BookingStatusChangeHandler } from '@/types/booking-actions';
 import {
   BookingTableDesktop,
   BookingTableMobile,
@@ -13,7 +14,7 @@ interface BookingsTableProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  onStatusChange?: (bookingId: string, newStatus: string) => void;
+  onStatusChange?: BookingStatusChangeHandler;
   onViewDetails?: (booking: PopulatedBooking) => void;
   onEdit?: (booking: PopulatedBooking) => void;
   onDelete?: (booking: PopulatedBooking) => void;

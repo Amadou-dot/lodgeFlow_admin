@@ -1,6 +1,7 @@
 'use client';
 
 import type { PopulatedBooking } from '@/types';
+import type { BookingStatusChangeHandler } from '@/types/booking-actions';
 import { Spinner } from '@heroui/spinner';
 import {
   Table,
@@ -15,7 +16,7 @@ import BookingTableCell from './BookingTableCell';
 interface BookingTableDesktopProps {
   bookings: PopulatedBooking[];
   isLoading: boolean;
-  onStatusChange?: (bookingId: string, newStatus: string) => void;
+  onStatusChange?: BookingStatusChangeHandler;
   onViewDetails?: (booking: PopulatedBooking) => void;
   onEdit?: (booking: PopulatedBooking) => void;
   onDelete?: (booking: PopulatedBooking) => void;
