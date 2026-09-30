@@ -900,6 +900,95 @@ try {
     'PASS booking detail ownership and allowlisted update persistence'
   );
 
+  const beforePaymentStatus = JSON.stringify(
+    await Booking.find().sort({ _id: 1 }).lean()
+  );
+  const callsBeforePaymentStatus = calls.length;
+  const paymentStatusRoute = `/api/payments/${bookingId}`;
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: paymentStatusRoute,
+  });
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: '/api/payments/invalid',
+  });
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: `/api/payments/${bookingId.toUpperCase()}`,
+      identity: 'customer',
+      status: 200,
+    }),
+    {
+      success: true,
+      data: {
+        isPaid: false,
+        depositPaid: false,
+        depositAmount: 75,
+        totalPrice: 300,
+        amountPaid: 0,
+        remainingAmount: 300,
+      },
+    }
+  );
+  for (const denied of [
+    { route: paymentStatusRoute, identity: 'foreign' },
+    {
+      route: `/api/payments/${new mongoose.Types.ObjectId()}`,
+      identity: 'customer',
+    },
+  ]) {
+    assert.deepEqual(
+      await request({ origin: customer, ...denied, status: 404 }),
+      { success: false, error: 'Booking not found' }
+    );
+  }
+  await mongoose.connection.db.admin().command({
+    configureFailPoint: 'failCommand',
+    mode: { times: 1 },
+    data: { failCommands: ['find'], errorCode: 2 },
+  });
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: paymentStatusRoute,
+      identity: 'customer',
+      status: 500,
+    }),
+    { success: false, error: 'Failed to fetch payment status' }
+  );
+  await mongoose.connection.db
+    .admin()
+    .command({ configureFailPoint: 'failCommand', mode: 'off' });
+  assert.equal(calls.length, callsBeforePaymentStatus);
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    beforePaymentStatus
+  );
+  console.log(
+    'PASS payment-status fields, ownership, database failure and unchanged state'
+  );
+  for (const id of ['invalid', '123456789012', '507f1f77bcf86cd7994390az']) {
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route: `/api/payments/${id}`,
+        identity: 'customer',
+        status: 400,
+      }),
+      { success: false, error: 'Invalid booking ID' }
+    );
+  }
+  assert.equal(calls.length, callsBeforePaymentStatus);
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    beforePaymentStatus
+  );
+  console.log(
+    'PASS payment-status invalid IDs rejected without writes/provider calls'
+  );
+
   const beforeInvalidCheckout = JSON.stringify(
     await Booking.find().sort({ _id: 1 }).lean()
   );
@@ -1196,6 +1285,34 @@ try {
   assert.equal(persisted.depositPaid, true);
   assert.equal(persisted.paymentConfirmationSentAt, undefined);
   assert.equal(persisted.checkoutPending, false);
+  const beforePaidStatus = JSON.stringify(persisted);
+  const callsBeforePaidStatus = calls.length;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: paymentStatusRoute,
+      identity: 'customer',
+      status: 200,
+    }),
+    {
+      success: true,
+      data: {
+        isPaid: false,
+        depositPaid: true,
+        depositAmount: 75,
+        totalPrice: 300,
+        amountPaid: 75,
+        remainingAmount: 225,
+        paidAt: persisted.paidAt.toISOString(),
+        stripeSessionId: persisted.stripeSessionId,
+      },
+    }
+  );
+  assert.equal(calls.length, callsBeforePaidStatus);
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforePaidStatus
+  );
   assert.equal(calls.at(-1).route, '/resend/send');
   assert.equal(calls.at(-1).input.from, 'LodgeFlow <payments@lodgeflow.app>');
   console.log(

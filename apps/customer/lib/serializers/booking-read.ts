@@ -5,6 +5,7 @@ import type {
   BookingDetailCabin,
   BookingHistoryItem,
   BookingDetail,
+  BookingPaymentStatus,
 } from '@/types/booking-read';
 
 type OptionalDateKey =
@@ -50,6 +51,23 @@ function objectId(value: unknown): string {
 
 function optionalDate(value: Date | null | undefined) {
   return value == null ? value : value.toISOString();
+}
+
+export function serializeBookingPaymentStatus(
+  booking: Pick<BookingReadSource, keyof BookingPaymentStatus>
+): BookingPaymentStatus {
+  return {
+    isPaid: booking.isPaid,
+    depositPaid: booking.depositPaid,
+    depositAmount: booking.depositAmount,
+    totalPrice: booking.totalPrice,
+    amountPaid: booking.amountPaid,
+    remainingAmount: booking.remainingAmount,
+    paidAt: optionalDate(booking.paidAt),
+    stripeSessionId: booking.stripeSessionId,
+    refundAmount: booking.refundAmount,
+    refundedAt: optionalDate(booking.refundedAt),
+  };
 }
 
 function bookingFields(booking: BookingReadSource): BookingReadFields {
