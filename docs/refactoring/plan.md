@@ -84,16 +84,16 @@ Phase 1 has eight merged slices (PRs #152–#154, #156–#159 and #164), coverin
 booking reads/mutations/cancellation, cabin and experience email inputs, checkout
 population, and validated cached customer payloads/dates. Sender repair #132
 completed separately in PR #155 with production and user inbox evidence. Phase 2
-has five merged slices (PRs #160–#163 and #165): confirmation request validation/safe errors and named payment summary,
-customer booking update and staff identity inputs, plus unused pagination cleanup.
-The latest merge,
-[PR #165](https://github.com/Amadou-dot/lodgeFlow_admin/pull/165) at `8e752de`,
+has six merged slices (PRs #160–#163, #165–#166): confirmation/checkout request
+validation and safe errors, named payment summary/customer update/staff identity
+inputs, and unused pagination cleanup. The latest merge,
+[PR #166](https://github.com/Amadou-dot/lodgeFlow_admin/pull/166) at `cc7bbeb`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with checkout JSON/booking-ID validation before database
-access, preserving authentication order, ownership, quotes and payment behavior.
-Catalog/resource/admin DTOs and the remaining operations, money and UI work are
-still open. The inventory and tracker retain per-slice validation and delivery
-evidence; the milestone remains open.
+SHA. The next Phase 1 slice covers the customer payment-status JSON projection,
+its unused hook and path-ID validation, preserving ownership and stored payment
+values. Catalog/resource/admin DTOs and the remaining operations, money and UI
+work are still open. The inventory and tracker retain per-slice validation and
+delivery evidence; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

@@ -348,6 +348,38 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   Redis entries use controlled unit dependencies, not a hosted Redis instance.
   Hosted login and live provider operations were not exercised.
 
+## Phase 1 slice 9: customer payment-status read boundary
+
+- `app/api/payments/[bookingId]/route.ts` uses `BookingPaymentStatus`, a projection
+  of the existing booking JSON fields, and `serializeBookingPaymentStatus`.
+  Timestamps become ISO strings explicitly; legacy nulls and omission remain
+  unchanged. Hydrated defaults, amounts in major units, response fields/envelopes,
+  and identical missing/foreign 404s are preserved. Reads do not recalculate or
+  write accounting values.
+- `hooks/usePayment.ts` drops the unused `usePaymentStatus` export and its duplicate
+  Date-shaped response type after a workspace-wide caller/re-export search. The
+  active checkout hook, payment button and invalidation keys remain unchanged.
+- **Related fix:** authenticate first, validate path IDs with a Zod schema, then
+  access MongoDB. Malformed IDs return `Invalid booking ID`/400 rather than a
+  database-cast 500. Valid uppercase IDs remain supported. Unexpected failures
+  use the server logger and retain the safe existing 500 response.
+- Eleven characterization cases pass before runtime changes, covering real
+  hydrated documents, ISO dates, omitted/null optional fields, money values,
+  cancelled bookings, ownership/auth and failure responses. Four ID regressions
+  fail before the change; HTTP independently reproduces the same invalid-ID 500
+  after passing read/ownership/database-failure checks without writes/provider calls.
+- Local validation on 2026-09-30: 61 focused cases and customer type checking pass.
+  `pnpm ci:check` passes formatting, read-only lint and 1,443 tests (admin 1,048;
+  customer 356; database 36; email 3). Expanded HTTP smoke, clean frozen installation
+  and all app/shared builds pass. All seven runtime/test files match validated
+  build inputs. Existing optional Sharp and absent-MongoDB build warnings remain
+  non-blocking; remote delivery gates are pending.
+- HTTP also checks receipt-backed amounts and ISO timestamps after the existing
+  webhook settlement scenario. Hosted login and live provider operations remain
+  outside this gate.
+- Remaining catalog/resource/admin DTOs and broader request families are separate
+  slices; #136/#139 remain excluded.
+
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 
 - `lib/validations/confirmation-email.ts` parses unknown request bodies using
@@ -540,10 +572,15 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   checking, expanded HTTP smoke, clean frozen installation and all app/shared
   builds pass. All eight runtime/test inputs match the validated build snapshot.
   Existing optional Sharp and absent-MongoDB build warnings remain non-blocking;
-  remote delivery gates are pending.
+  remote delivery gates are recorded below.
 - HTTP checks invalid JSON and body/ID types with unchanged booking records and
   payment/email call counts. Hosted login and live provider operations remain
   outside this gate.
+- Delivered in PR #166: reviewed `a83447a54e7d604d2a4c07544914dcfacb96fb53`,
+  merged `cc7bbeb68b89690f2c7319e3534daa880524ccd3`. All five PR CI jobs
+  (`36781424711`) and main CI jobs (`36781957487`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
 - Customer payment-status DTO/date types in `app/api/payments/[bookingId]/route.ts`
   and `hooks/usePayment.ts`, other request families and money unit conversions
   remain separate slices. No #136/#139 scope is added.

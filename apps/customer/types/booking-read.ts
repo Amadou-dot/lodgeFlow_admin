@@ -105,6 +105,21 @@ export interface BookingHistoryItem extends BookingReadFields {
   cabin: BookingHistoryCabin | null;
 }
 
+/** Existing payment-status JSON projection, including legacy null/omission semantics. */
+export type BookingPaymentStatus = Pick<
+  BookingReadFields,
+  | 'isPaid'
+  | 'depositPaid'
+  | 'depositAmount'
+  | 'totalPrice'
+  | 'amountPaid'
+  | 'remainingAmount'
+  | 'paidAt'
+  | 'stripeSessionId'
+  | 'refundAmount'
+  | 'refundedAt'
+>;
+
 export interface BookingDetail extends BookingReadFields {
   cabin: BookingDetailCabin | null;
   id: string;

@@ -1,22 +1,13 @@
 import { Booking, connectDB } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
 import type { ApiResponse } from '@/types';
+import type { BookingPaymentStatus } from '@/types/booking-read';
+import { serializeBookingPaymentStatus } from '@/lib/serializers/booking-read';
+import { paymentStatusParamsSchema } from '@/lib/validations/payment-status';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 type Params = Promise<{ bookingId: string }>;
-
-interface PaymentStatusData {
-  isPaid: boolean;
-  depositPaid: boolean;
-  depositAmount: number;
-  totalPrice: number;
-  amountPaid: number;
-  remainingAmount: number;
-  paidAt?: Date;
-  stripeSessionId?: string;
-  refundAmount?: number;
-  refundedAt?: Date;
-}
 
 export async function GET(
   _request: NextRequest,
@@ -32,9 +23,17 @@ export async function GET(
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
+    const input = paymentStatusParamsSchema.safeParse(await params);
+    if (!input.success) {
+      const response: ApiResponse<never> = {
+        success: false,
+        error: 'Invalid booking ID',
+      };
+      return NextResponse.json(response, { status: 400 });
+    }
 
-    const { bookingId } = await params;
+    const { bookingId } = input.data;
+    await connectDB();
     const booking = await Booking.findById(bookingId);
 
     if (!booking) {
@@ -53,27 +52,14 @@ export async function GET(
       return NextResponse.json(response, { status: 404 });
     }
 
-    const paymentStatus: PaymentStatusData = {
-      isPaid: booking.isPaid,
-      depositPaid: booking.depositPaid,
-      depositAmount: booking.depositAmount,
-      totalPrice: booking.totalPrice,
-      amountPaid: booking.amountPaid,
-      remainingAmount: booking.remainingAmount,
-      paidAt: booking.paidAt,
-      stripeSessionId: booking.stripeSessionId,
-      refundAmount: booking.refundAmount,
-      refundedAt: booking.refundedAt,
-    };
-
-    const response: ApiResponse<PaymentStatusData> = {
+    const response: ApiResponse<BookingPaymentStatus> = {
       success: true,
-      data: paymentStatus,
+      data: serializeBookingPaymentStatus(booking),
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching payment status:', error);
+    logger.error('Error fetching payment status', error);
     const response: ApiResponse<never> = {
       success: false,
       error: 'Failed to fetch payment status',
