@@ -85,13 +85,15 @@ booking reads/mutations/cancellation, cabin and experience email inputs, checkou
 population, payment-status reads, cabin catalog DTOs, and validated cached customer
 payloads/dates. Sender repair #132
 completed separately in PR #155 with production and user inbox evidence. Phase 2
-has six merged slices (PRs #160–#163, #165–#166): confirmation/checkout request
-validation and safe errors, named payment summary/customer update/staff identity
-inputs, and unused pagination cleanup. The latest merge,
-[PR #168](https://github.com/Amadou-dot/lodgeFlow_admin/pull/168) at `4af0834`,
+has seven merged slices (PRs #160–#163, #165–#166 and #169): confirmation/checkout
+request validation and safe errors, named payment summary/customer update/staff
+identity inputs, unused pagination cleanup, and active public cabin visibility.
+The latest merge,
+[PR #169](https://github.com/Amadou-dot/lodgeFlow_admin/pull/169) at `28b0da6`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with active-catalog filters for public homepage cards and
-availability search, following the cabin DTO migration. Other resource/admin DTOs and the remaining operations, money and UI
+SHA. Phase 2 continues with named overlap-query inputs across customer booking
+creation, admin booking writes and the public cabin calendar. Availability request
+validation, other resource/admin DTOs and the remaining operations, money and UI
 work are still open. The inventory and tracker retain per-slice validation and
 delivery evidence; the milestone remains open.
 

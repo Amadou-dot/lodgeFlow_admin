@@ -61,16 +61,17 @@ export interface IBooking extends Document {
   readonly paymentStatus?: 'paid' | 'partial' | 'unpaid';
   createdAt: Date;
   updatedAt: Date;
-  overlaps(otherCheckIn: Date, otherCheckOut: Date): boolean;
+}
+
+export interface BookingOverlapInput {
+  cabinId: string;
+  checkInDate: Date;
+  checkOutDate: Date;
+  excludeBookingId?: string;
 }
 
 export interface IBookingModel extends Model<IBooking> {
-  findOverlapping(
-    cabinId: mongoose.Types.ObjectId | string,
-    checkInDate: Date,
-    checkOutDate: Date,
-    excludeBookingId?: mongoose.Types.ObjectId | string
-  ): Promise<IBooking[]>;
+  findOverlapping(input: BookingOverlapInput): Promise<IBooking[]>;
 }
 
 const BookingSchema: Schema = new Schema(
@@ -284,21 +285,13 @@ BookingSchema.pre('validate', function (this: IBooking) {
   );
 });
 
-BookingSchema.methods.overlaps = function (
-  this: IBooking,
-  checkIn: Date,
-  checkOut: Date
-) {
-  return this.checkInDate < checkOut && this.checkOutDate > checkIn;
-};
-
 // Static method to find overlapping bookings
-BookingSchema.statics.findOverlapping = async function (
-  cabinId: mongoose.Types.ObjectId | string,
-  checkInDate: Date,
-  checkOutDate: Date,
-  excludeBookingId?: mongoose.Types.ObjectId | string
-): Promise<IBooking[]> {
+BookingSchema.statics.findOverlapping = async function ({
+  cabinId,
+  checkInDate,
+  checkOutDate,
+  excludeBookingId,
+}: BookingOverlapInput): Promise<IBooking[]> {
   const query: mongoose.FilterQuery<IBooking> = {
     cabin: cabinId,
     status: { $ne: 'cancelled' },
@@ -312,7 +305,7 @@ BookingSchema.statics.findOverlapping = async function (
 
   if (excludeBookingId) {
     query._id = {
-      $ne: new mongoose.Types.ObjectId(excludeBookingId.toString()),
+      $ne: new mongoose.Types.ObjectId(excludeBookingId),
     };
   }
 

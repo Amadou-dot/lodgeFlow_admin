@@ -209,11 +209,11 @@ describe('Booking Model', () => {
 
       // Check for overlap: Jun 3-7 (overlaps with Jun 1-5)
       // Use the cabin ObjectId directly from the created booking
-      const overlapping = await Booking.findOverlapping(
-        created.cabin,
-        new Date('2027-06-03'),
-        new Date('2027-06-07')
-      );
+      const overlapping = await Booking.findOverlapping({
+        cabinId: String(created.cabin),
+        checkInDate: new Date('2027-06-03'),
+        checkOutDate: new Date('2027-06-07'),
+      });
 
       expect(overlapping.length).toBe(1);
     });
@@ -231,11 +231,11 @@ describe('Booking Model', () => {
       );
 
       // Check for overlap: Jun 10-15 (no overlap)
-      const overlapping = await Booking.findOverlapping(
-        cabin._id,
-        new Date('2027-06-10'),
-        new Date('2027-06-15')
-      );
+      const overlapping = await Booking.findOverlapping({
+        cabinId: String(cabin._id),
+        checkInDate: new Date('2027-06-10'),
+        checkOutDate: new Date('2027-06-15'),
+      });
 
       expect(overlapping.length).toBe(0);
     });
@@ -252,12 +252,12 @@ describe('Booking Model', () => {
       );
 
       // Check overlap with the same dates, excluding self
-      const overlapping = await Booking.findOverlapping(
-        cabin._id,
-        new Date('2027-06-01'),
-        new Date('2027-06-05'),
-        new mongoose.Types.ObjectId(booking._id.toString())
-      );
+      const overlapping = await Booking.findOverlapping({
+        cabinId: String(cabin._id),
+        checkInDate: new Date('2027-06-01'),
+        checkOutDate: new Date('2027-06-05'),
+        excludeBookingId: String(booking._id),
+      });
 
       expect(overlapping.length).toBe(0);
     });
@@ -276,11 +276,11 @@ describe('Booking Model', () => {
       );
 
       // Check overlap: Jun 3-7 (should not detect cancelled)
-      const overlapping = await Booking.findOverlapping(
-        cabin._id,
-        new Date('2027-06-03'),
-        new Date('2027-06-07')
-      );
+      const overlapping = await Booking.findOverlapping({
+        cabinId: String(cabin._id),
+        checkInDate: new Date('2027-06-03'),
+        checkOutDate: new Date('2027-06-07'),
+      });
 
       expect(overlapping.length).toBe(0);
     });
@@ -299,11 +299,11 @@ describe('Booking Model', () => {
       );
 
       // Check overlap for cabin2: Jun 3-7 (different cabin, no overlap)
-      const overlapping = await Booking.findOverlapping(
-        cabin2._id,
-        new Date('2027-06-03'),
-        new Date('2027-06-07')
-      );
+      const overlapping = await Booking.findOverlapping({
+        cabinId: String(cabin2._id),
+        checkInDate: new Date('2027-06-03'),
+        checkOutDate: new Date('2027-06-07'),
+      });
 
       expect(overlapping.length).toBe(0);
     });

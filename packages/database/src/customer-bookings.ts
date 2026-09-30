@@ -65,11 +65,11 @@ export async function createCustomerBooking(input: BookingSelection) {
   return withCabinBookingLock(input.cabinId, async () => {
     if (
       (
-        await Booking.findOverlapping(
-          input.cabinId,
-          input.checkInDate,
-          input.checkOutDate
-        )
+        await Booking.findOverlapping({
+          cabinId: input.cabinId,
+          checkInDate: input.checkInDate,
+          checkOutDate: input.checkOutDate,
+        })
       ).length
     ) {
       throw new BookingRuleError(
