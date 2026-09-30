@@ -1,4 +1,9 @@
 import { connectDB, Booking, Cabin } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
+import {
+  cabinCalendarQuerySchema,
+  cabinIdSchema,
+} from '@/lib/validations/cabin';
 import type { ApiResponse } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -7,9 +12,29 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await connectDB();
-
     const { id: cabinId } = await context.params;
+    if (!cabinIdSchema.safeParse(cabinId).success)
+      return NextResponse.json(
+        { success: false, error: 'Invalid cabin ID' },
+        { status: 400 }
+      );
+
+    const { searchParams } = new URL(request.url);
+    const input = cabinCalendarQuerySchema.safeParse({
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
+    });
+    if (!input.success)
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            input.error.issues[0]?.message || 'Invalid availability date range',
+        },
+        { status: 400 }
+      );
+    const { startDate: queryStartDate, endDate: queryEndDate } = input.data;
+    await connectDB();
 
     // Verify cabin exists and is active
     const cabin = await Cabin.findById(cabinId);
@@ -20,18 +45,6 @@ export async function GET(
       };
       return NextResponse.json(response, { status: 404 });
     }
-
-    const url = new URL(request.url);
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
-
-    // Default to next 6 months if no date range provided
-    const defaultStart = new Date();
-    const defaultEnd = new Date();
-    defaultEnd.setMonth(defaultEnd.getMonth() + 6);
-
-    const queryStartDate = startDate ? new Date(startDate) : defaultStart;
-    const queryEndDate = endDate ? new Date(endDate) : defaultEnd;
 
     // Find all bookings that overlap with the query date range
     const bookings = await Booking.findOverlapping({
@@ -57,7 +70,8 @@ export async function GET(
         },
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    logger.error('Error fetching cabin availability', error);
     return NextResponse.json(
       {
         success: false,

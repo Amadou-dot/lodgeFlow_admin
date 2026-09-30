@@ -728,11 +728,44 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   customer 414; database 39; email 3). Expanded HTTP smoke, customer type checking,
   clean frozen installation and all app/shared builds pass. All five runtime/test
   inputs match the clean build snapshot. Existing optional Sharp, absent-MongoDB
-  and dynamic-render diagnostics remain non-blocking; remote delivery gates follow.
+  and dynamic-render diagnostics remain non-blocking; delivery gates are below.
+- Delivered in PR #171: reviewed `6fd2195209bba86f0d29f584301f76908c94e20c`,
+  merged `8b26f4f0d8035b8b1c07d7506a6d181fe5300d22`. All five PR CI jobs
+  (`36788028318`) and main CI jobs (`36788313943`) pass. Both exact-SHA previews
+  and production deployments are Ready, with configured roots, built routes and
+  production aliases verified.
 - Calendar path/query parsing remains separate work in
   `apps/customer/app/api/cabins/[id]/availability/route.ts`; its six-month defaults,
   date-only output and both UI consumers need their own characterization.
   #136/#139 remain excluded.
+
+
+## Phase 2 slice 10: public cabin calendar request boundary
+
+- Calendar request validation is implemented in
+  `apps/customer/lib/validations/cabin.ts` and
+  `app/api/cabins/[id]/availability/route.ts`. Path IDs and effective date ranges
+  are validated before database access; unexpected failures use the existing
+  server logger and retain the safe 500 response.
+- Before runtime edits, 15 characterization cases pass: exact query instants,
+  UTC date-only output, six-calendar-month defaults including month-end rollover,
+  empty/partial/repeated parameters, sparse status fallback, missing/nonpublic
+  cabin 404s and safe database failures. Twelve regression cases fail for malformed
+  IDs/dates, reversed/equal effective ranges and missing server logging. HTTP
+  independently reproduces the invalid-ID 500. After migration, all 88 focused
+  calendar/availability/catalog/preview component cases and customer type checking
+  pass. The expanded HTTP gate now passes invalid-ID/date/range cases with unchanged
+  booking/provider state and the existing positive calendar/date-only response.
+- `pnpm ci:check` passes formatting, read-only lint and 1,531 tests (admin 1,048;
+  customer 441; database 39; email 3). Customer type checking, expanded HTTP smoke,
+  clean frozen installation and all app/shared builds pass. All four runtime/test
+  files match validated build inputs. Existing optional Sharp, absent-MongoDB and
+  dynamic-render diagnostics remain non-blocking; remote delivery gates follow.
+- The existing `useCabinAvailability` hook, `CabinAvailabilityPreview` and
+  `BookingForm` consume the unchanged date-only range envelope. Their query keys,
+  refresh timing, end-exclusive date disabling and UI behavior remain untouched.
+  Broader component state/DTO cleanup remains separately tracked; #136/#139 stay
+  excluded.
 
 ## Phase 5 implementation: existing sender repair (#132)
 
