@@ -274,7 +274,7 @@ describe('experience confirmation characterization', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  test('manual provider failure returns the legacy envelope, allows retry and never marks delivery', async () => {
+  test('manual provider failure returns a safe error, allows retry and never marks delivery', async () => {
     mockSend.mockResolvedValueOnce({
       data: null,
       error: { message: 'Provider unavailable' },
@@ -282,7 +282,7 @@ describe('experience confirmation characterization', () => {
     const response = await POST(request());
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      error: { message: 'Provider unavailable' },
+      error: 'Failed to send confirmation email',
     });
     expect((await POST(request())).status).toBe(200);
     expect(mockUpdate).not.toHaveBeenCalled();

@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import type { BookingConfirmationInput } from '@/lib/validations/confirmation-email';
 
 /**
  * Hook to send booking confirmation email
@@ -6,7 +7,7 @@ import { useCallback } from 'react';
 export function useSendConfirmationEmail() {
   const sendConfirmationEmail = useCallback(async (bookingId: string) => {
     const response = await fetch('/api/send/confirm', {
-      body: JSON.stringify({ bookingId }),
+      body: JSON.stringify({ bookingId } satisfies BookingConfirmationInput),
       headers: {
         'Content-Type': 'application/json',
       },

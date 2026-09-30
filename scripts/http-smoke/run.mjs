@@ -1050,7 +1050,7 @@ try {
     body: { bookingId },
     status: 500,
   });
-  assert.equal(failedEmail.error.message, 'Injected email failure');
+  assert.deepEqual(failedEmail, { error: 'Failed to send confirmation email' });
   assert.equal(
     JSON.stringify(await Booking.findById(bookingId).lean()),
     beforeEmail
@@ -1155,7 +1155,9 @@ try {
       body: { bookingId },
       status: 500,
     });
-    assert.equal(failed.error.message, 'Injected email failure');
+    if (route === '/api/send/payment-confirm')
+      assert.deepEqual(failed, { error: 'Failed to send confirmation email' });
+    else assert.equal(failed.error.message, 'Injected email failure');
     emailFailure = false;
     const sent = await request({
       origin: customer,
@@ -1955,6 +1957,105 @@ try {
   assert.ok(diningDelivered.paymentConfirmationSentAt instanceof Date);
   console.log(
     'PASS shared confirmation helper retains dining rendering and delivery accounting'
+  );
+
+  const beforeConfirmationBoundary = JSON.stringify({
+    cabin: await Booking.findById(bookingId).lean(),
+    experience: await ExperienceBooking.findById(experienceId).lean(),
+  });
+  const callsBeforeConfirmationBoundary = calls.length;
+  for (const { route, id } of [
+    { route: '/api/send/confirm', id: bookingId },
+    { route: '/api/send/payment-confirm', id: bookingId },
+    { route: experienceRoute, id: experienceId },
+  ]) {
+    for (const { body, error } of [
+      { body: null, error: 'Invalid request body' },
+      { body: [], error: 'Invalid request body' },
+      { body: {}, error: 'Booking ID is required' },
+      { body: { bookingId: { $ne: null } }, error: 'Invalid booking ID' },
+      { body: { bookingId: 'not-an-id' }, error: 'Invalid booking ID' },
+    ])
+      assert.deepEqual(
+        await request({
+          origin: customer,
+          route,
+          identity: 'customer',
+          method: 'POST',
+          body,
+          status: 400,
+        }),
+        { error }
+      );
+
+    const malformed = await fetch(`${customer}${route}`, {
+      method: 'POST',
+      headers: { ...identity('customer'), 'content-type': 'application/json' },
+      body: '{',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(60000),
+    });
+    assert.equal(malformed.status, 400);
+    assert.match(
+      malformed.headers.get('content-type') ?? '',
+      /application\/json/
+    );
+    assert.deepEqual(await malformed.json(), { error: 'Invalid JSON body' });
+
+    await mongoose.connection.db.admin().command({
+      configureFailPoint: 'failCommand',
+      mode: { times: 1 },
+      data: { failCommands: ['find'], errorCode: 2 },
+    });
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route,
+        identity: 'customer',
+        method: 'POST',
+        body: { bookingId: id },
+        status: 500,
+      }),
+      { error: 'Failed to send confirmation email' }
+    );
+    await mongoose.connection.db
+      .admin()
+      .command({ configureFailPoint: 'failCommand', mode: 'off' });
+  }
+  assert.equal(calls.length, callsBeforeConfirmationBoundary);
+  emailFailure = true;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: experienceRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: experienceId },
+      status: 500,
+    }),
+    { error: 'Failed to send confirmation email' }
+  );
+  emailFailure = false;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: experienceRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: { bookingId: experienceId },
+      status: 200,
+    }),
+    { id: 'email_smoke' }
+  );
+  assert.equal(
+    JSON.stringify({
+      cabin: await Booking.findById(bookingId).lean(),
+      experience: await ExperienceBooking.findById(experienceId).lean(),
+    }),
+    beforeConfirmationBoundary
+  );
+  console.log(
+    'PASS manual confirmation body validation, safe database/provider errors and no booking writes'
   );
 
   for (const call of calls.filter(call => call.route === '/resend/send')) {
