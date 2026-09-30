@@ -74,10 +74,9 @@ already complies.
 ### Function contracts
 
 - **No adjacent positional parameters of the same type.** Replace ambiguous
-  strings, numbers, or booleans with a named options object. For example, migrate
-  `paymentSummary(totalPrice, depositAmount, payments)` toward
-  `paymentSummary({ totalPrice, depositAmount, payments })`, updating every caller.
-  The latter is a target signature, not the current API.
+  strings, numbers, or booleans with a named options object and update every
+  caller. `paymentSummary({ totalPrice, depositAmount, payments })` uses this
+  contract; it accepts read-only receipt amounts without requiring documents.
 - **No boolean parameter trains.** Use tagged options such as
   `{ action: 'update', changes } | { action: 'cancel' }` instead of a `cancel`
   switch paired with loosely related arguments. Independent choices such as

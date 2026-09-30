@@ -92,10 +92,11 @@ passing. Checkout population and missing-reference handling merged in PR #158 as
 verified Ready at that SHA. Experience-confirmation inputs merged in PR #159 as
 `0ec23d4`, with all five main CI jobs passing and both production apps verified
 Ready at that SHA. Phase 1 has seven merged slices; catalog/resource/admin
-boundaries remain. Phase 2 request validation and safe errors for the three
-migrated customer confirmation routes pass 1,364 local tests, both app type
-checks, the expanded HTTP gate and clean builds; remote CI and delivery are
-pending. The inventory records scope and remaining debt; the milestone remains open.
+boundaries remain. Phase 2 request validation and safe confirmation errors merged
+in PR #160 as `9d35897`; all five main CI jobs pass and both production deployments
+are verified Ready at that SHA. Phase 2 continues with F01's named
+`paymentSummary` inputs across all six callers, preserving receipt calculations
+and numeric units. The inventory records scope and validation; the milestone remains open.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next

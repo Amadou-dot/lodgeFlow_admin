@@ -768,11 +768,12 @@ export async function PUT(request: NextRequest) {
     if (updateData.totalPrice !== undefined) {
       Object.assign(
         updateData,
-        paymentSummary(
-          updateData.totalPrice,
-          updateData.depositAmount ?? existingBooking.depositAmount,
-          existingBooking.payments
-        )
+        paymentSummary({
+          totalPrice: updateData.totalPrice,
+          depositAmount:
+            updateData.depositAmount ?? existingBooking.depositAmount,
+          payments: existingBooking.payments,
+        })
       );
     }
     // Checkout reserves the quote by incrementing __v. This compare-and-set

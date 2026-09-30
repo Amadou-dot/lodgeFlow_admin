@@ -45,7 +45,7 @@ rather than treating counts as the completion gate.
 | T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Replace with checked input/DTO builders or real documents according to each test's responsibility; preserve behavioral assertions.                                                  |
 | T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
 | T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Validate cached payloads and normalize dates once; retain deleted-user negative cache and transient-failure semantics.                                                              |
-| F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Named options object, migrate both apps/model hooks, retain accounting regression results.                                                                                          |
+| F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Named inputs and tagged update/cancel operation, preserving owner filters, transactions and terminal-state checks. No broad #136 test expansion.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Named identity inputs; verify membership removal, missing assignment and wrong-organization denials.                                                                                |
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Migrate one helper/callback family with all callers; assert pagination/status behavior rather than argument implementation.                                                         |
@@ -333,10 +333,41 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   Both app type checks, `pnpm test:http`, clean frozen install and all app/shared
   builds pass. Runtime/test files match validated build inputs. No hosted login or
   live provider delivery; existing optional Sharp and missing-MongoDB build warnings
-  remain non-blocking. Remote CI and deployment verification are pending.
+  remain non-blocking.
+- Delivered in [PR #160](https://github.com/Amadou-dot/lodgeFlow_admin/pull/160),
+  reviewed `5a63126`, merged as `9d35897`. All five
+  [PR CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36768066652)
+  and [main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36768366982)
+  pass. Both previews and production deployments are Ready at the respective exact
+  SHAs; configured app roots, built routes and production aliases match.
 - Remaining V03 work includes customer `app/api/send/{welcome,dining-confirm}`,
   admin send routes and checkout validation/errors. Catalog/resource/admin DTOs
   remain Phase 1; receipt accounting and settlement delivery are unchanged.
+
+## Phase 2 slice 2: named booking payment summary inputs (F01)
+
+- `packages/database/src/booking-payments.ts` takes one named object containing
+  `totalPrice`, `depositAmount` and read-only receipt amounts. The summary no longer
+  requires receipt IDs, methods or dates it does not read. The positional API is removed.
+- All six callers migrated: both `addBookingPayment` calls, the Booking validation
+  hook, admin booking repricing, `buildDemoBookings` and the read-only audit script.
+  Both apps use the shared model/domain paths. API responses and UI consumers retain
+  the existing `amountPaid`, `remainingAmount`, `isPaid` and `depositPaid` fields.
+- Eight characterization cases pass before the signature change, covering unpaid,
+  partial/deposit/full receipts, decimal summation, free stays, zero deposit and
+  unchanged gross receipt/refund history. The calculation body, rounding, numeric
+  major-unit values and persistence behavior are unchanged. Existing integration
+  and HTTP gates protect quote locks, idempotency and concurrent receipt writes.
+- This implements F01's helper contract only. Money constructors/conversions remain
+  M01–M03 in Phase 3; audit query typing and other positional helper APIs remain
+  separate inventory work. No seed, audit against live data or storage migration is run.
+- Local validation on 2026-09-30: `pnpm ci:check` passes formatting, lint and 1,372
+  tests (admin 1,014; customer 322; database 33; email 3). Both app type checks,
+  database type check (including scripts/tests), `pnpm test:http`, clean frozen
+  install and all app/shared builds pass. All six runtime/script calls use one
+  object; runtime/test inputs match the validated build. No hosted login, live
+  providers, seeding or live audit. Existing optional Sharp/missing-MongoDB build
+  warnings remain non-blocking. Remote CI and deployment verification are pending.
 
 ## Phase 5 implementation: existing sender repair (#132)
 

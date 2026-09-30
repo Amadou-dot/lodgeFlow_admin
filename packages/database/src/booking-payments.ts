@@ -22,11 +22,15 @@ export function roundMoney(amount: number): number {
 }
 
 /** Required deposits are obligations. Only receipt entries count as received money. */
-export function paymentSummary(
-  totalPrice: number,
-  depositAmount: number,
-  payments: BookingPayment[]
-) {
+export function paymentSummary({
+  totalPrice,
+  depositAmount,
+  payments,
+}: {
+  totalPrice: number;
+  depositAmount: number;
+  payments: readonly Readonly<Pick<BookingPayment, 'amount'>>[];
+}) {
   const amountPaid = roundMoney(
     payments.reduce((total, payment) => total + payment.amount, 0)
   );
@@ -80,18 +84,22 @@ export function addBookingPayment(
       'Payment must be a positive amount with at most two decimal places'
     );
   }
-  const summary = paymentSummary(
-    booking.totalPrice,
-    booking.depositAmount,
-    booking.payments
-  );
+  const summary = paymentSummary({
+    totalPrice: booking.totalPrice,
+    depositAmount: booking.depositAmount,
+    payments: booking.payments,
+  });
   if (payment.amount > summary.remainingAmount) {
     throw new BookingPaymentError('Payment exceeds the outstanding balance');
   }
   booking.payments.push(payment);
   Object.assign(
     booking,
-    paymentSummary(booking.totalPrice, booking.depositAmount, booking.payments)
+    paymentSummary({
+      totalPrice: booking.totalPrice,
+      depositAmount: booking.depositAmount,
+      payments: booking.payments,
+    })
   );
   booking.paymentMethod = payment.method;
   booking.paidAt = payment.receivedAt;

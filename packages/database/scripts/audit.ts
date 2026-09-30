@@ -78,11 +78,11 @@ async function audit() {
       (a, b) => a.checkInDate.getTime() - b.checkInDate.getTime()
     )) {
       const payments = (booking.payments ?? []) as BookingPayment[];
-      const summary = paymentSummary(
-        booking.totalPrice,
-        booking.depositAmount,
-        payments
-      );
+      const summary = paymentSummary({
+        totalPrice: booking.totalPrice,
+        depositAmount: booking.depositAmount,
+        payments,
+      });
       if (
         Object.entries(summary).some(([key, value]) => booking[key] !== value)
       )
