@@ -744,6 +744,148 @@ try {
   console.log(
     'PASS explicit zero experience price limits return only free listings'
   );
+  const queryDiningFields = {
+    description: 'Isolated dining query fixture',
+    type: 'menu',
+    mealType: 'dinner',
+    category: 'regular',
+    servingTime: { start: '08:00', end: '22:00' },
+    minPeople: 1,
+    maxPeople: 4,
+    image: 'https://example.invalid/query-dining.jpg',
+    isAvailable: true,
+    isPopular: false,
+  };
+  const freeQueryDining = await Dining.create({
+    ...queryDiningFields,
+    name: 'Forest tea',
+    price: 0,
+    type: 'experience',
+    mealType: 'all-day',
+    category: 'non-alcoholic',
+    dietary: ['vegan', 'gluten-free'],
+  });
+  const breakfastQueryDining = await Dining.create({
+    ...queryDiningFields,
+    name: 'Morning menu',
+    description: 'Seasonal orchard breakfast',
+    price: 15,
+    mealType: 'breakfast',
+    dietary: ['vegetarian'],
+    isPopular: true,
+  });
+  const dinnerQueryDining = await Dining.create({
+    ...queryDiningFields,
+    name: 'Evening menu',
+    price: 25,
+    dietary: ['vegan'],
+  });
+  const hiddenQueryDining = await Dining.create({
+    ...queryDiningFields,
+    name: 'Hidden free dining',
+    price: 0,
+    isAvailable: false,
+  });
+  const freeDiningId = String(freeQueryDining._id);
+  const breakfastDiningId = String(breakfastQueryDining._id);
+  const dinnerDiningId = String(dinnerQueryDining._id);
+  const diningCatalogSnapshot = () =>
+    Dining.find()
+      .select('+reservationVersion')
+      .sort({ _id: 1 })
+      .lean()
+      .then(rows => JSON.stringify(rows));
+  const beforeDiningQueries = await diningCatalogSnapshot();
+  for (const { query, ids } of [
+    { query: '', ids: [freeDiningId, breakfastDiningId, dinnerDiningId] },
+    {
+      query: '?isAvailable=false',
+      ids: [freeDiningId, breakfastDiningId, dinnerDiningId],
+    },
+    { query: '?minPrice=10&maxPrice=20', ids: [breakfastDiningId] },
+    {
+      query:
+        '?type=experience&mealType=all-day&category=non-alcoholic&isPopular=false&dietary=gluten-free',
+      ids: [freeDiningId],
+    },
+    {
+      query: '?search=FOREST%7Corchard',
+      ids: [freeDiningId, breakfastDiningId],
+    },
+    { query: '?search=vegan', ids: [freeDiningId, dinnerDiningId] },
+    { query: '?isPopular=true', ids: [breakfastDiningId] },
+    { query: '?category=unknown', ids: [] },
+    { query: '?minPrice=40&maxPrice=10', ids: [] },
+  ]) {
+    const result = await request({
+      origin: customer,
+      route: `/api/dining${query}`,
+      status: 200,
+    });
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      result.data.map(row => row._id),
+      ids
+    );
+    const expected = await Dining.find({ _id: { $in: ids } }).sort({
+      mealType: 1,
+      type: 1,
+      name: 1,
+    });
+    assert.deepEqual(result, {
+      success: true,
+      data: JSON.parse(JSON.stringify(expected)),
+    });
+  }
+  const invalidDiningQuery = await request({
+    origin: customer,
+    route: '/api/dining?minPrice=-1',
+    status: 400,
+  });
+  assert.equal(invalidDiningQuery.success, false);
+  assert.match(invalidDiningQuery.error, /minPrice:/);
+  await mongoose.connection.db.admin().command({
+    configureFailPoint: 'failCommand',
+    mode: { times: 1 },
+    data: { failCommands: ['find'], errorCode: 2 },
+  });
+  assert.deepEqual(
+    await request({ origin: customer, route: '/api/dining', status: 500 }),
+    { success: false, message: 'Failed to fetch dining options' }
+  );
+  assert.equal(await diningCatalogSnapshot(), beforeDiningQueries);
+  assert.equal(calls.length, 0);
+  console.log(
+    'PASS dining availability, filters, search, sorting, JSON and safe validation/database failures without writes'
+  );
+  for (const query of ['?maxPrice=0', '?minPrice=0&maxPrice=0']) {
+    const result = await request({
+      origin: customer,
+      route: `/api/dining${query}`,
+      status: 200,
+    });
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      result.data.map(row => row._id),
+      [freeDiningId]
+    );
+    assert.equal(result.data[0].price, 0);
+  }
+  assert.equal(await diningCatalogSnapshot(), beforeDiningQueries);
+  assert.equal(calls.length, 0);
+  await Dining.deleteMany({
+    _id: {
+      $in: [
+        freeDiningId,
+        breakfastDiningId,
+        dinnerDiningId,
+        hiddenQueryDining._id,
+      ],
+    },
+  });
+  console.log(
+    'PASS explicit zero dining price limits return only free available listings'
+  );
   await mongoose.connection.db.admin().command({
     configureFailPoint: 'failCommand',
     mode: { times: 1 },
