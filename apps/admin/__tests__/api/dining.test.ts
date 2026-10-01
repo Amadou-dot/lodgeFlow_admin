@@ -349,10 +349,10 @@ describe('/api/dining', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(mockDelete).toHaveBeenCalledWith(
-        'dining',
-        '507f1f77bcf86cd799439011'
-      );
+      expect(mockDelete).toHaveBeenCalledWith({
+        kind: 'dining',
+        listingId: '507f1f77bcf86cd799439011',
+      });
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
     });

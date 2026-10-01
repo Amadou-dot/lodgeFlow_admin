@@ -352,11 +352,11 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(mockUpdate).toHaveBeenCalledWith(
-        'experience',
-        '507f1f77bcf86cd799439011',
-        { name: 'Updated Adventure' }
-      );
+      expect(mockUpdate).toHaveBeenCalledWith({
+        kind: 'experience',
+        listingId: '507f1f77bcf86cd799439011',
+        updates: { name: 'Updated Adventure' },
+      });
       expect(response.status).toBe(200);
       expect(data).toEqual({ success: true, data: updatedData });
     });
@@ -383,8 +383,8 @@ describe('/api/experiences/[id]', () => {
       expect(response.status).toBe(200);
       expect(data).toEqual({ success: true, data: updatedData });
       // _id/createdAt/updatedAt from the round-tripped object must not reach
-      // findByIdAndUpdate as part of the update payload.
-      const [, updatePayload] = mockUpdate.mock.calls.at(-1)!;
+      // the shared operation as part of the editable fields.
+      const [{ updates: updatePayload }] = mockUpdate.mock.calls.at(-1)!;
       expect(updatePayload).not.toHaveProperty('_id');
       expect(updatePayload).not.toHaveProperty('createdAt');
       expect(updatePayload).not.toHaveProperty('updatedAt');
@@ -468,10 +468,10 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(mockDelete).toHaveBeenCalledWith(
-        'experience',
-        '507f1f77bcf86cd799439011'
-      );
+      expect(mockDelete).toHaveBeenCalledWith({
+        kind: 'experience',
+        listingId: '507f1f77bcf86cd799439011',
+      });
       expect(response.status).toBe(200);
       expect(data).toEqual({
         success: true,

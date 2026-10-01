@@ -73,7 +73,11 @@ export async function PUT(
 
     const { _id: _validatedId, ...updateData } = validationResult.data;
 
-    const dining = await updateCapacityCatalog('dining', id, updateData);
+    const dining = await updateCapacityCatalog({
+      kind: 'dining',
+      listingId: id,
+      updates: updateData,
+    });
 
     if (!dining) {
       return createErrorResponse(
@@ -117,7 +121,10 @@ export async function DELETE(
     await connectDB();
 
     const { id } = await params;
-    const dining = await deleteCapacityCatalog('dining', id);
+    const dining = await deleteCapacityCatalog({
+      kind: 'dining',
+      listingId: id,
+    });
 
     if (!dining) {
       return createErrorResponse(

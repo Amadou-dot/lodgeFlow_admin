@@ -138,8 +138,16 @@ test('dining edits enforce capacity and cancellation releases seats', async () =
     },
   });
   assert.equal(updated.totalPrice, 50);
-  await assert.rejects(updateCapacityCatalog('dining', id, { maxPeople: 1 }));
-  await assert.rejects(deleteCapacityCatalog('dining', id));
+  await assert.rejects(
+    updateCapacityCatalog({
+      kind: 'dining',
+      listingId: id,
+      updates: { maxPeople: 1 },
+    })
+  );
+  await assert.rejects(
+    deleteCapacityCatalog({ kind: 'dining', listingId: id })
+  );
 });
 test('moving two parties to the same final dining slot cannot oversell', async () => {
   const listing = await dining();
@@ -205,7 +213,11 @@ test('experience creation and edits share the daily capacity limit', async () =>
     })
   );
   await assert.rejects(
-    updateCapacityCatalog('experience', id, { maxParticipants: 1 })
+    updateCapacityCatalog({
+      kind: 'experience',
+      listingId: id,
+      updates: { maxParticipants: 1 },
+    })
   );
   await updateExperienceReservation({
     reservationId: String(booking._id),
@@ -234,7 +246,11 @@ test('simultaneous capacity reduction and reservation creation preserve the capa
   const listing = await dining();
   const id = String(listing._id);
   await Promise.allSettled([
-    updateCapacityCatalog('dining', id, { maxPeople: 1 }),
+    updateCapacityCatalog({
+      kind: 'dining',
+      listingId: id,
+      updates: { maxPeople: 1 },
+    }),
     createDiningReservation({
       diningId: id,
       customerId: 'guest',

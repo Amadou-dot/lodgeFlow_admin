@@ -68,11 +68,11 @@ export async function PUT(request: Request, { params }: ParamProps) {
 
     const { _id: _validatedId, ...updateData } = validationResult.data;
 
-    const experience = await updateCapacityCatalog(
-      'experience',
-      id,
-      updateData
-    );
+    const experience = await updateCapacityCatalog({
+      kind: 'experience',
+      listingId: id,
+      updates: updateData,
+    });
     if (!experience) {
       return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
     }
@@ -108,7 +108,10 @@ export async function DELETE(_request: Request, { params }: ParamProps) {
   const { id } = await params;
   try {
     await connectToDatabase();
-    const experience = await deleteCapacityCatalog('experience', id);
+    const experience = await deleteCapacityCatalog({
+      kind: 'experience',
+      listingId: id,
+    });
     if (!experience) {
       return createErrorResponse('Experience not found', HTTP_STATUS.NOT_FOUND);
     }
