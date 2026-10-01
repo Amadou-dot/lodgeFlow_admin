@@ -82,18 +82,23 @@ Current execution status (2026-10-01): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has nineteen merged
-slices (PRs #160–#163, #165–#166, #169–#173 and #175–#182), covering request
+boundaries, plus validated cached customer payloads. Phase 2 has twenty merged
+slices (PRs #160–#163, #165–#166, #169–#173 and #175–#183), covering request
 validation, named helper inputs, unused pagination cleanup, public cabin
 visibility, booking status actions, guest reservation operations and typed
 cancellation guards, named catalog/staff operations, typed experience/dining filters
-and validated customer/admin welcome-email boundaries.
+and validated customer/admin welcome-email boundaries, plus named rate-limit inputs.
 Sender repair #132 completed separately in PR #155 with production and user inbox
-evidence; PR #174 repaired an order-dependent cache test fixture. The latest merge,
-[PR #182](https://github.com/Amadou-dot/lodgeFlow_admin/pull/182) at `bee9d7b`,
-has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with named rate-limit key inputs (F08), preserving existing
-user/endpoint namespaces, quotas, failure behavior and retry headers.
+evidence; PR #174 repaired an order-dependent cache test fixture. The latest
+implementation merge is
+[PR #183](https://github.com/Amadou-dot/lodgeFlow_admin/pull/183) at `5f1d1b7`,
+with all five main CI jobs passing and both production apps verified Ready at that
+SHA. Work is stopping after this completed implementation slice at the user's
+request. The next bounded candidate is the
+admin `ApiAuthResult` contract: represent authorized identity/role and denied
+response as separate states, preserving the permission matrix, default
+administrator-only access, audit attribution and production bypass protection.
+This candidate has been inspected but has no implementation changes yet.
 Other resource/admin DTOs, validation, money and UI work remain open.
 The inventory and tracker retain per-slice validation and delivery evidence;
 the milestone remains open. Historical tracker evidence through #182 is preserved

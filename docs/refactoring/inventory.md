@@ -58,6 +58,7 @@ rather than treating counts as the completion gate.
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18–19: validated requests for customer confirmations, cabin checkout and public availability search, plus customer/admin welcome-email boundaries. Continue per flow; preserve webhook acknowledgements.                                                                |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 17: typed filters and the related zero-price fix, preserving availability/search/JSON and cache behavior. Response DTOs remain Phase 1. |
+| V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Inspected; next bounded candidate after #183. Characterize the existing permission matrix, auth failures, local bypass and production protection; introduce a discriminated result and checked fixtures without changing HTTP or audit behavior. Implementation not started. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -1091,8 +1092,18 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
 - Preserve the full tracker body through #182 in `delivery-history.md`, including
   its recorded CI/deployment identifiers and limitations. The archive is byte-for-byte
   equal to the captured body beneath its explanatory header, and local links resolve.
-  Once this slice lands, the tracker can link that history and retain a concise
-  current-status section without losing delivery evidence.
+  PR #183 merged the archive at `5f1d1b7562e22fab0fe7d97a91574386a9226a24`.
+  Before tracker compaction, its fresh body was verified equal to the archived
+  snapshot; the tracker can link that history without losing delivery evidence.
+- Delivery is complete: reviewed `dedad1cb72b3a4d7aedb7b5b01466ebec03412a2`;
+  [PR CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36871366008)
+  and [main CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/36872529404)
+  passed all five jobs. Both previews were Ready at the reviewed SHA. Production
+  customer `dpl_RMMuLZTDta585HYaSnUPuTMxBCLu` and admin
+  `dpl_7jVm4jUWBWR1EiVrWe67FVxYTtxw` were verified Ready at the merge SHA,
+  with matching configured roots, built routes and production aliases.
+- Work stops after this slice at the user's request. V06 is the inspected next
+  candidate; no authorization-result implementation has started.
 
 ## Cache test reliability follow-up (T09)
 
