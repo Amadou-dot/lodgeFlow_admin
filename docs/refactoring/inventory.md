@@ -52,7 +52,7 @@ rather than treating counts as the completion gate.
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Implemented in Phase 2 slices 14–15: named catalog, private identity/count and staff status inputs, with typed editable fields and a validated status request boundary. Transaction, guard ordering and audit attribution are characterized; response/native-status DTO debt remains separate. |
-| F08 | Admin `lib/rate-limit.ts`: `createRateLimitKey` and API callers | Adjacent user/endpoint strings can be reversed. | 2 | Pending named-input slice; preserve anonymous fallback, per-user/endpoint namespaces, rate limits and response headers. |
+| F08 | Admin `lib/rate-limit.ts`: `createRateLimitKey` and API callers | Adjacent user/endpoint strings can be reversed. | 2 | Implemented in Phase 2 slice 20: named inputs at all three runtime callers; anonymous fallback, user/endpoint namespaces, rate limits and retry headers preserved. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18–19: validated requests for customer confirmations, cabin checkout and public availability search, plus customer/admin welcome-email boundaries. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -1068,6 +1068,31 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
 - Admin confirmation DTO/payload/error work, rate-limit key inputs (F08), internal
   email result errors and reservation checkout origin checks remain separate slices.
   No new emails, recipients, triggers or live provider operations.
+
+## Phase 2 slice 20: named rate-limit key inputs (F08)
+
+- `createRateLimitKey` takes named `userId`/`endpoint` fields at all three runtime
+  callers: admin welcome, booking confirmation and customer creation. Undefined
+  or empty legacy user IDs retain the existing anonymous namespace; generated
+  strings, Redis/local-limit behavior, quotas and HTTP retry headers are unchanged.
+- Before runtime edits, 50 rate-limit/welcome checks and affected-test types pass.
+  Added cases protect empty-user fallback and generated-key isolation across users
+  and endpoints. Expanded HTTP confirms that customer creation retains its separate
+  ten-request limit after email requests exhaust their own allowance, with no Clerk
+  mutation attempts or email/payment calls. Customer data lives in Clerk, not a
+  MongoDB customer collection; the assertion observes that actual write boundary.
+- After migration, the same 50 focused checks, admin types and affected-test
+  types pass. `pnpm ci:check` passes formatting/read-only lint and 1,724 tests
+  (admin 1,122/customer 540/database 59/email 3). Expanded HTTP and clean frozen
+  installation/builds pass with CI's public Clerk key and no app/provider secrets.
+  Existing optional Sharp, module-type, absent-MongoDB and dynamic-render diagnostics
+  remain non-blocking. No rate policy or authorization behavior intentionally changes;
+  hosted login/live provider operations were not exercised.
+- Preserve the full tracker body through #182 in `delivery-history.md`, including
+  its recorded CI/deployment identifiers and limitations. The archive is byte-for-byte
+  equal to the captured body beneath its explanatory header, and local links resolve.
+  Once this slice lands, the tracker can link that history and retain a concise
+  current-status section without losing delivery evidence.
 
 ## Cache test reliability follow-up (T09)
 

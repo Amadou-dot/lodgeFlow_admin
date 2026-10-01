@@ -82,21 +82,22 @@ Current execution status (2026-10-01): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has eighteen merged
-slices (PRs #160–#163, #165–#166, #169–#173 and #175–#181), covering request
+boundaries, plus validated cached customer payloads. Phase 2 has nineteen merged
+slices (PRs #160–#163, #165–#166, #169–#173 and #175–#182), covering request
 validation, named helper inputs, unused pagination cleanup, public cabin
 visibility, booking status actions, guest reservation operations and typed
 cancellation guards, named catalog/staff operations, typed experience/dining filters
-and safe customer welcome-email failures.
+and validated customer/admin welcome-email boundaries.
 Sender repair #132 completed separately in PR #155 with production and user inbox
 evidence; PR #174 repaired an order-dependent cache test fixture. The latest merge,
-[PR #181](https://github.com/Amadou-dot/lodgeFlow_admin/pull/181) at `fd02314`,
+[PR #182](https://github.com/Amadou-dot/lodgeFlow_admin/pull/182) at `bee9d7b`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with the admin welcome-email payload/error boundary and
-named hook inputs, preserving administrator-only access and rate limiting.
+SHA. Phase 2 continues with named rate-limit key inputs (F08), preserving existing
+user/endpoint namespaces, quotas, failure behavior and retry headers.
 Other resource/admin DTOs, validation, money and UI work remain open.
 The inventory and tracker retain per-slice validation and delivery evidence;
-the milestone remains open.
+the milestone remains open. Historical tracker evidence through #182 is preserved
+in [delivery-history.md](delivery-history.md).
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next
