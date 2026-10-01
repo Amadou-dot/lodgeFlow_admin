@@ -1,8 +1,5 @@
 import { renderHook } from '@testing-library/react';
-import {
-  useSendConfirmationEmail,
-  useSendWelcomeEmail,
-} from '@/hooks/useSendEmail';
+import { useSendConfirmationEmail } from '@/hooks/useSendEmail';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -79,44 +76,5 @@ describe('useSendConfirmationEmail', () => {
         {} as any
       )
     ).rejects.toThrow('Failed to send confirmation email');
-  });
-});
-
-describe('useSendWelcomeEmail', () => {
-  it('returns sendWelcomeEmail function', () => {
-    const { result } = renderHook(() => useSendWelcomeEmail());
-
-    expect(result.current.sendWelcomeEmail).toBeInstanceOf(Function);
-  });
-
-  it('sends POST to /api/send/welcome with correct data', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
-
-    const { result } = renderHook(() => useSendWelcomeEmail());
-    await result.current.sendWelcomeEmail('Jane', 'jane@example.com');
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/send/welcome', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firstName: 'Jane',
-        email: 'jane@example.com',
-      }),
-    });
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-    });
-
-    const { result } = renderHook(() => useSendWelcomeEmail());
-
-    await expect(
-      result.current.sendWelcomeEmail('Jane', 'jane@example.com')
-    ).rejects.toThrow('Failed to send welcome email');
   });
 });

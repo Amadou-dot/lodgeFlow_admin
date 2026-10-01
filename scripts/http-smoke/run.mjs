@@ -60,13 +60,18 @@ const secret = randomUUID();
 const clerk = createClerkFixture({
   organizationId: 'smoke_org',
   users: [
-    ...['customer', 'foreign', 'admin', 'front_desk', 'unassigned'].map(
-      name => ({
-        id: `smoke_${name}`,
-        email: `${name}@example.invalid`,
-        member: !['customer', 'foreign'].includes(name),
-      })
-    ),
+    ...[
+      'customer',
+      'foreign',
+      'admin',
+      'manager',
+      'front_desk',
+      'unassigned',
+    ].map(name => ({
+      id: `smoke_${name}`,
+      email: `${name}@example.invalid`,
+      member: !['customer', 'foreign'].includes(name),
+    })),
     { id: 'smoke_revoked', email: 'revoked@example.invalid', member: false },
   ],
 });
@@ -342,6 +347,12 @@ try {
       organizationId: 'smoke_org',
       userId: 'smoke_admin',
       role: 'admin',
+      updatedBy: 'smoke_setup',
+    },
+    {
+      organizationId: 'smoke_org',
+      userId: 'smoke_manager',
+      role: 'manager',
       updatedBy: 'smoke_setup',
     },
     {
@@ -2277,6 +2288,9 @@ try {
   console.log(
     'PASS admin proxy org boundary, current membership, assignment, role permission, allowed write and audit'
   );
+  const beforeAdminEmailBookings = JSON.stringify(
+    await Booking.find().sort({ _id: 1 }).lean()
+  );
   for (const route of ['/api/send/confirm', '/api/send/welcome']) {
     const body = {
       firstName: 'Smoke',
@@ -2294,6 +2308,45 @@ try {
       status: 403,
     });
     assert.equal(calls.length, countBefore);
+    if (route === '/api/send/welcome') {
+      for (const identity of ['manager', 'front_desk']) {
+        await request({
+          origin: admin,
+          route,
+          identity,
+          method: 'POST',
+          status: 403,
+        });
+      }
+      assert.equal(calls.length, countBefore);
+      console.log(
+        'PASS admin welcome remains administrator-only before body parsing'
+      );
+      for (const invalid of [
+        { body: undefined, error: 'Invalid welcome email data' },
+        {
+          body: { ...body, email: ['other@example.invalid'] },
+          error: 'Invalid email address',
+        },
+        {
+          body: { ...body, firstName: {} },
+          error: 'Invalid welcome email data',
+        },
+      ]) {
+        assert.deepEqual(
+          await request({
+            origin: admin,
+            route,
+            identity: 'admin',
+            method: 'POST',
+            body: invalid.body,
+            status: 400,
+          }),
+          { error: invalid.error }
+        );
+        assert.equal(calls.length, countBefore);
+      }
+    }
     emailFailure = true;
     const failed = await request({
       origin: admin,
@@ -2303,7 +2356,9 @@ try {
       body,
       status: 500,
     });
-    assert.equal(failed.error.message, 'Injected email failure');
+    if (route === '/api/send/welcome')
+      assert.deepEqual(failed, { error: 'Failed to send welcome email' });
+    else assert.equal(failed.error.message, 'Injected email failure');
     emailFailure = false;
     const sent = await request({
       origin: admin,
@@ -2319,7 +2374,29 @@ try {
       calls.at(-1).input.from,
       'LodgeFlow <notifications@lodgeflow.app>'
     );
+    if (route === '/api/send/welcome') {
+      const welcome = calls.at(-1).input;
+      assert.equal(welcome.subject, 'Welcome to LodgeFlow');
+      assert.match(welcome.html.replace(/<[^>]+>/g, ''), /join us, Smoke!/);
+      const beforeLimit = calls.length;
+      const limited = await request({
+        origin: admin,
+        route,
+        identity: 'admin',
+        method: 'POST',
+        body,
+        status: 429,
+      });
+      assert.equal(limited.success, false);
+      assert.equal(limited.error, 'Too many requests. Please try again later.');
+      assert.ok(limited.retryAfter > 0 && limited.retryAfter <= 60);
+      assert.equal(calls.length, beforeLimit);
+    }
   }
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    beforeAdminEmailBookings
+  );
   console.log(
     'PASS existing admin email authorization, failure and success contracts'
   );

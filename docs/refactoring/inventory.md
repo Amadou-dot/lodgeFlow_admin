@@ -52,9 +52,10 @@ rather than treating counts as the completion gate.
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Implemented in Phase 2 slices 14–15: named catalog, private identity/count and staff status inputs, with typed editable fields and a validated status request boundary. Transaction, guard ordering and audit attribution are characterized; response/native-status DTO debt remains separate. |
+| F08 | Admin `lib/rate-limit.ts`: `createRateLimitKey` and API callers | Adjacent user/endpoint strings can be reversed. | 2 | Pending named-input slice; preserve anonymous fallback, per-user/endpoint namespaces, rate limits and response headers. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18: validated requests for customer confirmations, cabin checkout and public availability search, plus safe welcome-email failures. Continue per flow; preserve webhook acknowledgements.                                                                |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18–19: validated requests for customer confirmations, cabin checkout and public availability search, plus customer/admin welcome-email boundaries. Continue per flow; preserve webhook acknowledgements.                                                                |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 17: typed filters and the related zero-price fix, preserving availability/search/JSON and cache behavior. Response DTOs remain Phase 1. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
@@ -1034,6 +1035,39 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   and request-origin fallbacks. Reservation checkout origin assertions, admin
   welcome/confirmation payload/error boundaries and internal email-result errors
   remain separate work. No new emails, recipients, triggers or live operations.
+
+## Phase 2 slice 19: admin welcome-email payload/error boundary (V03)
+
+- Parse unknown request JSON with `lib/validations/welcome-email.ts`. The successful
+  schema output contains string recipient/name fields; normalize legacy omitted or
+  null names to an empty greeting. Preserve recipient case, unknown-field stripping,
+  existing email validation and invalid-email precedence when both fields fail.
+- `useSendWelcomeEmail` takes named schema-derived inputs instead of adjacent
+  strings. All callers are migrated; dedicated checked hook fixtures replace the
+  superseded welcome tests. The raw success result remains `unknown` until consumed.
+- Intentional fixes: malformed/invalid bodies and non-string recipient/name values
+  return safe 400 JSON before dispatch; unexpected helper/configuration/provider
+  failures return safe string-error 500 rather than exposing exceptions/provider
+  objects or escaping the handler. Log unexpected failures with the shared logger.
+- Preserve administrator-only `requireApiAuth()` and auth → rate limit → payload
+  order. Keep the per-user welcome key, five-request/minute limit, 429 body/retry
+  headers, notification sender/override, subject/template, message ID and retry.
+- Before edits: 15 route characterizations, all 11 existing/new email-hook checks
+  and changed-test types pass. All 17 focused regressions fail as expected. Real
+  HTTP first confirms manager/front-desk denial, then reproduces an empty body
+  escaping as 500 instead of safe 400 JSON.
+- After edits, all 40 affected route/hook checks, admin types and an explicit
+  type check of all three changed test files pass. `pnpm ci:check` passes
+  formatting/read-only lint and 1,722 tests (admin 1,120/customer 540/database
+  59/email 3). Expanded HTTP passes exact role restrictions, invalid payloads,
+  safe provider failure/retry, rendered greeting, the retained five-request limit
+  and unchanged booking snapshots. Clean frozen installation and all builds pass
+  with CI's public Clerk key and no app/provider credentials. Existing optional
+  Sharp, module-type, absent-MongoDB and dynamic-render diagnostics remain
+  non-blocking. Hosted login and live delivery were not exercised.
+- Admin confirmation DTO/payload/error work, rate-limit key inputs (F08), internal
+  email result errors and reservation checkout origin checks remain separate slices.
+  No new emails, recipients, triggers or live provider operations.
 
 ## Cache test reliability follow-up (T09)
 

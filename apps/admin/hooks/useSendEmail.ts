@@ -1,5 +1,6 @@
 import { Cabin, PopulatedBooking } from '@/types';
 import { useCallback } from 'react';
+import type { WelcomeEmailInput } from '@/lib/validations/welcome-email';
 
 export function useSendConfirmationEmail() {
   const sendConfirmationEmail = useCallback(
@@ -32,7 +33,7 @@ export function useSendConfirmationEmail() {
 
 export function useSendWelcomeEmail() {
   const sendWelcomeEmail = useCallback(
-    async (firstName: string, email: string) => {
+    async ({ firstName, email }: WelcomeEmailInput): Promise<unknown> => {
       const response = await fetch('/api/send/welcome', {
         method: 'POST',
         headers: {
