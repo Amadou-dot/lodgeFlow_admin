@@ -78,21 +78,21 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-09-30): Phase 0 is complete in
+Current execution status (2026-10-01): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has sixteen merged
-slices (PRs #160–#163, #165–#166, #169–#173 and #175–#179), covering request
+boundaries, plus validated cached customer payloads. Phase 2 has seventeen merged
+slices (PRs #160–#163, #165–#166, #169–#173 and #175–#180), covering request
 validation, named helper inputs, unused pagination cleanup, public cabin
 visibility, booking status actions, guest reservation operations and typed
-cancellation guards, named catalog/staff operations and typed experience filters.
+cancellation guards, named catalog/staff operations and typed experience/dining filters.
 Sender repair #132 completed separately in PR #155 with production and user inbox
 evidence; PR #174 repaired an order-dependent cache test fixture. The latest merge,
-[PR #179](https://github.com/Amadou-dot/lodgeFlow_admin/pull/179) at `a86bb1f`,
+[PR #180](https://github.com/Amadou-dot/lodgeFlow_admin/pull/180) at `7e009b0`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with typed dining catalog queries and the corresponding
-focused fix for explicit zero-price limits dropped by the route and query hook.
+SHA. Phase 2 continues with the customer welcome-email failure boundary: contain
+Clerk/provider exceptions and replace exposed provider errors with safe JSON.
 Other resource/admin DTOs, validation, money and UI work remain open.
 The inventory and tracker retain per-slice validation and delivery evidence;
 the milestone remains open.

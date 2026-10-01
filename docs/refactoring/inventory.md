@@ -54,7 +54,7 @@ rather than treating counts as the completion gate.
 | F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Implemented in Phase 2 slices 14–15: named catalog, private identity/count and staff status inputs, with typed editable fields and a validated status request boundary. Transaction, guard ordering and audit attribution are characterized; response/native-status DTO debt remains separate. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18: validated requests for customer confirmations, cabin checkout and public availability search, plus safe welcome-email failures. Continue per flow; preserve webhook acknowledgements.                                                                |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 17: typed filters and the related zero-price fix, preserving availability/search/JSON and cache behavior. Response DTOs remain Phase 1. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
@@ -1003,6 +1003,37 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
 - Dining response DTOs and remaining page/select/sort type escapes need their own
   compatibility slices. This focused changed-path coverage does not implement the
   excluded #136 broad dining test program or add new filters/features.
+
+## Phase 2 slice 18: customer welcome-email failure boundary (V03)
+
+- Keep authentication, current-user lookup and lazy email dispatch inside one
+  `unknown` error boundary. Use the shared server logger for provider rejection
+  and unexpected failures, matching the migrated confirmation routes.
+- Intentional fix: failures return 500 JSON with the safe string
+  `Failed to send welcome email`. Previously provider objects/serialized exceptions
+  were exposed and Clerk auth/profile exceptions escaped the handler. Missing auth
+  remains 401 before profile/provider work; missing/invalid first email remains 400.
+- Preserve first-email selection rather than primary-email selection, the Guest
+  name fallback, notification sender/default/override, subject, rendered template,
+  message-ID success body and successful retry. The existing hook still posts
+  without recipient input and raises the same generic client error on failure.
+- Before runtime edits, 14 route/hook characterizations and customer type checks
+  pass. All eight focused failure regressions fail as expected; real HTTP exposes
+  the provider error object instead of the intended safe string. Jest uses the
+  established React static renderer; actual Resend SDK rendering remains in HTTP.
+- After the fix, all 31 welcome/sender checks and customer type checks pass.
+  `pnpm ci:check` passes formatting/read-only lint and 1,689 tests (admin
+  1,087/customer 540/database 59/email 3). Expanded HTTP passes safe provider and
+  real Clerk SDK profile failures, authenticated recipient/name selection, actual
+  rendered greeting, no-send denial and unchanged receipt snapshots. Clean frozen
+  installation and all builds pass using CI's public Clerk key without app/provider
+  credentials. Existing optional Sharp, module-type, absent-MongoDB and dynamic-render
+  diagnostics remain non-blocking. Hosted login/live delivery were not exercised.
+- Provider-origin review found no application links in the existing email
+  templates; customer checkout URLs use `lib/url.ts`, with intentional configured
+  and request-origin fallbacks. Reservation checkout origin assertions, admin
+  welcome/confirmation payload/error boundaries and internal email-result errors
+  remain separate work. No new emails, recipients, triggers or live operations.
 
 ## Cache test reliability follow-up (T09)
 

@@ -78,6 +78,7 @@ const refunds = new Map();
 let refundFailure = false;
 let stripeFailure = false;
 let emailFailure = true;
+let clerkProfileFailure = false;
 let replica;
 let provider;
 let completed = false;
@@ -357,6 +358,21 @@ try {
     },
   ]);
   provider = createServer(async (incoming, outgoing) => {
+    if (
+      clerkProfileFailure &&
+      incoming.method === 'GET' &&
+      incoming.url === '/v1/users/smoke_customer'
+    ) {
+      outgoing.writeHead(503, { 'content-type': 'application/json' });
+      outgoing.end(
+        JSON.stringify({
+          errors: [
+            { code: 'unexpected_error', message: 'Private profile failure' },
+          ],
+        })
+      );
+      return;
+    }
     if (clerk.handleRequest(incoming, outgoing)) return;
     if (incoming.headers['x-smoke-secret'] !== secret) {
       outgoing.writeHead(403);
@@ -1859,6 +1875,14 @@ try {
   const receiptSnapshot = JSON.stringify(
     await Booking.findById(bookingId).lean()
   );
+  const callsBeforeWelcomeAuth = calls.length;
+  await expectAuthenticationRedirect({
+    origin: customer,
+    route: '/api/send/welcome',
+    method: 'POST',
+    body: { email: 'untrusted@example.invalid' },
+  });
+  assert.equal(calls.length, callsBeforeWelcomeAuth);
   for (const route of ['/api/send/payment-confirm', '/api/send/welcome']) {
     emailFailure = true;
     const failed = await request({
@@ -1871,14 +1895,18 @@ try {
     });
     if (route === '/api/send/payment-confirm')
       assert.deepEqual(failed, { error: 'Failed to send confirmation email' });
-    else assert.equal(failed.error.message, 'Injected email failure');
+    else assert.deepEqual(failed, { error: 'Failed to send welcome email' });
     emailFailure = false;
     const sent = await request({
       origin: customer,
       route,
       identity: 'customer',
       method: 'POST',
-      body: { bookingId },
+      body: {
+        bookingId,
+        email: 'untrusted@example.invalid',
+        firstName: 'Untrusted',
+      },
       status: 200,
     });
     assert.deepEqual(sent, { id: 'email_smoke' });
@@ -1889,7 +1917,28 @@ try {
         ? 'LodgeFlow <payments@lodgeflow.app>'
         : 'LodgeFlow <notifications@lodgeflow.app>'
     );
+    if (route === '/api/send/welcome') {
+      const welcome = calls.at(-1).input;
+      assert.equal(welcome.subject, 'Welcome to LodgeFlow');
+      const text = welcome.html.replace(/<[^>]+>/g, '');
+      assert.match(text, /join us, Smoke!/);
+      assert.equal(text.includes('Untrusted'), false);
+    }
   }
+  const callsBeforeProfileFailure = calls.length;
+  clerkProfileFailure = true;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: '/api/send/welcome',
+      identity: 'customer',
+      method: 'POST',
+      status: 500,
+    }),
+    { error: 'Failed to send welcome email' }
+  );
+  clerkProfileFailure = false;
+  assert.equal(calls.length, callsBeforeProfileFailure);
   assert.equal(
     JSON.stringify(await Booking.findById(bookingId).lean()),
     receiptSnapshot
