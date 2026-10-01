@@ -51,7 +51,7 @@ rather than treating counts as the completion gate.
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Implemented in Phase 2 slices 5 and 11: unused pagination builders removed; named booking-table status inputs, string JSON IDs and checked action-menu data replace ambiguous callback signatures.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
-| F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Follow the admin catalog/status callers in a separate named-input slice; preserve capacity transactions, expected-state checks and audit attribution. |
+| F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Catalog update/delete, private catalog identity and count bounds migrated in Phase 2 slice 14, with resource-specific editable fields. Staff `transitionCapacityReservation` remains; preserve expected-state checks, guard ordering and audit attribution in its own slice. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -869,6 +869,40 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   shared `__tests__/setup/factories.ts` could not load its installed Faker ESM
   dependency in this integration project; runner/dependency changes remain
   separate O01 fixture debt. No application behavior was implicated.
+
+## Phase 2 slice 14: named catalog operations (F07 partial)
+
+- `updateCapacityCatalog` and `deleteCapacityCatalog` take named resource kind
+  and listing ID inputs. Updates use a discriminated resource kind and explicit
+  editable model fields, replacing `Record<string, unknown>`. IDs, timestamps
+  and contention versions are excluded from editable fields.
+- Migrate all six admin PUT/DELETE callers and their assertions. Private
+  `withCatalog` identity and `validateCount` bounds also use named inputs;
+  guest/staff callers retain their existing transaction and guard ordering.
+- Preserve parsed Zod allowlists, path-ID precedence, partial-update omissions,
+  response envelopes/status/messages and hydrated helper return values. Capacity
+  remains per dining seating and per experience day. The same catalog version
+  write, transaction session, history guard and rollback behavior remain intact.
+- Before runtime edits: 17 replica-set catalog/capacity cases and 69 affected
+  admin API/integration cases pass, along with the database type check and
+  expanded isolated HTTP gate. Twelve new domain cases protect unused deletion,
+  cancelled historical references, capacity/party/time conflicts, unchanged
+  reservation prices, omitted fields and concurrent creation/deletion.
+- HTTP now covers all six admin catalog write endpoints: front-desk denial,
+  allowed partial updates, ignored body IDs on detail routes, stripped server
+  fields, unchanged reservation prices, capacity rollback, cancelled-history
+  deletion denial and successful unused deletion. Provider counts stay unchanged.
+- After migration: all 59 database tests and 69 affected admin tests pass;
+  database/both app type checks and compile-only invalid-input checks pass.
+  `pnpm ci:check` passes formatting/read-only lint and 1,598 tests (admin
+  1,073/customer 463/database 59/email 3). Expanded `pnpm test:http`, clean frozen
+  installation and all builds pass using CI's public Clerk key with no app or
+  provider credentials. Final runtime/test files match the validated copy.
+  Existing module-type, absent-MongoDB and dynamic-render build diagnostics are
+  non-blocking. Hosted login and live provider operations were not exercised.
+- Staff status inputs remain F07; catalog/model response DTOs remain Phase 1.
+  No schema, storage, money, UI or cache contract changes. This is focused
+  protection for changed catalog helpers, not #136's broad coverage program.
 
 ## Cache test reliability follow-up (T09)
 

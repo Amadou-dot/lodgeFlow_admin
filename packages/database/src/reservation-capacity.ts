@@ -43,7 +43,15 @@ function validateDate(date: Date) {
   if (dayRange(date).$gte < today)
     throw new ReservationRuleError('Cannot reserve a date in the past');
 }
-function validateCount(count: number, min: number, max?: number) {
+function validateCount({
+  count,
+  min,
+  max,
+}: {
+  count: number;
+  min: number;
+  max?: number;
+}) {
   if (
     !Number.isInteger(count) ||
     count < min ||
@@ -54,11 +62,15 @@ function validateCount(count: number, min: number, max?: number) {
     );
 }
 
+export interface CapacityCatalogReference {
+  kind: 'dining' | 'experience';
+  listingId: string;
+}
+
 /** All capacity writers touch the same catalog document inside their transaction.
  * This creates an actual write conflict; a read/count alone permits write skew. */
 async function withCatalog<T>(
-  kind: 'dining' | 'experience',
-  id: string,
+  { kind, listingId: id }: CapacityCatalogReference,
   work: (
     catalog: (IDining | IExperience) & mongoose.Document,
     session: ClientSession
@@ -100,7 +112,11 @@ async function checkDining(
   if (!dining.isAvailable)
     throw new ReservationRuleError('Dining option is unavailable');
   validateDate(reservation.date);
-  validateCount(reservation.numGuests, dining.minPeople, dining.maxPeople);
+  validateCount({
+    count: reservation.numGuests,
+    min: dining.minPeople,
+    max: dining.maxPeople,
+  });
   if (
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(reservation.time) ||
     reservation.time < dining.servingTime.start ||
@@ -144,18 +160,21 @@ export async function createDiningReservation({
   customerId: customer,
   selection,
 }: CreateDiningReservationInput) {
-  const id = await withCatalog('dining', diningId, async (catalog, session) => {
-    const reservation = new DiningReservation({
-      ...selection,
-      dining: diningId,
-      customer,
-      status: 'pending',
-      isPaid: false,
-    });
-    await checkDining(catalog as IDining, reservation, session);
-    await reservation.save({ session });
-    return reservation._id;
-  });
+  const id = await withCatalog(
+    { kind: 'dining', listingId: diningId },
+    async (catalog, session) => {
+      const reservation = new DiningReservation({
+        ...selection,
+        dining: diningId,
+        customer,
+        status: 'pending',
+        isPaid: false,
+      });
+      await checkDining(catalog as IDining, reservation, session);
+      await reservation.save({ session });
+      return reservation._id;
+    }
+  );
   return DiningReservation.findById(id).populate('dining');
 }
 export async function updateDiningReservation(
@@ -166,8 +185,7 @@ export async function updateDiningReservation(
   const initial = await DiningReservation.findOne({ _id: id, customer });
   if (!initial) throw new ReservationRuleError('Reservation not found', 404);
   await withCatalog(
-    'dining',
-    String(initial.dining),
+    { kind: 'dining', listingId: String(initial.dining) },
     async (catalog, session) => {
       const reservation = await DiningReservation.findOne({
         _id: id,
@@ -222,7 +240,11 @@ async function checkExperience(
   session: ClientSession
 ) {
   validateDate(booking.date);
-  validateCount(booking.numParticipants, 1, experience.maxParticipants);
+  validateCount({
+    count: booking.numParticipants,
+    min: 1,
+    max: experience.maxParticipants,
+  });
   const rows = await ExperienceBooking.find({
     _id: { $ne: booking._id },
     experience: experience._id,
@@ -261,8 +283,7 @@ export async function createExperienceReservation({
   selection,
 }: CreateExperienceReservationInput) {
   const id = await withCatalog(
-    'experience',
-    experienceId,
+    { kind: 'experience', listingId: experienceId },
     async (catalog, session) => {
       const booking = new ExperienceBooking({
         ...selection,
@@ -286,8 +307,7 @@ export async function updateExperienceReservation(
   const initial = await ExperienceBooking.findOne({ _id: id, customer });
   if (!initial) throw new ReservationRuleError('Reservation not found', 404);
   await withCatalog(
-    'experience',
-    String(initial.experience),
+    { kind: 'experience', listingId: String(initial.experience) },
     async (catalog, session) => {
       const booking = await ExperienceBooking.findOne({
         _id: id,
@@ -334,12 +354,77 @@ export async function updateExperienceReservation(
   return ExperienceBooking.findById(id).populate('experience');
 }
 
-export async function updateCapacityCatalog(
-  kind: 'dining' | 'experience',
-  id: string,
-  updates: Record<string, unknown>
-) {
-  return withCatalog(kind, id, async (catalog, session) => {
+type DiningCatalogUpdates = Partial<
+  Pick<
+    IDining,
+    | 'name'
+    | 'description'
+    | 'type'
+    | 'mealType'
+    | 'category'
+    | 'subCategory'
+    | 'price'
+    | 'servingTime'
+    | 'maxPeople'
+    | 'minPeople'
+    | 'image'
+    | 'gallery'
+    | 'ingredients'
+    | 'allergens'
+    | 'dietary'
+    | 'beverages'
+    | 'includes'
+    | 'duration'
+    | 'location'
+    | 'specialRequirements'
+    | 'isPopular'
+    | 'isAvailable'
+    | 'seasonality'
+    | 'tags'
+    | 'rating'
+    | 'reviewCount'
+  >
+>;
+type ExperienceCatalogUpdates = Partial<
+  Pick<
+    IExperience,
+    | 'name'
+    | 'description'
+    | 'duration'
+    | 'price'
+    | 'difficulty'
+    | 'category'
+    | 'image'
+    | 'includes'
+    | 'available'
+    | 'ctaText'
+    | 'longDescription'
+    | 'gallery'
+    | 'isPopular'
+    | 'maxParticipants'
+    | 'minAge'
+    | 'requirements'
+    | 'location'
+    | 'highlights'
+    | 'whatToBring'
+    | 'cancellationPolicy'
+    | 'seasonality'
+    | 'tags'
+    | 'rating'
+    | 'reviewCount'
+  >
+>;
+export type UpdateCapacityCatalogInput = { listingId: string } & (
+  | { kind: 'dining'; updates: DiningCatalogUpdates }
+  | { kind: 'experience'; updates: ExperienceCatalogUpdates }
+);
+
+export async function updateCapacityCatalog({
+  kind,
+  listingId: id,
+  updates,
+}: UpdateCapacityCatalogInput) {
+  return withCatalog({ kind, listingId: id }, async (catalog, session) => {
     Object.assign(catalog, updates);
     const start = new Date();
     start.setUTCHours(0, 0, 0, 0);
@@ -397,11 +482,11 @@ export async function updateCapacityCatalog(
   });
 }
 
-export async function deleteCapacityCatalog(
-  kind: 'dining' | 'experience',
-  id: string
-) {
-  return withCatalog(kind, id, async (catalog, session) => {
+export async function deleteCapacityCatalog({
+  kind,
+  listingId: id,
+}: CapacityCatalogReference) {
+  return withCatalog({ kind, listingId: id }, async (catalog, session) => {
     const used =
       kind === 'dining'
         ? await DiningReservation.exists({ dining: id }).session(session)
@@ -432,43 +517,46 @@ export async function transitionCapacityReservation(
   const resourceId = String(
     initial.get(kind === 'dining' ? 'dining' : 'experience')
   );
-  return withCatalog(kind, resourceId, async (_catalog, session) => {
-    const reservation =
-      kind === 'dining'
-        ? await DiningReservation.findById(id).session(session)
-        : await ExperienceBooking.findById(id).session(session);
-    if (!reservation)
-      throw new ReservationRuleError('Reservation not found', 404);
-    if (reservation.status !== expectedStatus)
-      throw new ReservationRuleError(
-        'Reservation changed; refresh and try again',
-        409
-      );
-    const beforeStatus = reservation.status;
-    if (nextStatus === beforeStatus)
-      return { changed: false, beforeStatus, reservation };
-    const transitions =
-      kind === 'dining'
-        ? DINING_STATUS_TRANSITIONS
-        : EXPERIENCE_STATUS_TRANSITIONS;
-    if (!transitions[beforeStatus]?.includes(nextStatus))
-      throw new ReservationRuleError('Invalid reservation status transition');
-    if (
-      nextStatus === 'cancelled' &&
-      (reservationPaymentSummary(reservation).legacyPaid ||
-        reservationPaymentSummary(reservation).refundableCents > 0)
-    )
-      throw new ReservationRuleError(
-        'Paid reservations require refund reconciliation before cancellation',
-        409
-      );
-    if (
-      reservation.checkout?.pending ||
-      reservation.stripeRefund?.status === 'pending'
-    )
-      throw new ReservationRuleError('An online transaction is pending', 409);
-    reservation.set('status', nextStatus);
-    await reservation.save({ session });
-    return { changed: true, beforeStatus, reservation };
-  });
+  return withCatalog(
+    { kind, listingId: resourceId },
+    async (_catalog, session) => {
+      const reservation =
+        kind === 'dining'
+          ? await DiningReservation.findById(id).session(session)
+          : await ExperienceBooking.findById(id).session(session);
+      if (!reservation)
+        throw new ReservationRuleError('Reservation not found', 404);
+      if (reservation.status !== expectedStatus)
+        throw new ReservationRuleError(
+          'Reservation changed; refresh and try again',
+          409
+        );
+      const beforeStatus = reservation.status;
+      if (nextStatus === beforeStatus)
+        return { changed: false, beforeStatus, reservation };
+      const transitions =
+        kind === 'dining'
+          ? DINING_STATUS_TRANSITIONS
+          : EXPERIENCE_STATUS_TRANSITIONS;
+      if (!transitions[beforeStatus]?.includes(nextStatus))
+        throw new ReservationRuleError('Invalid reservation status transition');
+      if (
+        nextStatus === 'cancelled' &&
+        (reservationPaymentSummary(reservation).legacyPaid ||
+          reservationPaymentSummary(reservation).refundableCents > 0)
+      )
+        throw new ReservationRuleError(
+          'Paid reservations require refund reconciliation before cancellation',
+          409
+        );
+      if (
+        reservation.checkout?.pending ||
+        reservation.stripeRefund?.status === 'pending'
+      )
+        throw new ReservationRuleError('An online transaction is pending', 409);
+      reservation.set('status', nextStatus);
+      await reservation.save({ session });
+      return { changed: true, beforeStatus, reservation };
+    }
+  );
 }

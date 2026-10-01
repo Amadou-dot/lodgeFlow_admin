@@ -2148,6 +2148,88 @@ try {
     assert.equal(edited.data[resource.countKey], 3);
     assert.equal(edited.data.totalPrice, resource.listing.price * 3);
     assert.deepEqual(edited.data.specialRequests, ['Window please']);
+    const listingId = String(resource.listing._id);
+    const catalogPaths =
+      resource.kind === 'dining'
+        ? ['/api/dining', `/api/dining/${listingId}`]
+        : [`/api/experiences/${listingId}`];
+    for (const catalogPath of catalogPaths) {
+      const deletePath =
+        catalogPath === '/api/dining'
+          ? `${catalogPath}?id=${listingId}`
+          : catalogPath;
+      const beforeCatalogDenied = await snapshot();
+      for (const method of ['PUT', 'DELETE']) {
+        const denied = await request({
+          origin: admin,
+          route: method === 'PUT' ? catalogPath : deletePath,
+          identity: 'front_desk',
+          method,
+          status: 403,
+          body: { _id: listingId, name: 'Forbidden edit' },
+        });
+        assert.equal(denied.success, false);
+      }
+      const conflict = await request({
+        origin: admin,
+        route: catalogPath,
+        identity: 'admin',
+        method: 'PUT',
+        status: 409,
+        body: {
+          _id: listingId,
+          name: 'Must roll back',
+          [resource.kind === 'dining' ? 'maxPeople' : 'maxParticipants']: 2,
+        },
+      });
+      assert.equal(
+        conflict.error,
+        'Capacity cannot be reduced below existing reservations'
+      );
+      assert.equal(await snapshot(), beforeCatalogDenied);
+      const beforeReservation = JSON.stringify(
+        await resource.model.findById(saved.data._id).lean()
+      );
+      const catalogEdited = await request({
+        origin: admin,
+        route: catalogPath,
+        identity: 'admin',
+        method: 'PUT',
+        status: 200,
+        body: {
+          _id: catalogPath === '/api/dining' ? listingId : 'ignored-body-id',
+          name: 'Renamed catalog listing',
+          price: 12.5,
+          reservationVersion: 999999,
+          createdAt: '2000-01-01T00:00:00.000Z',
+        },
+      });
+      assert.equal(catalogEdited.success, true);
+      assert.equal(catalogEdited.data._id, listingId);
+      assert.equal(catalogEdited.data.price, 12.5);
+      assert.equal(catalogEdited.data.isPopular, false);
+      assert.equal(
+        catalogEdited.message,
+        resource.kind === 'dining'
+          ? 'Dining item updated successfully'
+          : undefined
+      );
+      const catalogRow = await resource.catalog
+        .findById(listingId)
+        .select('+reservationVersion')
+        .lean();
+      assert.equal(catalogRow.name, 'Renamed catalog listing');
+      assert.equal(catalogRow.price, 12.5);
+      assert.notEqual(catalogRow.reservationVersion, 999999);
+      assert.equal(
+        catalogRow.createdAt.toISOString(),
+        resource.listing.createdAt.toISOString()
+      );
+      assert.equal(
+        JSON.stringify(await resource.model.findById(saved.data._id).lean()),
+        beforeReservation
+      );
+    }
     const cancelled = await request({
       origin: customer,
       route,
@@ -2176,10 +2258,57 @@ try {
       error: 'This reservation can no longer be changed',
     });
     assert.equal(await snapshot(), beforeRepeat);
+    for (const catalogPath of catalogPaths) {
+      const deletePath =
+        catalogPath === '/api/dining'
+          ? `${catalogPath}?id=${listingId}`
+          : catalogPath;
+      const beforeHistoryDenied = await snapshot();
+      const historyDenied = await request({
+        origin: admin,
+        route: deletePath,
+        identity: 'admin',
+        method: 'DELETE',
+        status: 409,
+      });
+      assert.equal(
+        historyDenied.error,
+        'Cannot delete a listing referenced by reservation history'
+      );
+      assert.equal(await snapshot(), beforeHistoryDenied);
+      const unused = await resource.catalog.create({
+        ...resource.listing.toObject(),
+        _id: new mongoose.Types.ObjectId(),
+      });
+      const unusedId = String(unused._id);
+      const removed = await request({
+        origin: admin,
+        route:
+          catalogPath === '/api/dining'
+            ? `${catalogPath}?id=${unusedId}`
+            : catalogPath.replace(listingId, unusedId),
+        identity: 'admin',
+        method: 'DELETE',
+        status: 200,
+      });
+      assert.deepEqual(removed, {
+        success: true,
+        data: null,
+        message:
+          resource.kind === 'dining'
+            ? 'Dining item deleted successfully'
+            : 'Experience deleted successfully',
+      });
+      assert.equal(await resource.catalog.findById(unusedId), null);
+      assert.equal(await snapshot(), beforeHistoryDenied);
+    }
     assert.equal(calls.length, providerCount);
   }
   console.log(
     'PASS guest reservation create/update/cancel, owner filters, persisted selections and transaction rollback without provider calls'
+  );
+  console.log(
+    'PASS admin catalog edits/deletion: permissions, path IDs, partial updates, capacity rollback and cancelled history without provider calls'
   );
 
   const experienceFields = {
