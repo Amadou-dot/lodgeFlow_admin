@@ -6,29 +6,29 @@ import {
   RATE_LIMIT_CONFIGS,
 } from '@/lib/rate-limit';
 import { WelcomeEmail } from '@/components/EmailTemplates';
-import { validateEmail } from '@/utils/utilityFunctions';
 import { getResend } from '@/lib/resend';
+import { logger } from '@/lib/logger';
+import { readWelcomeEmailRequest } from '@/lib/validations/welcome-email';
 
 export async function POST(request: Request) {
-  // Require authentication - prevents email spam abuse
-  const authResult = await requireApiAuth();
-  if (!authResult.authenticated) return authResult.error;
-
-  // Rate limit email sending (stricter limits)
-  const rateLimitKey = createRateLimitKey(authResult.userId, 'send-welcome');
-  const rateLimitResult = await checkRateLimit(
-    rateLimitKey,
-    RATE_LIMIT_CONFIGS.EMAIL
-  );
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult.resetTime);
-  }
-
-  const { firstName, email } = await request.json();
   try {
-    if (!validateEmail(email)) {
-      return Response.json({ error: 'Invalid email address' }, { status: 400 });
+    // The default authorization contract is application administrators only.
+    const authResult = await requireApiAuth();
+    if (!authResult.authenticated) return authResult.error;
+
+    const rateLimitKey = createRateLimitKey(authResult.userId, 'send-welcome');
+    const rateLimitResult = await checkRateLimit(
+      rateLimitKey,
+      RATE_LIMIT_CONFIGS.EMAIL
+    );
+    if (!rateLimitResult.success) {
+      return createRateLimitResponse(rateLimitResult.resetTime);
     }
+
+    const input = await readWelcomeEmailRequest(request);
+    if (!input.success)
+      return Response.json({ error: input.error }, { status: 400 });
+    const { firstName, email } = input.data;
 
     const { data, error } = await getResend().emails.send({
       from: getEmailSender({ kind: 'notification' }),
@@ -38,11 +38,21 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return Response.json({ error }, { status: 500 });
+      logger.error('Welcome provider rejected the send', error, {
+        route: 'welcome',
+      });
+      return Response.json(
+        { error: 'Failed to send welcome email' },
+        { status: 500 }
+      );
     }
 
     return Response.json(data);
-  } catch (error) {
-    return Response.json({ error }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('Welcome request failed', error, { route: 'welcome' });
+    return Response.json(
+      { error: 'Failed to send welcome email' },
+      { status: 500 }
+    );
   }
 }
