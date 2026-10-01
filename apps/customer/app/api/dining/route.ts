@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { connectDB, Dining } from '@lodgeflow/database';
+import { connectDB, Dining, type IDining } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
+import type { FilterQuery } from 'mongoose';
 import { diningQuerySchema } from '@/lib/validations';
 import {
   validateRequest,
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
     } = validation.data;
 
     // Build query object based on validated parameters
-    const query: any = { isAvailable: true };
+    const query: FilterQuery<IDining> = { isAvailable: true };
 
     if (type) {
       query.type = type;
@@ -53,10 +55,11 @@ export async function GET(request: Request) {
     }
 
     // Price range filtering
-    if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = minPrice;
-      if (maxPrice) query.price.$lte = maxPrice;
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.price = {
+        ...(minPrice === undefined ? {} : { $gte: minPrice }),
+        ...(maxPrice === undefined ? {} : { $lte: maxPrice }),
+      };
     }
 
     // Dietary restrictions filtering
@@ -84,8 +87,11 @@ export async function GET(request: Request) {
       success: true,
       data: dining,
     });
-  } catch (error) {
-    console.error('Error fetching dining options:', error);
+  } catch (error: unknown) {
+    logger.error(
+      'Error fetching dining options',
+      error instanceof Error ? error : undefined
+    );
     return NextResponse.json(
       {
         success: false,
