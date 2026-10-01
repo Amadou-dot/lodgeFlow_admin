@@ -82,17 +82,17 @@ Current execution status (2026-09-30): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has fourteen merged
-slices (PRs #160–#163, #165–#166, #169–#173 and #175–#177), covering request
+boundaries, plus validated cached customer payloads. Phase 2 has fifteen merged
+slices (PRs #160–#163, #165–#166, #169–#173 and #175–#178), covering request
 validation, named helper inputs, unused pagination cleanup, public cabin
 visibility, booking status actions, guest reservation operations and typed
-cancellation guards, plus typed catalog operation inputs. Sender repair #132
-completed separately in PR #155 with production and user inbox evidence; PR #174
-repaired an order-dependent cache test fixture. The latest merge,
-[PR #177](https://github.com/Amadou-dot/lodgeFlow_admin/pull/177) at `a8ea33b`,
+cancellation guards, plus named catalog/staff operations and typed request inputs.
+Sender repair #132 completed separately in PR #155 with production and user inbox
+evidence; PR #174 repaired an order-dependent cache test fixture. The latest merge,
+[PR #178](https://github.com/Amadou-dot/lodgeFlow_admin/pull/178) at `af5b389`,
 has all five main CI jobs passing and both production apps verified Ready at that
-SHA. Phase 2 continues with named staff reservation status inputs and validated
-request bodies, preserving stale-state/payment guards and audit attribution.
+SHA. Phase 2 continues with typed experience catalog queries and a focused fix
+for explicit zero-price limits dropped by the route and query hook.
 Other resource/admin DTOs, validation, money and UI work remain open.
 The inventory and tracker retain per-slice validation and delivery evidence;
 the milestone remains open.

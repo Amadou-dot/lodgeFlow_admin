@@ -8,9 +8,9 @@ const fetchExperiences = async (
 
   if (params.category) searchParams.append('category', params.category);
   if (params.difficulty) searchParams.append('difficulty', params.difficulty);
-  if (params.minPrice)
+  if (params.minPrice !== undefined)
     searchParams.append('minPrice', params.minPrice.toString());
-  if (params.maxPrice)
+  if (params.maxPrice !== undefined)
     searchParams.append('maxPrice', params.maxPrice.toString());
   if (params.isPopular !== undefined)
     searchParams.append('isPopular', params.isPopular.toString());

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { connectDB, Experience } from '@lodgeflow/database';
+import { connectDB, Experience, type IExperience } from '@lodgeflow/database';
+import type { FilterQuery } from 'mongoose';
 import type { ApiResponse, Experience as ExperienceType } from '@/types';
+import { logger } from '@lodgeflow/database/logger';
 import { experienceQuerySchema } from '@/lib/validations';
 import {
   validateRequest,
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
       validation.data;
 
     // Build query
-    const query: any = {};
+    const query: FilterQuery<IExperience> = {};
 
     if (category) {
       query.category = category;
@@ -37,10 +39,11 @@ export async function GET(request: NextRequest) {
       query.difficulty = difficulty;
     }
 
-    if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = minPrice;
-      if (maxPrice) query.price.$lte = maxPrice;
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.price = {
+        ...(minPrice === undefined ? {} : { $gte: minPrice }),
+        ...(maxPrice === undefined ? {} : { $lte: maxPrice }),
+      };
     }
 
     if (isPopular !== undefined) {
@@ -63,8 +66,11 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch (error) {
-    console.error('Error fetching experiences:', error);
+  } catch (error: unknown) {
+    logger.error(
+      'Error fetching experiences',
+      error instanceof Error ? error : undefined
+    );
 
     const response: ApiResponse<never> = {
       success: false,

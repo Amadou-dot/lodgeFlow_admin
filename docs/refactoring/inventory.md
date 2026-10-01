@@ -55,6 +55,7 @@ rather than treating counts as the completion gate.
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
+| V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -943,6 +944,34 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   `ReservationDetail.tsx` still uses string statuses and date-bearing shared payment
   state; `models/DiningReservation.ts` omits schema-supported `seated` from its
   interface union. Those representations need their own compatibility coverage.
+
+## Phase 2 slice 16: typed experience queries and zero-price limits (V04)
+
+- `GET /api/experiences` constructs a typed `FilterQuery<IExperience>` from its
+  existing parsed query schema, replacing the query `any`. Unexpected failures
+  use the shared logger and preserve the safe 500 response.
+- Related bug fix: the route and `useExperiences` retain explicit zero lower or
+  upper price bounds. Previously `maxPrice=0` returned paid listings because both
+  layers treated zero as an absent filter. No price/storage/rounding changes.
+- Preserve category/difficulty/popularity/tag semantics, unknown-query stripping,
+  final repeated-query values, popular-first/price-second sorting, full hydrated
+  JSON, response envelopes and validation/database failure order. The hook retains
+  query keys, five-minute freshness, ten-minute retention and existing error/empty
+  response behavior. The current page's unfiltered invocation is unchanged.
+- Before runtime edits: 20 route/hook characterizations and customer type checks
+  pass. Seven focused zero-bound regressions fail as expected. Expanded real HTTP
+  passes existing filter/sort/JSON/error cases, then reproduces `maxPrice=0`
+  returning all three free/paid fixtures instead of only the free one.
+- After the fix: all 27 focused cases and customer type checks pass.
+  `pnpm ci:check` passes formatting/read-only lint and 1,639 tests (admin
+  1,087/customer 490/database 59/email 3). Expanded HTTP now passes, including
+  free-only zero upper bounds, unchanged catalog snapshots and no provider calls.
+  Clean frozen installation and all builds pass with CI's public Clerk key and
+  no app/provider credentials; all five final runtime/test files match the build
+  inputs. Existing optional Sharp, module-type, absent-MongoDB and dynamic-render
+  diagnostics remain non-blocking. Hosted login/live delivery were not exercised.
+- Catalog response DTOs and other resources' filters remain separate slices.
+  No new filter controls, features, provider operations or schema migrations.
 
 ## Cache test reliability follow-up (T09)
 

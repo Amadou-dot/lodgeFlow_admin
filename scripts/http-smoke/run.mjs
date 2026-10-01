@@ -627,6 +627,123 @@ try {
   );
   assert.equal(calls.length, 0);
   console.log('PASS public customer catalog through proxy and route');
+  const queryExperienceFields = {
+    description: 'Isolated experience query fixture',
+    duration: '1 hour',
+    difficulty: 'Easy',
+    category: 'Nature',
+    image: 'https://example.invalid/query-walk.jpg',
+    includes: ['Guide'],
+    available: ['Monday'],
+    ctaText: 'Book now',
+    tags: ['forest', 'family'],
+    maxParticipants: 4,
+  };
+  const popularPaidExperience = await Experience.create({
+    ...queryExperienceFields,
+    name: 'Popular paid walk',
+    price: 50,
+    isPopular: true,
+  });
+  const freeQueryExperience = await Experience.create({
+    ...queryExperienceFields,
+    name: 'Free query walk',
+    price: 0,
+    isPopular: false,
+  });
+  const affordableExperience = await Experience.create({
+    ...queryExperienceFields,
+    name: 'Water outing',
+    price: 25,
+    isPopular: false,
+    difficulty: 'Moderate',
+    category: 'Water Sports',
+    tags: ['water'],
+  });
+  const popularPaidId = String(popularPaidExperience._id);
+  const freeQueryId = String(freeQueryExperience._id);
+  const affordableId = String(affordableExperience._id);
+  const experienceCatalogSnapshot = () =>
+    Experience.find()
+      .select('+reservationVersion')
+      .sort({ _id: 1 })
+      .lean()
+      .then(rows => JSON.stringify(rows));
+  const beforeExperienceQueries = await experienceCatalogSnapshot();
+  for (const { query, ids } of [
+    { query: '', ids: [popularPaidId, freeQueryId, affordableId] },
+    { query: '?minPrice=10&maxPrice=40', ids: [affordableId] },
+    {
+      query: '?category=Nature&difficulty=Easy&isPopular=false&tags=family',
+      ids: [freeQueryId],
+    },
+    { query: '?isPopular=true', ids: [popularPaidId] },
+    { query: '?minPrice=40&maxPrice=10', ids: [] },
+  ]) {
+    const result = await request({
+      origin: customer,
+      route: `/api/experiences${query}`,
+      status: 200,
+    });
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      result.data.map(row => row._id),
+      ids
+    );
+    const expected = await Experience.find({ _id: { $in: ids } }).sort({
+      isPopular: -1,
+      price: 1,
+    });
+    assert.deepEqual(result, {
+      success: true,
+      data: JSON.parse(JSON.stringify(expected)),
+    });
+  }
+  const invalidExperienceQuery = await request({
+    origin: customer,
+    route: '/api/experiences?minPrice=-1',
+    status: 400,
+  });
+  assert.equal(invalidExperienceQuery.success, false);
+  assert.match(invalidExperienceQuery.error, /minPrice:/);
+  await mongoose.connection.db.admin().command({
+    configureFailPoint: 'failCommand',
+    mode: { times: 1 },
+    data: { failCommands: ['find'], errorCode: 2 },
+  });
+  assert.deepEqual(
+    await request({ origin: customer, route: '/api/experiences', status: 500 }),
+    {
+      success: false,
+      error: 'Failed to fetch experiences',
+    }
+  );
+  assert.equal(await experienceCatalogSnapshot(), beforeExperienceQueries);
+  assert.equal(calls.length, 0);
+  console.log(
+    'PASS experience catalog filters, sorting, JSON and safe validation/database failures without writes'
+  );
+  for (const query of ['?maxPrice=0', '?minPrice=0&maxPrice=0']) {
+    const result = await request({
+      origin: customer,
+      route: `/api/experiences${query}`,
+      status: 200,
+    });
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      result.data.map(row => row._id),
+      [freeQueryId]
+    );
+    assert.equal(result.data[0].price, 0);
+  }
+  assert.equal(await experienceCatalogSnapshot(), beforeExperienceQueries);
+  assert.equal(calls.length, 0);
+  await Experience.deleteMany({
+    _id: { $in: [popularPaidId, freeQueryId, affordableId] },
+  });
+  console.log(
+    'PASS explicit zero experience price limits return only free listings'
+  );
   await mongoose.connection.db.admin().command({
     configureFailPoint: 'failCommand',
     mode: { times: 1 },
