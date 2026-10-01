@@ -2302,6 +2302,126 @@ try {
       assert.equal(await resource.catalog.findById(unusedId), null);
       assert.equal(await snapshot(), beforeHistoryDenied);
     }
+    const staffRow = await resource.model.create({
+      [resource.kind]: listingId,
+      customer: 'smoke_customer',
+      date: new Date(operationDate),
+      [resource.countKey]: 2,
+      ...(resource.kind === 'dining'
+        ? { time: '18:00' }
+        : { timeSlot: '18:00' }),
+      totalPrice: 25,
+    });
+    const staffId = String(staffRow._id);
+    const staffRoute = `${resource.route}/${staffId}`;
+    const staffSnapshot = async () =>
+      JSON.stringify(
+        await Promise.all([
+          resource.model.findById(staffId).lean(),
+          resource.catalog
+            .findById(listingId)
+            .select('+reservationVersion')
+            .lean(),
+          mongoose.connection
+            .collection('auditlogs')
+            .find({ resourceId: staffId })
+            .toArray(),
+        ])
+      );
+    const beforeStaffDenied = await staffSnapshot();
+    for (const attempt of [
+      { identity: 'unassigned', status: 403, body: { status: 'confirmed' } },
+      {
+        identity: 'front_desk',
+        status: 400,
+        body: { expectedStatus: 'pending', status: 'confirmed', totalPrice: 0 },
+      },
+      {
+        identity: 'front_desk',
+        status: 409,
+        body: { expectedStatus: 'unknown', status: 'unknown' },
+      },
+    ]) {
+      const rejected = await request({
+        origin: admin,
+        route: staffRoute,
+        method: 'PATCH',
+        ...attempt,
+      });
+      assert.equal(rejected.success, false);
+      assert.equal(await staffSnapshot(), beforeStaffDenied);
+    }
+    const details = await request({
+      origin: admin,
+      route: staffRoute,
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.equal(details.data.reservation._id, staffId);
+    assert.equal(details.data.reservation[resource.kind]._id, listingId);
+    assert.deepEqual(details.data.allowedStatuses, ['confirmed', 'cancelled']);
+    assert.equal(await staffSnapshot(), beforeStaffDenied);
+    const confirmed = await request({
+      origin: admin,
+      route: staffRoute,
+      identity: 'front_desk',
+      method: 'PATCH',
+      status: 200,
+      body: { expectedStatus: 'pending', status: 'confirmed' },
+    });
+    assert.deepEqual(confirmed, {
+      success: true,
+      data: JSON.parse(JSON.stringify(await resource.model.findById(staffId))),
+    });
+    assert.equal(confirmed.data.status, 'confirmed');
+    assert.equal(confirmed.data.totalPrice, 25);
+    assert.deepEqual(confirmed.data.receipts, []);
+    const statusAudits = await mongoose.connection
+      .collection('auditlogs')
+      .find({ resourceId: staffId })
+      .toArray();
+    assert.equal(statusAudits.length, 1);
+    assert.equal(statusAudits[0].actor, 'smoke_front_desk');
+    assert.equal(statusAudits[0].actorRole, 'front_desk');
+    assert.equal(statusAudits[0].organizationId, 'smoke_org');
+    assert.equal(
+      statusAudits[0].action,
+      resource.kind === 'dining'
+        ? 'dining_reservation.status_change'
+        : 'experience_booking.status_change'
+    );
+    assert.deepEqual(statusAudits[0].before, { status: 'pending' });
+    assert.deepEqual(statusAudits[0].after, { status: 'confirmed' });
+    const noOp = await request({
+      origin: admin,
+      route: staffRoute,
+      identity: 'front_desk',
+      method: 'PATCH',
+      status: 200,
+      body: { expectedStatus: 'confirmed', status: 'confirmed' },
+    });
+    assert.deepEqual(noOp, confirmed);
+    assert.deepEqual(
+      await mongoose.connection
+        .collection('auditlogs')
+        .find({ resourceId: staffId })
+        .toArray(),
+      statusAudits
+    );
+    const beforeStale = await staffSnapshot();
+    const stale = await request({
+      origin: admin,
+      route: staffRoute,
+      identity: 'front_desk',
+      method: 'PATCH',
+      status: 409,
+      body: { expectedStatus: 'pending', status: 'cancelled' },
+    });
+    assert.deepEqual(stale, {
+      success: false,
+      error: 'Reservation changed; refresh and try again',
+    });
+    assert.equal(await staffSnapshot(), beforeStale);
     assert.equal(calls.length, providerCount);
   }
   console.log(
@@ -2309,6 +2429,9 @@ try {
   );
   console.log(
     'PASS admin catalog edits/deletion: permissions, path IDs, partial updates, capacity rollback and cancelled history without provider calls'
+  );
+  console.log(
+    'PASS staff reservation detail/status: permissions, strict payloads, stale-state rollback, no-op retries and exact audit attribution'
   );
 
   const experienceFields = {

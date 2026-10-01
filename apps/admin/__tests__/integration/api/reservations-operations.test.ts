@@ -368,15 +368,30 @@ it('releases capacity with the shared transaction and rejects competing stale st
   });
   const id = String(reservation!._id);
   const results = await Promise.allSettled([
-    transitionCapacityReservation('dining', id, 'pending', 'confirmed'),
-    transitionCapacityReservation('dining', id, 'pending', 'cancelled'),
+    transitionCapacityReservation({
+      kind: 'dining',
+      reservationId: id,
+      expectedStatus: 'pending',
+      nextStatus: 'confirmed',
+    }),
+    transitionCapacityReservation({
+      kind: 'dining',
+      reservationId: id,
+      expectedStatus: 'pending',
+      nextStatus: 'cancelled',
+    }),
   ]);
   expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(
     1
   );
   const current = await DiningReservation.findById(id);
   if (current.status === 'confirmed')
-    await transitionCapacityReservation('dining', id, 'confirmed', 'no-show');
+    await transitionCapacityReservation({
+      kind: 'dining',
+      reservationId: id,
+      expectedStatus: 'confirmed',
+      nextStatus: 'no-show',
+    });
   await expect(
     createDiningReservation({
       diningId: String(f.dining._id),
@@ -411,15 +426,20 @@ it('blocks paid dining and experience cancellations without recording false refu
     isPaid: true,
   });
   await expect(
-    transitionCapacityReservation('dining', dining.id, 'confirmed', 'cancelled')
+    transitionCapacityReservation({
+      kind: 'dining',
+      reservationId: dining.id,
+      expectedStatus: 'confirmed',
+      nextStatus: 'cancelled',
+    })
   ).rejects.toMatchObject({ status: 409 });
   await expect(
-    transitionCapacityReservation(
-      'experience',
-      exp.id,
-      'confirmed',
-      'cancelled'
-    )
+    transitionCapacityReservation({
+      kind: 'experience',
+      reservationId: exp.id,
+      expectedStatus: 'confirmed',
+      nextStatus: 'cancelled',
+    })
   ).rejects.toMatchObject({ status: 409 });
   expect(await AuditLog.countDocuments()).toBe(0);
 });
@@ -484,7 +504,12 @@ it('records partial payments with refund permissions and allows cancellation aft
     })
   ).rejects.toMatchObject({ status: 409 });
   await expect(
-    transitionCapacityReservation('dining', id, 'pending', 'cancelled')
+    transitionCapacityReservation({
+      kind: 'dining',
+      reservationId: id,
+      expectedStatus: 'pending',
+      nextStatus: 'cancelled',
+    })
   ).rejects.toMatchObject({ status: 409 });
   (requireApiAuth as jest.Mock).mockImplementation(async ({ permission }) =>
     permission === 'refunds:issue'
@@ -514,7 +539,12 @@ it('records partial payments with refund permissions and allows cancellation aft
     },
   });
   await expect(
-    transitionCapacityReservation('dining', id, 'pending', 'cancelled')
+    transitionCapacityReservation({
+      kind: 'dining',
+      reservationId: id,
+      expectedStatus: 'pending',
+      nextStatus: 'cancelled',
+    })
   ).resolves.toMatchObject({ changed: true });
 });
 it('rejects malformed payment payloads and unauthorized collection', async () => {

@@ -18,9 +18,18 @@ import {
 } from './api-utils';
 import { recordAudit } from './audit';
 import { getClerkUser } from './clerk-users';
+import { logger } from './logger';
 import connectDB from './mongodb';
-type Kind = 'dining' | 'experience';
-export async function reservationDetails(id: string, kind: Kind) {
+import { reservationStatusSchema } from './validations/reservation-status';
+
+interface ReservationReference {
+  reservationId: string;
+  kind: 'dining' | 'experience';
+}
+export async function reservationDetails({
+  reservationId: id,
+  kind,
+}: ReservationReference) {
   const access = await requireApiAuth({ permission: 'bookings:read' });
   if (!access.authenticated) return access.error;
   if (!mongoose.isValidObjectId(id))
@@ -44,43 +53,41 @@ export async function reservationDetails(id: string, kind: Kind) {
       customerName: customer?.name || 'Unavailable guest',
       allowedStatuses: transitions[reservation.status] ?? [],
     });
-  } catch {
+  } catch (error: unknown) {
+    logger.error(
+      'Error loading reservation',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse('Unable to load reservation', 500);
   }
 }
-export async function changeReservationStatus(
-  request: Request,
-  id: string,
-  kind: Kind
-) {
+export async function changeReservationStatus({
+  request,
+  reservationId: id,
+  kind,
+}: ReservationReference & { request: Request }) {
   const access = await requireApiAuth({ permission: 'bookings:manage' });
   if (!access.authenticated) return access.error;
-  let body;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return createErrorResponse('Invalid JSON', 400);
   }
-  if (
-    !body ||
-    typeof body !== 'object' ||
-    Array.isArray(body) ||
-    typeof body.status !== 'string' ||
-    typeof body.expectedStatus !== 'string' ||
-    Object.keys(body).some(key => !['status', 'expectedStatus'].includes(key))
-  )
+  const parsed = reservationStatusSchema.safeParse(body);
+  if (!parsed.success)
     return createErrorResponse(
       'Only status and expectedStatus are accepted',
       400
     );
   try {
     await connectDB();
-    const result = await transitionCapacityReservation(
+    const result = await transitionCapacityReservation({
       kind,
-      id,
-      body.expectedStatus,
-      body.status
-    );
+      reservationId: id,
+      expectedStatus: parsed.data.expectedStatus,
+      nextStatus: parsed.data.status,
+    });
     if (result.changed)
       await recordAudit(access, {
         action:
@@ -94,9 +101,13 @@ export async function changeReservationStatus(
         after: { status: result.reservation.status },
       });
     return createSuccessResponse(result.reservation);
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return createErrorResponse(error.message, error.status);
+    logger.error(
+      'Error changing reservation status',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse('Unable to change reservation status', 500);
   }
 }
