@@ -68,15 +68,41 @@ afterEach(() => {
 
 describe('createRateLimitKey', () => {
   it('namespaces the key by user and endpoint', () => {
-    expect(createRateLimitKey('user_123', 'send-confirm')).toBe(
-      'user_123:send-confirm'
-    );
+    expect(
+      createRateLimitKey({ userId: 'user_123', endpoint: 'send-confirm' })
+    ).toBe('user_123:send-confirm');
   });
 
   it('falls back to "anonymous" when there is no user id', () => {
-    expect(createRateLimitKey(undefined, 'send-confirm')).toBe(
-      'anonymous:send-confirm'
+    expect(
+      createRateLimitKey({ userId: undefined, endpoint: 'send-confirm' })
+    ).toBe('anonymous:send-confirm');
+  });
+
+  it('retains the anonymous namespace for an empty legacy user id', () => {
+    expect(createRateLimitKey({ userId: '', endpoint: 'send-welcome' })).toBe(
+      'anonymous:send-welcome'
     );
+  });
+
+  it('keeps limits separate by endpoint and by user with the generated keys', () => {
+    const config = { limit: 1, windowMs: 60 * 1000 };
+    const welcome = createRateLimitKey({
+      userId: 'staff_a',
+      endpoint: 'send-welcome',
+    });
+    const confirmation = createRateLimitKey({
+      userId: 'staff_a',
+      endpoint: 'send-confirm',
+    });
+    const otherStaff = createRateLimitKey({
+      userId: 'staff_b',
+      endpoint: 'send-welcome',
+    });
+    expect(checkRateLimitInMemory(welcome, config).success).toBe(true);
+    expect(checkRateLimitInMemory(welcome, config).success).toBe(false);
+    expect(checkRateLimitInMemory(confirmation, config).success).toBe(true);
+    expect(checkRateLimitInMemory(otherStaff, config).success).toBe(true);
   });
 });
 

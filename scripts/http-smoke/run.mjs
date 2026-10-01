@@ -84,6 +84,7 @@ let refundFailure = false;
 let stripeFailure = false;
 let emailFailure = true;
 let clerkProfileFailure = false;
+let clerkMutationAttempts = 0;
 let replica;
 let provider;
 let completed = false;
@@ -369,6 +370,12 @@ try {
     },
   ]);
   provider = createServer(async (incoming, outgoing) => {
+    if (
+      incoming.url.startsWith('/v1/users') &&
+      ['POST', 'PATCH', 'DELETE'].includes(incoming.method)
+    ) {
+      clerkMutationAttempts++;
+    }
     if (
       clerkProfileFailure &&
       incoming.method === 'GET' &&
@@ -2399,6 +2406,37 @@ try {
   );
   console.log(
     'PASS existing admin email authorization, failure and success contracts'
+  );
+  const callsBeforeCustomerLimit = calls.length;
+  const clerkMutationsBeforeCustomerLimit = clerkMutationAttempts;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const invalidCustomer = await request({
+      origin: admin,
+      route: '/api/customers',
+      identity: 'admin',
+      method: 'POST',
+      body: {},
+      status: 400,
+    });
+    assert.equal(invalidCustomer.success, false);
+  }
+  const customerLimit = await request({
+    origin: admin,
+    route: '/api/customers',
+    identity: 'admin',
+    method: 'POST',
+    body: {},
+    status: 429,
+  });
+  assert.equal(
+    customerLimit.error,
+    'Too many requests. Please try again later.'
+  );
+  assert.ok(customerLimit.retryAfter > 0 && customerLimit.retryAfter <= 60);
+  assert.equal(calls.length, callsBeforeCustomerLimit);
+  assert.equal(clerkMutationAttempts, clerkMutationsBeforeCustomerLimit);
+  console.log(
+    'PASS customer creation keeps its separate ten-request limit without Clerk mutation attempts or email/payment calls'
   );
 
   const guestDining = await Dining.create({

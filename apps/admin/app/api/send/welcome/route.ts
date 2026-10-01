@@ -16,7 +16,10 @@ export async function POST(request: Request) {
     const authResult = await requireApiAuth();
     if (!authResult.authenticated) return authResult.error;
 
-    const rateLimitKey = createRateLimitKey(authResult.userId, 'send-welcome');
+    const rateLimitKey = createRateLimitKey({
+      userId: authResult.userId,
+      endpoint: 'send-welcome',
+    });
     const rateLimitResult = await checkRateLimit(
       rateLimitKey,
       RATE_LIMIT_CONFIGS.EMAIL

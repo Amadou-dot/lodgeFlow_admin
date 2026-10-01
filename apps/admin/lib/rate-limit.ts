@@ -203,10 +203,13 @@ export function checkRateLimitInMemory(
 /**
  * Create a rate limit key from user ID and endpoint
  */
-export function createRateLimitKey(
-  userId: string | undefined,
-  endpoint: string
-): string {
+export function createRateLimitKey({
+  userId,
+  endpoint,
+}: {
+  userId?: string;
+  endpoint: string;
+}): string {
   return `${userId || 'anonymous'}:${endpoint}`;
 }
 
