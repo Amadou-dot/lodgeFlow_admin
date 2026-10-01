@@ -4,8 +4,15 @@ import {
 } from '@/lib/reservation-status-route';
 import type { IdParam } from '@/types';
 export async function GET(_request: Request, { params }: IdParam) {
-  return reservationDetails((await params).id, 'experience');
+  return reservationDetails({
+    reservationId: (await params).id,
+    kind: 'experience',
+  });
 }
 export async function PATCH(request: Request, { params }: IdParam) {
-  return changeReservationStatus(request, (await params).id, 'experience');
+  return changeReservationStatus({
+    request,
+    reservationId: (await params).id,
+    kind: 'experience',
+  });
 }

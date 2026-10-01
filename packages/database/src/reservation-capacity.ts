@@ -501,13 +501,22 @@ export async function deleteCapacityCatalog({
   });
 }
 
+export interface TransitionCapacityReservationInput {
+  kind: 'dining' | 'experience';
+  reservationId: string;
+  // Request strings are compared/validated inside the transaction so missing
+  // and stale reservations keep precedence over invalid transition errors.
+  expectedStatus: string;
+  nextStatus: string;
+}
+
 /** Staff status edits use the same catalog lock as guest capacity writers. */
-export async function transitionCapacityReservation(
-  kind: 'dining' | 'experience',
-  id: string,
-  expectedStatus: string,
-  nextStatus: string
-) {
+export async function transitionCapacityReservation({
+  kind,
+  reservationId: id,
+  expectedStatus,
+  nextStatus,
+}: TransitionCapacityReservationInput) {
   requireId(id);
   const initial =
     kind === 'dining'

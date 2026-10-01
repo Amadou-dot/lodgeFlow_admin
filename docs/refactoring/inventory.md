@@ -51,7 +51,7 @@ rather than treating counts as the completion gate.
 | F04 | `apps/admin/lib/api-utils.ts`: pagination helpers; booking-table status callbacks                                | Same-type positional values recur across utilities and component contracts.                  | 2        | Implemented in Phase 2 slices 5 and 11: unused pagination builders removed; named booking-table status inputs, string JSON IDs and checked action-menu data replace ambiguous callback signatures.                                                         |
 | F05 | `packages/database/src/customer-bookings.ts`: `updateCustomerBooking` | Booking and customer string IDs can be confused. | 2 | Implemented in Phase 2 slice 3: named identity/update inputs, exact denial/no-write and paid-update accounting characterization. |
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
-| F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Catalog update/delete, private catalog identity and count bounds migrated in Phase 2 slice 14, with resource-specific editable fields. Staff `transitionCapacityReservation` remains; preserve expected-state checks, guard ordering and audit attribution in its own slice. |
+| F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Implemented in Phase 2 slices 14–15: named catalog, private identity/count and staff status inputs, with typed editable fields and a validated status request boundary. Transaction, guard ordering and audit attribution are characterized; response/native-status DTO debt remains separate. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6 and 9: validated requests for customer confirmations, cabin checkout and public availability search. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -903,6 +903,46 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
 - Staff status inputs remain F07; catalog/model response DTOs remain Phase 1.
   No schema, storage, money, UI or cache contract changes. This is focused
   protection for changed catalog helpers, not #136's broad coverage program.
+
+## Phase 2 slice 15: named staff status operations (F07)
+
+- `transitionCapacityReservation` takes named kind, reservation ID and requested
+  expected/next statuses. `reservationDetails` and `changeReservationStatus`
+  also take named inputs; migrate both admin GET/PATCH wrappers and every shared
+  operation test caller.
+- Parse unknown request bodies through `lib/validations/reservation-status.ts`.
+  Keep the exact malformed-JSON and strict-field 400 responses. A refinement
+  rejects an own `__proto__` key because installed Zod otherwise drops it even
+  for strict objects; the old route rejected it. Operator/dotted/extra keys,
+  missing fields and non-string values remain rejected before database access.
+- Requested status strings stay untrimmed and are compared/validated inside the
+  existing transaction. Early enum parsing would change the characterized
+  invalid-ID/missing 404 and stale-state 409 precedence. Preserve same-status
+  no-ops, lifecycle rules, paid/receipt/checkout/refund guards, the catalog version
+  write, transactional retries, saved selections/receipts and audit attribution.
+- Unexpected server errors are logged through the existing logger and retain the
+  safe 500 envelopes. Audit recording keeps its existing non-transactional policy;
+  this slice does not change failure recovery or claim atomic audit persistence.
+- Before runtime edits: 14 new integration cases plus 11 existing reservation
+  operation cases pass, with the new/migrated tests separately type-checked.
+  Coverage includes auth before body/ID handling, strict fields, response order,
+  allowed changes, no-op retries, protected transactions, competing status writes,
+  detail fields, safe failures and unchanged reservation/catalog/audit snapshots.
+- Expanded real HTTP covers both admin detail/PATCH paths, front-desk access,
+  denied assignment/payloads, stale-state rollback, preserved JSON/prices/receipts,
+  exact actor/role/organization audit fields and no duplicate audit on a no-op.
+  It passes before runtime changes and makes no live provider calls.
+- After migration: the same 25 integration cases and their separate type check
+  pass; both app checks and database build pass. `pnpm ci:check` passes formatting,
+  read-only lint and 1,612 tests (admin 1,087/customer 463/database 59/email 3).
+  Expanded HTTP, clean frozen installation and all builds pass in an isolated
+  copy using CI's public Clerk key without app/provider credentials. Final
+  runtime/test files match the build snapshot. Existing optional Sharp,
+  module-type, absent-MongoDB and dynamic-render diagnostics are non-blocking.
+- Reservation response DTOs/native statuses remain a Phase 1 boundary slice:
+  `ReservationDetail.tsx` still uses string statuses and date-bearing shared payment
+  state; `models/DiningReservation.ts` omits schema-supported `seated` from its
+  interface union. Those representations need their own compatibility coverage.
 
 ## Cache test reliability follow-up (T09)
 
