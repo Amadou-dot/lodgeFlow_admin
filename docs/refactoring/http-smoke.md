@@ -25,6 +25,9 @@ Memory Server binary download. No application credentials are required.
   independently enforced. No auth bypass flag or replacement `auth()` is used.
 - Shared Mongoose schemas, pricing, booking lock, checkout quote writes, payment
   settlement, settings writes and audit persistence against disposable MongoDB.
+- Admin bulk cabin deletion: front-desk denial, missing populated-reference
+  conflict without writes, manager success/counts, retained history and redacted
+  audit attribution.
 - The real Stripe webhook signature verifier, with locally signed payloads.
 - The installed Resend SDK and `@react-email/render` template rendering, with
   transport intercepted before live delivery.

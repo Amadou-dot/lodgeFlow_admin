@@ -71,16 +71,11 @@ async function handleBulkDelete(ids: string[], access: ApiAuthResult) {
   const activeBookings = await Booking.find({
     cabin: { $in: ids },
     status: { $nin: ['cancelled', 'checked-out'] },
-  }).populate('cabin', 'name');
+  }).populate<{ cabin: { name?: string } | null }>('cabin', 'name');
 
   if (activeBookings.length > 0) {
     const cabinNames = Array.from(
-      new Set(
-        activeBookings.map(b => {
-          const cabin = b.cabin as unknown as { name: string };
-          return cabin?.name || 'Unknown';
-        })
-      )
+      new Set(activeBookings.map(booking => booking.cabin?.name || 'Unknown'))
     );
 
     return createErrorResponse(

@@ -45,6 +45,7 @@ rather than treating counts as the completion gate.
 | T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Replace with checked input/DTO builders or real documents according to each test's responsibility; preserve behavioral assertions.                                                  |
 | T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
 | T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Implemented in Phase 1 slice 8: validated unknown cache payloads and dates, per-entry misses for malformed data, preserved negative cache and transient failures.                                                              |
+| T10 | Admin `app/api/cabins/bulk/route.ts`: `handleBulkDelete` | Populated cabin-name projection is concealed behind a double cast. | 1 | Implemented in Phase 1 slice 11: nullable sparse name projection with preserved active-booking denial, deduplication, Unknown fallback, history, counts and audit attribution. |
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Implemented in Phase 2 slice 12: named guest create inputs and tagged update/cancel operations at all callers, with owner/payment/terminal guards and catalog transaction writes preserved.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
@@ -437,6 +438,29 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   (`36785129808`) and main CI jobs (`36785374090`) pass. Both exact-SHA previews
   and production deployments are Ready, with configured roots, built routes and
   production aliases verified.
+
+## Phase 1 slice 11: admin bulk-delete cabin population (T10)
+
+- The active-booking query now declares its nullable cabin-name projection.
+  Sparse legacy names remain optional and keep the existing `Unknown` fallback;
+  deleted references remain null. Removed the double cast without changing
+  filter semantics, encounter-order name deduplication or denial text.
+- Eleven new real-Mongo characterization cases and 26 existing cabin-hook cases
+  pass before the runtime edit. Coverage protects auth-before-parse/DB ordering,
+  every active/terminal booking status, scope, sparse/deleted references,
+  duplicate/missing IDs, deletion counts, retained booking history and audit
+  attribution/redaction. Hook request, toasts and invalidation stay unchanged.
+- Expanded HTTP characterization passes before the edit with real Clerk role
+  checks, missing-reference no-write denial and allowed manager deletion/audit.
+  Services are disposable and providers controlled; no live operations run.
+- Final local validation: the same 37 focused checks, both app type checks and
+  a strict check of the new integration test pass. `pnpm ci:check` passes
+  formatting, read-only lint and 1,781 tests (admin 1,179, customer 540,
+  database 59, email 3). Expanded HTTP passes after the edit, and a clean
+  frozen installation and all workspace builds pass using CI's public key.
+- Broader bulk payload validation and error handling remain Phase 2 work.
+  Existing deletion/concurrent-booking behavior is unchanged; this slice does
+  not establish atomic serialization between catalog deletion and booking writes.
 
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 
