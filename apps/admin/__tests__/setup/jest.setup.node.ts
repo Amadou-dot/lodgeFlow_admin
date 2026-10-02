@@ -1,3 +1,4 @@
+import type { ApiAuthResult } from '@/lib/api-utils';
 import mongoose from 'mongoose';
 
 beforeAll(async () => {
@@ -23,7 +24,8 @@ jest.mock('@/lib/api-utils', () => ({
   requireApiAuth: jest.fn().mockResolvedValue({
     authenticated: true,
     userId: 'test-user-id',
-  }),
+    role: 'admin',
+  } satisfies ApiAuthResult),
 }));
 
 // Mock Clerk SDK

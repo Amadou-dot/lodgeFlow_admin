@@ -107,12 +107,9 @@ export function createErrorResponse(
 /**
  * API Authentication result
  */
-export interface ApiAuthResult {
-  authenticated: boolean;
-  userId?: string;
-  role?: StaffRole;
-  error?: NextResponse<ApiErrorResponse>;
-}
+export type ApiAuthResult =
+  | { authenticated: true; userId: string; role: StaffRole }
+  | { authenticated: false; error: NextResponse<ApiErrorResponse> };
 
 /**
  * Require authentication for API routes

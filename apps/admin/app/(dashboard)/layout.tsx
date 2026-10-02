@@ -11,7 +11,7 @@ export default async function DashboardLayout({
 }) {
   const access = await requireApiAuth({ permission: 'bookings:read' });
   if (!access.authenticated) {
-    redirect(access.error?.status === 401 ? '/sign-in' : '/unauthorized');
+    redirect(access.error.status === 401 ? '/sign-in' : '/unauthorized');
   }
   return (
     <AuthGuard>

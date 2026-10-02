@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 
+import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 import connectToDatabase from '@lodgeflow/database/mongodb';
 
@@ -27,7 +28,8 @@ jest.mock('@/lib/api-utils', () => ({
   requireApiAuth: jest.fn().mockResolvedValue({
     authenticated: true,
     userId: 'test-user-id',
-  }),
+    role: 'admin',
+  } satisfies ApiAuthResult),
 }));
 
 // Import after mocks are set up

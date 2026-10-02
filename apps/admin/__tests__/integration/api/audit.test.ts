@@ -1,8 +1,14 @@
+import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 import AuditLog from '@lodgeflow/database/models/AuditLog';
 import Cabin from '@lodgeflow/database/models/Cabin';
 import Booking from '@lodgeflow/database/models/Booking';
-import { requireApiAuth, createErrorResponse } from '@/lib/api-utils';
+import {
+  requireApiAuth,
+  createErrorResponse,
+  type ApiAuthResult,
+} from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
 import {
   auditSnapshot,
   auditDiff,
@@ -21,8 +27,8 @@ jest.mock('@lodgeflow/database/mongodb', () =>
 const access = {
   authenticated: true,
   userId: 'user_auditor',
-  role: 'admin' as const,
-};
+  role: 'admin',
+} satisfies ApiAuthResult;
 const organizationId = 'org_lodgeflow';
 const request = (path: string, method = 'GET', body?: unknown) =>
   new NextRequest('https://admin.test' + path, {
@@ -36,7 +42,7 @@ const request = (path: string, method = 'GET', body?: unknown) =>
   });
 beforeEach(() => {
   process.env.LODGEFLOW_STAFF_ORG_ID = organizationId;
-  (requireApiAuth as jest.Mock).mockResolvedValue(access);
+  jest.mocked(requireApiAuth).mockResolvedValue(access);
 });
 afterEach(() => {
   delete process.env.LODGEFLOW_STAFF_ORG_ID;
@@ -51,6 +57,7 @@ const cabinData = {
 };
 it('records actual cabin changes, omits no-ops, and redacts free text', async () => {
   const response = await createCabin(request('/api/cabins', 'POST', cabinData));
+  assert(response);
   expect(response.status).toBe(201);
   const cabin = (await response.json()).data;
   const created = await AuditLog.findOne({ action: 'cabin.create' }).lean();
@@ -158,7 +165,7 @@ it('limits history to the trusted organization and supports filters and paginati
   expect((await GET(request('/api/audit?action=unknown')))?.status).toBe(400);
 });
 it('requires audit:read before accessing history', async () => {
-  (requireApiAuth as jest.Mock).mockResolvedValue({
+  jest.mocked(requireApiAuth).mockResolvedValue({
     authenticated: false,
     error: createErrorResponse('Forbidden', 403),
   });
@@ -166,12 +173,18 @@ it('requires audit:read before accessing history', async () => {
   expect(requireApiAuth).toHaveBeenCalledWith({ permission: 'audit:read' });
 });
 it('does not roll back a successful mutation when audit persistence fails', async () => {
+  const logError = jest.spyOn(logger, 'error').mockImplementation(() => {});
   jest
     .spyOn(AuditLog, 'create')
-    .mockRejectedValue(new Error('audit unavailable') as never);
+    .mockRejectedValue(new Error('audit unavailable'));
   const response = await createCabin(request('/api/cabins', 'POST', cabinData));
+  assert(response);
   expect(response.status).toBe(201);
   expect(await Cabin.countDocuments()).toBe(1);
+  expect(logError).toHaveBeenCalledWith('Audit write failed', undefined, {
+    action: 'cabin.create',
+    resourceId: expect.any(String),
+  });
 });
 it('keeps detached business-only snapshots and has no TTL index', async () => {
   const source = { amountPaid: 2, observations: 'secret', passport: 'secret' };
@@ -190,7 +203,7 @@ it('keeps detached business-only snapshots and has no TTL index', async () => {
     )
   ).toBe(false);
   await recordAudit(
-    { authenticated: false },
+    { authenticated: false, error: createErrorResponse('Forbidden', 403) },
     {
       action: 'staff.role_change',
       resourceType: 'staff',
@@ -199,5 +212,45 @@ it('keeps detached business-only snapshots and has no TTL index', async () => {
       after: { role: 'admin' },
     }
   );
+  expect(await AuditLog.countDocuments()).toBe(0);
+});
+
+it.each(['front_desk', 'manager', 'admin'] as const)(
+  'records the successful %s identity and organization without inventing a role',
+  async role => {
+    await recordAudit(
+      { authenticated: true, userId: 'user_actor', role },
+      {
+        action: 'booking.status_change',
+        resourceType: 'booking',
+        resourceId: 'booking_target',
+        before: { status: 'confirmed' },
+        after: { status: 'checked-in' },
+      }
+    );
+    const event = await AuditLog.findOne().lean();
+    expect(event).toMatchObject({
+      actor: 'user_actor',
+      actorRole: role,
+      organizationId,
+      action: 'booking.status_change',
+      resourceType: 'booking',
+      resourceId: 'booking_target',
+      before: { status: 'confirmed' },
+      after: { status: 'checked-in' },
+    });
+    expect(await AuditLog.countDocuments()).toBe(1);
+  }
+);
+
+it('skips audit persistence without a configured organization', async () => {
+  delete process.env.LODGEFLOW_STAFF_ORG_ID;
+  await recordAudit(access, {
+    action: 'cabin.update',
+    resourceType: 'cabin',
+    resourceId: 'cabin_target',
+    before: { price: 100 },
+    after: { price: 200 },
+  });
   expect(await AuditLog.countDocuments()).toBe(0);
 });

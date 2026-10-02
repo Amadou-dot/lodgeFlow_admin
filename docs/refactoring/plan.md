@@ -78,7 +78,7 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-10-01): Phase 0 is complete in
+Current execution status (2026-10-02): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
@@ -93,12 +93,14 @@ evidence; PR #174 repaired an order-dependent cache test fixture. The latest
 implementation merge is
 [PR #183](https://github.com/Amadou-dot/lodgeFlow_admin/pull/183) at `5f1d1b7`,
 with all five main CI jobs passing and both production apps verified Ready at that
-SHA. Work is stopping after this completed implementation slice at the user's
-request. The next bounded candidate is the
-admin `ApiAuthResult` contract: represent authorized identity/role and denied
-response as separate states, preserving the permission matrix, default
-administrator-only access, audit attribution and production bypass protection.
-This candidate has been inspected but has no implementation changes yet.
+SHA. Documentation handoff #184 preserved that stopping point; work resumed at
+the user's request on 2026-10-02. V06 / Phase 2 slice 21 now represents the admin
+`ApiAuthResult` as separate authenticated identity/role and denied-response states.
+Existing guards narrow callers without auth-field assertions. Checked fixtures
+and characterization cover the permission matrix, default administrator-only
+access, exact HTTP errors, audit attribution/failure policy and production bypass
+protection. This is a type-contract cleanup with no intended policy or HTTP
+behavior change; delivery evidence is recorded in the tracker.
 Other resource/admin DTOs, validation, money and UI work remain open.
 The inventory and tracker retain per-slice validation and delivery evidence;
 the milestone remains open. Historical tracker evidence through #182 is preserved

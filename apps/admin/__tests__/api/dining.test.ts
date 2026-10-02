@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 
+import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 jest.mock('@lodgeflow/database/reservation-capacity', () => ({
   ...jest.requireActual('@lodgeflow/database/reservation-capacity'),
@@ -46,7 +47,7 @@ jest.mock('@lodgeflow/database/models/Dining', () => ({
 
 // Get the mocked module
 import Dining from '@lodgeflow/database/models/Dining';
-const MockDining = Dining as jest.MockedFunction<typeof Dining> &
+const MockDining = Dining as jest.MockedClass<typeof Dining> &
   typeof mockDiningModel;
 
 // Mock auth to bypass authentication
@@ -55,7 +56,8 @@ jest.mock('@/lib/api-utils', () => ({
   requireApiAuth: jest.fn().mockResolvedValue({
     authenticated: true,
     userId: 'test-user-id',
-  }),
+    role: 'admin',
+  } satisfies ApiAuthResult),
   escapeRegex: jest.fn((str: string) =>
     str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   ),
@@ -129,7 +131,6 @@ describe('/api/dining', () => {
 
       const request = new NextRequest('http://localhost/api/dining?type=menu');
       const response = await GET(request);
-      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(mockDiningModel.find).toHaveBeenCalledWith(

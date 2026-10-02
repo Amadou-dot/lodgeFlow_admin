@@ -1,10 +1,7 @@
 import { logger } from '@/lib/logger';
-import { resolveStaffRole } from '@/lib/staff-access';
 jest.mock('@/lib/staff-access', () => ({
   resolveStaffRole: jest.fn().mockResolvedValue(null),
 }));
-import { auth } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
 
 import {
   createSuccessResponse,
@@ -18,7 +15,6 @@ import {
   parseIntParam,
   sanitizeUpdatePayload,
   createValidationErrorResponse,
-  requireApiAuth,
   HTTP_STATUS,
   API_CONFIG,
 } from '@/lib/api-utils';
@@ -448,80 +444,6 @@ describe('api-utils', () => {
 
     it('falls back for non-numeric strings', () => {
       expect(parseIntParam('abc', 7)).toBe(7);
-    });
-  });
-
-  describe('requireApiAuth', () => {
-    const mockAuth = auth as unknown as jest.Mock;
-    const originalBypass = process.env.TESTING_AUTH_BYPASS;
-
-    afterEach(() => {
-      process.env.TESTING_AUTH_BYPASS = originalBypass;
-      mockAuth.mockReset();
-      (resolveStaffRole as jest.Mock).mockReset().mockResolvedValue(null);
-    });
-
-    it('bypasses auth when TESTING_AUTH_BYPASS=true outside production', async () => {
-      process.env.TESTING_AUTH_BYPASS = 'true';
-
-      const result = await requireApiAuth();
-
-      expect(result).toEqual({
-        authenticated: true,
-        userId: 'test-user',
-        role: 'admin',
-      });
-      expect(mockAuth).not.toHaveBeenCalled();
-    });
-
-    it('returns 401 when there is no user', async () => {
-      delete process.env.TESTING_AUTH_BYPASS;
-      mockAuth.mockResolvedValue({ userId: null, has: undefined });
-
-      const result = await requireApiAuth();
-
-      expect(result.authenticated).toBe(false);
-      expect(result.error?.status).toBe(HTTP_STATUS.UNAUTHORIZED);
-    });
-
-    it('returns 403 when the user lacks an authorized role', async () => {
-      delete process.env.TESTING_AUTH_BYPASS;
-      mockAuth.mockResolvedValue({
-        userId: 'user_123',
-        has: ({ role }: { role: string }) => role === 'org:customer',
-      });
-
-      const result = await requireApiAuth();
-
-      expect(result.authenticated).toBe(false);
-      expect(result.error?.status).toBe(HTTP_STATUS.FORBIDDEN);
-    });
-
-    it('returns the userId for authorized admins', async () => {
-      delete process.env.TESTING_AUTH_BYPASS;
-      mockAuth.mockResolvedValue({
-        userId: 'user_admin',
-        has: ({ role }: { role: string }) => role === 'org:admin',
-      });
-
-      (resolveStaffRole as jest.Mock).mockResolvedValue('admin');
-      const result = await requireApiAuth();
-
-      expect(result).toEqual({
-        authenticated: true,
-        userId: 'user_admin',
-        role: 'admin',
-      });
-    });
-
-    it('returns 401 when the auth check throws', async () => {
-      delete process.env.TESTING_AUTH_BYPASS;
-      mockAuth.mockRejectedValue(new Error('clerk unavailable'));
-
-      const result = await requireApiAuth();
-
-      expect(result.authenticated).toBe(false);
-      expect(result.error?.status).toBe(HTTP_STATUS.UNAUTHORIZED);
     });
   });
 });
