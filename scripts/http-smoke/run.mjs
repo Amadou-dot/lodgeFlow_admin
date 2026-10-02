@@ -2295,6 +2295,83 @@ try {
   console.log(
     'PASS admin proxy org boundary, current membership, assignment, role permission, allowed write and audit'
   );
+  const bulkCabin = await Cabin.create({
+    name: 'Bulk deletion fixture',
+    description: 'Private bulk fixture description',
+    image: 'https://example.invalid/bulk-cabin.jpg',
+    capacity: 2,
+    price: 200,
+  });
+  const missingBulkCabinId = new mongoose.Types.ObjectId();
+  const bulkBooking = await Booking.create({
+    cabin: missingBulkCabinId,
+    customer: 'smoke_customer',
+    checkInDate: new Date('2040-06-01'),
+    checkOutDate: new Date('2040-06-03'),
+    numNights: 2,
+    numGuests: 1,
+    cabinPrice: 200,
+    totalPrice: 400,
+    status: 'confirmed',
+  });
+  const bulkIds = [String(missingBulkCabinId), String(bulkCabin._id)];
+  const bulkState = async () =>
+    JSON.stringify({
+      cabins: await Cabin.find({ _id: { $in: bulkIds } }).lean(),
+      booking: await Booking.findById(bulkBooking._id).lean(),
+      audits: await mongoose.connection
+        .collection('auditlogs')
+        .find({ resourceId: { $in: bulkIds } })
+        .toArray(),
+    });
+  const beforeBulkDenial = await bulkState();
+  await request({
+    origin: admin,
+    route: '/api/cabins/bulk',
+    identity: 'front_desk',
+    method: 'POST',
+    body: { action: 'delete', ids: bulkIds },
+    status: 403,
+  });
+  assert.equal(await bulkState(), beforeBulkDenial);
+  const bulkConflict = await request({
+    origin: admin,
+    route: '/api/cabins/bulk',
+    identity: 'manager',
+    method: 'POST',
+    body: { action: 'delete', ids: bulkIds },
+    status: 409,
+  });
+  assert.deepEqual(bulkConflict, {
+    success: false,
+    error: 'Cannot delete cabins with active bookings: Unknown',
+  });
+  assert.equal(await bulkState(), beforeBulkDenial);
+  bulkBooking.status = 'checked-out';
+  await bulkBooking.save();
+  const bulkDeleted = await request({
+    origin: admin,
+    route: '/api/cabins/bulk',
+    identity: 'manager',
+    method: 'POST',
+    body: { action: 'delete', ids: bulkIds },
+    status: 200,
+  });
+  assert.deepEqual(bulkDeleted, { success: true, data: { deletedCount: 1 } });
+  assert.equal(await Cabin.countDocuments({ _id: { $in: bulkIds } }), 0);
+  assert.equal(await Booking.countDocuments({ _id: bulkBooking._id }), 1);
+  const bulkAudit = await mongoose.connection
+    .collection('auditlogs')
+    .find({ resourceId: String(bulkCabin._id) })
+    .toArray();
+  assert.equal(bulkAudit.length, 1);
+  assert.equal(bulkAudit[0].actor, 'smoke_manager');
+  assert.equal(bulkAudit[0].actorRole, 'manager');
+  assert.equal(bulkAudit[0].action, 'cabin.delete');
+  assert.equal(bulkAudit[0].before.description, '[redacted]');
+  console.log(
+    'PASS bulk cabin deletion preserves missing-reference denial, role checks, history, counts and audit attribution'
+  );
   const beforeAdminEmailBookings = JSON.stringify(
     await Booking.find().sort({ _id: 1 }).lean()
   );

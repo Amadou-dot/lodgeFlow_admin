@@ -82,8 +82,11 @@ Current execution status (2026-10-02): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
 Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
 covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 2 has twenty merged
-slices (PRs #160–#163, #165–#166, #169–#173 and #175–#183), covering request
+boundaries, plus validated cached customer payloads. Phase 1 slice 11 now types
+nullable cabin-name population in admin bulk deletion, preserving denial names,
+missing-reference fallback, deletion counts, history and audit behavior.
+Phase 2 has twenty-one merged slices (PRs #160–#163, #165–#166, #169–#173,
+#175–#183 and #185), covering request
 validation, named helper inputs, unused pagination cleanup, public cabin
 visibility, booking status actions, guest reservation operations and typed
 cancellation guards, named catalog/staff operations, typed experience/dining filters
@@ -91,7 +94,7 @@ and validated customer/admin welcome-email boundaries, plus named rate-limit inp
 Sender repair #132 completed separately in PR #155 with production and user inbox
 evidence; PR #174 repaired an order-dependent cache test fixture. The latest
 implementation merge is
-[PR #183](https://github.com/Amadou-dot/lodgeFlow_admin/pull/183) at `5f1d1b7`,
+[PR #185](https://github.com/Amadou-dot/lodgeFlow_admin/pull/185) at `8663ff5`,
 with all five main CI jobs passing and both production apps verified Ready at that
 SHA. Documentation handoff #184 preserved that stopping point; work resumed at
 the user's request on 2026-10-02. V06 / Phase 2 slice 21 now represents the admin
@@ -101,6 +104,10 @@ and characterization cover the permission matrix, default administrator-only
 access, exact HTTP errors, audit attribution/failure policy and production bypass
 protection. This is a type-contract cleanup with no intended policy or HTTP
 behavior change; delivery evidence is recorded in the tracker.
+The user requested completion of all remaining Phase 1–2 work, followed by a
+review checkpoint before any Phase 3 implementation. Payment-flow readiness
+alone does not satisfy this checkpoint. Keep remaining work visible in the
+inventory and verify the acceptance criteria before stopping for review.
 Other resource/admin DTOs, validation, money and UI work remain open.
 The inventory and tracker retain per-slice validation and delivery evidence;
 the milestone remains open. Historical tracker evidence through #182 is preserved
