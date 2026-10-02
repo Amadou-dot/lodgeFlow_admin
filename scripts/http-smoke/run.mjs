@@ -2372,6 +2372,82 @@ try {
   console.log(
     'PASS bulk cabin deletion preserves missing-reference denial, role checks, history, counts and audit attribution'
   );
+  const discountedCabin = await Cabin.create({
+    name: 'Bulk discount fixture',
+    description: 'Bulk discount fixture description',
+    image: 'https://example.invalid/discount.jpg',
+    capacity: 2,
+    price: 200,
+    discount: 10,
+  });
+  const discountIds = [String(discountedCabin._id)];
+  const discountState = async () =>
+    JSON.stringify({
+      cabin: await Cabin.findById(discountedCabin._id).lean(),
+      audits: await mongoose.connection
+        .collection('auditlogs')
+        .find({ resourceId: String(discountedCabin._id) })
+        .toArray(),
+    });
+  const beforeBulkInvalid = await discountState();
+  for (const body of [
+    null,
+    { action: 'delete', ids: discountIds, discount: 1 },
+    { action: 'delete', ids: discountIds, $set: { price: 1 } },
+  ]) {
+    assert.deepEqual(
+      await request({
+        origin: admin,
+        route: '/api/cabins/bulk',
+        identity: 'manager',
+        method: 'POST',
+        body,
+        status: 400,
+      }),
+      { success: false, error: 'Invalid bulk operation data' }
+    );
+    assert.equal(await discountState(), beforeBulkInvalid);
+  }
+  await mongoose.connection.db.admin().command({
+    configureFailPoint: 'failCommand',
+    mode: { times: 1 },
+    data: { failCommands: ['update'], errorCode: 2 },
+  });
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: '/api/cabins/bulk',
+      identity: 'manager',
+      method: 'POST',
+      body: { action: 'update-discount', ids: discountIds, discount: 25.5 },
+      status: 500,
+    }),
+    { success: false, error: 'Bulk operation failed' }
+  );
+  assert.equal(await discountState(), beforeBulkInvalid);
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: '/api/cabins/bulk',
+      identity: 'manager',
+      method: 'POST',
+      body: { action: 'update-discount', ids: discountIds, discount: 25.5 },
+      status: 200,
+    }),
+    { success: true, data: { modifiedCount: 1 } }
+  );
+  assert.equal((await Cabin.findById(discountedCabin._id)).discount, 25.5);
+  const discountAudit = await mongoose.connection
+    .collection('auditlogs')
+    .findOne({ resourceId: String(discountedCabin._id) });
+  assert.equal(discountAudit.actor, 'smoke_manager');
+  assert.equal(discountAudit.actorRole, 'manager');
+  assert.equal(discountAudit.action, 'cabin.update');
+  assert.deepEqual(discountAudit.before, { discount: 10 });
+  assert.deepEqual(discountAudit.after, { discount: 25.5 });
+  console.log(
+    'PASS bulk request validation, safe write failure, retry and discount audit attribution'
+  );
   const beforeAdminEmailBookings = JSON.stringify(
     await Booking.find().sort({ _id: 1 }).lean()
   );

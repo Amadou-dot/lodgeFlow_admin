@@ -7,11 +7,12 @@ import {
   requireApiAuth,
 } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
+import { logger } from '@/lib/logger';
+import { readBulkCabinRequest } from '@/lib/validations/bulk-cabin';
 import { Booking, Cabin } from '@lodgeflow/database';
 import { NextRequest } from 'next/server';
 
-const MAX_BULK_ITEMS = 50;
-const OBJECT_ID_REGEX = /^[a-f0-9]{24}$/i;
+type AuthorizedAccess = Extract<ApiAuthResult, { authenticated: true }>;
 
 export async function POST(request: NextRequest) {
   const authResult = await requireApiAuth({ permission: 'cabins:write' });
@@ -19,54 +20,43 @@ export async function POST(request: NextRequest) {
 
   try {
     await connectDB();
-    const body = await request.json();
-    const { action, ids } = body;
-
-    if (!action || !ids || !Array.isArray(ids) || ids.length === 0) {
-      return createErrorResponse(
-        'action and ids (non-empty array) are required',
-        HTTP_STATUS.BAD_REQUEST
-      );
+    const parsed = await readBulkCabinRequest(request);
+    if (!parsed.success) {
+      return createErrorResponse(parsed.error, HTTP_STATUS.BAD_REQUEST);
     }
 
-    if (
-      !ids.every(
-        (id: unknown) => typeof id === 'string' && OBJECT_ID_REGEX.test(id)
-      )
-    ) {
-      return createErrorResponse(
-        'Each id must be a valid ObjectId string',
-        HTTP_STATUS.BAD_REQUEST
-      );
-    }
-
-    if (ids.length > MAX_BULK_ITEMS) {
-      return createErrorResponse(
-        `Cannot process more than ${MAX_BULK_ITEMS} items at once`,
-        HTTP_STATUS.BAD_REQUEST
-      );
-    }
-
-    switch (action) {
+    switch (parsed.data.action) {
       case 'delete':
-        return handleBulkDelete(ids, authResult);
+        return await handleBulkDelete({
+          ids: parsed.data.ids,
+          access: authResult,
+        });
       case 'update-discount':
-        return handleBulkUpdateDiscount(ids, body.discount, authResult);
-      default:
-        return createErrorResponse(
-          `Unknown action: ${action}`,
-          HTTP_STATUS.BAD_REQUEST
-        );
+        return await handleBulkUpdateDiscount({
+          ids: parsed.data.ids,
+          discount: parsed.data.discount,
+          access: authResult,
+        });
     }
   } catch (error) {
+    logger.error(
+      'Bulk cabin operation failed',
+      error instanceof Error ? error : undefined
+    );
     return createErrorResponse(
-      error instanceof Error ? error.message : 'Bulk operation failed',
+      'Bulk operation failed',
       HTTP_STATUS.INTERNAL_SERVER_ERROR
     );
   }
 }
 
-async function handleBulkDelete(ids: string[], access: ApiAuthResult) {
+async function handleBulkDelete({
+  ids,
+  access,
+}: {
+  ids: string[];
+  access: AuthorizedAccess;
+}) {
   // Check for active bookings on any of the selected cabins
   const activeBookings = await Booking.find({
     cabin: { $in: ids },
@@ -100,29 +90,15 @@ async function handleBulkDelete(ids: string[], access: ApiAuthResult) {
   });
 }
 
-async function handleBulkUpdateDiscount(
-  ids: string[],
-  discount: number,
-  access: ApiAuthResult
-) {
-  if (
-    discount === undefined ||
-    discount === null ||
-    typeof discount !== 'number'
-  ) {
-    return createErrorResponse(
-      'discount (number) is required',
-      HTTP_STATUS.BAD_REQUEST
-    );
-  }
-
-  if (discount < 0) {
-    return createErrorResponse(
-      'Discount must be a non-negative number',
-      HTTP_STATUS.BAD_REQUEST
-    );
-  }
-
+async function handleBulkUpdateDiscount({
+  ids,
+  discount,
+  access,
+}: {
+  ids: string[];
+  discount: number;
+  access: AuthorizedAccess;
+}) {
   // Validate discount doesn't exceed price for any selected cabin
   const cabins = await Cabin.find({ _id: { $in: ids } });
   const invalidCabins = cabins.filter(c => discount >= c.price);

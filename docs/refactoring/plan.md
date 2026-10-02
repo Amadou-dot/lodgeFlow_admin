@@ -80,7 +80,7 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 
 Current execution status (2026-10-02): Phase 0 is complete in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
-Phase 1 has ten merged slices (PRs #152–#154, #156–#159, #164 and #167–#168),
+Phase 1 has eleven merged slices (PRs #152–#154, #156–#159, #164, #167–#168 and #187),
 covering customer booking, email, checkout, payment-status and cabin catalog
 boundaries, plus validated cached customer payloads. Phase 1 slice 11 now types
 nullable cabin-name population in admin bulk deletion, preserving denial names,
@@ -94,7 +94,7 @@ and validated customer/admin welcome-email boundaries, plus named rate-limit inp
 Sender repair #132 completed separately in PR #155 with production and user inbox
 evidence; PR #174 repaired an order-dependent cache test fixture. The latest
 implementation merge is
-[PR #185](https://github.com/Amadou-dot/lodgeFlow_admin/pull/185) at `8663ff5`,
+[PR #187](https://github.com/Amadou-dot/lodgeFlow_admin/pull/187) at `48dc079`,
 with all five main CI jobs passing and both production apps verified Ready at that
 SHA. Documentation handoff #184 preserved that stopping point; work resumed at
 the user's request on 2026-10-02. V06 / Phase 2 slice 21 now represents the admin
@@ -104,6 +104,10 @@ and characterization cover the permission matrix, default administrator-only
 access, exact HTTP errors, audit attribution/failure policy and production bypass
 protection. This is a type-contract cleanup with no intended policy or HTTP
 behavior change; delivery evidence is recorded in the tracker.
+V07 / Phase 2 slice 22 adds validated bulk cabin operations and contains their
+asynchronous failures. Existing denial precedence and success behavior are
+preserved; malformed/contradictory/unknown payloads and raw error disclosure receive
+focused fixes with failing-before regressions.
 The user requested completion of all remaining Phase 1–2 work, followed by a
 review checkpoint before any Phase 3 implementation. Payment-flow readiness
 alone does not satisfy this checkpoint. Keep remaining work visible in the

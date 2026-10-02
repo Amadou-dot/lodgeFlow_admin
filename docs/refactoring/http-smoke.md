@@ -28,6 +28,8 @@ Memory Server binary download. No application credentials are required.
 - Admin bulk cabin deletion: front-desk denial, missing populated-reference
   conflict without writes, manager success/counts, retained history and redacted
   audit attribution.
+- Admin bulk request validation and discount changes: safe invalid-body denial,
+  injected write failure without mutation, successful retry and manager audit.
 - The real Stripe webhook signature verifier, with locally signed payloads.
 - The installed Resend SDK and `@react-email/render` template rendering, with
   transport intercepted before live delivery.
