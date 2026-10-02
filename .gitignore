@@ -85,3 +85,6 @@ packages/*/coverage/
 packages/*/dist/
 packages/*/.env*
 !packages/*/.env.example
+
+# local progress file
+progress.md
