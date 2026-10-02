@@ -65,7 +65,7 @@ export async function reservationPayment(
         id,
         token: parsed.data.id,
         amountCents: parsed.data.amountCents,
-        actor: access.userId!,
+        actor: access.userId,
         reference: parsed.data.reference,
         stripe: new Stripe(process.env.STRIPE_SECRET_KEY!),
       });
@@ -82,7 +82,7 @@ export async function reservationPayment(
     const result = await recordReservationReceipt({
       kind,
       id,
-      receipt: { ...parsed.data, actor: access.userId! },
+      receipt: { ...parsed.data, actor: access.userId },
     });
     if (result.changed)
       await recordAudit(access, {

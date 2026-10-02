@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 
+import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 import { GET, POST, PUT, DELETE } from '@/app/api/cabins/route';
 import {
@@ -35,7 +36,7 @@ jest.mock('@lodgeflow/database/models/Cabin', () => ({
 
 // Get the mocked module
 import Cabin from '@lodgeflow/database/models/Cabin';
-const MockCabin = Cabin as jest.MockedFunction<typeof Cabin> &
+const MockCabin = Cabin as jest.MockedClass<typeof Cabin> &
   typeof mockCabinModel;
 
 // Mock auth to bypass authentication
@@ -44,7 +45,8 @@ jest.mock('@/lib/api-utils', () => ({
   requireApiAuth: jest.fn().mockResolvedValue({
     authenticated: true,
     userId: 'test-user-id',
-  }),
+    role: 'admin',
+  } satisfies ApiAuthResult),
   escapeRegex: jest.fn((str: string) =>
     str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   ),
@@ -133,7 +135,6 @@ describe('/api/cabins', () => {
         'http://localhost/api/cabins?discount=with'
       );
       const response = await GET(request);
-      const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(mockCabinModel.find).toHaveBeenCalledWith(

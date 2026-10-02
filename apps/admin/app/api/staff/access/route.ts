@@ -6,6 +6,6 @@ export async function GET() {
   return createSuccessResponse({
     userId: access.userId,
     role: access.role,
-    permissions: permissionsFor(access.role!),
+    permissions: permissionsFor(access.role),
   });
 }

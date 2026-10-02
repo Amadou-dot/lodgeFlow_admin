@@ -58,7 +58,7 @@ rather than treating counts as the completion gate.
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18–19: validated requests for customer confirmations, cabin checkout and public availability search, plus customer/admin welcome-email boundaries. Continue per flow; preserve webhook acknowledgements.                                                                |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 17: typed filters and the related zero-price fix, preserving availability/search/JSON and cache behavior. Response DTOs remain Phase 1. |
-| V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Inspected; next bounded candidate after #183. Characterize the existing permission matrix, auth failures, local bypass and production protection; introduce a discriminated result and checked fixtures without changing HTTP or audit behavior. Implementation not started. |
+| V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -1102,8 +1102,40 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   customer `dpl_RMMuLZTDta585HYaSnUPuTMxBCLu` and admin
   `dpl_7jVm4jUWBWR1EiVrWe67FVxYTtxw` were verified Ready at the merge SHA,
   with matching configured roots, built routes and production aliases.
-- Work stops after this slice at the user's request. V06 is the inspected next
-  candidate; no authorization-result implementation has started.
+- Work stopped here at the user's request. The 2026-10-02 resume implements
+  V06 in the following slice.
+
+## Phase 2 slice 21: explicit admin authorization result (V06)
+
+- `ApiAuthResult` now requires `userId` and `StaffRole` on success, or a typed
+  error response on denial. Existing route/audit guards narrow the result;
+  staff-access, payment attribution and dashboard redirects no longer need
+  auth-field assertions or optional error access. Runtime authorization is
+  unchanged, including the default administrator-only policy.
+- Characterization covers every role/permission pair, omitted options, exact
+  denial envelopes, active-organization normalization, Clerk/lookup errors,
+  local-only bypass and production rejection. Real-Mongo audit tests preserve
+  attribution for all roles, missing-organization/denial no-ops, redaction and
+  logged audit failure without rolling back successful writes.
+- Migrated incomplete auth fixtures to checked success/denial objects. Replaced
+  the responsibility's double-cast Clerk mocks with narrow dependency shapes and
+  removed unused `__tests__/setup/auth-helpers.ts`. Two legacy constructor mocks
+  and unused bindings were corrected so all touched test files can be checked
+  using the unchanged strict compiler settings.
+- Before changing the contract, 232 checks passed across 11 focused suites.
+  App and affected-test type checks are separate from Jest, whose node projects
+  disable diagnostics. The existing HTTP gate protects real SDK authorization,
+  permission denials and audit writes using disposable services; it does not
+  prove hosted login or live provider delivery.
+- Local validation passed: `pnpm ci:check` (formatting, read-only lint and 1,770
+  tests: admin 1,168/customer 540/database 59/email 3), both app type checks and
+  all nine touched test-file type checks, `pnpm test:http`, and clean frozen
+  installation/all builds with CI's throwaway public Clerk key. Existing
+  module-type, absent-MongoDB and dynamic-render build diagnostics remain
+  non-blocking. Runtime/test/config inputs match the validated clean copy.
+- Remaining debt stays in the existing inventory: other API/DTO boundaries,
+  validation and money work are open. Audit snapshot casts, bulk-cabin request
+  validation/population and unrelated error helpers are not rewritten here.
 
 ## Cache test reliability follow-up (T09)
 

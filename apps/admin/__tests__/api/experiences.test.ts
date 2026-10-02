@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 
+import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 jest.mock('@lodgeflow/database/reservation-capacity', () => ({
   ...jest.requireActual('@lodgeflow/database/reservation-capacity'),
@@ -36,7 +37,8 @@ jest.mock('@/lib/api-utils', () => ({
   requireApiAuth: jest.fn().mockResolvedValue({
     authenticated: true,
     userId: 'test-user-id',
-  }),
+    role: 'admin',
+  } satisfies ApiAuthResult),
 }));
 
 // Mock data

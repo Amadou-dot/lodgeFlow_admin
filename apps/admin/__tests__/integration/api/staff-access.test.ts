@@ -1,16 +1,40 @@
+import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 import { PUT as updateBooking } from '@/app/api/bookings/route';
 import { PATCH as patchBooking } from '@/app/api/bookings/[id]/route';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import type { auth } from '@clerk/nextjs/server';
 import StaffAccess from '@lodgeflow/database/models/StaffAccess';
 import { resolveStaffRole } from '@/lib/staff-access';
 import { requireApiAuth } from '@/lib/api-utils';
 import { PUT } from '@/app/api/staff/route';
+const mockAuth = jest.fn<
+  Promise<Pick<Awaited<ReturnType<typeof auth>>, 'userId' | 'orgId' | 'has'>>,
+  []
+>();
+const mockMembership = jest.fn<
+  Promise<{
+    data: { publicUserData: { userId: string } }[];
+    totalCount: number;
+  }>,
+  [{ userId?: string[] }]
+>();
+const mockClient = jest.fn<
+  Promise<{
+    organizations: { getOrganizationMembershipList: typeof mockMembership };
+  }>,
+  []
+>();
+jest.mock('@clerk/nextjs/server', () => ({
+  auth: () => mockAuth(),
+  clerkClient: () => mockClient(),
+}));
 jest.mock('@lodgeflow/database/mongodb', () =>
   jest.fn().mockResolvedValue(undefined)
 );
-const actualAuth = jest.requireActual('@/lib/api-utils')
-  .requireApiAuth as typeof requireApiAuth;
+const actualAuth =
+  jest.requireActual<typeof import('@/lib/api-utils')>(
+    '@/lib/api-utils'
+  ).requireApiAuth;
 const organizationId = 'org_lodgeflow';
 let members: string[];
 const request = (userId: string, role: string | null) =>
@@ -23,23 +47,24 @@ beforeEach(async () => {
   process.env.LODGEFLOW_STAFF_ORG_ID = organizationId;
   delete process.env.TESTING_AUTH_BYPASS;
   members = ['user_admin', 'user_second', 'user_front', 'user_guest'];
-  (auth as unknown as jest.Mock).mockResolvedValue({
+  jest.clearAllMocks();
+  mockAuth.mockResolvedValue({
     userId: 'user_admin',
     orgId: organizationId,
+    has: () => false,
   });
-  (clerkClient as unknown as jest.Mock).mockResolvedValue({
+  mockMembership.mockImplementation(async ({ userId }) => ({
+    data: members
+      .filter(id => !userId || userId.includes(id))
+      .map(id => ({ publicUserData: { userId: id } })),
+    totalCount: members.length,
+  }));
+  mockClient.mockResolvedValue({
     organizations: {
-      getOrganizationMembershipList: jest.fn(
-        async ({ userId }: { userId?: string[] }) => ({
-          data: members
-            .filter(id => !userId || userId.includes(id))
-            .map(id => ({ publicUserData: { userId: id } })),
-          totalCount: members.length,
-        })
-      ),
+      getOrganizationMembershipList: mockMembership,
     },
   });
-  (requireApiAuth as jest.Mock).mockImplementation(actualAuth);
+  jest.mocked(requireApiAuth).mockImplementation(actualAuth);
   await StaffAccess.init();
   await StaffAccess.create([
     {
@@ -112,13 +137,13 @@ it('revokes access on membership removal and on assignment deletion', async () =
   ).toBeNull();
 });
 it('fails closed if Clerk membership lookup fails', async () => {
-  (clerkClient as unknown as jest.Mock).mockRejectedValue(new Error('offline'));
+  mockClient.mockRejectedValue(new Error('offline'));
   expect(
     (await actualAuth({ permission: 'bookings:read' })).authenticated
   ).toBe(false);
 });
 it('enforces permissions independently of Clerk role claims', async () => {
-  (auth as unknown as jest.Mock).mockResolvedValue({
+  mockAuth.mockResolvedValue({
     userId: 'user_front',
     orgId: organizationId,
     has: () => true,
@@ -126,10 +151,12 @@ it('enforces permissions independently of Clerk role claims', async () => {
   expect(
     (await actualAuth({ permission: 'bookings:manage' })).authenticated
   ).toBe(true);
-  expect(
-    (await actualAuth({ permission: 'refunds:issue' })).error?.status
-  ).toBe(403);
-  expect((await actualAuth()).error?.status).toBe(403);
+  const refundAccess = await actualAuth({ permission: 'refunds:issue' });
+  assert(!refundAccess.authenticated);
+  expect(refundAccess.error.status).toBe(403);
+  const defaultAccess = await actualAuth();
+  assert(!defaultAccess.authenticated);
+  expect(defaultAccess.error.status).toBe(403);
   expect((await PUT(request('user_guest', 'admin')))?.status).toBe(403);
 });
 it('allows assignment and revocation, but rejects outsiders and self changes', async () => {
@@ -175,7 +202,8 @@ it('uniquely scopes assignments to organization and user', async () => {
 });
 it('serializes reciprocal administrator revocations without removing both admins', async () => {
   // Simulate both requests having passed their membership checks before either write.
-  (requireApiAuth as jest.Mock)
+  jest
+    .mocked(requireApiAuth)
     .mockResolvedValueOnce({
       authenticated: true,
       userId: 'user_admin',
@@ -197,9 +225,10 @@ it('serializes reciprocal administrator revocations without removing both admins
 });
 
 it('denies refund-field writes through both booking update endpoints', async () => {
-  (auth as unknown as jest.Mock).mockResolvedValue({
+  mockAuth.mockResolvedValue({
     userId: 'user_front',
     orgId: organizationId,
+    has: () => false,
   });
   const body = { _id: '507f1f77bcf86cd799439011', refundAmount: 1 };
   const url = 'https://admin.test/api/bookings';
