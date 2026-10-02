@@ -60,6 +60,7 @@ rather than treating counts as the completion gate.
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 17: typed filters and the related zero-price fix, preserving availability/search/JSON and cache behavior. Response DTOs remain Phase 1. |
 | V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
+| V07 | Admin `app/api/cabins/bulk/route.ts` and `lib/validations/bulk-cabin.ts` | Raw payloads, raw exception messages and unawaited operations escape the request boundary. | 2 | Implemented in Phase 2 slice 22: validated tagged operations, preserved legacy denial precedence, safe logged failures and rejected contradictory/unknown fields. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
@@ -458,9 +459,36 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
   formatting, read-only lint and 1,781 tests (admin 1,179, customer 540,
   database 59, email 3). Expanded HTTP passes after the edit, and a clean
   frozen installation and all workspace builds pass using CI's public key.
-- Broader bulk payload validation and error handling remain Phase 2 work.
+- Broader bulk payload validation and error handling are addressed in Phase 2
+  slice 22 below.
   Existing deletion/concurrent-booking behavior is unchanged; this slice does
   not establish atomic serialization between catalog deletion and booking writes.
+
+## Phase 2 slice 22: admin bulk cabin request and error boundary (V07)
+
+- The request reader returns a schema-derived delete/discount operation. It
+  retains the established required-fields, ID-format, maximum-count, action and
+  discount-error precedence. The route retains authorization before DB/parsing,
+  and price-dependent discount checks remain against current stored cabins.
+- Intentional fixes: malformed/null bodies, non-string actions, non-finite
+  discounts, contradictory delete/discount payloads and unknown fields now return
+  safe 400 responses. Strict operation schemas reject operator/dotted/immutable
+  and server-owned fields; only parsed IDs/discounts reach the named handlers.
+- The route awaits each operation inside its error boundary. Unexpected failures
+  are logged and return `Bulk operation failed`/500, including asynchronous
+  read/delete/update failures that previously escaped the catch or disclosed raw
+  exception text. Successful counts, audit attribution, retained history and
+  cancellation-status behavior remain unchanged.
+- Before runtime edits, 57 route/hook characterization checks passed and all 16
+  new regressions failed. Real HTTP reproduced null-body 500. After the edit all
+  73 focused checks pass; the strict new-test type check passes without casts.
+- Final local gates pass: formatting/read-only lint and 1,817 tests (admin 1,215,
+  customer 540, database 59, email 3), admin runtime/test types, expanded HTTP,
+  and a clean frozen installation/all workspace builds using CI's public key.
+  HTTP verifies safe write failure without mutation, retry and discount audits.
+- This slice preserves existing check/write sequencing and audit failure policy.
+  It does not claim new concurrency guarantees for catalog deletion or discount
+  changes. No live provider or database operations are used for verification.
 
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 
