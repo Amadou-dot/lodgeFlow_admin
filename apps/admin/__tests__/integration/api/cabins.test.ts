@@ -8,8 +8,13 @@ import { GET, POST, PUT } from '@/app/api/cabins/route';
 import { GET as getById, PUT as updateById } from '@/app/api/cabins/[id]/route';
 import Cabin from '@lodgeflow/database/models/Cabin';
 
-function createRequest(url: string, options?: { method?: string; body?: any }) {
-  const init: RequestInit = { method: options?.method || 'GET' };
+function createRequest(
+  url: string,
+  options?: { method?: string; body?: unknown }
+) {
+  const init: NonNullable<ConstructorParameters<typeof NextRequest>[1]> = {
+    method: options?.method || 'GET',
+  };
   if (options?.body) {
     init.body = JSON.stringify(options.body);
     init.headers = { 'Content-Type': 'application/json' };
@@ -17,7 +22,7 @@ function createRequest(url: string, options?: { method?: string; body?: any }) {
   return new NextRequest(new URL(url, 'http://localhost:3000'), init);
 }
 
-function validCabinPayload(overrides: Record<string, any> = {}) {
+function validCabinPayload(overrides: Record<string, unknown> = {}) {
   return {
     name: 'Lakeside Cabin',
     description: 'A beautiful cabin with stunning lake views and comfort.',

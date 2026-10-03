@@ -1,3 +1,4 @@
+import { serializeCabinDetail } from '@lodgeflow/database/cabin-json';
 import { auditSnapshot, CABIN_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
 import {
   createErrorResponse,
@@ -31,7 +32,7 @@ export async function GET(
       return createErrorResponse('Cabin not found', HTTP_STATUS.NOT_FOUND);
     }
 
-    return createSuccessResponse(cabin);
+    return createSuccessResponse(serializeCabinDetail(cabin));
   } catch (error) {
     logger.error(
       'Error fetching cabin',
@@ -78,7 +79,9 @@ export async function PUT(
       }
       const effectiveDiscount = updateData.discount ?? existingCabin.discount;
       const effectivePrice = updateData.price ?? existingCabin.price;
-      if (!isDiscountValid(effectiveDiscount, effectivePrice)) {
+      if (
+        !isDiscountValid({ discount: effectiveDiscount, price: effectivePrice })
+      ) {
         return createErrorResponse(
           'Validation failed',
           HTTP_STATUS.BAD_REQUEST,
@@ -109,7 +112,7 @@ export async function PUT(
       before: auditBefore,
       after: auditSnapshot(cabin, CABIN_AUDIT_FIELDS),
     });
-    return createSuccessResponse(cabin);
+    return createSuccessResponse(serializeCabinDetail(cabin));
   } catch (error: unknown) {
     if (isMongooseValidationError(error)) {
       return createErrorResponse(

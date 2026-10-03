@@ -373,12 +373,12 @@ describe('Cabin Validation Schemas', () => {
 
   describe('isDiscountValid', () => {
     it('returns true when discount is less than price', () => {
-      expect(isDiscountValid(50, 200)).toBe(true);
+      expect(isDiscountValid({ discount: 50, price: 200 })).toBe(true);
     });
 
     it('returns false when discount equals or exceeds price', () => {
-      expect(isDiscountValid(200, 200)).toBe(false);
-      expect(isDiscountValid(250, 200)).toBe(false);
+      expect(isDiscountValid({ discount: 200, price: 200 })).toBe(false);
+      expect(isDiscountValid({ discount: 250, price: 200 })).toBe(false);
     });
   });
 });

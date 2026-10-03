@@ -4,6 +4,8 @@
 
 import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
+import mongoose, { Types } from 'mongoose';
+import type { CabinDetailSource } from '@lodgeflow/database/cabin-json';
 import { GET, POST, PUT, DELETE } from '@/app/api/cabins/route';
 import {
   GET as getById,
@@ -14,30 +16,33 @@ import connectToDatabase from '@lodgeflow/database/mongodb';
 
 // Mock the database connection
 jest.mock('@lodgeflow/database/mongodb');
-const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
-  typeof connectToDatabase
->;
+const mockConnectToDatabase = jest.mocked(connectToDatabase);
 
-// Mock the Cabin model (default export)
-const mockCabinModel = {
-  find: jest.fn(),
-  findById: jest.fn(),
-  findByIdAndUpdate: jest.fn(),
-  findByIdAndDelete: jest.fn(),
-  create: jest.fn(),
-};
+interface CabinModelMock {
+  find: jest.Mock;
+  findById: jest.Mock;
+  findByIdAndUpdate: jest.Mock;
+  findByIdAndDelete: jest.Mock;
+  create: jest.Mock;
+}
 
 jest.mock('@lodgeflow/database/models/Cabin', () => ({
   __esModule: true,
-  default: jest.fn(() => ({
-    save: jest.fn(),
-  })),
+  default: {
+    find: jest.fn(),
+    findById: jest.fn(),
+    findByIdAndUpdate: jest.fn(),
+    findByIdAndDelete: jest.fn(),
+    create: jest.fn(),
+  },
 }));
-
-// Get the mocked module
-import Cabin from '@lodgeflow/database/models/Cabin';
-const MockCabin = Cabin as jest.MockedClass<typeof Cabin> &
-  typeof mockCabinModel;
+const mockCabinModel = jest.requireMock<{ default: CabinModelMock }>(
+  '@lodgeflow/database/models/Cabin'
+).default;
+jest.mock('@/lib/audit', () => ({
+  ...jest.requireActual<typeof import('@/lib/audit')>('@/lib/audit'),
+  recordAudit: jest.fn(),
+}));
 
 // Mock auth to bypass authentication
 jest.mock('@/lib/api-utils', () => ({
@@ -54,29 +59,27 @@ jest.mock('@/lib/api-utils', () => ({
 
 // Mock cabin data
 const mockCabinData = {
-  _id: '507f1f77bcf86cd799439011',
+  _id: new Types.ObjectId('507f1f77bcf86cd799439011'),
   name: 'Lakeside Cabin',
   description: 'A beautiful cabin by the lake with stunning views.',
   capacity: 4,
   price: 200,
   discount: 20,
   image: 'https://example.com/cabin.jpg',
-  amenities: {
-    wifi: true,
-    tv: true,
-    airConditioning: true,
-    heating: true,
-  },
-  isAvailable: true,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-};
+  amenities: ['WiFi', 'TV'],
+  images: [],
+  status: 'active',
+  extraGuestFee: 0,
+  discountedPrice: 180,
+  createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+} satisfies CabinDetailSource;
 
 const mockCabinList = [
   mockCabinData,
   {
     ...mockCabinData,
-    _id: '507f1f77bcf86cd799439012',
+    _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
     name: 'Mountain Retreat',
     price: 300,
     capacity: 6,
@@ -86,10 +89,9 @@ const mockCabinList = [
 describe('/api/cabins', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue(
-      {} as ReturnType<typeof connectToDatabase>
-    );
-    Object.assign(MockCabin, mockCabinModel);
+    mockConnectToDatabase.mockResolvedValue(mongoose);
+    for (const mock of Object.values(mockCabinModel)) mock.mockReset();
+    mockCabinModel.findById.mockResolvedValue(mockCabinData);
   });
 
   describe('GET /api/cabins', () => {
@@ -345,10 +347,9 @@ describe('/api/cabins', () => {
 describe('/api/cabins/[id]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue(
-      {} as ReturnType<typeof connectToDatabase>
-    );
-    Object.assign(MockCabin, mockCabinModel);
+    mockConnectToDatabase.mockResolvedValue(mongoose);
+    for (const mock of Object.values(mockCabinModel)) mock.mockReset();
+    mockCabinModel.findById.mockResolvedValue(mockCabinData);
   });
 
   describe('GET /api/cabins/[id]', () => {

@@ -1,11 +1,11 @@
 import type {
   CabinSummary as BookingHistoryCabin,
   CabinDetail as BookingDetailCabin,
-} from './cabin-read';
+} from '@lodgeflow/database/cabin-json';
 export type {
   CabinSummary as BookingHistoryCabin,
   CabinDetail as BookingDetailCabin,
-} from './cabin-read';
+} from '@lodgeflow/database/cabin-json';
 import type {
   BOOKING_STATUSES,
   PAYMENT_METHODS,

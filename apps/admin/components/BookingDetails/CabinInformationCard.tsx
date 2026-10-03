@@ -2,7 +2,7 @@ import type { Cabin } from '@/types';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 
 interface CabinInformationCardProps {
-  cabin: Cabin;
+  cabin: Pick<Cabin, 'image' | 'name' | 'capacity' | 'description'>;
   cabinPrice: number;
 }
 

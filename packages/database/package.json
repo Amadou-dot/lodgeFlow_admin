@@ -21,7 +21,8 @@
     "./booking-payments": "./src/booking-payments.ts",
     "./reservation-capacity": "./src/reservation-capacity.ts",
     "./models/StaffAccess": "./src/models/StaffAccess.ts",
-    "./models/AuditLog": "./src/models/AuditLog.ts"
+    "./models/AuditLog": "./src/models/AuditLog.ts",
+    "./cabin-json": "./src/cabin-json.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

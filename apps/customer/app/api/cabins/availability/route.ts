@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Booking, Cabin } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
 import type { ApiResponse, AvailableCabin } from '@/types';
-import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
+import { serializeCabinDetail } from '@lodgeflow/database/cabin-json';
 import { cabinAvailabilitySchema } from '@/lib/validations/cabin';
 import { readJsonRequestBody } from '@/lib/validations/request-body';
 

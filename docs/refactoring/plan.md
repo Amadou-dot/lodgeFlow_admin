@@ -85,8 +85,8 @@ covering customer booking, email, checkout, payment-status and cabin catalog
 boundaries, plus validated cached customer payloads. Phase 1 slice 11 now types
 nullable cabin-name population in admin bulk deletion, preserving denial names,
 missing-reference fallback, deletion counts, history and audit behavior.
-Phase 2 has twenty-one merged slices (PRs #160–#163, #165–#166, #169–#173,
-#175–#183 and #185), covering request
+Phase 2 has twenty-two merged slices (PRs #160–#163, #165–#166, #169–#173,
+#175–#183, #185 and #188), covering request
 validation, named helper inputs, unused pagination cleanup, public cabin
 visibility, booking status actions, guest reservation operations and typed
 cancellation guards, named catalog/staff operations, typed experience/dining filters
@@ -94,7 +94,7 @@ and validated customer/admin welcome-email boundaries, plus named rate-limit inp
 Sender repair #132 completed separately in PR #155 with production and user inbox
 evidence; PR #174 repaired an order-dependent cache test fixture. The latest
 implementation merge is
-[PR #187](https://github.com/Amadou-dot/lodgeFlow_admin/pull/187) at `48dc079`,
+[PR #188](https://github.com/Amadou-dot/lodgeFlow_admin/pull/188) at `a003a5c`,
 with all five main CI jobs passing and both production apps verified Ready at that
 SHA. Documentation handoff #184 preserved that stopping point; work resumed at
 the user's request on 2026-10-02. V06 / Phase 2 slice 21 now represents the admin
@@ -108,6 +108,10 @@ V07 / Phase 2 slice 22 adds validated bulk cabin operations and contains their
 asynchronous failures. Existing denial precedence and success behavior are
 preserved; malformed/contradictory/unknown payloads and raw error disclosure receive
 focused fixes with failing-before regressions.
+Phase 1 slice 12 shares the existing cabin JSON contract across both apps and
+migrates admin catalog, detail and mutation responses/callers. It also names the
+discount/price predicate inputs and fixes legacy null optional fields crashing
+the cabin editor; response fields and persisted values are preserved.
 The user requested completion of all remaining Phase 1–2 work, followed by a
 review checkpoint before any Phase 3 implementation. Payment-flow readiness
 alone does not satisfy this checkpoint. Keep remaining work visible in the

@@ -55,7 +55,7 @@ export function useCreateCabin() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (cabin: CreateCabinData) => {
+    mutationFn: async (cabin: CreateCabinData): Promise<Cabin> => {
       const response = await fetch('/api/cabins', {
         method: 'POST',
         headers: {
@@ -85,7 +85,7 @@ export function useUpdateCabin() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (cabin: UpdateCabinData) => {
+    mutationFn: async (cabin: UpdateCabinData): Promise<Cabin> => {
       const response = await fetch(`/api/cabins/${cabin._id}`, {
         method: 'PUT',
         headers: {

@@ -93,7 +93,13 @@ export const updateCabinSchema = z
  * refine above, since it has no persisted price to compare against. Routes
  * must call this against the cabin's stored price before persisting.
  */
-export function isDiscountValid(discount: number, price: number): boolean {
+export function isDiscountValid({
+  discount,
+  price,
+}: {
+  discount: number;
+  price: number;
+}): boolean {
   return discount < price;
 }
 
