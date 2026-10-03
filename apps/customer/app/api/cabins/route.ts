@@ -5,7 +5,7 @@ import type { ICabin } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
 import type { FilterQuery } from 'mongoose';
 import type { ApiResponse, Cabin as CabinType } from '@/types';
-import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
+import { serializeCabinDetail } from '@lodgeflow/database/cabin-json';
 import { cabinQuerySchema } from '@/lib/validations';
 import {
   validateRequest,

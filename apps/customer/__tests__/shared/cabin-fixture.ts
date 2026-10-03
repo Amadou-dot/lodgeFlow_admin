@@ -1,4 +1,4 @@
-import type { CabinDetail } from '@/types/cabin-read';
+import type { CabinDetail } from '@lodgeflow/database/cabin-json';
 
 export function createCabinFixture(
   overrides: Partial<CabinDetail> = {}

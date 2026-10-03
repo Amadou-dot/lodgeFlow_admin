@@ -2295,6 +2295,75 @@ try {
   console.log(
     'PASS admin proxy org boundary, current membership, assignment, role permission, allowed write and audit'
   );
+  const adminCabinPayload = {
+    name: 'Admin JSON fixture',
+    description: 'Admin cabin response characterization fixture',
+    image: 'https://example.invalid/admin-json.jpg',
+    images: ['https://example.invalid/admin-json-room.jpg'],
+    capacity: 4,
+    price: 250,
+    discount: 25,
+    amenities: ['WiFi'],
+    status: 'maintenance',
+    bedrooms: 2,
+    bathrooms: 1,
+    size: 750,
+    minNights: 2,
+    extraGuestFee: 15,
+  };
+  const adminCabinCreated = await request({
+    origin: admin,
+    route: '/api/cabins',
+    identity: 'manager',
+    method: 'POST',
+    body: adminCabinPayload,
+    status: 201,
+  });
+  const adminCabinId = adminCabinCreated.data._id;
+  const savedAdminCabinJson = async () =>
+    JSON.parse(JSON.stringify(await Cabin.findById(adminCabinId)));
+  assert.deepEqual(adminCabinCreated, {
+    success: true,
+    data: await savedAdminCabinJson(),
+  });
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: '/api/cabins?search=Admin%20JSON%20fixture',
+      identity: 'front_desk',
+      status: 200,
+    }),
+    { success: true, data: [await savedAdminCabinJson()] }
+  );
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: `/api/cabins/${adminCabinId}`,
+      identity: 'front_desk',
+      status: 200,
+    }),
+    { success: true, data: await savedAdminCabinJson() }
+  );
+  for (const route of ['/api/cabins', `/api/cabins/${adminCabinId}`]) {
+    const updatedAdminCabin = await request({
+      origin: admin,
+      route,
+      identity: 'manager',
+      method: 'PUT',
+      body: { _id: adminCabinId, description: `Edited via ${route}` },
+      status: 200,
+    });
+    assert.deepEqual(updatedAdminCabin, {
+      success: true,
+      data: await savedAdminCabinJson(),
+    });
+    assert.equal(updatedAdminCabin.data.discount, 25);
+    assert.equal(updatedAdminCabin.data.status, 'maintenance');
+    assert.equal(updatedAdminCabin.data.minNights, 2);
+  }
+  console.log(
+    'PASS admin cabin catalog, detail, create and update preserve full JSON fields and partial updates'
+  );
   const bulkCabin = await Cabin.create({
     name: 'Bulk deletion fixture',
     description: 'Private bulk fixture description',

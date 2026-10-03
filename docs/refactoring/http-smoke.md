@@ -30,6 +30,8 @@ Memory Server binary download. No application credentials are required.
   audit attribution.
 - Admin bulk request validation and discount changes: safe invalid-body denial,
   injected write failure without mutation, successful retry and manager audit.
+- Admin cabin catalog/detail/create/update responses: complete JSON compared
+  with real saved documents, front-desk reads and preserved omitted update fields.
 - The real Stripe webhook signature verifier, with locally signed payloads.
 - The installed Resend SDK and `@react-email/render` template rendering, with
   transport intercepted before live delivery.

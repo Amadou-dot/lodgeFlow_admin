@@ -1,40 +1,8 @@
-// Mock @tanstack/react-query before imports
-let capturedQueryConfig: any = null;
-let capturedMutationConfig: any = null;
-
-const mockInvalidateQueries = jest.fn();
-const mockQueryClient = { invalidateQueries: mockInvalidateQueries };
-
-jest.mock('@tanstack/react-query', () => ({
-  useQuery: jest.fn((config: any) => {
-    capturedQueryConfig = config;
-    return {
-      data: undefined,
-      error: undefined,
-      isLoading: true,
-      isFetching: false,
-      refetch: jest.fn(),
-    };
-  }),
-  useMutation: jest.fn((config: any) => {
-    capturedMutationConfig = config;
-    return {
-      mutate: jest.fn(),
-      mutateAsync: jest.fn(),
-      isPending: false,
-      isError: false,
-      isSuccess: false,
-      reset: jest.fn(),
-    };
-  }),
-  useQueryClient: jest.fn(() => mockQueryClient),
-}));
-
-jest.mock('@heroui/toast', () => ({
-  addToast: jest.fn(),
-}));
-
+import { createElement, type ReactNode } from 'react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { addToast } from '@heroui/toast';
+import type { Cabin, CabinFilters, CreateCabinData } from '@/types';
 import {
   useCabins,
   useCabin,
@@ -45,344 +13,303 @@ import {
   useBulkUpdateDiscount,
 } from '@/hooks/useCabins';
 
+const fetchMock = jest.fn();
+const originalFetch = global.fetch;
+let client: QueryClient;
+const createInput = {
+  name: 'Pine Cabin',
+  price: 200,
+  capacity: 4,
+  discount: 0,
+  image: 'https://example.invalid/pine.jpg',
+  description: 'A forest retreat',
+  amenities: ['WiFi'],
+} satisfies CreateCabinData;
+const cabin: Cabin = {
+  ...createInput,
+  _id: '507f1f77bcf86cd799439011',
+  id: '507f1f77bcf86cd799439011',
+  images: [],
+  status: 'active' as const,
+  extraGuestFee: 0,
+  discountedPrice: 200,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+function response({ body, ok = true }: { body: unknown; ok?: boolean }) {
+  return { ok, json: async () => body } satisfies Pick<Response, 'ok' | 'json'>;
+}
+function wrapper({ children }: { children: ReactNode }) {
+  return createElement(QueryClientProvider, { client }, children);
+}
 beforeEach(() => {
-  capturedQueryConfig = null;
-  capturedMutationConfig = null;
   jest.clearAllMocks();
-  (global.fetch as jest.Mock) = jest.fn();
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: [cabin] } })
+  );
+  global.fetch = fetchMock;
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+});
+afterEach(() => {
+  client.clear();
+  global.fetch = originalFetch;
+  jest.restoreAllMocks();
 });
 
-describe('useCabins', () => {
-  it('uses cabins query key with filters', () => {
-    const filters = { search: 'lake', status: 'active' };
-    useCabins(filters);
-
-    expect(capturedQueryConfig.queryKey).toEqual(['cabins', filters]);
+describe('cabin query contracts', () => {
+  test.each<[CabinFilters, string]>([
+    [{}, '/api/cabins?'],
+    [
+      {
+        search: 'pine & lake',
+        status: 'active',
+        sortBy: 'price',
+        sortOrder: 'desc',
+      },
+      '/api/cabins?search=pine+%26+lake&status=active&sortBy=price&sortOrder=desc',
+    ],
+    [{ capacity: 'small' }, '/api/cabins?capacity=small'],
+    [{ discount: 'with' }, '/api/cabins?discount=with'],
+    [{ filter: 'with-discount' }, '/api/cabins?filter=with-discount'],
+  ])('keeps query keys, filters and JSON for %j', async (filters, url) => {
+    const { result } = renderHook(() => useCabins(filters), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith(url);
+    expect(client.getQueryData(['cabins', filters])).toEqual([cabin]);
+    expect(result.current.data).toEqual([cabin]);
+    expect(result.current.data?.[0]._id).toBe(cabin._id);
+    expect(result.current.data?.[0].createdAt).toBe(cabin.createdAt);
   });
-
-  it('uses empty filters by default', () => {
-    useCabins();
-
-    expect(capturedQueryConfig.queryKey).toEqual(['cabins', {}]);
+  test('uses empty filters by default', async () => {
+    const { result } = renderHook(() => useCabins(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.getQueryData(['cabins', {}])).toEqual([cabin]);
   });
-
-  it('builds URL with filter params', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useCabins({ search: 'lake', status: 'active', sortBy: 'price' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('search=lake');
-    expect(fetchUrl).toContain('status=active');
-    expect(fetchUrl).toContain('sortBy=price');
+  test('retains the legacy bare list response', async () => {
+    fetchMock.mockResolvedValue(response({ body: [cabin] }));
+    const { result } = renderHook(() => useCabins(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([cabin]);
   });
-
-  it('includes capacity filter in URL', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useCabins({ capacity: '4' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('capacity=4');
+  test('reports read failure', async () => {
+    fetchMock.mockResolvedValue(response({ ok: false, body: {} }));
+    const { result } = renderHook(() => useCabins(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe('Failed to fetch cabins');
   });
-
-  it('includes discount filter in URL', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useCabins({ discount: 'with-discount' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('discount=with-discount');
+  test.each([true, false])(
+    'keeps detail query and response with envelope=%p',
+    async envelope => {
+      fetchMock.mockResolvedValue(
+        response({ body: envelope ? { success: true, data: cabin } : cabin })
+      );
+      const { result } = renderHook(() => useCabin(cabin._id), { wrapper });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(fetchMock).toHaveBeenCalledWith(`/api/cabins/${cabin._id}`);
+      expect(client.getQueryData(['cabin', cabin._id])).toEqual(cabin);
+    }
+  );
+  test('does not fetch without an ID', () => {
+    renderHook(() => useCabin(''), { wrapper });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
-
-  it('returns data from success response', async () => {
-    const mockCabins = [{ _id: '1', name: 'Lake Cabin' }];
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockCabins }),
-    });
-
-    useCabins();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result).toEqual(mockCabins);
+  test('reports detail failure', async () => {
+    fetchMock.mockResolvedValue(response({ ok: false, body: {} }));
+    const { result } = renderHook(() => useCabin(cabin._id), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe('Failed to fetch cabin');
   });
+});
 
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-    });
-
-    useCabins();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch cabins'
+describe('cabin mutation contracts', () => {
+  test('creates with the exact request, returns JSON and invalidates catalog/statistics', async () => {
+    fetchMock.mockResolvedValue(
+      response({ body: { success: true, data: cabin } })
     );
-  });
-});
-
-describe('useCabin', () => {
-  it('uses cabin query key with id', () => {
-    useCabin('abc123');
-
-    expect(capturedQueryConfig.queryKey).toEqual(['cabin', 'abc123']);
-  });
-
-  it('is disabled when id is empty', () => {
-    useCabin('');
-
-    expect(capturedQueryConfig.enabled).toBe(false);
-  });
-
-  it('is enabled when id is provided', () => {
-    useCabin('abc123');
-
-    expect(capturedQueryConfig.enabled).toBe(true);
-  });
-
-  it('fetches cabin by id', async () => {
-    const mockCabin = { _id: 'abc123', name: 'Mountain Lodge' };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockCabin }),
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateCabin(), { wrapper });
+    await act(async () => {
+      expect(await result.current.mutateAsync(createInput)).toEqual(cabin);
     });
-
-    useCabin('abc123');
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/cabins/abc123');
-    expect(result).toEqual(mockCabin);
-  });
-
-  it('throws when id is empty in queryFn', async () => {
-    useCabin('');
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Cabin ID is required'
-    );
-  });
-});
-
-describe('useCreateCabin', () => {
-  it('sends POST request to /api/cabins', async () => {
-    const newCabin = { name: 'New Cabin', price: 200, capacity: 4 };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({ success: true, data: { _id: '1', ...newCabin } }),
+    expect(fetchMock).toHaveBeenCalledWith('/api/cabins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createInput),
     });
-
-    useCreateCabin();
-    await capturedMutationConfig.mutationFn(newCabin);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/cabins',
+    expect(invalidated.mock.calls).toEqual([
+      [{ queryKey: ['cabins'] }],
+      [{ queryKey: ['cabin-stats'] }],
+    ]);
+    expect(addToast).toHaveBeenCalledWith(
       expect.objectContaining({
+        description: 'Cabin created successfully',
+        color: 'success',
+      })
+    );
+  });
+  test.each([
+    {
+      body: { error: 'Duplicate cabin', message: 'Please rename' },
+      error: 'Duplicate cabin',
+      toast: 'Please rename',
+    },
+    {
+      body: {},
+      error: 'Failed to create cabin',
+      toast: 'Failed to create cabin',
+    },
+  ])(
+    'keeps create failure and does not invalidate: %j',
+    async ({ body, error, toast }) => {
+      fetchMock.mockResolvedValue(response({ ok: false, body }));
+      const invalidated = jest.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(() => useCreateCabin(), { wrapper });
+      await act(async () => {
+        await expect(result.current.mutateAsync(createInput)).rejects.toThrow(
+          error
+        );
+      });
+      expect(invalidated).not.toHaveBeenCalled();
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({ description: toast, color: 'danger' })
+      );
+    }
+  );
+  test('updates only supplied fields and keeps invalidation/toast behavior', async () => {
+    const input = { _id: cabin._id, name: 'Renamed' };
+    const updated = { ...cabin, name: input.name };
+    fetchMock.mockResolvedValue(
+      response({ body: { success: true, data: updated } })
+    );
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateCabin(), { wrapper });
+    await act(async () => {
+      expect(await result.current.mutateAsync(input)).toEqual(updated);
+    });
+    expect(fetchMock).toHaveBeenCalledWith(`/api/cabins/${cabin._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    expect(invalidated.mock.calls).toEqual([
+      [{ queryKey: ['cabins'] }],
+      [{ queryKey: ['cabin-stats'] }],
+    ]);
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Cabin updated successfully',
+        color: 'success',
+      })
+    );
+  });
+  test('keeps update failure without invalidation', async () => {
+    fetchMock.mockResolvedValue(
+      response({ ok: false, body: { error: 'Invalid price' } })
+    );
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateCabin(), { wrapper });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ _id: cabin._id, price: 0 })
+      ).rejects.toThrow('Invalid price');
+    });
+    expect(invalidated).not.toHaveBeenCalled();
+  });
+  test('deletes by string ID and invalidates both caches', async () => {
+    const body = {
+      success: true,
+      data: null,
+      message: 'Cabin deleted successfully',
+    };
+    fetchMock.mockResolvedValue(response({ body }));
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteCabin(), { wrapper });
+    await act(async () => {
+      expect(await result.current.mutateAsync(cabin._id)).toEqual(body);
+    });
+    expect(fetchMock).toHaveBeenCalledWith(`/api/cabins/${cabin._id}`, {
+      method: 'DELETE',
+    });
+    expect(invalidated.mock.calls).toEqual([
+      [{ queryKey: ['cabins'] }],
+      [{ queryKey: ['cabin-stats'] }],
+    ]);
+  });
+  test('keeps deletion failure without invalidation', async () => {
+    fetchMock.mockResolvedValue(
+      response({ ok: false, body: { error: 'Cabin has active bookings' } })
+    );
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteCabin(), { wrapper });
+    await act(async () => {
+      await expect(result.current.mutateAsync(cabin._id)).rejects.toThrow(
+        'Cabin has active bookings'
+      );
+    });
+    expect(invalidated).not.toHaveBeenCalled();
+  });
+  test.each([0, 1, 3])(
+    'keeps bulk delete request, count %i, toast and invalidation',
+    async deletedCount => {
+      fetchMock.mockResolvedValue(
+        response({ body: { success: true, data: { deletedCount } } })
+      );
+      const invalidated = jest.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(() => useBulkDeleteCabins(), { wrapper });
+      await act(async () => {
+        expect(await result.current.mutateAsync([cabin._id])).toEqual({
+          deletedCount,
+        });
+      });
+      expect(fetchMock).toHaveBeenCalledWith('/api/cabins/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCabin),
-      })
-    );
-  });
-
-  it('throws and shows toast on error response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: 'Cabin name already exists' }),
-    });
-
-    useCreateCabin();
-
-    await expect(
-      capturedMutationConfig.mutationFn({ name: 'Duplicate' })
-    ).rejects.toThrow('Cabin name already exists');
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'danger' })
-    );
-  });
-
-  it('invalidates cabins and cabin-stats queries on success', () => {
-    useCreateCabin();
-    capturedMutationConfig.onSuccess();
-
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['cabins'],
-    });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['cabin-stats'],
-    });
-  });
-
-  it('shows success toast on creation', () => {
-    useCreateCabin();
-    capturedMutationConfig.onSuccess();
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        color: 'success',
-        description: 'Cabin created successfully',
-      })
-    );
-  });
-});
-
-describe('useUpdateCabin', () => {
-  it('sends PUT request with cabin id', async () => {
-    const updatedCabin = { _id: 'abc123', name: 'Updated Cabin', price: 300 };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: updatedCabin }),
-    });
-
-    useUpdateCabin();
-    await capturedMutationConfig.mutationFn(updatedCabin);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/cabins/abc123',
-      expect.objectContaining({ method: 'PUT' })
-    );
-  });
-
-  it('invalidates queries on success', () => {
-    useUpdateCabin();
-    capturedMutationConfig.onSuccess();
-
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['cabins'],
-    });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['cabin-stats'],
-    });
-  });
-});
-
-describe('useDeleteCabin', () => {
-  it('sends DELETE request with cabin id', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
-
-    useDeleteCabin();
-    await capturedMutationConfig.mutationFn('abc123');
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/cabins/abc123',
-      expect.objectContaining({ method: 'DELETE' })
-    );
-  });
-
-  it('throws on error response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: 'Cabin has active bookings' }),
-    });
-
-    useDeleteCabin();
-
-    await expect(capturedMutationConfig.mutationFn('abc123')).rejects.toThrow(
-      'Cabin has active bookings'
-    );
-  });
-
-  it('invalidates queries on success', () => {
-    useDeleteCabin();
-    capturedMutationConfig.onSuccess();
-
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['cabins'],
-    });
-  });
-});
-
-describe('useBulkDeleteCabins', () => {
-  it('sends POST with delete action and ids', async () => {
-    const ids = ['id1', 'id2', 'id3'];
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: { deletedCount: 3 } }),
-    });
-
-    useBulkDeleteCabins();
-    await capturedMutationConfig.mutationFn(ids);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/cabins/bulk',
-      expect.objectContaining({
+        body: JSON.stringify({ action: 'delete', ids: [cabin._id] }),
+      });
+      expect(invalidated.mock.calls).toEqual([
+        [{ queryKey: ['cabins'] }],
+        [{ queryKey: ['cabin-stats'] }],
+      ]);
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: `${deletedCount} cabin${deletedCount === 1 ? '' : 's'} deleted`,
+          color: 'success',
+        })
+      );
+    }
+  );
+  test.each([1, 2])(
+    'keeps bulk discount request, count %i, toast and invalidation',
+    async modifiedCount => {
+      fetchMock.mockResolvedValue(
+        response({ body: { success: true, data: { modifiedCount } } })
+      );
+      const invalidated = jest.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(() => useBulkUpdateDiscount(), { wrapper });
+      const input = { ids: [cabin._id], discount: 15 };
+      await act(async () => {
+        expect(await result.current.mutateAsync(input)).toEqual({
+          modifiedCount,
+        });
+      });
+      expect(fetchMock).toHaveBeenCalledWith('/api/cabins/bulk', {
         method: 'POST',
-        body: JSON.stringify({ action: 'delete', ids }),
-      })
-    );
-  });
-
-  it('shows toast with correct count on success', () => {
-    useBulkDeleteCabins();
-    capturedMutationConfig.onSuccess({ deletedCount: 3 });
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        description: '3 cabins deleted',
-        color: 'success',
-      })
-    );
-  });
-
-  it('uses singular form for single deletion', () => {
-    useBulkDeleteCabins();
-    capturedMutationConfig.onSuccess({ deletedCount: 1 });
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        description: '1 cabin deleted',
-      })
-    );
-  });
-});
-
-describe('useBulkUpdateDiscount', () => {
-  it('sends POST with update-discount action', async () => {
-    const ids = ['id1', 'id2'];
-    const discount = 15;
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({ success: true, data: { modifiedCount: 2 } }),
-    });
-
-    useBulkUpdateDiscount();
-    await capturedMutationConfig.mutationFn({ ids, discount });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/cabins/bulk',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ action: 'update-discount', ids, discount }),
-      })
-    );
-  });
-
-  it('shows toast with correct count on success', () => {
-    useBulkUpdateDiscount();
-    capturedMutationConfig.onSuccess({ modifiedCount: 2 });
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        description: 'Discount updated for 2 cabins',
-        color: 'success',
-      })
-    );
-  });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update-discount', ...input }),
+      });
+      expect(invalidated.mock.calls).toEqual([
+        [{ queryKey: ['cabins'] }],
+        [{ queryKey: ['cabin-stats'] }],
+      ]);
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: `Discount updated for ${modifiedCount} cabin${modifiedCount === 1 ? '' : 's'}`,
+          color: 'success',
+        })
+      );
+    }
+  );
 });

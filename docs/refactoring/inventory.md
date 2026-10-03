@@ -46,6 +46,7 @@ rather than treating counts as the completion gate.
 | T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
 | T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Implemented in Phase 1 slice 8: validated unknown cache payloads and dates, per-entry misses for malformed data, preserved negative cache and transient failures.                                                              |
 | T10 | Admin `app/api/cabins/bulk/route.ts`: `handleBulkDelete` | Populated cabin-name projection is concealed behind a double cast. | 1 | Implemented in Phase 1 slice 11: nullable sparse name projection with preserved active-booking denial, deduplication, Unknown fallback, history, counts and audit attribution. |
+| T11 | Admin cabin catalog/detail/create/update routes, `types/index.ts`, `hooks/useCabins.ts` and cabin UI | JSON cabin responses are typed as Mongoose documents. | 1 | Implemented in Phase 1 slice 12: shared existing cabin DTO/serializer, plain admin read/mutation types, checked fixtures and normalized editor absence. Admin availability remains separate. |
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Implemented in Phase 2 slice 12: named guest create inputs and tagged update/cancel operations at all callers, with owner/payment/terminal guards and catalog transaction writes preserved.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
@@ -54,6 +55,7 @@ rather than treating counts as the completion gate.
 | F06 | `packages/database/src/models/Booking.ts`: `findOverlapping`, unused `overlaps` | Date positionals and string/ObjectId alternatives obscure the overlap contract. | 2 | Implemented in Phase 2 slice 8: named string IDs and Date inputs at all callers; preserve strict boundaries, status selection, self-exclusion and booking locks. |
 | F07 | `packages/database/src/reservation-capacity.ts`: catalog/staff helpers and `validateCount` | Catalog IDs, status transitions and count bounds retain positional inputs. | 2 | Implemented in Phase 2 slices 14–15: named catalog, private identity/count and staff status inputs, with typed editable fields and a validated status request boundary. Transaction, guard ordering and audit attribution are characterized; response/native-status DTO debt remains separate. |
 | F08 | Admin `lib/rate-limit.ts`: `createRateLimitKey` and API callers | Adjacent user/endpoint strings can be reversed. | 2 | Implemented in Phase 2 slice 20: named inputs at all three runtime callers; anonymous fallback, user/endpoint namespaces, rate limits and retry headers preserved. |
+| F09 | Admin `lib/validations/cabin.ts`: `isDiscountValid` | Discount and price numbers can be swapped. | 2 | Completed alongside Phase 1 slice 12: named inputs at both routes and all three test calls, with unchanged comparison and stored-price validation. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
 | V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18–19: validated requests for customer confirmations, cabin checkout and public availability search, plus customer/admin welcome-email boundaries. Continue per flow; preserve webhook acknowledgements.                                                                |
@@ -489,6 +491,40 @@ Email input now exposes`cabinSubtotal`from saved`totalPrice - extrasPrice`;
 - This slice preserves existing check/write sequencing and audit failure policy.
   It does not claim new concurrency guarantees for catalog deletion or discount
   changes. No live provider or database operations are used for verification.
+
+## Phase 1 slice 12: shared cabin JSON and admin catalog callers (T11, F09)
+
+- Moved the existing customer cabin DTOs and serializers into exported
+  `packages/database/src/cabin-json.ts`. Both apps use that module; all former
+  customer imports are migrated and the two superseded app-local files removed.
+  Type-only client imports keep Mongoose runtime code on the server.
+- Admin catalog/detail/create/update routes now serialize explicit cabin JSON.
+  Admin `Cabin`, query and mutation results are plain DTOs with string IDs/dates;
+  the cabin information card accepts only displayed fields. Required/optional
+  fields, virtuals, sparse hydrated defaults, legacy null/omission and envelopes
+  remain unchanged. Cabin-modal absence is explicitly null, addressing that
+  component's part of T08; dining/experience/settings props remain open.
+- Related editor fix: legacy null bedroom/bathroom/size/minimum-night fields
+  previously crashed edit rendering at `toString()`. Normalize those values to
+  omitted form fields without changing read JSON or PATCH clearing semantics.
+  The editor sends writable form fields and the string ID, omitting response
+  metadata that the server already ignored. View/create/edit interaction checks
+  include the failing-before legacy-null case.
+- Named `isDiscountValid({ discount, price })` replaces both numeric-position
+  route calls and all test callers. The predicate and database-dependent
+  discount/price checks are unchanged; this introduces no money-unit changes.
+- Before runtime changes, 124 admin route/schema/hook cases, all 540 customer
+  tests and expanded HTTP pass. Replacing captured hook callbacks with 24 real
+  query/mutation tests also passes before edits; these protect requests, JSON
+  values, disabled queries, failure behavior, toasts and exact cache invalidation.
+  Query fixtures now represent ObjectIds/Dates and typed cabin projections;
+  integration request fixtures use unknown transport input rather than `any`.
+- Final local gates pass: formatting/read-only lint and 1,828 tests (admin 1,226,
+  customer 540, database 59, email 3), both app types and strict affected-test
+  types, expanded HTTP and clean frozen installation/all workspace builds. The
+  122 route/schema/hook checks and three modal interactions pass after migration.
+- Admin booking/customer/reporting DTOs and the cabin availability query remain
+  separate work. This slice does not mark the broader Phase 1–2 checkpoint done.
 
 ## Phase 2 slice 1: manual customer confirmation request/error boundaries
 

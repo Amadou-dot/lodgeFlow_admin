@@ -1,3 +1,4 @@
+import type { CabinDetail } from '@lodgeflow/database/cabin-json';
 import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { ICabin } from '@lodgeflow/database/models/Cabin';
 import type { IDining } from '@lodgeflow/database/models/Dining';
@@ -19,7 +20,7 @@ export type IconSvgProps = SVGProps<SVGSVGElement> & {
 export type IdParam = { params: Promise<{ id: string }> };
 
 // Re-export model types for easier importing
-export type Cabin = ICabin;
+export type Cabin = CabinDetail;
 // Customer is now imported from clerk.ts instead of the model
 export type {
   ClerkUser,

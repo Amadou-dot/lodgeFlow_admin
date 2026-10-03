@@ -2,7 +2,7 @@ import type {
   IBooking,
   IBookingModel,
 } from '@lodgeflow/database/models/Booking';
-import type { CabinDetail } from './cabin-read';
+import type { CabinDetail } from '@lodgeflow/database/cabin-json';
 import type { IDining } from '@lodgeflow/database/models/Dining';
 import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
 import type { IExperience } from '@lodgeflow/database/models/Experience';

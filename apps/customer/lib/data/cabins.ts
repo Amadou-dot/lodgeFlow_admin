@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { Cabin, connectDB } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
 import type { Cabin as CabinType } from '@/types';
-import { serializeCabinDetail } from '@/lib/serializers/cabin-read';
+import { serializeCabinDetail } from '@lodgeflow/database/cabin-json';
 import { cabinIdSchema } from '@/lib/validations/cabin';
 
 /**

@@ -24,7 +24,7 @@ import { useEffect, useState } from 'react';
 interface CabinModalProps {
   isOpen: boolean;
   onClose: () => void;
-  cabin?: Cabin | null;
+  cabin: Cabin | null;
   mode: 'view' | 'create' | 'edit';
   onEdit?: (cabin: Cabin) => void;
 }
@@ -72,10 +72,10 @@ export default function CabinModal({
         discount: cabin.discount,
         description: cabin.description,
         amenities: cabin.amenities,
-        bedrooms: cabin.bedrooms,
-        bathrooms: cabin.bathrooms,
-        size: cabin.size,
-        minNights: cabin.minNights,
+        bedrooms: cabin.bedrooms ?? undefined,
+        bathrooms: cabin.bathrooms ?? undefined,
+        size: cabin.size ?? undefined,
+        minNights: cabin.minNights ?? undefined,
         extraGuestFee: cabin.extraGuestFee || 0,
       });
     } else if (mode === 'create') {
@@ -122,9 +122,8 @@ export default function CabinModal({
         await createCabin.mutateAsync(formData);
       } else if (mode === 'edit' && cabin) {
         await updateCabin.mutateAsync({
-          ...cabin,
           ...formData,
-          _id: cabin._id.toString(),
+          _id: cabin._id,
         });
       }
       onClose();

@@ -3,11 +3,11 @@ import {
   serializeCabinDetail,
   type CabinSummarySource as HistoryCabinSource,
   type CabinDetailSource as DetailCabinSource,
-} from './cabin-read';
+} from '@lodgeflow/database/cabin-json';
 export type {
   CabinSummarySource as HistoryCabinSource,
   CabinDetailSource as DetailCabinSource,
-} from './cabin-read';
+} from '@lodgeflow/database/cabin-json';
 import { Types } from 'mongoose';
 import type {
   BookingReadFields,
