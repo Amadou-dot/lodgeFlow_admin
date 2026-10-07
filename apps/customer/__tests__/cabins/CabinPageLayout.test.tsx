@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import CabinDetailClient from '@/components/CabinDetailClient';
 import { useUser } from '@clerk/nextjs';
 
+const mockBookingFee = jest.fn();
+const mockMobileBookingFee = jest.fn();
+
 // Mock all dependencies
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -53,7 +56,12 @@ jest.mock(
 );
 
 jest.mock('@/components/BookingForm', () => {
-  return function MockBookingForm() {
+  return function MockBookingForm({
+    cabin,
+  }: {
+    cabin: { extraGuestFee?: number };
+  }) {
+    mockBookingFee(cabin.extraGuestFee);
     return <div data-testid='booking-form'>Booking Form</div>;
   };
 });
@@ -83,7 +91,12 @@ jest.mock('@/components/CabinDetails', () => {
 });
 
 jest.mock('@/components/CabinMobileTabs', () => {
-  return function MockCabinMobileTabs() {
+  return function MockCabinMobileTabs({
+    bookingCabin,
+  }: {
+    bookingCabin: { extraGuestFee?: number };
+  }) {
+    mockMobileBookingFee(bookingCabin.extraGuestFee);
     return <div data-testid='cabin-mobile-tabs'>Mobile Tabs</div>;
   };
 });
@@ -143,6 +156,12 @@ describe('Enhanced Cabin Page - Issue #17', () => {
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('Cabins')).toBeInTheDocument();
     expect(screen.getByText('Mountain View Cabin')).toBeInTheDocument();
+  });
+
+  it('passes the persisted extra-guest fee to desktop and mobile booking forms', () => {
+    render(<CabinDetailClient cabin={{ ...mockCabin, extraGuestFee: 20 }} />);
+    expect(mockBookingFee).toHaveBeenCalledWith(20);
+    expect(mockMobileBookingFee).toHaveBeenCalledWith(20);
   });
 
   it('renders Back to Cabins button', () => {

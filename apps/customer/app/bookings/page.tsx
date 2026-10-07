@@ -38,6 +38,7 @@ import {
 } from '@/hooks/useExperienceBooking';
 import type { BookingHistoryItem } from '@/types/booking-read';
 import type { UpdateBookingDetailsInput } from '@/lib/validations/booking';
+import { formatBookingStayDate } from '@/lib/booking-date';
 
 const statusFilters = [
   { key: 'all', label: 'All Bookings' },
@@ -362,8 +363,13 @@ export default function BookingsPage() {
                         <div className='flex items-center gap-2 text-sm'>
                           <Calendar className='w-4 h-4 text-default-400' />
                           <span>
-                            {formatDate(booking.checkInDate)} -{' '}
-                            {formatDate(booking.checkOutDate)}
+                            {formatBookingStayDate({
+                              date: booking.checkInDate,
+                            })}{' '}
+                            -{' '}
+                            {formatBookingStayDate({
+                              date: booking.checkOutDate,
+                            })}
                           </span>
                         </div>
 
@@ -391,7 +397,8 @@ export default function BookingsPage() {
                           ) : null}
                         </div>
 
-                        {!booking.isPaid &&
+                        {booking.cabin &&
+                          !booking.isPaid &&
                           booking.status !== 'cancelled' &&
                           (() => {
                             const amountReceived = booking.amountPaid ?? 0;
@@ -881,13 +888,17 @@ export default function BookingsPage() {
                         <div>
                           <p className='text-sm text-default-500'>Check-in</p>
                           <p className='font-medium'>
-                            {formatDate(selectedBooking.checkInDate)}
+                            {formatBookingStayDate({
+                              date: selectedBooking.checkInDate,
+                            })}
                           </p>
                         </div>
                         <div>
                           <p className='text-sm text-default-500'>Check-out</p>
                           <p className='font-medium'>
-                            {formatDate(selectedBooking.checkOutDate)}
+                            {formatBookingStayDate({
+                              date: selectedBooking.checkOutDate,
+                            })}
                           </p>
                         </div>
                       </div>

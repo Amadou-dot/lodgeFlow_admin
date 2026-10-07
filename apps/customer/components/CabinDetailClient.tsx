@@ -50,6 +50,7 @@ export default function CabinDetailClient({ cabin }: CabinDetailClientProps) {
   const bookingCabin = {
     _id: cabinId,
     discount: cabin.discount,
+    extraGuestFee: cabin.extraGuestFee,
     image: cabin.image,
     maxCapacity: cabin.capacity,
     name: cabin.name,
