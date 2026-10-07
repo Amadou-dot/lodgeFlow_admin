@@ -25,6 +25,7 @@ import {
   Moon,
   Square,
   DollarSign,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { useSettings } from '@/hooks/useSettings';
@@ -35,7 +36,7 @@ interface CabinDetailsProps {
 }
 
 // Map amenities to icons
-const amenityIconMap: Record<string, any> = {
+const amenityIconMap: Record<string, LucideIcon> = {
   WiFi: Wifi,
   'Wi-Fi': Wifi,
   Kitchen: Utensils,

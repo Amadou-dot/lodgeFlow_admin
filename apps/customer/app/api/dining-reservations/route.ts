@@ -1,3 +1,13 @@
+import { diningReservationQuerySchema } from '@/lib/validations/query-params';
+import type { FilterQuery } from 'mongoose';
+import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { logger } from '@lodgeflow/database/logger';
+import {
+  serializeDiningReservationDetail,
+  serializeDiningReservationHistory,
+  type DiningHistorySource,
+} from '@lodgeflow/database/reservation-json';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -20,9 +30,11 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Authentication required' },
         { status: 401 }
       );
+    const body = await readJsonRequestBody(request);
+    if (!body.success) return validationErrorResponse(body.error);
     const validation = validateRequest(
       createDiningReservationSchema,
-      await request.json()
+      body.data
     );
     if (!validation.success) return validationErrorResponse(validation.error);
     await connectDB();
@@ -32,14 +44,23 @@ export async function POST(request: NextRequest) {
       customerId: userId,
       selection: selection,
     });
-    return NextResponse.json({ success: true, data }, { status: 201 });
-  } catch (error) {
+    return NextResponse.json(
+      {
+        success: true,
+        data:
+          data === null
+            ? null
+            : serializeDiningReservationDetail(data.toObject()),
+      },
+      { status: 201 }
+    );
+  } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return NextResponse.json(
         { success: false, error: error.message },
         { status: error.status }
       );
-    console.error('Failed to create reservation:', error);
+    logger.error('Failed to create reservation:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create reservation' },
       { status: 500 }
@@ -58,29 +79,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-
-    const query: Record<string, unknown> = { customer: userId };
-    if (status) {
-      query.status = status;
-    }
+    const parsed = diningReservationQuerySchema
+      .pick({ status: true })
+      .safeParse({ status: searchParams.get('status') || undefined });
+    if (!parsed.success)
+      return NextResponse.json(
+        { success: false, error: 'Invalid reservation status' },
+        { status: 400 }
+      );
+    const query: FilterQuery<IDiningReservation> = { customer: userId };
+    if (parsed.data.status) query.status = parsed.data.status;
+    await connectDB();
 
     const reservations = await DiningReservation.find(query)
       .populate('dining', 'name image price type mealType servingTime location')
       .sort({ createdAt: -1 })
-      .lean();
+      .lean<DiningHistorySource[]>();
 
-    const response: ApiResponse<typeof reservations> = {
+    const response: ApiResponse<
+      ReturnType<typeof serializeDiningReservationHistory>[]
+    > = {
       success: true,
-      data: reservations,
+      data: reservations.map(serializeDiningReservationHistory),
     };
 
     return NextResponse.json(response);
-  } catch (error) {
-    console.error('Error fetching dining reservations:', error);
+  } catch (error: unknown) {
+    logger.error('Error fetching dining reservations:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: 'Failed to fetch dining reservations',

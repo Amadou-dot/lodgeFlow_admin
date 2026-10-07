@@ -1,3 +1,10 @@
+import type {
+  ExperienceDayAvailability,
+  ExperienceRangeAvailability,
+} from '@/types/reservation-availability';
+import { logger } from '@lodgeflow/database/logger';
+import { catalogIdSchema } from '@/lib/validations/catalog';
+import { reservationAvailabilityQuerySchema } from '@/lib/validations/reservation-availability';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { connectDB, Experience, ExperienceBooking } from '@lodgeflow/database';
@@ -7,13 +14,26 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await connectDB();
-
     const { id: experienceId } = await context.params;
     const url = new URL(request.url);
-    const dateParam = url.searchParams.get('date');
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
+    if (!catalogIdSchema.safeParse(experienceId).success)
+      return NextResponse.json(
+        { success: false, error: 'Experience not found' },
+        { status: 404 }
+      );
+    const parsed = reservationAvailabilityQuerySchema.safeParse({
+      date: url.searchParams.get('date') || undefined,
+      time: undefined,
+      startDate: url.searchParams.get('startDate') || undefined,
+      endDate: url.searchParams.get('endDate') || undefined,
+    });
+    if (!parsed.success)
+      return NextResponse.json(
+        { success: false, error: parsed.error.issues[0].message },
+        { status: 400 }
+      );
+    const selection = parsed.data;
+    await connectDB();
 
     const experience = await Experience.findById(experienceId);
     if (!experience) {
@@ -24,14 +44,8 @@ export async function GET(
     }
 
     // If checking a specific date
-    if (dateParam) {
-      const checkDate = new Date(dateParam);
-      if (isNaN(checkDate.getTime())) {
-        return NextResponse.json(
-          { success: false, error: 'Invalid date parameter' },
-          { status: 400 }
-        );
-      }
+    if (selection.kind === 'day') {
+      const { dateParam, checkDate } = selection;
 
       const dayStart = new Date(checkDate);
       dayStart.setHours(0, 0, 0, 0);
@@ -52,7 +66,10 @@ export async function GET(
       const maxParticipants = experience.maxParticipants || Infinity;
       const spotsRemaining = Math.max(0, maxParticipants - totalParticipants);
 
-      return NextResponse.json({
+      return NextResponse.json<{
+        success: true;
+        data: ExperienceDayAvailability;
+      }>({
         success: true,
         data: {
           experienceId,
@@ -64,33 +81,7 @@ export async function GET(
       });
     }
 
-    // If checking a date range (for calendar display)
-    const defaultStart = new Date();
-    const defaultEnd = new Date();
-    defaultEnd.setMonth(defaultEnd.getMonth() + 3);
-
-    const queryStart = startDate ? new Date(startDate) : defaultStart;
-    let queryEnd = endDate ? new Date(endDate) : defaultEnd;
-
-    if (isNaN(queryStart.getTime()) || isNaN(queryEnd.getTime())) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid date range parameters' },
-        { status: 400 }
-      );
-    }
-
-    // Clamp range to maximum 6 months to prevent heavy queries
-    const maxRangeMs = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
-    if (queryEnd.getTime() - queryStart.getTime() > maxRangeMs) {
-      queryEnd = new Date(queryStart.getTime() + maxRangeMs);
-    }
-
-    if (queryEnd <= queryStart) {
-      return NextResponse.json(
-        { success: false, error: 'End date must be after start date' },
-        { status: 400 }
-      );
-    }
+    const { queryStart, queryEnd } = selection;
 
     const bookings = await ExperienceBooking.find({
       experience: experienceId,
@@ -119,7 +110,10 @@ export async function GET(
       }
     });
 
-    return NextResponse.json({
+    return NextResponse.json<{
+      success: true;
+      data: ExperienceRangeAvailability;
+    }>({
       success: true,
       data: {
         experienceId,
@@ -133,7 +127,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching experience availability:', error);
+    logger.error('Error fetching experience availability:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch experience availability' },
       { status: 500 }

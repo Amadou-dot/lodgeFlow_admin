@@ -20,7 +20,7 @@ export function siteToLodgingBusiness(): Record<string, unknown> {
 }
 
 export function cabinToLodgingBusiness(cabin: Cabin): Record<string, unknown> {
-  const cabinId = (cabin as any)._id?.toString?.() ?? (cabin as any)._id;
+  const cabinId = cabin._id;
   const url = `${base()}/cabins/${cabinId}`;
   const effectivePrice = Math.max(0, cabin.price - (cabin.discount ?? 0));
 

@@ -156,20 +156,23 @@ const MONGO_METADATA_KEYS = [
   '__v',
 ] as const;
 
-export function stripSettingsMongoMetadata(
-  body: Record<string, unknown>
-): Record<string, unknown> {
-  const cleaned = { ...body };
+export function stripSettingsMongoMetadata(body: unknown): unknown {
+  if (typeof body !== 'object' || body === null || Array.isArray(body))
+    return body;
+  const cleaned: Record<string, unknown> = { ...body };
   for (const key of MONGO_METADATA_KEYS) {
     delete cleaned[key];
   }
   return cleaned;
 }
 
-export function getBookingLengthRangeError(
-  minBookingLength: number,
-  maxBookingLength: number
-): string | null {
+export function getBookingLengthRangeError({
+  minBookingLength,
+  maxBookingLength,
+}: {
+  minBookingLength: number;
+  maxBookingLength: number;
+}): string | null {
   if (minBookingLength > maxBookingLength) {
     return 'Maximum booking length must be greater than or equal to minimum booking length';
   }

@@ -1,11 +1,11 @@
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Select, SelectItem } from '@heroui/select';
 import { BookingFormFieldProps, PriceBreakdown } from './types';
-import type { ISettings } from '@lodgeflow/database/models/Settings';
+import type { Settings } from '@/types';
 import type { SharedSelection } from '@heroui/system';
 
 interface PaymentInformationProps extends BookingFormFieldProps {
-  settings?: ISettings | null;
+  settings?: Pick<Settings, 'requireDeposit' | 'currency'>;
   priceBreakdown: PriceBreakdown;
 }
 
@@ -25,9 +25,19 @@ export default function PaymentInformation({
           label='Payment Method'
           placeholder='Select payment method'
           selectedKeys={formData.paymentMethod ? [formData.paymentMethod] : []}
-          onSelectionChange={(keys: SharedSelection) =>
-            onInputChange('paymentMethod', Array.from(keys)[0] as string)
-          }
+          onSelectionChange={(keys: SharedSelection) => {
+            const selected = Array.from(keys)[0];
+            if (
+              selected === 'cash' ||
+              selected === 'card' ||
+              selected === 'bank-transfer' ||
+              selected === 'online'
+            ) {
+              onInputChange('paymentMethod', selected);
+            } else if (selected === undefined) {
+              onInputChange('paymentMethod', '');
+            }
+          }}
         >
           <SelectItem key='cash'>Cash</SelectItem>
           <SelectItem key='card'>Card</SelectItem>

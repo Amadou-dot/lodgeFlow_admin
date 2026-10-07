@@ -11,7 +11,8 @@ export interface BookingFormData {
   hasLateCheckOut: boolean;
   observations: string;
   specialRequests: string[];
-  paymentMethod: string;
+  paymentMethod:
+    (typeof import('@lodgeflow/database/config').PAYMENT_METHODS)[number] | '';
   isPaid: boolean;
   depositPaid: boolean;
 }
@@ -36,9 +37,9 @@ export interface BookingFormProps {
 
 export interface BookingFormFieldProps {
   formData: BookingFormData;
-  onInputChange: (
-    field: keyof BookingFormData,
-    value: BookingFormData[keyof BookingFormData]
+  onInputChange: <K extends keyof BookingFormData>(
+    field: K,
+    value: BookingFormData[K]
   ) => void;
   priceBreakdown?: PriceBreakdown;
 }

@@ -104,13 +104,13 @@ export default function BookingPDFTemplate({
   className,
   id = 'booking-pdf-template',
 }: BookingPDFTemplateProps) {
-  const formatDate = (date: string | Date) => {
+  const formatDate = (date: string) => {
     const parsed = new Date(date);
     return isNaN(parsed.getTime())
       ? 'Invalid date'
       : format(parsed, 'EEEE, MMMM dd, yyyy');
   };
-  const formatDateTime = (date: string | Date) => {
+  const formatDateTime = (date: string) => {
     const parsed = new Date(date);
     return isNaN(parsed.getTime())
       ? 'Invalid date'
@@ -136,21 +136,21 @@ export default function BookingPDFTemplate({
 
   const getAddons = () => {
     const addons = [];
-    if (booking.extras.hasBreakfast) {
+    if (booking.extras?.hasBreakfast) {
       addons.push(`Breakfast - ${formatPrice(booking.extras.breakfastPrice)}`);
     }
-    if (booking.extras.hasPets) {
+    if (booking.extras?.hasPets) {
       addons.push(`Pet Fee - ${formatPrice(booking.extras.petFee)}`);
     }
-    if (booking.extras.hasParking) {
+    if (booking.extras?.hasParking) {
       addons.push(`Parking - ${formatPrice(booking.extras.parkingFee)}`);
     }
-    if (booking.extras.hasEarlyCheckIn) {
+    if (booking.extras?.hasEarlyCheckIn) {
       addons.push(
         `Early Check-in - ${formatPrice(booking.extras.earlyCheckInFee)}`
       );
     }
-    if (booking.extras.hasLateCheckOut) {
+    if (booking.extras?.hasLateCheckOut) {
       addons.push(
         `Late Check-out - ${formatPrice(booking.extras.lateCheckOutFee)}`
       );
@@ -267,18 +267,20 @@ export default function BookingPDFTemplate({
         <h2 style={printStyles.sectionTitle}>Cabin Information</h2>
         <div style={printStyles.row}>
           <span style={printStyles.label}>Cabin:</span>
-          <span style={printStyles.value}>{booking.cabin.name}</span>
+          <span style={printStyles.value}>
+            {booking.cabin?.name ?? 'Cabin no longer available'}
+          </span>
         </div>
         <div style={printStyles.row}>
           <span style={printStyles.label}>Capacity:</span>
           <span style={printStyles.value}>
-            Up to {booking.cabin.capacity} guests
+            Up to {booking.cabin?.capacity ?? 'N/A'} guests
           </span>
         </div>
         <div style={printStyles.row}>
           <span style={printStyles.label}>Nightly Rate:</span>
           <span style={printStyles.value}>
-            {formatPrice(booking.cabin.price)}
+            {booking.cabin ? formatPrice(booking.cabin.price) : 'N/A'}
           </span>
         </div>
       </div>
@@ -394,7 +396,7 @@ export default function BookingPDFTemplate({
               <span style={printStyles.label}>Refund Status:</span>
               <span style={printStyles.value}>{booking.refundStatus}</span>
             </div>
-            {booking.refundAmount !== undefined && (
+            {booking.refundAmount != null && (
               <div style={printStyles.row}>
                 <span style={printStyles.label}>Refund Amount:</span>
                 <span style={printStyles.value}>

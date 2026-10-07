@@ -1,3 +1,5 @@
+import type { DiningJsonSource } from './dining-json';
+import type { ExperienceJsonSource } from './experience-json';
 import { reservationPaymentSummary } from './reservation-payment-state';
 import {
   DINING_STATUS_TRANSITIONS,
@@ -175,7 +177,9 @@ export async function createDiningReservation({
       return reservation._id;
     }
   );
-  return DiningReservation.findById(id).populate('dining');
+  return DiningReservation.findById(id).populate<{
+    dining: DiningJsonSource | null;
+  }>('dining');
 }
 export async function updateDiningReservation(
   input: UpdateDiningReservationInput
@@ -227,7 +231,9 @@ export async function updateDiningReservation(
       await reservation.save({ session });
     }
   );
-  return DiningReservation.findById(id).populate('dining');
+  return DiningReservation.findById(id).populate<{
+    dining: DiningJsonSource | null;
+  }>('dining');
 }
 
 export type ExperienceSelection = Pick<
@@ -297,7 +303,9 @@ export async function createExperienceReservation({
       return booking._id;
     }
   );
-  return ExperienceBooking.findById(id).populate('experience');
+  return ExperienceBooking.findById(id).populate<{
+    experience: ExperienceJsonSource | null;
+  }>('experience');
 }
 export async function updateExperienceReservation(
   input: UpdateExperienceReservationInput
@@ -351,7 +359,9 @@ export async function updateExperienceReservation(
       await booking.save({ session });
     }
   );
-  return ExperienceBooking.findById(id).populate('experience');
+  return ExperienceBooking.findById(id).populate<{
+    experience: ExperienceJsonSource | null;
+  }>('experience');
 }
 
 type DiningCatalogUpdates = Partial<

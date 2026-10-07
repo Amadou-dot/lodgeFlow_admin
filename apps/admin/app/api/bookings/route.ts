@@ -1,3 +1,11 @@
+import { bookingQuerySchema } from '@/lib/validations/catalog-query';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { bookingIdSchema } from '@/lib/validations/booking';
+import {
+  serializeAdminBooking,
+  type AdminBookingCabinSource,
+  type AdminBookingSource,
+} from '@/lib/serializers/booking';
 import {
   auditSnapshot,
   BOOKING_AUDIT_FIELDS,
@@ -11,6 +19,7 @@ import {
 } from '@lodgeflow/database';
 import {
   createValidationErrorResponse,
+  createErrorResponse,
   escapeRegex,
   parsePagination,
   requireApiAuth,
@@ -32,13 +41,18 @@ import connectDB from '@/lib/mongodb';
 import { createBookingSchema, updateBookingSchema } from '@/lib/validations';
 import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { BookingQueryFilter, MongoSortOrder } from '@/types/api';
-import { getErrorMessage, isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { Booking, Cabin, Settings } from '@lodgeflow/database';
 
-async function populateBookingsWithClerkCustomers(bookings: IBooking[]) {
+async function populateBookingsWithClerkCustomers(
+  bookings: AdminBookingSource[]
+) {
   const customerIds = bookings.map(booking => booking.customer);
-  const uniqueCustomerIds = Array.from(new Set(customerIds)) as string[];
+  const uniqueCustomerIds = Array.from(new Set(customerIds));
 
   // Batch fetch all customers with optimized caching
   const { users: customerMap, errors: clerkErrors } =
@@ -55,12 +69,7 @@ async function populateBookingsWithClerkCustomers(bookings: IBooking[]) {
       email: 'N/A',
     };
 
-    return {
-      ...booking.toObject(),
-      customer: customerData,
-      guest: customerData, // For legacy compatibility
-      cabinName: (booking.cabin as unknown as { name?: string })?.name,
-    };
+    return serializeAdminBooking({ booking, customer: customerData });
   });
 
   return {
@@ -78,14 +87,16 @@ export async function GET(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
     const { page, limit, skip } = parsePagination(searchParams);
-    const status = searchParams.get('status');
-    const search = searchParams.get('search');
-    const sortBy = searchParams.get('sortBy') || 'checkInDate';
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const { status, search, sortBy, sortOrder } = bookingQuerySchema.parse({
+      status: searchParams.get('status'),
+      search: searchParams.get('search'),
+      sortBy: searchParams.get('sortBy'),
+      sortOrder: searchParams.get('sortOrder'),
+    });
+
+    await connectDB();
 
     // Build query for status filter only
     const query: BookingQueryFilter = {};
@@ -94,19 +105,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build sort object (whitelist sortable fields — sortBy is user input)
-    const SORTABLE_FIELDS = new Set([
-      'checkInDate',
-      'checkOutDate',
-      'totalPrice',
-      'createdAt',
-      'status',
-      'numNights',
-      'numGuests',
-    ]);
-    const sortField = sortBy === 'created_at' ? 'createdAt' : sortBy;
-    const sort: MongoSortOrder = {};
-    sort[SORTABLE_FIELDS.has(sortField) ? sortField : 'checkInDate'] =
-      sortOrder === 'desc' ? -1 : 1;
+    const sort: MongoSortOrder = { [sortBy]: sortOrder };
 
     // If there's a search term, resolve matching cabins and customers first,
     // then run a fully database-side paginated query. This keeps the search
@@ -125,7 +124,10 @@ export async function GET(request: NextRequest) {
       // Bounded to the first 100 matches to keep the query cheap.
       let customerIds: string[] = [];
       try {
-        const { data: matchingCustomers } = await searchClerkUsers(search, 100);
+        const { data: matchingCustomers } = await searchClerkUsers({
+          query: search,
+          limit: 100,
+        });
         customerIds = matchingCustomers.map(c => c.id);
       } catch (clerkError) {
         logger.error('Clerk customer search failed', clerkError);
@@ -155,7 +157,10 @@ export async function GET(request: NextRequest) {
 
       const [matchingBookings, totalBookings] = await Promise.all([
         Booking.find(searchQuery)
-          .populate('cabin', 'name image capacity price discount')
+          .populate<{ cabin: AdminBookingCabinSource | null }>(
+            'cabin',
+            'name image capacity price discount'
+          )
           .sort(sort)
           .skip(skip)
           .limit(limit),
@@ -184,7 +189,10 @@ export async function GET(request: NextRequest) {
     } else {
       // No search term - use database pagination for better performance
       const bookings = await Booking.find(query)
-        .populate('cabin', 'name image capacity price discount')
+        .populate<{ cabin: AdminBookingCabinSource | null }>(
+          'cabin',
+          'name image capacity price discount'
+        )
         .sort(sort)
         .skip(skip)
         .limit(limit);
@@ -228,15 +236,17 @@ export async function POST(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success) return createErrorResponse(json.error, 400);
+    const body = json.data;
 
     // Validate request body
     const validationResult = createBookingSchema.safeParse(body);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     // Verify cabin is active before creating booking
     const cabin = await Cabin.findById(validationResult.data.cabin);
@@ -382,10 +392,9 @@ export async function POST(request: NextRequest) {
     });
 
     // Populate the response
-    const populatedBooking = await Booking.findById(booking._id).populate(
-      'cabin',
-      'name image capacity price discount'
-    );
+    const populatedBooking = await Booking.findById(booking._id).populate<{
+      cabin: AdminBookingCabinSource | null;
+    }>('cabin', 'name image capacity price discount');
     if (!populatedBooking) {
       return NextResponse.json(
         { success: false, error: 'Failed to load created booking' },
@@ -454,21 +463,9 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Validation failed',
-          details: error.errors,
+          details: mongooseValidationDetails(error),
         },
         { status: 400 }
-      );
-    }
-
-    // Handle date overlap errors
-    const errorMessage = getErrorMessage(error);
-    if (errorMessage.includes('overlap')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: errorMessage,
-        },
-        { status: 409 } // Conflict
       );
     }
 
@@ -489,11 +486,13 @@ export async function PUT(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success) return createErrorResponse(json.error, 400);
+    const body = json.data;
 
     if (
+      body !== null &&
+      typeof body === 'object' &&
       ['refundStatus', 'refundAmount', 'refundedAt'].some(key =>
         Object.prototype.hasOwnProperty.call(body, key)
       )
@@ -508,24 +507,20 @@ export async function PUT(request: NextRequest) {
       return createValidationErrorResponse(validationResult.error);
     }
 
-    const { _id, ...updateData } = validationResult.data;
-
-    // Never trust client-supplied pricing fields on update — same trust
-    // boundary as POST (see calculateBookingPricing in lib/booking-pricing.ts
-    // and issue #122). These are only ever set below, recomputed from the
-    // cabin/settings documents when a pricing-relevant field actually changes.
-    delete updateData.numNights;
-    delete updateData.cabinPrice;
-    delete updateData.extrasPrice;
-    delete updateData.totalPrice;
-    delete updateData.remainingAmount;
-    // Payment state comes from receipts; ordinary edits cannot forge a payment.
-    delete updateData.depositAmount;
-    delete updateData.isPaid;
-    delete updateData.depositPaid;
-    delete updateData.paidAt;
-    delete updateData.stripeSessionId;
-    delete updateData.stripePaymentIntentId;
+    await connectDB();
+    const { _id, ...parsedUpdates } = validationResult.data;
+    // Only the server adds derived amounts after validated choices are repriced.
+    const updateData: typeof parsedUpdates &
+      Partial<
+        Pick<
+          IBooking,
+          | 'numNights'
+          | 'cabinPrice'
+          | 'extrasPrice'
+          | 'totalPrice'
+          | 'depositAmount'
+        >
+      > = parsedUpdates;
 
     // Fetch the existing booking first so auto-timestamping can check prior state
     const existingBooking = await Booking.findById(_id);
@@ -793,7 +788,12 @@ export async function PUT(request: NextRequest) {
       const checkOut = updateData.checkOutDate || existingBooking.checkOutDate;
 
       const lockResult = await withCabinBookingLock<
-        LockedWriteResult<IBooking | null>
+        LockedWriteResult<
+          | (Omit<IBooking, 'cabin'> & {
+              cabin: AdminBookingCabinSource | null;
+            })
+          | null
+        >
       >(cabinId, async () => {
         const overlapping = await Booking.findOverlapping({
           cabinId: cabinId.toString(),
@@ -811,7 +811,10 @@ export async function PUT(request: NextRequest) {
           {
             new: true,
           }
-        ).populate('cabin', 'name image capacity price discount');
+        ).populate<{ cabin: AdminBookingCabinSource | null }>(
+          'cabin',
+          'name image capacity price discount'
+        );
         return { ok: true, booking: updated };
       });
 
@@ -829,7 +832,10 @@ export async function PUT(request: NextRequest) {
     } else {
       booking = await Booking.findOneAndUpdate(updateFilter, safeUpdate, {
         new: true,
-      }).populate('cabin', 'name image capacity price discount');
+      }).populate<{ cabin: AdminBookingCabinSource | null }>(
+        'cabin',
+        'name image capacity price discount'
+      );
     }
 
     if (!booking) {
@@ -898,20 +904,9 @@ export async function PUT(request: NextRequest) {
         {
           success: false,
           error: 'Validation failed',
-          details: error.errors,
+          details: mongooseValidationDetails(error),
         },
         { status: 400 }
-      );
-    }
-
-    const errorMessage = getErrorMessage(error);
-    if (errorMessage.includes('overlap')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: errorMessage,
-        },
-        { status: 409 }
       );
     }
 
@@ -932,8 +927,6 @@ export async function DELETE(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -946,6 +939,10 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (!bookingIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid booking ID', 400);
+    await connectDB();
 
     // Get the booking before deleting to access customer ID
     const booking = await Booking.findById(id);

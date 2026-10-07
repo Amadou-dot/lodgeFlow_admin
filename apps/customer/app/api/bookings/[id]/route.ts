@@ -1,3 +1,9 @@
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import {
+  bookingIdSchema,
+  cancelBookingSchema,
+} from '@/lib/validations/booking';
+import { logger } from '@lodgeflow/database/logger';
 import {
   serializeBookingDetail,
   type DetailCabinSource,
@@ -39,9 +45,14 @@ export async function GET(
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
     const { id } = await params;
+    if (!bookingIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
 
+    await connectDB();
     const booking = await Booking.findById(id).populate<{
       cabin: DetailCabinSource | null;
     }>('cabin');
@@ -69,7 +80,7 @@ export async function GET(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    console.error('Error fetching booking:', error);
+    logger.error('Error fetching booking:', error);
 
     const response: ApiResponse<never> = {
       success: false,
@@ -100,16 +111,20 @@ export async function PATCH(
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
     const { id } = await params;
-    const body = await request.json();
-
-    // Validate request body with Zod
-    const validation = validateRequest(updateBookingDetailsSchema, body);
+    if (!bookingIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    const json = await readJsonRequestBody(request);
+    if (!json.success) return validationErrorResponse(json.error);
+    const validation = validateRequest(updateBookingDetailsSchema, json.data);
     if (!validation.success) {
       return validationErrorResponse(validation.error);
     }
 
+    await connectDB();
     const updatedBooking = await updateCustomerBooking({
       bookingId: id,
       customerId: userId,
@@ -147,7 +162,7 @@ export async function PATCH(
         { status }
       );
     }
-    console.error('Error updating booking:', error);
+    logger.error('Error updating booking:', error);
 
     const response: ApiResponse<never> = {
       success: false,
@@ -179,24 +194,29 @@ export async function DELETE(
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
     const { id } = await params;
+    if (!bookingIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
 
-    // Parse optional cancellation reason from body (only if JSON content-type)
+    // Empty/non-JSON DELETE bodies retain the optional-reason contract.
     let cancellationReason: string | undefined;
-    const contentType = request.headers.get('content-type');
-    if (contentType?.includes('application/json')) {
-      try {
-        const body = await request.json();
-        cancellationReason = body.reason;
-      } catch (parseError) {
-        // Log malformed JSON but don't fail the cancellation
-        console.error('Failed to parse cancellation request body:', parseError);
+    if (request.headers.get('content-type')?.includes('application/json')) {
+      const text = await request.text();
+      if (text.trim()) {
+        const json = await readJsonRequestBody({ text: async () => text });
+        if (!json.success) return validationErrorResponse(json.error);
+        const validation = validateRequest(cancelBookingSchema, json.data);
+        if (!validation.success)
+          return validationErrorResponse(validation.error);
+        cancellationReason = validation.data.reason;
       }
     }
-    // If no content-type or not JSON, cancellationReason remains undefined (expected for simple DELETE)
 
     // Find the booking with cabin populated for email
+    await connectDB();
     const booking = await Booking.findById(id).populate<{
       cabin: Pick<DetailCabinSource, 'name'> | null;
     }>('cabin', 'name image capacity price discount description');
@@ -285,11 +305,11 @@ export async function DELETE(
         stripeRefundError = 'Refund requires staff reconciliation';
         break;
       }
-      const result = await createRefund(
-        refund.paymentIntentId,
-        refund.amount,
-        `cancel:${id}:${refund.paymentIntentId}`
-      );
+      const result = await createRefund({
+        paymentIntentId: refund.paymentIntentId,
+        amount: refund.amount,
+        idempotencyKey: `cancel:${id}:${refund.paymentIntentId}`,
+      });
       if (!result.success) {
         stripeRefundError = result.error;
         break;
@@ -321,10 +341,10 @@ export async function DELETE(
         refundType: refundEstimate.refundType,
         reason: refundEstimate.reason,
       }).catch(err => {
-        console.error('Failed to send cancellation email:', err);
+        logger.error('Failed to send cancellation email:', err);
       });
     } else {
-      console.error(
+      logger.error(
         'Could not send cancellation email: booking or cabin data missing after update'
       );
     }
@@ -351,7 +371,7 @@ export async function DELETE(
         { success: false, error: 'Booking changed; refresh and try again' },
         { status: 409 }
       );
-    console.error('Error cancelling booking:', error);
+    logger.error('Error cancelling booking:', error);
 
     const response: ApiResponse<never> = {
       success: false,

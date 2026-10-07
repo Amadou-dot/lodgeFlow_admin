@@ -1,3 +1,8 @@
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import {
+  catalogIdSchema,
+  withCatalogPathId,
+} from '@/lib/validations/catalog-request';
 import { serializeCabinDetail } from '@lodgeflow/database/cabin-json';
 import { auditSnapshot, CABIN_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
 import {
@@ -10,7 +15,10 @@ import {
 import { logger } from '@/lib/logger';
 import connectDB from '@/lib/mongodb';
 import { isDiscountValid, updateCabinSchema } from '@/lib/validations';
-import { isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest } from 'next/server';
 import { Cabin } from '@lodgeflow/database';
 
@@ -23,8 +31,10 @@ export async function GET(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
     const { id } = await params;
+    if (!catalogIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid catalog ID', HTTP_STATUS.BAD_REQUEST);
+    await connectDB();
 
     const cabin = await Cabin.findById(id);
 
@@ -54,15 +64,21 @@ export async function PUT(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
     const { id } = await params;
 
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const body = json.data;
 
-    const validationResult = updateCabinSchema.safeParse({ ...body, _id: id });
+    const validationResult = updateCabinSchema.safeParse(
+      withCatalogPathId({ body, id })
+    );
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     const { _id: _validatedId, ...updateData } = validationResult.data;
 
@@ -118,7 +134,7 @@ export async function PUT(
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 
@@ -142,8 +158,10 @@ export async function DELETE(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
     const { id } = await params;
+    if (!catalogIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid catalog ID', HTTP_STATUS.BAD_REQUEST);
+    await connectDB();
 
     const cabin = await Cabin.findByIdAndDelete(id);
 

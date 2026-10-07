@@ -1,3 +1,11 @@
+import { diningReservationQuerySchema } from '@/lib/validations/query-params';
+import type { FilterQuery } from 'mongoose';
+import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
+import { logger } from '@lodgeflow/database/logger';
+import {
+  serializeDiningReservationHistory,
+  type DiningHistorySource,
+} from '@lodgeflow/database/reservation-json';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -21,15 +29,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-
-    const query: Record<string, unknown> = { customer: userId };
-    if (status) {
-      query.status = status;
-    }
+    const parsed = diningReservationQuerySchema
+      .pick({ status: true })
+      .safeParse({ status: searchParams.get('status') || undefined });
+    if (!parsed.success)
+      return NextResponse.json(
+        { success: false, error: 'Invalid reservation status' },
+        { status: 400 }
+      );
+    const query: FilterQuery<IDiningReservation> = { customer: userId };
+    if (parsed.data.status) query.status = parsed.data.status;
+    await connectDB();
 
     const reservations = await DiningReservation.find(query)
       .populate(
@@ -37,16 +48,18 @@ export async function GET(request: NextRequest) {
         'name image price type mealType servingTime location maxPeople'
       )
       .sort({ createdAt: -1 })
-      .lean();
+      .lean<DiningHistorySource[]>();
 
-    const response: ApiResponse<typeof reservations> = {
+    const response: ApiResponse<
+      ReturnType<typeof serializeDiningReservationHistory>[]
+    > = {
       success: true,
-      data: reservations,
+      data: reservations.map(serializeDiningReservationHistory),
     };
 
     return NextResponse.json(response, { status: 200 });
-  } catch (error) {
-    console.error('Error fetching dining reservation history:', error);
+  } catch (error: unknown) {
+    logger.error('Error fetching dining reservation history:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: 'Failed to fetch dining reservation history',

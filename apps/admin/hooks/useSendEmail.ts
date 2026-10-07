@@ -1,21 +1,20 @@
-import { Cabin, PopulatedBooking } from '@/types';
+import {
+  confirmationEmailSchema,
+  type ConfirmationEmailRequest,
+} from '@/lib/validations/confirmation-email';
 import { useCallback } from 'react';
 import type { WelcomeEmailInput } from '@/lib/validations/welcome-email';
 
 export function useSendConfirmationEmail() {
   const sendConfirmationEmail = useCallback(
-    async (
-      firstName: string,
-      email: string,
-      bookingData: PopulatedBooking,
-      cabinData: Cabin
-    ) => {
+    async (input: ConfirmationEmailRequest) => {
+      const payload = confirmationEmailSchema.parse(input);
       const response = await fetch('/api/send/confirm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ firstName, email, bookingData, cabinData }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {

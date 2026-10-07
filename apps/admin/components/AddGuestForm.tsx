@@ -1,7 +1,7 @@
 'use client';
 
 import { useCreateCustomer, useUpdateCustomer } from '@/hooks/useCustomers';
-import type { Customer } from '@/types/clerk';
+import type { GuestFormCustomer } from '@/types/customer-json';
 import { Form } from '@heroui/form';
 import { useEffect, useState } from 'react';
 import {
@@ -10,14 +10,15 @@ import {
   EmergencyContactSection,
   FormActionsSection,
   type FormData,
+  type GuestInputChange,
   initialFormData,
   PreferencesSection,
-} from './AddGuestForm/';
+} from './AddGuestForm/index';
 
 interface AddGuestFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
-  initialData?: Customer; // Changed from FormData to Customer
+  initialData?: GuestFormCustomer; // Changed from FormData to Customer
   isEditing?: boolean;
 }
 
@@ -75,19 +76,35 @@ export default function AddGuestForm({
     }
   }, [isEditing, initialData]);
 
-  const handleInputChange = (field: string, value: string) => {
-    const keys = field.split('.');
+  const handleInputChange: GuestInputChange = change => {
     setFormData(prev => {
-      const updated = { ...prev };
-      let current: Record<string, unknown> = updated as Record<string, unknown>;
-
-      for (let i = 0; i < keys.length - 1; i++) {
-        current = current[keys[i]] as Record<string, unknown>;
+      switch (change.section) {
+        case 'profile':
+          return { ...prev, [change.field]: change.value };
+        case 'address':
+          return {
+            ...prev,
+            address: { ...prev.address, [change.field]: change.value },
+          };
+        case 'emergencyContact':
+          return {
+            ...prev,
+            emergencyContact: {
+              ...prev.emergencyContact,
+              [change.field]: change.value,
+            },
+          };
+        case 'preferences':
+          return {
+            ...prev,
+            preferences: { ...prev.preferences, [change.field]: change.value },
+          };
       }
-
-      current[keys[keys.length - 1]] = value;
-      return updated;
     });
+    const field =
+      change.section === 'profile'
+        ? change.field
+        : `${change.section}.${change.field}`;
 
     // Clear error when user starts typing
     if (errors[field]) {

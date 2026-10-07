@@ -1,6 +1,7 @@
 jest.mock('@/lib/seed-database', () => ({ seedDatabase: jest.fn() }));
 import { seedDatabase } from '@/lib/seed-database';
 import { GET } from '@/app/api/cron/seed/route';
+import { logger } from '@/lib/logger';
 const mockSeedDatabase = seedDatabase as jest.MockedFunction<
   typeof seedDatabase
 >;
@@ -98,5 +99,22 @@ describe('GET /api/cron/seed authorization', () => {
       },
     });
     expect(mockSeedDatabase).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs failures from the mocked seed operation without exposing them', async () => {
+    const failure = new Error('private database connection details');
+    mockSeedDatabase.mockRejectedValueOnce(failure);
+    const logged = jest.spyOn(logger, 'error').mockImplementation(() => {});
+    const response = await GET(
+      new Request('http://localhost/api/cron/seed', {
+        headers: { Authorization: 'Bearer seed-secret' },
+      })
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Failed to seed database',
+    });
+    expect(logged).toHaveBeenCalledWith('Error seeding database', failure);
   });
 });

@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
-import mongoose from 'mongoose';
-import DiningReservation from './models/DiningReservation';
+import mongoose, { type Model } from 'mongoose';
+import DiningReservation, {
+  type IDiningReservation,
+} from './models/DiningReservation';
 import ExperienceBooking from './models/ExperienceBooking';
 import Settings from './models/Settings';
 import { ReservationRuleError } from './reservation-capacity';
@@ -10,8 +12,24 @@ import {
 } from './reservation-payment-state';
 
 type Kind = 'dining' | 'experience';
-const modelFor = (kind: Kind) =>
-  kind === 'dining' ? DiningReservation : ExperienceBooking;
+type PaymentRecord = Pick<
+  IDiningReservation,
+  | '_id'
+  | 'customer'
+  | 'status'
+  | 'isPaid'
+  | 'totalPrice'
+  | 'receipts'
+  | 'checkout'
+  | 'stripeRefund'
+  | 'stripePaymentIntentId'
+>;
+const modelFor = (
+  kind: Kind
+): Pick<
+  Model<PaymentRecord>,
+  'findOne' | 'findById' | 'updateOne' | 'findOneAndUpdate'
+> => (kind === 'dining' ? DiningReservation : ExperienceBooking);
 export interface ReservationStripeGateway {
   checkout: {
     sessions: {
@@ -206,7 +224,7 @@ export async function settleReservationCheckout({
       recordedAt: new Date(),
     });
     row.stripePaymentIntentId = paymentIntentId;
-    row.checkout.pending = false;
+    quote.pending = false;
     row.isPaid = reservationPaymentSummary(row).balanceCents === 0;
     try {
       await row.save();

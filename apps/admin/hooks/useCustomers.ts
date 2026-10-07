@@ -1,5 +1,10 @@
 'use client';
 
+import type {
+  CreateCustomerInput,
+  UpdateCustomerRequest,
+} from '@/lib/validations/customer';
+
 import { SWR_CONFIG } from '@/lib/config';
 import type {
   Customer,
@@ -107,8 +112,10 @@ export const useCustomer = (id: string) => {
 
 // Create customer
 export const useCreateCustomer = () => {
-  return useMutation<Customer, Error, Partial<Customer>>({
-    mutationFn: async (customerData: Partial<Customer>): Promise<Customer> => {
+  return useMutation<Customer, Error, CreateCustomerInput>({
+    mutationFn: async (
+      customerData: CreateCustomerInput
+    ): Promise<Customer> => {
       const response = await fetch('/api/customers', {
         method: 'POST',
         headers: {
@@ -133,9 +140,9 @@ export const useCreateCustomer = () => {
 
 // Update customer
 export const useUpdateCustomer = () => {
-  return useMutation<Customer, Error, Partial<Customer> & { id: string }>({
+  return useMutation<Customer, Error, UpdateCustomerRequest & { id: string }>({
     mutationFn: async (
-      customerData: Partial<Customer> & { id: string }
+      customerData: UpdateCustomerRequest & { id: string }
     ): Promise<Customer> => {
       const response = await fetch(`/api/customers/${customerData.id}`, {
         method: 'PUT',

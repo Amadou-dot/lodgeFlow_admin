@@ -11,6 +11,8 @@ jest.mock('@lodgeflow/database', () => ({
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/bookings/[id]/refund-estimate/route';
 import { getCancellationDeadlines } from '@/lib/cancellation';
+import { connectDB } from '@lodgeflow/database';
+import { logger } from '@lodgeflow/database/logger';
 
 const booking = {
   customer: 'user_owner',
@@ -20,19 +22,50 @@ const booking = {
   refundAmount: 0,
   checkoutPending: false,
 };
-const request = () =>
+const request = (id = '507f1f77bcf86cd799439011') =>
   GET(
     new NextRequest('http://localhost/api/bookings/booking/refund-estimate'),
-    { params: Promise.resolve({ id: 'booking' }) }
+    { params: Promise.resolve({ id }) }
   );
 
 beforeEach(() => {
+  jest.clearAllMocks();
   jest.useFakeTimers().setSystemTime(new Date('2030-02-01T12:00:00.000Z'));
   mockAuth.mockResolvedValue({ userId: 'user_owner' });
   mockFindBooking.mockResolvedValue({ ...booking });
   mockFindSettings.mockResolvedValue({ cancellationPolicy: 'moderate' });
 });
-afterEach(() => jest.useRealTimers());
+afterEach(() => {
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+});
+
+it('conceals an invalid ID before database access', async () => {
+  const response = await request('invalid');
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({
+    success: false,
+    error: 'Booking not found',
+  });
+  expect(connectDB).not.toHaveBeenCalled();
+  expect(mockFindBooking).not.toHaveBeenCalled();
+});
+
+it('logs an unexpected failure while returning the safe error envelope', async () => {
+  const failure = new Error('private database details');
+  mockFindBooking.mockRejectedValueOnce(failure);
+  const logged = jest.spyOn(logger, 'error').mockImplementation(() => {});
+  const response = await request();
+  expect(response.status).toBe(500);
+  expect(await response.json()).toEqual({
+    success: false,
+    error: 'Failed to calculate refund estimate',
+  });
+  expect(logged).toHaveBeenCalledWith(
+    'Error calculating refund estimate',
+    failure
+  );
+});
 
 it('returns received-money estimate with ISO deadlines and the existing envelope', async () => {
   const response = await request();

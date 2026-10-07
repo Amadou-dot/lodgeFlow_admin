@@ -372,3 +372,18 @@ describe('invalid customer cache regressions', () => {
     expect(mockGetUser).toHaveBeenCalledTimes(2);
   });
 });
+
+test('partial legacy profile metadata survives cache reads without an SDK miss', async () => {
+  const data = {
+    ...cachedCustomer('user_partial'),
+    emergencyContact: { name: 'Guardian', phone: '555' },
+    preferences: {
+      roomType: 'quiet',
+      floorPreference: 'ground',
+      specialRequests: 'Step free',
+    },
+  };
+  mockGet.mockResolvedValue({ data });
+  expect(JSON.parse(JSON.stringify(await getClerkUser(data.id)))).toEqual(data);
+  expect(mockGetUser).not.toHaveBeenCalled();
+});

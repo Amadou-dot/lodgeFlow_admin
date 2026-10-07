@@ -361,7 +361,7 @@ export default function ExperiencesPage() {
       <ExperienceModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        experience={selectedExperience}
+        experience={selectedExperience ?? undefined}
         mode={modalMode}
         onEdit={handleEditExperience}
         onCreateSubmit={handleCreateSubmit}

@@ -1,4 +1,16 @@
-import { requireApiAuth } from '@/lib/api-utils';
+import { logger } from '@/lib/logger';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { updateCustomerSchema } from '@/lib/validations/customer';
+import { serializeCustomer } from '@/lib/serializers/customer';
+import {
+  serializeRecentCustomerBooking,
+  type AdminBookingCabinSource,
+} from '@/lib/serializers/booking';
+import {
+  requireApiAuth,
+  createErrorResponse,
+  createValidationErrorResponse,
+} from '@/lib/api-utils';
 import {
   deleteCompleteCustomer,
   getClerkUser,
@@ -37,7 +49,13 @@ export async function GET(
     await connectDB();
 
     const [statsResult, recentBookings] = await Promise.all([
-      Booking.aggregate([
+      Booking.aggregate<{
+        totalBookings: number;
+        completedBookings: number;
+        totalRevenue: number;
+        averageStayLength: number;
+        lastBookingDate: Date;
+      }>([
         { $match: { customer: id } },
         {
           $group: {
@@ -73,7 +91,10 @@ export async function GET(
         },
       ]),
       Booking.find({ customer: id })
-        .populate('cabin', 'name image capacity price')
+        .populate<{ cabin: AdminBookingCabinSource | null }>(
+          'cabin',
+          'name image capacity price'
+        )
         .sort({ createdAt: -1 })
         .limit(10),
     ]);
@@ -87,17 +108,17 @@ export async function GET(
     };
 
     const customerData = {
-      ...customer,
+      ...serializeCustomer(customer),
       // Override computed fields with actual booking stats
       totalBookings: stats.totalBookings,
       totalSpent: stats.totalRevenue,
-      lastBookingDate: stats.lastBookingDate,
+      lastBookingDate: stats.lastBookingDate?.toISOString(),
       loyaltyTier: getLoyaltyTier(stats.totalRevenue).tier,
       // Additional calculated stats for display
       completedBookings: stats.completedBookings,
       totalRevenue: stats.totalRevenue,
       averageStayLength: stats.averageStayLength,
-      recentBookings,
+      recentBookings: recentBookings.map(serializeRecentCustomerBooking),
     };
 
     return NextResponse.json({
@@ -105,6 +126,7 @@ export async function GET(
       data: customerData,
     });
   } catch (error) {
+    logger.error('Failed to fetch customer', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch customer' },
       { status: 500 }
@@ -123,29 +145,18 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    const body = await request.json();
-
-    // Update complete customer (Clerk user + metadata)
-    const customer = await updateCompleteCustomer(id, {
-      // Clerk user fields
-      firstName: body.firstName,
-      lastName: body.lastName,
-      username: body.username,
-
-      // Extended data fields (stored in Clerk metadata)
-      nationality: body.nationality,
-      nationalId: body.nationalId,
-      address: body.address,
-      emergencyContact: body.emergencyContact,
-      preferences: body.preferences,
-    });
+    const body = await readJsonRequestBody(request);
+    if (!body.success) return createErrorResponse(body.error, 400);
+    const parsed = updateCustomerSchema.safeParse(body.data);
+    if (!parsed.success) return createValidationErrorResponse(parsed.error);
+    const customer = await updateCompleteCustomer(id, parsed.data);
 
     return NextResponse.json({
       success: true,
-      data: customer,
+      data: serializeCustomer(customer),
     });
   } catch (error: unknown) {
-    console.error('Error updating customer:', error);
+    logger.error('Failed to update customer', error);
 
     return NextResponse.json(
       {
@@ -190,7 +201,7 @@ export async function DELETE(
       message: 'Customer deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting customer:', error);
+    logger.error('Failed to delete customer', error);
     return NextResponse.json(
       {
         success: false,

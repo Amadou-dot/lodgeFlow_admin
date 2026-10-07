@@ -7,27 +7,54 @@ import type {
   updateExperienceReservation,
 } from '@lodgeflow/database';
 
-const responseData = {
-  _id: 'reservation-id',
+import { Types } from 'mongoose';
+import type {
+  DiningReservationSource,
+  ExperienceReservationSource,
+} from '@lodgeflow/database/reservation-json';
+const base = {
+  _id: new Types.ObjectId('507f1f77bcf86cd7994390ac'),
+  customer: 'owner',
   totalPrice: 50,
+  isPaid: false,
   date: new Date('2030-06-01T18:00:00Z'),
+  receipts: [],
+  specialRequests: [],
 };
+const diningSource = {
+  ...base,
+  dining: null,
+  time: '18:00',
+  numGuests: 2,
+  status: 'pending',
+} satisfies DiningReservationSource & { dining: null };
+const experienceSource = {
+  ...base,
+  experience: null,
+  numParticipants: 2,
+  status: 'pending',
+} satisfies ExperienceReservationSource & { experience: null };
+const diningResponse = { toObject: () => diningSource };
+const experienceResponse = { toObject: () => experienceSource };
+function json(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
 const mockAuth = jest.fn<Promise<{ userId: string | null }>, []>();
 const mockConnect = jest.fn<Promise<void>, []>();
 const mockCreateDining = jest.fn<
-  Promise<typeof responseData>,
+  Promise<typeof diningResponse>,
   Parameters<typeof createDiningReservation>
 >();
 const mockUpdateDining = jest.fn<
-  Promise<typeof responseData>,
+  Promise<typeof diningResponse>,
   Parameters<typeof updateDiningReservation>
 >();
 const mockCreateExperience = jest.fn<
-  Promise<typeof responseData>,
+  Promise<typeof experienceResponse>,
   Parameters<typeof createExperienceReservation>
 >();
 const mockUpdateExperience = jest.fn<
-  Promise<typeof responseData>,
+  Promise<typeof experienceResponse>,
   Parameters<typeof updateExperienceReservation>
 >();
 jest.mock('@clerk/nextjs/server', () => ({ auth: () => mockAuth() }));
@@ -66,6 +93,7 @@ const date = '2030-06-01T18:00:00Z';
 const profiles = [
   {
     kind: 'dining',
+    response: diningSource,
     post: diningPost,
     patch: diningPatch,
     remove: diningDelete,
@@ -83,6 +111,7 @@ const profiles = [
   },
   {
     kind: 'experience',
+    response: experienceSource,
     post: experiencePost,
     patch: experiencePatch,
     remove: experienceDelete,
@@ -96,7 +125,7 @@ const profiles = [
     },
   },
 ] as const;
-const params = { params: Promise.resolve({ id: 'reservation-id' }) };
+const params = { params: Promise.resolve({ id: '507f1f77bcf86cd7994390ac' }) };
 function request({ method, body }: { method: string; body: string }) {
   return new NextRequest('http://localhost/api/reservation', { method, body });
 }
@@ -104,13 +133,10 @@ beforeEach(() => {
   jest.resetAllMocks();
   mockAuth.mockResolvedValue({ userId: 'owner' });
   mockConnect.mockResolvedValue();
-  for (const mock of [
-    mockCreateDining,
-    mockUpdateDining,
-    mockCreateExperience,
-    mockUpdateExperience,
-  ])
-    mock.mockResolvedValue(responseData);
+  mockCreateDining.mockResolvedValue(diningResponse);
+  mockUpdateDining.mockResolvedValue(diningResponse);
+  mockCreateExperience.mockResolvedValue(experienceResponse);
+  mockUpdateExperience.mockResolvedValue(experienceResponse);
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => jest.restoreAllMocks());
@@ -133,7 +159,7 @@ for (const profile of profiles) {
       async ({ method, invoke }) => {
         mockAuth.mockResolvedValueOnce({ userId: null });
         const input = request({ method, body: '{' });
-        const read = jest.spyOn(input, 'json');
+        const read = jest.spyOn(input, 'text');
         const response = await invoke(input);
         expect(response.status).toBe(401);
         expect(await response.json()).toEqual({
@@ -152,17 +178,13 @@ for (const profile of profiles) {
           method: 'POST',
           body: JSON.stringify({
             ...profile.body,
-            customer: 'foreign',
-            totalPrice: 0,
-            isPaid: true,
-            status: 'confirmed',
           }),
         })
       );
       expect(response.status).toBe(201);
       expect(await response.json()).toEqual({
         success: true,
-        data: { ...responseData, date: responseData.date.toISOString() },
+        data: json(profile.response),
       });
       expect(mockConnect).toHaveBeenCalledTimes(1);
       expect(profile.create).toHaveBeenCalledWith({
@@ -193,9 +215,6 @@ for (const profile of profiles) {
           body: JSON.stringify({
             specialRequests: ['Window please'],
             date,
-            customer: 'foreign',
-            totalPrice: 0,
-            status: 'cancelled',
           }),
         }),
         params
@@ -203,11 +222,11 @@ for (const profile of profiles) {
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         success: true,
-        data: { ...responseData, date: responseData.date.toISOString() },
+        data: json(profile.response),
         message: 'Reservation updated successfully',
       });
       expect(profile.update).toHaveBeenCalledWith({
-        reservationId: 'reservation-id',
+        reservationId: '507f1f77bcf86cd7994390ac',
         customerId: 'owner',
         action: 'update',
         updates: { specialRequests: ['Window please'], date: new Date(date) },
@@ -229,17 +248,17 @@ for (const profile of profiles) {
     });
     test('DELETE ignores the request body and keeps cancellation success', async () => {
       const input = request({ method: 'DELETE', body: '{' });
-      const read = jest.spyOn(input, 'json');
+      const read = jest.spyOn(input, 'text');
       const response = await profile.remove(input, params);
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         success: true,
-        data: { ...responseData, date: responseData.date.toISOString() },
+        data: json(profile.response),
         message: 'Reservation cancelled successfully',
       });
       expect(read).not.toHaveBeenCalled();
       expect(profile.update).toHaveBeenCalledWith({
-        reservationId: 'reservation-id',
+        reservationId: '507f1f77bcf86cd7994390ac',
         customerId: 'owner',
         action: 'cancel',
       });
@@ -288,4 +307,101 @@ for (const profile of profiles) {
       }
     );
   });
+}
+
+for (const profile of profiles) {
+  test.each(['POST', 'PATCH'])(
+    `${profile.kind} %s rejects malformed JSON before effects`,
+    async method => {
+      const input = request({ method, body: '{' });
+      const response =
+        method === 'POST'
+          ? await profile.post(input)
+          : await profile.patch(input, params);
+      expect(response.status).toBe(400);
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(profile.create).not.toHaveBeenCalled();
+      expect(profile.update).not.toHaveBeenCalled();
+    }
+  );
+  test.each([
+    'customer',
+    'totalPrice',
+    'isPaid',
+    'status',
+    '$set',
+    'checkout.pending',
+  ])(`${profile.kind} rejects protected field %s`, async field => {
+    for (const method of ['POST', 'PATCH']) {
+      const input = request({
+        method,
+        body: JSON.stringify({
+          ...(method === 'POST' ? profile.body : { specialRequests: [] }),
+          [field]: 'forged',
+        }),
+      });
+      const response =
+        method === 'POST'
+          ? await profile.post(input)
+          : await profile.patch(input, params);
+      expect(response.status).toBe(400);
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(profile.create).not.toHaveBeenCalled();
+      expect(profile.update).not.toHaveBeenCalled();
+    }
+  });
+}
+
+for (const profile of profiles) {
+  test(`${profile.kind} rejects prototype keys before effects`, async () => {
+    const response = await profile.patch(
+      request({
+        method: 'PATCH',
+        body: '{"__proto__":{},"specialRequests":[]}',
+      }),
+      params
+    );
+    expect(response.status).toBe(400);
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(profile.update).not.toHaveBeenCalled();
+  });
+}
+
+for (const profile of profiles) {
+  test(`${profile.kind} validates listing identifiers before connecting`, async () => {
+    const body = {
+      ...profile.body,
+      [profile.kind === 'dining' ? 'diningId' : 'experienceId']: 'invalid',
+    };
+    const response = await profile.post(
+      request({ method: 'POST', body: JSON.stringify(body) })
+    );
+    expect(response.status).toBe(400);
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(profile.create).not.toHaveBeenCalled();
+  });
+  test(`${profile.kind} invalid mutation IDs fail before connecting`, async () => {
+    const response = await profile.patch(
+      request({ method: 'PATCH', body: '{}' }),
+      { params: Promise.resolve({ id: 'invalid' }) }
+    );
+    expect(response.status).toBe(404);
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(profile.update).not.toHaveBeenCalled();
+  });
+}
+
+for (const profile of profiles) {
+  test.each([null, 1893456000000, [], {}])(
+    `${profile.kind} accepts only transport date strings: %j`,
+    async dateValue => {
+      const response = await profile.patch(
+        request({ method: 'PATCH', body: JSON.stringify({ date: dateValue }) }),
+        params
+      );
+      expect(response.status).toBe(400);
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(profile.update).not.toHaveBeenCalled();
+    }
+  );
 }

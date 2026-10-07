@@ -1,3 +1,11 @@
+import { diningQuerySchema } from '@/lib/validations/catalog-query';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { catalogIdSchema } from '@/lib/validations/catalog-request';
+import {
+  serializeDining,
+  type DiningJsonSource,
+} from '@lodgeflow/database/dining-json';
+import type { Model } from 'mongoose';
 import {
   updateCapacityCatalog,
   deleteCapacityCatalog,
@@ -15,8 +23,13 @@ import { logger } from '@/lib/logger';
 import { createDiningSchema, updateDiningSchema } from '@/lib/validations';
 import { connectDB, Dining } from '@lodgeflow/database';
 import type { DiningQueryFilter, MongoSortOrder } from '@/types/api';
-import { isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest } from 'next/server';
+
+const diningReader: Model<DiningJsonSource> = Dining;
 
 export async function GET(request: NextRequest) {
   // Require authentication
@@ -24,24 +37,26 @@ export async function GET(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const mealType = searchParams.get('mealType');
-    const category = searchParams.get('category');
-    const isAvailable = searchParams.get('isAvailable');
-    const search = searchParams.get('search');
-    const sortBy = searchParams.get('sortBy') || 'name';
-    const sortOrder = searchParams.get('sortOrder') || 'asc';
+    const { type, mealType, category, isAvailable, search, sortBy, sortOrder } =
+      diningQuerySchema.parse({
+        type: searchParams.get('type'),
+        mealType: searchParams.get('mealType'),
+        category: searchParams.get('category'),
+        isAvailable: searchParams.get('isAvailable'),
+        search: searchParams.get('search'),
+        sortBy: searchParams.get('sortBy'),
+        sortOrder: searchParams.get('sortOrder'),
+      });
+
+    await connectDB();
 
     // Build filter object
     const filter: DiningQueryFilter = {};
     if (type) filter.type = type;
     if (mealType) filter.mealType = mealType;
     if (category) filter.category = category;
-    if (isAvailable !== null && isAvailable !== undefined)
-      filter.isAvailable = isAvailable === 'true';
+    if (isAvailable !== undefined) filter.isAvailable = isAvailable;
 
     // Add search functionality (sanitize to prevent regex injection)
     if (search) {
@@ -70,22 +85,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Build sort object (whitelist sortable fields — sortBy is user input)
-    const SORTABLE_FIELDS = new Set([
-      'name',
-      'price',
-      'type',
-      'mealType',
-      'category',
-      'maxPeople',
-      'createdAt',
-    ]);
-    const sort: MongoSortOrder = {};
-    sort[SORTABLE_FIELDS.has(sortBy) ? sortBy : 'name'] =
-      sortOrder === 'asc' ? 1 : -1;
+    const sort: MongoSortOrder = { [sortBy]: sortOrder };
 
-    const dining = await Dining.find(filter).sort(sort);
+    const dining = await diningReader.find(filter).sort(sort);
 
-    return createSuccessResponse(dining);
+    return createSuccessResponse(dining.map(serializeDining));
   } catch (error) {
     if (error instanceof ReservationRuleError)
       return createErrorResponse(error.message, error.status);
@@ -106,20 +110,23 @@ export async function POST(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const body = json.data;
 
     const validationResult = createDiningSchema.safeParse(body);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
 
-    const dining = new Dining(validationResult.data);
+    await connectDB();
+
+    const dining = new diningReader(validationResult.data);
     await dining.save();
 
     return createSuccessResponse(
-      dining,
+      serializeDining(dining),
       'Dining item created successfully',
       HTTP_STATUS.CREATED
     );
@@ -130,7 +137,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 
@@ -151,14 +158,17 @@ export async function PUT(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const body = json.data;
 
     const validationResult = updateDiningSchema.safeParse(body);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     const { _id, ...updateData } = validationResult.data;
 
@@ -175,7 +185,13 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    return createSuccessResponse(dining, 'Dining item updated successfully');
+    if (!('mealType' in dining))
+      throw new TypeError('Expected a dining catalog');
+
+    return createSuccessResponse(
+      serializeDining(dining),
+      'Dining item updated successfully'
+    );
   } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return createErrorResponse(error.message, error.status);
@@ -183,7 +199,7 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 
@@ -204,8 +220,6 @@ export async function DELETE(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -215,6 +229,10 @@ export async function DELETE(request: NextRequest) {
         HTTP_STATUS.BAD_REQUEST
       );
     }
+
+    if (!catalogIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid catalog ID', HTTP_STATUS.BAD_REQUEST);
+    await connectDB();
 
     const dining = await deleteCapacityCatalog({
       kind: 'dining',

@@ -1,9 +1,21 @@
+import { z } from 'zod';
+import {
+  customerAddressSchema,
+  customerEmergencyContactSchema,
+  customerPreferencesSchema,
+} from '@/lib/validations/customer-metadata';
+import { customerProviderError } from './customer-errors';
+import type {
+  CreateCustomerInput,
+  UpdateCustomerInput,
+  CustomerFieldChange,
+} from './validations/customer';
 import type {
   ClerkUserListParams,
   Customer,
   CustomerPrivateMetadata,
   CustomerPublicMetadata,
-} from '@/types';
+} from '@/types/clerk';
 import { clerkClient, type User } from '@clerk/nextjs/server';
 
 import { logger } from '@/lib/logger';
@@ -188,8 +200,10 @@ async function waitForRateLimit(): Promise<void> {
  */
 async function retryWithBackoff<T>(
   operation: () => Promise<T>,
-  maxRetries: number = 2,
-  baseDelay: number = 1000
+  {
+    maxRetries = 2,
+    baseDelay = 1000,
+  }: { maxRetries?: number; baseDelay?: number } = {}
 ): Promise<T> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -215,24 +229,93 @@ async function retryWithBackoff<T>(
   throw new Error('Max retries exceeded');
 }
 
+export type CustomerClerkSource = Pick<
+  User,
+  | 'id'
+  | 'firstName'
+  | 'lastName'
+  | 'username'
+  | 'primaryEmailAddressId'
+  | 'imageUrl'
+  | 'hasImage'
+  | 'publicMetadata'
+  | 'privateMetadata'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'lastSignInAt'
+  | 'lastActiveAt'
+  | 'banned'
+  | 'locked'
+> & {
+  emailAddresses: Pick<User['emailAddresses'][number], 'id' | 'emailAddress'>[];
+  phoneNumbers: Pick<User['phoneNumbers'][number], 'phoneNumber'>[];
+};
+
 /**
  * Extract extended data from Clerk user metadata
  */
-function extractMetadata(clerkUser: User): {
+function metadataField<T extends z.ZodType>({
+  value,
+  schema,
+  field,
+}: {
+  value: unknown;
+  schema: T;
+  field: string;
+}): z.output<T> | undefined {
+  if (value == null) return undefined;
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  logger.warn('Ignoring invalid customer metadata', { field });
+  return undefined;
+}
+
+function extractMetadata(clerkUser: CustomerClerkSource): {
   publicMeta: CustomerPublicMetadata;
   privateMeta: CustomerPrivateMetadata;
 } {
-  const publicMeta = (clerkUser.publicMetadata || {}) as CustomerPublicMetadata;
-  const privateMeta = (clerkUser.privateMetadata ||
-    {}) as CustomerPrivateMetadata;
-  return { publicMeta, privateMeta };
+  const publicData = clerkUser.publicMetadata ?? {};
+  const privateData = clerkUser.privateMetadata ?? {};
+  return {
+    publicMeta: {
+      nationality: metadataField({
+        value: publicData.nationality,
+        schema: z.string(),
+        field: 'nationality',
+      }),
+      preferences: metadataField({
+        value: publicData.preferences,
+        schema: customerPreferencesSchema,
+        field: 'preferences',
+      }),
+    },
+    privateMeta: {
+      nationalId: metadataField({
+        value: privateData.nationalId,
+        schema: z.string(),
+        field: 'nationalId',
+      }),
+      address: metadataField({
+        value: privateData.address,
+        schema: customerAddressSchema,
+        field: 'address',
+      }),
+      emergencyContact: metadataField({
+        value: privateData.emergencyContact,
+        schema: customerEmergencyContactSchema,
+        field: 'emergencyContact',
+      }),
+    },
+  };
 }
 
 /**
  * Converts Clerk user data to our Customer format.
  * Extended data is read from Clerk metadata (publicMetadata + privateMetadata).
  */
-export function convertClerkUserToCustomer(clerkUser: User): Customer {
+export function convertClerkUserToCustomer(
+  clerkUser: CustomerClerkSource
+): Customer {
   // Get primary email address
   const primaryEmail = clerkUser.emailAddresses.find(
     email => email.id === clerkUser.primaryEmailAddressId
@@ -403,11 +486,15 @@ export async function getClerkUser(userId: string): Promise<Customer | null> {
 /**
  * Search users from Clerk with query
  */
-export async function searchClerkUsers(
-  query: string,
-  limit: number = 10,
-  offset: number = 0
-): Promise<{ data: Customer[]; totalCount: number }> {
+export async function searchClerkUsers({
+  query,
+  limit = 10,
+  offset = 0,
+}: {
+  query: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Customer[]; totalCount: number }> {
   return getClerkUsers({
     query,
     limit,
@@ -530,17 +617,11 @@ export async function createClerkUser(userData: {
     const clerkUser = await client.users.createUser(createParams);
     return clerkUser;
   } catch (error: unknown) {
-    console.error('Error creating user in Clerk:', error);
-
-    if (error && typeof error === 'object' && 'errors' in error) {
-      const clerkError = error as { errors: Array<{ message: string }> };
-      const errorMessages = clerkError.errors
-        .map(err => err.message)
-        .join(', ');
-      throw new Error(`Failed to create user: ${errorMessages}`);
-    }
-
-    throw new Error('Failed to create user in Clerk');
+    logger.error('Failed to create user in Clerk', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to create user in Clerk',
+    });
   }
 }
 
@@ -564,7 +645,11 @@ export async function updateClerkUser(
       username?: string;
     }
 
-    const updateParams: ClerkUpdateUserParams = {};
+    const updateParams: ClerkUpdateUserParams = {
+      firstName: undefined,
+      lastName: undefined,
+      username: undefined,
+    };
 
     if (userData.firstName !== undefined) {
       updateParams.firstName = userData.firstName;
@@ -579,17 +664,11 @@ export async function updateClerkUser(
     const clerkUser = await client.users.updateUser(userId, updateParams);
     return clerkUser;
   } catch (error: unknown) {
-    console.error('Error updating user in Clerk:', error);
-
-    if (error && typeof error === 'object' && 'errors' in error) {
-      const clerkError = error as { errors: Array<{ message: string }> };
-      const errorMessages = clerkError.errors
-        .map(err => err.message)
-        .join(', ');
-      throw new Error(`Failed to update user: ${errorMessages}`);
-    }
-
-    throw new Error('Failed to update user in Clerk');
+    logger.error('Failed to update user in Clerk', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to update user in Clerk',
+    });
   }
 }
 
@@ -602,18 +681,11 @@ export async function deleteClerkUser(userId: string): Promise<User> {
     const deletedUser = await client.users.deleteUser(userId);
     return deletedUser;
   } catch (error: unknown) {
-    console.error('Error deleting user from Clerk:', error);
-
-    if (
-      error &&
-      typeof error === 'object' &&
-      'status' in error &&
-      error.status === 404
-    ) {
-      throw new Error('User not found');
-    }
-
-    throw new Error('Failed to delete user from Clerk');
+    logger.error('Failed to delete user in Clerk', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to delete user in Clerk',
+    });
   }
 }
 
@@ -626,18 +698,11 @@ export async function lockClerkUser(userId: string): Promise<User> {
     const lockedUser = await client.users.lockUser(userId);
     return lockedUser;
   } catch (error: unknown) {
-    console.error('Error locking user in Clerk:', error);
-
-    if (
-      error &&
-      typeof error === 'object' &&
-      'status' in error &&
-      error.status === 404
-    ) {
-      throw new Error('User not found');
-    }
-
-    throw new Error('Failed to lock user in Clerk');
+    logger.error('Failed to lock user in Clerk', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to lock user in Clerk',
+    });
   }
 }
 
@@ -650,50 +715,20 @@ export async function unlockClerkUser(userId: string): Promise<User> {
     const unlockedUser = await client.users.unlockUser(userId);
     return unlockedUser;
   } catch (error: unknown) {
-    console.error('Error unlocking user in Clerk:', error);
-
-    if (error instanceof Error && error.message.includes('not found')) {
-      throw new Error('User not found');
-    }
-
-    throw new Error('Failed to unlock user in Clerk');
+    logger.error('Failed to unlock user in Clerk', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to unlock user in Clerk',
+    });
   }
 }
 
 /**
  * Create a complete customer (Clerk user + metadata)
  */
-export async function createCompleteCustomer(userData: {
-  // Required Clerk fields
-  email: string;
-  phone?: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  username?: string;
-
-  // Extended data fields (stored in Clerk metadata)
-  nationality?: string;
-  nationalId?: string;
-  address?: {
-    street?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    zipCode?: string;
-  };
-  emergencyContact?: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    relationship?: string;
-  };
-  preferences?: {
-    smokingPreference?: 'smoking' | 'non-smoking' | 'no-preference';
-    dietaryRestrictions?: string[];
-    accessibilityNeeds?: string[];
-  };
-}): Promise<Customer> {
+export async function createCompleteCustomer(
+  userData: CreateCustomerInput
+): Promise<Customer> {
   try {
     // 1. Create user in Clerk
     const clerkUser = await createClerkUser({
@@ -702,7 +737,6 @@ export async function createCompleteCustomer(userData: {
       password: userData.password,
       firstName: userData.firstName,
       lastName: userData.lastName,
-      username: userData.username,
     });
 
     // 2. Store extended data in Clerk metadata
@@ -710,15 +744,12 @@ export async function createCompleteCustomer(userData: {
     const privateMetadata: CustomerPrivateMetadata = {};
 
     if (userData.nationality) publicMetadata.nationality = userData.nationality;
-    if (userData.preferences)
-      publicMetadata.preferences =
-        userData.preferences as CustomerPublicMetadata['preferences'];
+    if (userData.preferences) publicMetadata.preferences = userData.preferences;
 
     if (userData.nationalId) privateMetadata.nationalId = userData.nationalId;
     if (userData.address) privateMetadata.address = userData.address;
     if (userData.emergencyContact)
-      privateMetadata.emergencyContact =
-        userData.emergencyContact as CustomerPrivateMetadata['emergencyContact'];
+      privateMetadata.emergencyContact = userData.emergencyContact;
 
     const client = await clerkClient();
     const updatedUser = await client.users.updateUserMetadata(clerkUser.id, {
@@ -729,8 +760,11 @@ export async function createCompleteCustomer(userData: {
     // 3. Return combined customer object
     return convertClerkUserToCustomer(updatedUser);
   } catch (error) {
-    console.error('Error creating complete customer:', error);
-    throw error;
+    logger.error('Failed to create customer', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to create customer',
+    });
   }
 }
 
@@ -744,7 +778,7 @@ export async function deleteCompleteCustomer(
     await deleteClerkUser(clerkUserId);
     await invalidateCache(clerkUserId);
   } catch (error) {
-    console.error('Error deleting complete customer:', error);
+    logger.error('Failed to delete customer', error);
     throw error;
   }
 }
@@ -754,34 +788,7 @@ export async function deleteCompleteCustomer(
  */
 export async function updateCompleteCustomer(
   clerkUserId: string,
-  userData: {
-    // Clerk fields that can be updated
-    firstName?: string;
-    lastName?: string;
-    username?: string;
-
-    // Extended data fields (stored in Clerk metadata)
-    nationality?: string;
-    nationalId?: string;
-    address?: {
-      street?: string;
-      city?: string;
-      state?: string;
-      country?: string;
-      zipCode?: string;
-    };
-    emergencyContact?: {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      relationship?: string;
-    };
-    preferences?: {
-      smokingPreference?: 'smoking' | 'non-smoking' | 'no-preference';
-      dietaryRestrictions?: string[];
-      accessibilityNeeds?: string[];
-    };
-  }
+  changes: UpdateCustomerInput
 ): Promise<Customer> {
   try {
     const client = await clerkClient();
@@ -789,9 +796,9 @@ export async function updateCompleteCustomer(
     // 1. Update user in Clerk (only if Clerk-related fields are provided)
     let clerkUser;
     const clerkUpdateFields = {
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      username: userData.username,
+      firstName: changes.firstName,
+      lastName: changes.lastName,
+      username: changes.username,
     };
 
     const hasClerkUpdates = Object.values(clerkUpdateFields).some(
@@ -805,31 +812,29 @@ export async function updateCompleteCustomer(
     }
 
     // 2. Update extended data in Clerk metadata
-    const publicMetadata: Partial<CustomerPublicMetadata> = {};
-    const privateMetadata: Partial<CustomerPrivateMetadata> = {};
+    const publicMetadata: Record<string, unknown> = {};
+    const privateMetadata: Record<string, unknown> = {};
     let hasMetadataUpdates = false;
 
-    if (userData.nationality !== undefined) {
-      publicMetadata.nationality = userData.nationality;
+    if (changes.nationality.kind !== 'unchanged') {
+      publicMetadata.nationality = changeValue(changes.nationality);
       hasMetadataUpdates = true;
     }
-    if (userData.preferences !== undefined) {
-      publicMetadata.preferences =
-        userData.preferences as CustomerPublicMetadata['preferences'];
+    if (changes.preferences.kind !== 'unchanged') {
+      publicMetadata.preferences = changeValue(changes.preferences);
       hasMetadataUpdates = true;
     }
 
-    if (userData.nationalId !== undefined) {
-      privateMetadata.nationalId = userData.nationalId;
+    if (changes.nationalId.kind !== 'unchanged') {
+      privateMetadata.nationalId = changeValue(changes.nationalId);
       hasMetadataUpdates = true;
     }
-    if (userData.address !== undefined) {
-      privateMetadata.address = userData.address;
+    if (changes.address.kind !== 'unchanged') {
+      privateMetadata.address = changeValue(changes.address);
       hasMetadataUpdates = true;
     }
-    if (userData.emergencyContact !== undefined) {
-      privateMetadata.emergencyContact =
-        userData.emergencyContact as CustomerPrivateMetadata['emergencyContact'];
+    if (changes.emergencyContact.kind !== 'unchanged') {
+      privateMetadata.emergencyContact = changeValue(changes.emergencyContact);
       hasMetadataUpdates = true;
     }
 
@@ -850,7 +855,18 @@ export async function updateCompleteCustomer(
 
     return convertClerkUserToCustomer(clerkUser);
   } catch (error) {
-    console.error('Error updating complete customer:', error);
-    throw error;
+    logger.error('Failed to update customer', error);
+    throw customerProviderError({
+      error,
+      fallback: 'Failed to update customer',
+    });
   }
+}
+
+function changeValue<T>(change: CustomerFieldChange<T>): T | null | undefined {
+  return change.kind === 'set'
+    ? change.value
+    : change.kind === 'clear'
+      ? null
+      : undefined;
 }

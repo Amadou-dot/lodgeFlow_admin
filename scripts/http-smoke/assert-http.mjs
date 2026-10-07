@@ -26,3 +26,18 @@ export async function expectJson({
   );
   return response.json();
 }
+
+/** Clerk can deny API requests via a marked rewrite or its configured sign-in URL. */
+export function assertAuthenticationDenied(response) {
+  if (response.status === 404) {
+    assert.equal(
+      response.headers.get('x-clerk-auth-reason'),
+      'protect-rewrite'
+    );
+    return;
+  }
+  assert.equal(response.status, 307);
+  const location = new URL(response.headers.get('location'));
+  assert.equal(location.hostname, 'accounts.smoke.test');
+  assert.equal(location.pathname, '/sign-in');
+}

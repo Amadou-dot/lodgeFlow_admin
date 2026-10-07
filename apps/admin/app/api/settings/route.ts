@@ -1,3 +1,6 @@
+import { logger } from '@/lib/logger';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { serializeSettings } from '@lodgeflow/database/settings-json';
 import { auditSnapshot, SETTINGS_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
 import {
   createErrorResponse,
@@ -11,7 +14,10 @@ import {
   stripSettingsMongoMetadata,
   updateSettingsSchema,
 } from '@/lib/validations/settings';
-import { isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest, NextResponse } from 'next/server';
 import { Settings } from '@lodgeflow/database';
 
@@ -71,10 +77,10 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      data: settings,
+      data: serializeSettings(settings.toObject()),
     });
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    logger.error('Failed to fetch settings', error);
     return NextResponse.json(
       {
         success: false,
@@ -91,18 +97,16 @@ export async function PUT(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
-
+    const body = await readJsonRequestBody(request);
+    if (!body.success) return createErrorResponse(body.error, 400);
     const validationResult = updateSettingsSchema.safeParse(
-      typeof body === 'object' && body !== null
-        ? stripSettingsMongoMetadata(body as Record<string, unknown>)
-        : body
+      stripSettingsMongoMetadata(body.data)
     );
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     // Get current settings or create new if none exist
     let settings = await Settings.findOne();
@@ -116,10 +120,10 @@ export async function PUT(request: NextRequest) {
       effectiveMinBookingLength !== undefined &&
       effectiveMaxBookingLength !== undefined
     ) {
-      const rangeError = getBookingLengthRangeError(
-        effectiveMinBookingLength,
-        effectiveMaxBookingLength
-      );
+      const rangeError = getBookingLengthRangeError({
+        minBookingLength: effectiveMinBookingLength,
+        maxBookingLength: effectiveMaxBookingLength,
+      });
       if (rangeError) {
         return createErrorResponse('Validation failed', 400, {
           maxBookingLength: [rangeError],
@@ -147,17 +151,17 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: settings,
+      data: serializeSettings(settings.toObject()),
     });
   } catch (error: unknown) {
-    console.error('Error updating settings:', error);
+    logger.error('Failed to update settings', error);
 
     if (isMongooseValidationError(error)) {
       return NextResponse.json(
         {
           success: false,
           error: 'Validation failed',
-          details: error.errors,
+          details: mongooseValidationDetails(error),
         },
         { status: 400 }
       );
@@ -199,10 +203,10 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      data: settings,
+      data: serializeSettings(settings.toObject()),
     });
   } catch (error) {
-    console.error('Error resetting settings:', error);
+    logger.error('Failed to reset settings', error);
     return NextResponse.json(
       {
         success: false,

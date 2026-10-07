@@ -2,6 +2,10 @@
  * @jest-environment node
  */
 
+import { Error as MongooseError } from 'mongoose';
+
+import mongoose, { Types } from 'mongoose';
+import type { DiningJsonSource } from '@lodgeflow/database/dining-json';
 import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 jest.mock('@lodgeflow/database/reservation-capacity', () => ({
@@ -30,25 +34,29 @@ const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
   typeof connectToDatabase
 >;
 
-// Mock the Dining model (default export)
+// Narrow the constructor dependency to the data and save operation used here.
 const mockDiningModel = {
   find: jest.fn(),
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
 };
-
+const mockDiningConstructor = jest.fn<
+  DiningJsonSource & { save: () => Promise<void> },
+  [unknown]
+>();
 jest.mock('@lodgeflow/database/models/Dining', () => ({
   __esModule: true,
-  default: jest.fn(() => ({
-    save: jest.fn(),
-  })),
+  default: Object.assign(
+    function Dining(input: unknown) {
+      return mockDiningConstructor(input);
+    },
+    {
+      find: (...args: unknown[]) => mockDiningModel.find(...args),
+      findById: (...args: unknown[]) => mockDiningModel.findById(...args),
+    }
+  ),
 }));
-
-// Get the mocked module
-import Dining from '@lodgeflow/database/models/Dining';
-const MockDining = Dining as jest.MockedClass<typeof Dining> &
-  typeof mockDiningModel;
 
 // Mock auth to bypass authentication
 jest.mock('@/lib/api-utils', () => ({
@@ -64,8 +72,8 @@ jest.mock('@/lib/api-utils', () => ({
 }));
 
 // Mock dining data
-const mockDiningData = {
-  _id: '507f1f77bcf86cd799439011',
+const mockDiningData: DiningJsonSource = {
+  _id: new Types.ObjectId('507f1f77bcf86cd799439011'),
   name: 'Continental Breakfast',
   description:
     'A delicious continental breakfast with fresh pastries and coffee.',
@@ -84,15 +92,15 @@ const mockDiningData = {
   allergens: ['gluten', 'dairy'],
   isAvailable: true,
   isPopular: true,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
+  createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
 };
 
-const mockDiningList = [
+const mockDiningList: DiningJsonSource[] = [
   mockDiningData,
   {
     ...mockDiningData,
-    _id: '507f1f77bcf86cd799439012',
+    _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
     name: 'Lunch Special',
     mealType: 'lunch',
     price: 35,
@@ -102,11 +110,12 @@ const mockDiningList = [
 describe('/api/dining', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue(
-      {} as ReturnType<typeof connectToDatabase>
-    );
+    mockConnectToDatabase.mockResolvedValue(mongoose);
+    mockDiningConstructor.mockImplementation(() => ({
+      ...mockDiningData,
+      save: jest.fn().mockResolvedValue(undefined),
+    }));
     // Set up static method mocks on the constructor
-    Object.assign(MockDining, mockDiningModel);
   });
 
   describe('GET /api/dining', () => {
@@ -263,21 +272,18 @@ describe('/api/dining', () => {
     });
 
     it('maps a Mongoose ValidationError to a 400 response', async () => {
-      const validationError = Object.assign(
-        new Error('Dining validation failed'),
-        {
-          name: 'ValidationError',
-          errors: {
-            price: { message: 'Price must be positive' },
-          },
-        }
+      const validationError = new MongooseError.ValidationError();
+      validationError.addError(
+        'price',
+        new MongooseError.ValidatorError({
+          path: 'price',
+          message: 'Price must be positive',
+        })
       );
-      MockDining.mockImplementation(
-        () =>
-          ({
-            save: jest.fn().mockRejectedValue(validationError),
-          }) as any
-      );
+      mockDiningConstructor.mockImplementation(() => ({
+        ...mockDiningData,
+        save: jest.fn().mockRejectedValue(validationError),
+      }));
 
       const request = new NextRequest('http://localhost/api/dining', {
         method: 'POST',
@@ -290,7 +296,9 @@ describe('/api/dining', () => {
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
       expect(data.error).toBe('Validation failed');
-      expect(data.details).toEqual(validationError.errors);
+      expect(data.details).toEqual({
+        price: { message: 'Invalid value', path: 'price' },
+      });
     });
   });
 
@@ -322,7 +330,7 @@ describe('/api/dining', () => {
       const request = new NextRequest('http://localhost/api/dining', {
         method: 'PUT',
         body: JSON.stringify({
-          _id: 'nonexistent',
+          _id: '507f1f77bcf86cd7994390ff',
           price: 30,
         }),
       });
@@ -362,7 +370,7 @@ describe('/api/dining', () => {
       mockDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/dining?id=nonexistent',
+        'http://localhost/api/dining?id=507f1f77bcf86cd7994390ff',
         {
           method: 'DELETE',
         }
@@ -380,10 +388,11 @@ describe('/api/dining', () => {
 describe('/api/dining/[id]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue(
-      {} as ReturnType<typeof connectToDatabase>
-    );
-    Object.assign(MockDining, mockDiningModel);
+    mockConnectToDatabase.mockResolvedValue(mongoose);
+    mockDiningConstructor.mockImplementation(() => ({
+      ...mockDiningData,
+      save: jest.fn().mockResolvedValue(undefined),
+    }));
   });
 
   describe('GET /api/dining/[id]', () => {
@@ -410,9 +419,9 @@ describe('/api/dining/[id]', () => {
       mockDiningModel.findById.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/dining/nonexistent'
+        'http://localhost/api/dining/507f1f77bcf86cd7994390ff'
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await getById(request, { params });
       const data = await response.json();
@@ -486,12 +495,12 @@ describe('/api/dining/[id]', () => {
       mockDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/dining/nonexistent',
+        'http://localhost/api/dining/507f1f77bcf86cd7994390ff',
         {
           method: 'DELETE',
         }
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await deleteById(request, { params });
       const data = await response.json();

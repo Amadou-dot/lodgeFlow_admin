@@ -1,80 +1,62 @@
 import { renderHook } from '@testing-library/react';
 import { useSendConfirmationEmail } from '@/hooks/useSendEmail';
-
+import type { ConfirmationEmailRequest } from '@/lib/validations/confirmation-email';
+const payload: ConfirmationEmailRequest = {
+  firstName: 'John',
+  email: 'john@example.com',
+  bookingData: {
+    _id: 'booking1',
+    checkInDate: '2040-01-01',
+    checkOutDate: '2040-01-03',
+    numNights: 2,
+    numGuests: 2,
+    cabinPrice: 100,
+    extrasPrice: 0,
+    totalPrice: 200,
+    depositAmount: 50,
+    remainingAmount: 200,
+  },
+  cabinData: {
+    name: 'Lake Cabin',
+    capacity: 4,
+    price: 100,
+    description: 'Quiet cabin',
+    amenities: [],
+  },
+};
 beforeEach(() => {
   jest.clearAllMocks();
-  (global.fetch as jest.Mock) = jest.fn();
+  global.fetch = jest.fn();
 });
-
-describe('useSendConfirmationEmail', () => {
-  it('returns sendConfirmationEmail function', () => {
-    const { result } = renderHook(() => useSendConfirmationEmail());
-
-    expect(result.current.sendConfirmationEmail).toBeInstanceOf(Function);
+test('returns a callable confirmation sender', () => {
+  const { result } = renderHook(() => useSendConfirmationEmail());
+  expect(result.current.sendConfirmationEmail).toBeInstanceOf(Function);
+});
+test('sends named confirmation data as the existing POST body', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ id: 'email' }),
+  } satisfies Pick<Response, 'ok' | 'json'>);
+  const { result } = renderHook(() => useSendConfirmationEmail());
+  expect(await result.current.sendConfirmationEmail(payload)).toEqual({
+    id: 'email',
   });
-
-  it('sends POST to /api/send/confirm with correct data', async () => {
-    const mockBookingData = { _id: 'booking1' } as any;
-    const mockCabinData = { _id: 'cabin1', name: 'Lake Cabin' } as any;
-
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
-
-    const { result } = renderHook(() => useSendConfirmationEmail());
-    await result.current.sendConfirmationEmail(
-      'John',
-      'john@example.com',
-      mockBookingData,
-      mockCabinData
-    );
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/send/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firstName: 'John',
-        email: 'john@example.com',
-        bookingData: mockBookingData,
-        cabinData: mockCabinData,
-      }),
-    });
+  expect(global.fetch).toHaveBeenCalledWith('/api/send/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: 'Email service unavailable' }),
-    });
-
-    const { result } = renderHook(() => useSendConfirmationEmail());
-
-    await expect(
-      result.current.sendConfirmationEmail(
-        'John',
-        'john@example.com',
-        {} as any,
-        {} as any
-      )
-    ).rejects.toThrow('Email service unavailable');
-  });
-
-  it('uses default error message when none provided', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({}),
-    });
-
-    const { result } = renderHook(() => useSendConfirmationEmail());
-
-    await expect(
-      result.current.sendConfirmationEmail(
-        'John',
-        'john@example.com',
-        {} as any,
-        {} as any
-      )
-    ).rejects.toThrow('Failed to send confirmation email');
-  });
+});
+test.each([
+  { error: 'Email service unavailable', expected: 'Email service unavailable' },
+  { error: undefined, expected: 'Failed to send confirmation email' },
+])('retains error handling: $expected', async ({ error, expected }) => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: false,
+    json: async () => ({ error }),
+  } satisfies Pick<Response, 'ok' | 'json'>);
+  const { result } = renderHook(() => useSendConfirmationEmail());
+  await expect(result.current.sendConfirmationEmail(payload)).rejects.toThrow(
+    expected
+  );
 });

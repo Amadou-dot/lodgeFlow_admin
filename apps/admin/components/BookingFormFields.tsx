@@ -65,9 +65,9 @@ interface BookingFormFieldsProps {
   handleCustomerSearch: (searchValue: string) => void;
 
   // Form Handlers
-  handleInputChange: (
-    field: keyof BookingFormData,
-    value: string | number | boolean | string[]
+  handleInputChange: <K extends keyof BookingFormData>(
+    field: K,
+    value: BookingFormData[K]
   ) => void;
   addSpecialRequest: () => void;
   removeSpecialRequest: (index: number) => void;

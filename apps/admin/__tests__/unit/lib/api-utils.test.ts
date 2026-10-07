@@ -7,13 +7,10 @@ import {
   createSuccessResponse,
   createErrorResponse,
   escapeRegex,
-  handleApiError,
-  validateRequiredFields,
   formatZodErrors,
   createRateLimitResponse,
   parsePagination,
   parseIntParam,
-  sanitizeUpdatePayload,
   createValidationErrorResponse,
   HTTP_STATUS,
   API_CONFIG,
@@ -125,11 +122,10 @@ describe('api-utils', () => {
 
     it('still logs server failures as errors', () => {
       jest.mocked(logger.error).mockClear();
-      const error = new Error('Database unavailable');
-      createErrorResponse(error, 503);
+      createErrorResponse('Service unavailable', 503);
       expect(logger.error).toHaveBeenCalledWith(
         'API Error',
-        error,
+        undefined,
         expect.objectContaining({ status: 503 })
       );
     });
@@ -141,13 +137,6 @@ describe('api-utils', () => {
       expect(response.status).toBe(500);
       expect(body.success).toBe(false);
       expect(body.error).toBe('Something went wrong');
-    });
-
-    it('extracts message from Error object', async () => {
-      const response = createErrorResponse(new Error('Bad input'));
-      const body = await response.json();
-
-      expect(body.error).toBe('Bad input');
     });
 
     it('uses custom status code', async () => {
@@ -168,102 +157,6 @@ describe('api-utils', () => {
       const body = await response.json();
 
       expect(body.details).toBeUndefined();
-    });
-  });
-
-  describe('handleApiError', () => {
-    it('maps "not found" errors to 404', async () => {
-      const response = handleApiError(new Error('Resource not found'));
-      expect(response.status).toBe(404);
-    });
-
-    it('maps "unauthorized" errors to 401', async () => {
-      const response = handleApiError(new Error('unauthorized access'));
-      expect(response.status).toBe(401);
-    });
-
-    it('maps "authentication" errors to 401', async () => {
-      const response = handleApiError(new Error('authentication failed'));
-      expect(response.status).toBe(401);
-    });
-
-    it('maps "forbidden" errors to 403', async () => {
-      const response = handleApiError(new Error('forbidden action'));
-      expect(response.status).toBe(403);
-    });
-
-    it('maps "permission" errors to 403', async () => {
-      const response = handleApiError(new Error('no permission'));
-      expect(response.status).toBe(403);
-    });
-
-    it('maps "validation" errors to 400', async () => {
-      const response = handleApiError(new Error('validation error'));
-      expect(response.status).toBe(400);
-    });
-
-    it('maps "invalid" errors to 400', async () => {
-      const response = handleApiError(new Error('invalid data'));
-      expect(response.status).toBe(400);
-    });
-
-    it('defaults to 500 for unknown Error', async () => {
-      const response = handleApiError(new Error('something broke'));
-      expect(response.status).toBe(500);
-    });
-
-    it('handles non-Error types', async () => {
-      const response = handleApiError('string error');
-      const body = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(body.error).toBe('An unexpected error occurred');
-    });
-
-    it('handles null/undefined errors', async () => {
-      const response = handleApiError(null);
-      expect(response.status).toBe(500);
-    });
-  });
-
-  describe('validateRequiredFields', () => {
-    it('returns valid when all fields present', () => {
-      const body = { name: 'Test', email: 'test@test.com' };
-      const result = validateRequiredFields(body, ['name', 'email']);
-
-      expect(result.isValid).toBe(true);
-      expect(result.missingFields).toHaveLength(0);
-    });
-
-    it('detects undefined fields', () => {
-      const body = { name: 'Test', email: undefined };
-      const result = validateRequiredFields(body, ['name', 'email']);
-
-      expect(result.isValid).toBe(false);
-      expect(result.missingFields).toContain('email');
-    });
-
-    it('detects null fields', () => {
-      const body = { name: null, email: 'test@test.com' };
-      const result = validateRequiredFields(body, ['name', 'email']);
-
-      expect(result.isValid).toBe(false);
-      expect(result.missingFields).toContain('name');
-    });
-
-    it('detects empty string fields', () => {
-      const body = { name: '', email: 'test@test.com' };
-      const result = validateRequiredFields(body, ['name', 'email']);
-
-      expect(result.isValid).toBe(false);
-      expect(result.missingFields).toContain('name');
-    });
-
-    it('returns all missing fields', () => {
-      const body = { name: undefined, email: null, phone: '' };
-      const result = validateRequiredFields(body, ['name', 'email', 'phone']);
-
-      expect(result.missingFields).toHaveLength(3);
     });
   });
 
@@ -393,43 +286,6 @@ describe('api-utils', () => {
       expect(result.page).toBe(1);
       expect(result.limit).toBe(API_CONFIG.DEFAULT_PAGE_SIZE);
       expect(result.skip).toBe(0);
-    });
-  });
-
-  describe('sanitizeUpdatePayload', () => {
-    it('passes through plain fields', () => {
-      const result = sanitizeUpdatePayload({ name: 'Cabin A', price: 100 });
-
-      expect(result).toEqual({ name: 'Cabin A', price: 100 });
-    });
-
-    it('strips MongoDB operator keys', () => {
-      const result = sanitizeUpdatePayload({
-        name: 'Cabin A',
-        $inc: { price: -50 },
-        $unset: { discount: '' },
-      });
-
-      expect(result).toEqual({ name: 'Cabin A' });
-    });
-
-    it('strips dotted path keys', () => {
-      const result = sanitizeUpdatePayload({
-        name: 'Cabin A',
-        'settings.secret': true,
-      });
-
-      expect(result).toEqual({ name: 'Cabin A' });
-    });
-
-    it('strips immutable fields', () => {
-      const result = sanitizeUpdatePayload({
-        _id: 'someid',
-        __v: 3,
-        name: 'Cabin A',
-      });
-
-      expect(result).toEqual({ name: 'Cabin A' });
     });
   });
 

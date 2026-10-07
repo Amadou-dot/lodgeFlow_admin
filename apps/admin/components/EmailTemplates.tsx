@@ -1,15 +1,11 @@
-import { Cabin, PopulatedBooking } from '@/types';
+import type { ConfirmationEmailInput } from '@/lib/validations/confirmation-email';
 import { formatCurrency } from '@/utils/utilityFunctions';
 
 interface EmailTemplateProps {
   firstName: string;
 }
 
-interface BookingEmailTemplateProps {
-  firstName: string;
-  bookingData: PopulatedBooking;
-  cabinData: Cabin;
-}
+type BookingEmailTemplateProps = Omit<ConfirmationEmailInput, 'email'>;
 
 const emailStyles = {
   container: {
@@ -144,7 +140,7 @@ export function BookingConfirmationEmail({
   bookingData,
   cabinData,
 }: BookingEmailTemplateProps) {
-  const formatDate = (date: string | Date) => {
+  const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -157,23 +153,23 @@ export function BookingConfirmationEmail({
 
   const getAddons = () => {
     const addons = [];
-    if (bookingData.extras.hasBreakfast) {
+    if (bookingData.extras?.hasBreakfast) {
       addons.push(
         `Breakfast - ${formatPrice(bookingData.extras.breakfastPrice)}`
       );
     }
-    if (bookingData.extras.hasPets) {
+    if (bookingData.extras?.hasPets) {
       addons.push(`Pet Fee - ${formatPrice(bookingData.extras.petFee)}`);
     }
-    if (bookingData.extras.hasParking) {
+    if (bookingData.extras?.hasParking) {
       addons.push(`Parking - ${formatPrice(bookingData.extras.parkingFee)}`);
     }
-    if (bookingData.extras.hasEarlyCheckIn) {
+    if (bookingData.extras?.hasEarlyCheckIn) {
       addons.push(
         `Early Check-in - ${formatPrice(bookingData.extras.earlyCheckInFee)}`
       );
     }
-    if (bookingData.extras.hasLateCheckOut) {
+    if (bookingData.extras?.hasLateCheckOut) {
       addons.push(
         `Late Check-out - ${formatPrice(bookingData.extras.lateCheckOutFee)}`
       );

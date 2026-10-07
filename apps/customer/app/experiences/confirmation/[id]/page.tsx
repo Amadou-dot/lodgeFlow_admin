@@ -23,28 +23,7 @@ import { title, subtitle } from '@/components/primitives';
 
 type Params = Promise<{ id: string }>;
 
-interface ExperienceBookingData {
-  _id: string;
-  experience: {
-    _id: string;
-    name: string;
-    image: string;
-    price: number;
-    duration: string;
-    category: string;
-    location?: string;
-  };
-  customer: string;
-  date: string;
-  timeSlot?: string;
-  numParticipants: number;
-  status: string;
-  totalPrice: number;
-  isPaid: boolean;
-  specialRequests: string[];
-  observations?: string;
-}
-
+import type { ExperienceReservationDetail as ExperienceBookingData } from '@lodgeflow/database/reservation-json';
 export default function ExperienceConfirmationPage({
   params,
 }: {
@@ -172,10 +151,10 @@ export default function ExperienceConfirmationPage({
         {/* Experience Image */}
         <div className='relative h-64 lg:h-full min-h-[300px] rounded-lg overflow-hidden'>
           <Image
-            alt={booking.experience.name}
+            alt={booking.experience?.name ?? 'Removed listing'}
             className='rounded-lg'
             fill
-            src={booking.experience.image}
+            src={booking.experience?.image ?? '/placeholder-experience.jpg'}
             style={{ objectFit: 'cover' }}
           />
         </div>
@@ -195,7 +174,9 @@ export default function ExperienceConfirmationPage({
 
             <div>
               <p className='text-sm text-default-500'>Experience</p>
-              <p className='font-semibold text-lg'>{booking.experience.name}</p>
+              <p className='font-semibold text-lg'>
+                {booking.experience?.name ?? 'Removed listing'}
+              </p>
             </div>
 
             <div className='flex items-center gap-2'>
@@ -228,19 +209,19 @@ export default function ExperienceConfirmationPage({
       </div>
 
       {/* Special Requests */}
-      {(booking.specialRequests.length > 0 || booking.observations) && (
+      {((booking.specialRequests?.length ?? 0) > 0 || booking.observations) && (
         <Card className='mb-6'>
           <CardHeader>
             <h2 className={title({ size: 'sm' })}>Additional Information</h2>
           </CardHeader>
           <CardBody className='space-y-4'>
-            {booking.specialRequests.length > 0 && (
+            {(booking.specialRequests?.length ?? 0) > 0 && (
               <div>
                 <p className='text-sm text-default-500 mb-2'>
                   Special Requests:
                 </p>
                 <ul className='list-disc list-inside space-y-1'>
-                  {booking.specialRequests.map((request, index) => (
+                  {booking.specialRequests?.map((request, index) => (
                     <li key={index} className='text-sm'>
                       {request}
                     </li>
@@ -272,9 +253,15 @@ export default function ExperienceConfirmationPage({
           />
           <div className='flex justify-between items-center'>
             <span className='text-default-600'>
-              ${booking.experience.price} x {booking.numParticipants}{' '}
-              participant
-              {booking.numParticipants > 1 ? 's' : ''}
+              {booking.experience ? (
+                <>
+                  ${booking.experience.price} x {booking.numParticipants}{' '}
+                  participant
+                  {booking.numParticipants > 1 ? 's' : ''}
+                </>
+              ) : (
+                'Listing price unavailable'
+              )}
             </span>
             <span className='font-semibold'>${booking.totalPrice}</span>
           </div>

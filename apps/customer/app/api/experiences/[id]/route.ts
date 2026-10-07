@@ -1,6 +1,15 @@
+import { logger } from '@lodgeflow/database/logger';
+import { catalogIdSchema } from '@/lib/validations/catalog';
+import {
+  serializeExperience,
+  type ExperienceJsonSource,
+} from '@lodgeflow/database/experience-json';
+import type { Model } from 'mongoose';
 import { connectDB, Experience } from '@lodgeflow/database';
 import type { ApiResponse, Experience as ExperienceType } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
+
+const experienceReader: Model<ExperienceJsonSource> = Experience;
 
 export async function GET(
   request: NextRequest,
@@ -9,8 +18,14 @@ export async function GET(
   try {
     const { id } = await params;
 
+    if (!catalogIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Experience not found' },
+        { status: 404 }
+      );
+
     await connectDB();
-    const experience = await Experience.findById(id).lean();
+    const experience = await experienceReader.findById(id).lean();
 
     if (!experience) {
       const response: ApiResponse<never> = {
@@ -22,7 +37,7 @@ export async function GET(
     }
 
     // Convert MongoDB document to plain object
-    const serializedExperience = JSON.parse(JSON.stringify(experience));
+    const serializedExperience = serializeExperience(experience);
 
     const response: ApiResponse<ExperienceType> = {
       success: true,
@@ -31,7 +46,10 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching experience:', error);
+    logger.error(
+      'Error fetching experience',
+      error instanceof Error ? error : undefined
+    );
 
     const response: ApiResponse<never> = {
       success: false,

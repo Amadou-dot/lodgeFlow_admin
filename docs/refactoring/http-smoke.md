@@ -32,6 +32,18 @@ Memory Server binary download. No application credentials are required.
   injected write failure without mutation, successful retry and manager audit.
 - Admin cabin catalog/detail/create/update responses: complete JSON compared
   with real saved documents, front-desk reads and preserved omitted update fields.
+- Admin cabin availability: date-only JSON, own-booking exclusion, invalid IDs
+  and dates rejected without writes, and preserved read permissions.
+- Admin dining/experience catalog JSON and partial edits; booking/customer/Settings,
+  reporting, staff/audit and reservation/calendar responses and permissions.
+- Strict catalog/booking/reservation request fields, invalid JSON/IDs, denied
+  effects, safe provider/database failures and successful retries.
+- Dining/experience availability retains day/range bounds and capacity grouping.
+  Manual confirmations exercise rendered templates, owner checks and paid/free
+  sender selection without changing reservation accounting.
+- Cancellation refund failures return a safe error, retain the pending state and
+  reuse the idempotency key on retry. Signed completion events update receipts;
+  duplicate or older events cannot increase completed refunds.
 - The real Stripe webhook signature verifier, with locally signed payloads.
 - The installed Resend SDK and `@react-email/render` template rendering, with
   transport intercepted before live delivery.

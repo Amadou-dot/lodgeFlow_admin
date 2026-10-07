@@ -1,3 +1,5 @@
+import { ReservationReadError } from './validations/reservation-reads';
+import { logger } from './logger';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -19,27 +21,27 @@ export async function calendarResponse(
   try {
     range = calendarRange(new URL(request.url).searchParams);
   } catch (error) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Invalid date range',
-      400
-    );
+    if (error instanceof ReservationReadError)
+      return createErrorResponse(error.message, 400);
+    logger.error('Unable to load calendar', error);
+    return createErrorResponse('Unable to load calendar', 500);
   }
   try {
     await connectDB();
     const data =
       kind === 'cabins'
-        ? await cabinCalendar(range.start, range.end)
-        : await capacityCalendar(
-            kind === 'dining' ? 'dining' : 'experience',
-            range.start,
-            range.end
-          );
+        ? await cabinCalendar(range)
+        : await capacityCalendar({
+            kind: kind === 'dining' ? 'dining' : 'experience',
+            ...range,
+          });
     return createSuccessResponse({
       ...data,
       start: range.start.toISOString(),
       end: range.end.toISOString(),
     });
-  } catch {
+  } catch (error: unknown) {
+    logger.error('Unable to load calendar', error);
     return createErrorResponse('Unable to load calendar', 500);
   }
 }

@@ -80,12 +80,12 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
 
   const todayDate = today(getLocalTimeZone());
 
-  const isDateUnavailable = (date: any) => {
+  const isDateUnavailable = (date: DateValue) => {
     if (!availabilityData?.success || !availabilityData.data.unavailableDates) {
       return false;
     }
 
-    const calendarDate = 'calendar' in date ? toCalendarDate(date) : date;
+    const calendarDate = toCalendarDate(date);
 
     return availabilityData.data.unavailableDates.some(range => {
       const startDate = parseDate(range.start);

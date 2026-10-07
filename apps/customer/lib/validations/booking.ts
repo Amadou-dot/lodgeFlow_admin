@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { objectRequestSchema } from './object-request';
+export const bookingIdSchema = z
+  .string()
+  .regex(/^[a-f\d]{24}$/i, 'Invalid booking ID');
+const requestDateSchema = z.string().pipe(z.coerce.date());
 
 import {
   BOOKING_STATUSES,
@@ -9,14 +14,14 @@ import {
 /**
  * Booking extras schema
  */
-const extrasSelectionSchema = z.object({
+const extrasSelectionFields = z.strictObject({
   hasBreakfast: z.boolean().optional(),
   hasPets: z.boolean().optional(),
   hasParking: z.boolean().optional(),
   hasEarlyCheckIn: z.boolean().optional(),
   hasLateCheckOut: z.boolean().optional(),
 });
-const bookingExtrasSchema = extrasSelectionSchema;
+const bookingExtrasSchema = objectRequestSchema.pipe(extrasSelectionFields);
 
 /**
  * Booking status enum — uses shared constants from lib/config.ts
@@ -36,14 +41,13 @@ export const refundStatusSchema = z.enum(REFUND_STATUSES);
 /**
  * Create booking request schema (guest-facing)
  *
- * Note: cabinPrice, numNights, totalPrice are calculated server-side,
- * so they're optional in the request but required before saving to DB.
+ * Pricing and receipt fields are calculated server-side and rejected as input.
  */
-export const createBookingSchema = z
-  .object({
-    cabinId: z.string().min(1, 'Cabin ID is required'),
-    checkInDate: z.coerce.date(),
-    checkOutDate: z.coerce.date(),
+const createFieldsSchema = z
+  .strictObject({
+    cabinId: bookingIdSchema,
+    checkInDate: requestDateSchema,
+    checkOutDate: requestDateSchema,
     numGuests: z.number().int().min(1, 'At least 1 guest required').max(50),
     extras: bookingExtrasSchema.optional().default({}),
     specialRequests: z.array(z.string()).optional().default([]),
@@ -58,40 +62,26 @@ export const createBookingSchema = z
  * Update booking details schema (guest-facing PATCH for /api/bookings/[id])
  * Allows guests to update certain booking details before check-in
  */
-export const updateBookingDetailsSchema = z.object({
+const updateFieldsSchema = z.strictObject({
   numGuests: z.number().int().min(1).max(50).optional(),
   specialRequests: z.array(z.string()).optional(),
   extras: bookingExtrasSchema.optional(),
 });
 
-/**
- * Update booking request schema (admin-facing or internal PATCH)
- * Used for updating booking status, cancellation, or payment info
- */
-export const patchBookingSchema = z.object({
+export const createBookingSchema = objectRequestSchema.pipe(createFieldsSchema);
+export const updateBookingDetailsSchema =
+  objectRequestSchema.pipe(updateFieldsSchema);
+export const cancelBookingSchema = objectRequestSchema.pipe(
+  z.strictObject({ reason: z.string().max(500).optional() })
+);
+export const bookingHistoryQuerySchema = z.object({
   status: bookingStatusSchema.optional(),
-  cancellationReason: z.string().max(500).optional(),
-  stripePaymentIntentId: z
-    .string()
-    .startsWith('pi_', 'Invalid Stripe payment intent ID')
-    .max(255)
-    .optional(),
-  stripeSessionId: z
-    .string()
-    .startsWith('cs_', 'Invalid Stripe session ID')
-    .max(255)
-    .optional(),
 });
-
-export type CreateBookingInput = z.infer<typeof createBookingSchema>;
-export type UpdateBookingDetailsInput = z.infer<
+export type CreateBookingInput = z.output<typeof createBookingSchema>;
+export type UpdateBookingDetailsInput = z.output<
   typeof updateBookingDetailsSchema
 >;
-export type PatchBookingInput = z.infer<typeof patchBookingSchema>;
-
-/** JSON request dates are ISO strings; the server schema converts them to Date.
- * Keep defaults optional at the transport boundary through z.input. */
 export type CreateBookingRequest = Omit<
-  z.input<typeof createBookingSchema>,
-  'checkInDate' | 'checkOutDate'
-> & { checkInDate: string; checkOutDate: string };
+  z.input<typeof createFieldsSchema>,
+  'extras'
+> & { extras?: z.input<typeof extrasSelectionFields> };

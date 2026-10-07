@@ -27,18 +27,4 @@ export function reservationHref(type: ReservationType, id: string) {
 export function utcDate(value: string) {
   return value.slice(0, 10);
 }
-export interface ReservationRow {
-  _id: string;
-  type: ReservationType;
-  date: string;
-  endDate: string | null;
-  time: string | null;
-  partySize: number;
-  resourceName: string;
-  customer: string;
-  customerName: string;
-  status: string;
-  lifecycle: Lifecycle;
-  totalPrice: number;
-  isPaid: boolean;
-}
+export type { ReservationRow } from '@/types/reservation-calendar';

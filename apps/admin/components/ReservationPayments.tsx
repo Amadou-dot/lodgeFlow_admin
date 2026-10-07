@@ -2,9 +2,9 @@
 import { useRef, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import type {
-  ReservationReceipt,
-  ReservationPaymentState,
-} from '@lodgeflow/database';
+  ReservationReceiptJson,
+  ReservationPaymentJson,
+} from '@lodgeflow/database/reservation-json';
 export interface PaymentSummary {
   totalCents: number;
   paidCents: number;
@@ -22,7 +22,7 @@ export function ReservationPayments({
   stripeRefund,
   status,
   reload,
-}: ReservationPaymentState & {
+}: ReservationPaymentJson & {
   endpoint: string;
   payment: PaymentSummary;
   currency: string;
@@ -32,7 +32,8 @@ export function ReservationPayments({
   const canManage = usePermission('bookings:manage');
   const canRefund = usePermission('refunds:issue');
   const [type, setType] = useState<'payment' | 'refund'>('payment');
-  const [method, setMethod] = useState<ReservationReceipt['method']>('cash');
+  const [method, setMethod] =
+    useState<ReservationReceiptJson['method']>('cash');
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [state, setState] = useState<
@@ -178,7 +179,7 @@ export function ReservationPayments({
               className='block border rounded p-2 bg-background'
               value={method}
               onChange={e =>
-                setMethod(e.target.value as ReservationReceipt['method'])
+                setMethod(e.target.value as ReservationReceiptJson['method'])
               }
             >
               <option value='cash'>Cash</option>

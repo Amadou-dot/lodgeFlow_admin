@@ -29,13 +29,13 @@ export default function BookingSidebar({
         depositAmount={booking.depositAmount}
         amountPaid={booking.amountPaid}
         remainingAmount={booking.remainingAmount}
-        paymentMethod={booking.paymentMethod}
+        paymentMethod={booking.paymentMethod ?? undefined}
         paidAt={booking.paidAt?.toString()}
-        stripeSessionId={booking.stripeSessionId}
-        stripePaymentIntentId={booking.stripePaymentIntentId}
+        stripeSessionId={booking.stripeSessionId ?? undefined}
+        stripePaymentIntentId={booking.stripePaymentIntentId ?? undefined}
         paymentConfirmationSentAt={booking.paymentConfirmationSentAt?.toString()}
         refundStatus={booking.refundStatus}
-        refundAmount={booking.refundAmount}
+        refundAmount={booking.refundAmount ?? undefined}
         refundedAt={booking.refundedAt?.toString()}
       />
 
@@ -48,8 +48,8 @@ export default function BookingSidebar({
       />
 
       <BookingHistoryCard
-        createdAt={booking.createdAt.toString()}
-        updatedAt={booking.updatedAt.toString()}
+        createdAt={booking.createdAt ?? undefined}
+        updatedAt={booking.updatedAt ?? undefined}
       />
     </div>
   );

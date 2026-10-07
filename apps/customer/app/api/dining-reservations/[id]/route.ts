@@ -1,3 +1,8 @@
+import { reservationIdSchema } from '@/lib/validations/reservation-id';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { logger } from '@lodgeflow/database/logger';
+import { serializeDiningReservationDetail } from '@lodgeflow/database/reservation-json';
+import type { DiningJsonSource } from '@lodgeflow/database/dining-json';
 import {
   updateDiningReservation,
   ReservationRuleError,
@@ -25,10 +30,16 @@ export async function GET(
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
-
     const { id } = await params;
-    const reservation = await DiningReservation.findById(id).populate('dining');
+    if (!reservationIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Dining reservation not found' },
+        { status: 404 }
+      );
+    await connectDB();
+    const reservation = await DiningReservation.findById(id).populate<{
+      dining: DiningJsonSource | null;
+    }>('dining');
 
     if (!reservation) {
       const response: ApiResponse<never> = {
@@ -46,14 +57,16 @@ export async function GET(
       return NextResponse.json(response, { status: 404 });
     }
 
-    const response: ApiResponse<typeof reservation> = {
+    const response: ApiResponse<
+      ReturnType<typeof serializeDiningReservationDetail>
+    > = {
       success: true,
-      data: reservation,
+      data: serializeDiningReservationDetail(reservation.toObject()),
     };
 
     return NextResponse.json(response);
-  } catch (error) {
-    console.error('Error fetching dining reservation:', error);
+  } catch (error: unknown) {
+    logger.error('Error fetching dining reservation:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: 'Failed to fetch dining reservation',
@@ -78,16 +91,28 @@ async function change({
         { success: false, error: 'Authentication required' },
         { status: 401 }
       );
-    const parsed = updateDiningDetailsSchema.safeParse(
-      action === 'cancel' ? {} : await request.json()
-    );
+    const body =
+      action === 'cancel'
+        ? { success: true as const, data: {} }
+        : await readJsonRequestBody(request);
+    if (!body.success)
+      return NextResponse.json(
+        { success: false, error: body.error },
+        { status: 400 }
+      );
+    const parsed = updateDiningDetailsSchema.safeParse(body.data);
     if (!parsed.success)
       return NextResponse.json(
         { success: false, error: 'Invalid reservation details' },
         { status: 400 }
       );
-    await connectDB();
     const { id } = await params;
+    if (!reservationIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Reservation or listing not found' },
+        { status: 404 }
+      );
+    await connectDB();
     const data = await updateDiningReservation({
       reservationId: id,
       customerId: userId,
@@ -95,19 +120,22 @@ async function change({
     });
     return NextResponse.json({
       success: true,
-      data,
+      data:
+        data === null
+          ? null
+          : serializeDiningReservationDetail(data.toObject()),
       message:
         action === 'cancel'
           ? 'Reservation cancelled successfully'
           : 'Reservation updated successfully',
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return NextResponse.json(
         { success: false, error: error.message },
         { status: error.status }
       );
-    console.error('Failed to change reservation:', error);
+    logger.error('Failed to change reservation:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to change reservation' },
       { status: 500 }

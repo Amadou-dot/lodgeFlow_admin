@@ -2,12 +2,12 @@ import { formatCurrency } from '@/utils/utilityFunctions';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Divider } from '@heroui/divider';
 import { PriceBreakdown as PriceBreakdownType } from './types';
-import type { ISettings } from '@lodgeflow/database/models/Settings';
+import type { Settings } from '@/types';
 
 interface PriceBreakdownProps {
   priceBreakdown: PriceBreakdownType;
   numNights: number;
-  settings?: ISettings | null;
+  settings?: Pick<Settings, 'requireDeposit' | 'depositPercentage'>;
 }
 
 export default function PriceBreakdown({

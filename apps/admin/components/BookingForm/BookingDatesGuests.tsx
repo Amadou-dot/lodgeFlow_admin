@@ -1,3 +1,4 @@
+import { cabinAvailabilityResponseSchema } from '@/lib/validations/cabin-availability';
 import type { Cabin } from '@/types';
 import { DateRangePicker } from '@heroui/date-picker';
 import { Input } from '@heroui/input';
@@ -19,21 +20,12 @@ interface BookingDatesGuestsProps extends BookingFormFieldProps {
   maxGuestsPerBooking?: number;
 }
 
-interface UnavailableDateRange {
-  start: string;
-  end: string;
-}
-
-interface AvailabilityData {
-  cabinId: string;
-  unavailableDates: UnavailableDateRange[];
-  queryRange: {
-    start: string;
-    end: string;
-  };
-}
-
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Failed to load availability data');
+  const body: unknown = await response.json();
+  return cabinAvailabilityResponseSchema.parse(body);
+};
 
 export default function BookingDatesGuests({
   formData,
@@ -49,10 +41,7 @@ export default function BookingDatesGuests({
     ? `/api/cabins/${selectedCabin.id}/availability${excludeBookingId ? `?excludeBookingId=${excludeBookingId}` : ''}`
     : null;
 
-  const { data: availabilityData, error } = useSWR<{
-    success: boolean;
-    data: AvailabilityData;
-  }>(availabilityUrl, fetcher);
+  const { data: availabilityData, error } = useSWR(availabilityUrl, fetcher);
 
   // Convert string dates to CalendarDate objects for the DateRangePicker
   const dateRange: RangeValue<DateValue> | null =
@@ -122,8 +111,7 @@ export default function BookingDatesGuests({
       >
         <DateRangePicker
           label='Stay Duration'
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          value={dateRange as any}
+          value={dateRange}
           onChange={handleDateRangeChange}
           minValue={todayDate}
           showMonthAndYearPickers

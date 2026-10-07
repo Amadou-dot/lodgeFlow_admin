@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import DiningConfirmation from '@/app/dining/confirmation/[id]/page';
 import ExperienceConfirmation from '@/app/experiences/confirmation/[id]/page';
@@ -60,6 +61,33 @@ for (const kind of ['dining', 'experience'] as const) {
     render(<Component params={Promise.resolve({ id: 'reservation' })} />);
     expect(
       await screen.findByRole('button', { name: 'Pay outstanding balance' })
+    ).toBeInTheDocument();
+  });
+}
+
+for (const kind of ['dining', 'experience'] as const) {
+  it(`keeps the ${kind} confirmation usable after its listing is deleted`, async () => {
+    const data =
+      kind === 'dining'
+        ? {
+            ...common,
+            dining: null,
+            time: '19:00',
+            numGuests: 2,
+            dietaryRequirements: [],
+            tablePreference: 'no-preference',
+          }
+        : { ...common, experience: null, numParticipants: 2 };
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data }),
+    });
+    const Component =
+      kind === 'dining' ? DiningConfirmation : ExperienceConfirmation;
+    render(<Component params={Promise.resolve({ id: 'reservation' })} />);
+    expect(await screen.findByText('Removed listing')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Pay outstanding balance' })
     ).toBeInTheDocument();
   });
 }

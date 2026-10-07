@@ -11,8 +11,13 @@ import {
 } from '@/app/api/experiences/[id]/route';
 import { Experience } from '@lodgeflow/database/models/Experience';
 
-function createRequest(url: string, options?: { method?: string; body?: any }) {
-  const init: RequestInit = { method: options?.method || 'GET' };
+function createRequest(
+  url: string,
+  options?: { method?: string; body?: unknown }
+) {
+  const init: NonNullable<ConstructorParameters<typeof NextRequest>[1]> = {
+    method: options?.method || 'GET',
+  };
   if (options?.body) {
     init.body = JSON.stringify(options.body);
     init.headers = { 'Content-Type': 'application/json' };
@@ -20,7 +25,7 @@ function createRequest(url: string, options?: { method?: string; body?: any }) {
   return new NextRequest(new URL(url, 'http://localhost:3000'), init);
 }
 
-function validExperiencePayload(overrides: Record<string, any> = {}) {
+function validExperiencePayload(overrides: Record<string, unknown> = {}) {
   return {
     name: 'Mountain Hiking Tour',
     description: 'An exciting hiking tour through scenic mountain trails.',
@@ -106,7 +111,7 @@ describe('Experiences API Routes', () => {
       expect(body.success).toBe(false);
     });
 
-    it('silently strips unknown legacy keys', async () => {
+    it('rejects unknown legacy keys', async () => {
       const request = createRequest('http://localhost:3000/api/experiences', {
         method: 'POST',
         body: { ...validExperiencePayload(), included: ['Legacy key'] },
@@ -115,9 +120,9 @@ describe('Experiences API Routes', () => {
       const response = await POST(request);
       const body = await response.json();
 
-      expect(response.status).toBe(201);
-      expect(body.success).toBe(true);
-      expect(body.data).not.toHaveProperty('included');
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(await Experience.countDocuments()).toBe(0);
     });
   });
 
@@ -161,7 +166,7 @@ describe('Experiences API Routes', () => {
       expect(body.data.reviewCount).toBe(12);
     });
 
-    it('accepts a full round-tripped payload including _id, createdAt, updatedAt', async () => {
+    it('rejects round-tripped server metadata without changing the listing', async () => {
       const experience = await Experience.create(validExperiencePayload());
 
       const request = createRequest(
@@ -180,9 +185,11 @@ describe('Experiences API Routes', () => {
       });
       const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.success).toBe(true);
-      expect(body.data.name).toBe('Updated via round trip');
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect((await Experience.findById(experience._id))?.name).toBe(
+        experience.name
+      );
     });
 
     it('rejects an invalid difficulty value on update', async () => {

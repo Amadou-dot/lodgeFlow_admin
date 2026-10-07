@@ -1,12 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-interface DiningStats {
-  totalItems: number;
-  menuCount: number;
-  experienceCount: number;
-  averagePrice: number;
-  availableItems: number;
-}
+import type { DiningStats } from '@/types/catalog-stats';
 
 export function useDiningStats() {
   return useQuery<DiningStats>({

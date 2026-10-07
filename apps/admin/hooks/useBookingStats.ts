@@ -1,11 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-interface BookingStats {
-  todayCheckIns: number;
-  todayCheckOuts: number;
-  checkedIn: number;
-  unconfirmed: number;
-}
+import type { BookingStats } from '@/types/catalog-stats';
 
 export function useBookingStats() {
   return useQuery<BookingStats>({

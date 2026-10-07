@@ -1,3 +1,5 @@
+import type { CabinStats } from '@/types/catalog-stats';
+import { logger } from '@/lib/logger';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -14,7 +16,7 @@ export async function GET() {
   try {
     await connectDB();
 
-    const [result] = await Cabin.aggregate([
+    const [result] = await Cabin.aggregate<CabinStats>([
       {
         $group: {
           _id: null,
@@ -67,7 +69,7 @@ export async function GET() {
 
     return createSuccessResponse(stats);
   } catch (error) {
-    console.error('Error fetching cabin stats:', error);
+    logger.error('Error fetching cabin stats:', error);
     return createErrorResponse(
       'Failed to fetch cabin stats',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

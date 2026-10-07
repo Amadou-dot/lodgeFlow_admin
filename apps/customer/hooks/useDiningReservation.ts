@@ -1,3 +1,6 @@
+import { diningDayAvailabilitySchema } from '@/lib/validations/reservation-availability';
+import type { DiningDayAvailability } from '@/types/reservation-availability';
+import type { DiningReservationHistory } from '@lodgeflow/database/reservation-json';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -46,7 +49,7 @@ export const useCreateDiningReservation = () => {
  */
 export const useDiningReservationHistory = (status?: string) => {
   return useQuery({
-    queryFn: async (): Promise<PopulatedDiningReservation[]> => {
+    queryFn: async (): Promise<DiningReservationHistory[]> => {
       const url = status
         ? `/api/dining-reservations/history?status=${status}`
         : '/api/dining-reservations/history';
@@ -57,7 +60,7 @@ export const useDiningReservationHistory = (status?: string) => {
         throw new Error('Failed to fetch dining reservation history');
       }
 
-      const data: ApiResponse<PopulatedDiningReservation[]> =
+      const data: ApiResponse<DiningReservationHistory[]> =
         await response.json();
       return data.data || [];
     },
@@ -93,7 +96,9 @@ export const useCancelDiningReservation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (reservationId: string): Promise<ApiResponse<null>> => {
+    mutationFn: async (
+      reservationId: string
+    ): Promise<ApiResponse<PopulatedDiningReservation>> => {
       const response = await fetch(
         `/api/dining-reservations/${reservationId}`,
         {
@@ -117,27 +122,21 @@ export const useCancelDiningReservation = () => {
   });
 };
 
-interface DiningAvailability {
-  diningId: string;
-  date: string;
-  time?: string;
-  seatsRemaining: number;
-  maxPeople: number;
-  isAvailable: boolean;
-  availableTimeSlots?: { time: string; seatsRemaining: number }[];
-}
-
 /**
  * Hook to check dining availability for a specific date and optional time
  */
-export const useDiningAvailability = (
-  diningId: string,
-  date?: string,
-  time?: string
-) => {
+export const useDiningAvailability = ({
+  diningId,
+  date,
+  time,
+}: {
+  diningId: string;
+  date?: string;
+  time?: string;
+}) => {
   return useQuery({
     enabled: !!diningId && !!date,
-    queryFn: async (): Promise<DiningAvailability | null> => {
+    queryFn: async (): Promise<DiningDayAvailability | null> => {
       const params = new URLSearchParams();
       if (date) params.append('date', date);
       if (time) params.append('time', time);
@@ -150,8 +149,8 @@ export const useDiningAvailability = (
         throw new Error('Failed to fetch dining availability');
       }
 
-      const data: ApiResponse<DiningAvailability> = await response.json();
-      return data.data || null;
+      const data: ApiResponse<unknown> = await response.json();
+      return data.data ? diningDayAvailabilitySchema.parse(data.data) : null;
     },
     queryKey: ['dining-availability', diningId, date, time],
     staleTime: 2 * 60 * 1000,

@@ -1,5 +1,9 @@
 # LodgeFlow
 
+> **Maintenance notice:** LodgeFlow is currently under maintenance and being
+> refactored. New features are paused while this work is completed. See the
+> [refactoring plan](docs/refactoring/plan.md) for progress.
+
 Hotel management platform: an admin dashboard and a customer-facing booking site
 sharing one MongoDB database and one Clerk tenant.
 

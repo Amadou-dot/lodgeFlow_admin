@@ -1,31 +1,26 @@
 import type {
-  IBooking,
-  IBookingModel,
-} from '@lodgeflow/database/models/Booking';
+  DiningReservationJson,
+  DiningReservationDetail,
+  ExperienceReservationJson,
+  ExperienceReservationDetail,
+} from '@lodgeflow/database/reservation-json';
+import type { SettingsJson } from '@lodgeflow/database/settings-json';
+import type { ExperienceJson } from '@lodgeflow/database/experience-json';
+import type { DiningJson } from '@lodgeflow/database/dining-json';
 import type { CabinDetail } from '@lodgeflow/database/cabin-json';
-import type { IDining } from '@lodgeflow/database/models/Dining';
-import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
-import type { IExperience } from '@lodgeflow/database/models/Experience';
-import type { IExperienceBooking } from '@lodgeflow/database/models/ExperienceBooking';
-import type { IProcessedStripeEvent } from '@lodgeflow/database/models/ProcessedStripeEvent';
-import type {
-  ISettings,
-  ISettingsModel,
-} from '@lodgeflow/database/models/Settings';
 import { SVGProps } from 'react';
 
 export type IconSvgProps = SVGProps<SVGSVGElement> & {
   size?: number;
 };
 
-// Re-export model types for easier importing
+// Serializable application data shapes.
 export type Cabin = CabinDetail;
-export type Booking = IBooking;
-export type Settings = ISettings;
-export type Experience = IExperience;
-export type Dining = IDining & { _id: string };
-export type ExperienceBooking = IExperienceBooking;
-export type DiningReservation = IDiningReservation;
+export type Settings = SettingsJson;
+export type Experience = ExperienceJson;
+export type Dining = DiningJson;
+export type ExperienceBooking = ExperienceReservationJson;
+export type DiningReservation = DiningReservationJson;
 
 // API request types
 export interface CreateCabinData {
@@ -113,22 +108,9 @@ export interface UpdateExperienceData extends Partial<CreateExperienceData> {
 }
 
 // Experience Booking types
-export interface PopulatedExperienceBooking extends Omit<
-  IExperienceBooking,
-  'experience' | 'date'
-> {
-  experience: IExperience;
-  date: string | Date;
-}
+export type PopulatedExperienceBooking = ExperienceReservationDetail;
 
-export interface CreateExperienceBookingData {
-  experienceId: string;
-  date: Date;
-  timeSlot?: string;
-  numParticipants: number;
-  specialRequests?: string[];
-  observations?: string;
-}
+export type { CreateExperienceBookingRequest as CreateExperienceBookingData } from '@/lib/validations/experience-booking';
 
 // Dining-related types
 export interface DiningQueryParams {
@@ -143,36 +125,13 @@ export interface DiningQueryParams {
 }
 
 // Dining Reservation types
-export interface PopulatedDiningReservation extends Omit<
-  IDiningReservation,
-  'dining' | 'date'
-> {
-  dining: IDining;
-  date: string | Date;
-}
+export type PopulatedDiningReservation = DiningReservationDetail;
 
-export interface CreateDiningReservationData {
-  diningId: string;
-  date: Date;
-  time: string;
-  numGuests: number;
-  dietaryRequirements?: string[];
-  specialRequests?: string[];
-  tablePreference?: 'indoor' | 'outdoor' | 'bar' | 'no-preference';
-  occasion?: string;
-}
-
-// Stripe event tracking
-export type ProcessedStripeEvent = IProcessedStripeEvent;
-
-// Model type re-exports
-export type { IBookingModel } from '@lodgeflow/database/models/Booking';
-export type { ISettingsModel } from '@lodgeflow/database/models/Settings';
+export type { CreateDiningReservationRequest as CreateDiningReservationData } from '@/lib/validations/dining-reservation';
 
 // Zod-validated input types (preferred for new code)
 export type {
   CreateBookingInput,
-  PatchBookingInput,
   UpdateBookingDetailsInput,
 } from '@/lib/validations/booking';
 export type {

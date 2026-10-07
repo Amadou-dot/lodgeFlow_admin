@@ -1,3 +1,4 @@
+import type { ExperienceReservationHistory } from '@lodgeflow/database/reservation-json';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -46,7 +47,7 @@ export const useCreateExperienceBooking = () => {
  */
 export const useExperienceBookingHistory = (status?: string) => {
   return useQuery({
-    queryFn: async (): Promise<PopulatedExperienceBooking[]> => {
+    queryFn: async (): Promise<ExperienceReservationHistory[]> => {
       const url = status
         ? `/api/experience-bookings/history?status=${status}`
         : '/api/experience-bookings/history';
@@ -57,7 +58,7 @@ export const useExperienceBookingHistory = (status?: string) => {
         throw new Error('Failed to fetch experience booking history');
       }
 
-      const data: ApiResponse<PopulatedExperienceBooking[]> =
+      const data: ApiResponse<ExperienceReservationHistory[]> =
         await response.json();
       return data.data || [];
     },
@@ -93,7 +94,9 @@ export const useCancelExperienceBooking = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (bookingId: string): Promise<ApiResponse<null>> => {
+    mutationFn: async (
+      bookingId: string
+    ): Promise<ApiResponse<PopulatedExperienceBooking>> => {
       const response = await fetch(`/api/experience-bookings/${bookingId}`, {
         method: 'DELETE',
       });
@@ -111,43 +114,5 @@ export const useCancelExperienceBooking = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['experience-bookings'] });
     },
-  });
-};
-
-interface ExperienceAvailability {
-  experienceId: string;
-  date?: string;
-  spotsRemaining?: number;
-  maxParticipants: number | null;
-  isAvailable?: boolean;
-  fullyBookedDates?: string[];
-  availableDays?: string[];
-}
-
-/**
- * Hook to check experience availability for a specific date
- */
-export const useExperienceAvailability = (
-  experienceId: string,
-  date?: string
-) => {
-  return useQuery({
-    enabled: !!experienceId,
-    queryFn: async (): Promise<ExperienceAvailability | null> => {
-      const params = date ? `?date=${date}` : '';
-      const response = await fetch(
-        `/api/experiences/${experienceId}/availability${params}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch experience availability');
-      }
-
-      const data: ApiResponse<ExperienceAvailability> = await response.json();
-      return data.data || null;
-    },
-    queryKey: ['experience-availability', experienceId, date],
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
   });
 };

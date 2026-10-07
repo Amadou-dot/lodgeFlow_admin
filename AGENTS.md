@@ -139,6 +139,9 @@ already complies.
   e.g. `{ kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; message: string }`.
   Keep independent state independent and derive values available from query state
   instead of maintaining duplicate booleans.
+- Existing cabin/booking read DTOs preserve verified legacy null-versus-omission
+  semantics in their transport adapters. Internal editor/modal inputs normalize
+  absence; do not apply that normalization to stored data or response JSON.
 - Preserve response envelopes, pagination and status codes during a type cleanup.
   Admin `lib/api-utils.ts` already has a discriminated `ApiResponse<T>`; other
   response declarations and routes are inconsistent and need deliberate migration.

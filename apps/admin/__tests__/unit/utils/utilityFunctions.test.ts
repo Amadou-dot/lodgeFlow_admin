@@ -51,16 +51,24 @@ describe('utilityFunctions', () => {
 
   describe('calcNumNights', () => {
     it('calculates nights between two dates', () => {
-      expect(calcNumNights('2026-07-01', '2026-07-05')).toBe(4);
+      expect(
+        calcNumNights({ checkInDate: '2026-07-01', checkOutDate: '2026-07-05' })
+      ).toBe(4);
     });
 
     it('returns 0 when either date is missing', () => {
-      expect(calcNumNights('', '2026-07-05')).toBe(0);
-      expect(calcNumNights('2026-07-01', '')).toBe(0);
+      expect(
+        calcNumNights({ checkInDate: '', checkOutDate: '2026-07-05' })
+      ).toBe(0);
+      expect(
+        calcNumNights({ checkInDate: '2026-07-01', checkOutDate: '' })
+      ).toBe(0);
     });
 
     it('returns negative nights when the range is inverted', () => {
-      expect(calcNumNights('2026-07-05', '2026-07-01')).toBe(-4);
+      expect(
+        calcNumNights({ checkInDate: '2026-07-05', checkOutDate: '2026-07-01' })
+      ).toBe(-4);
     });
   });
 

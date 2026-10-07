@@ -1,3 +1,8 @@
+import { experienceEditableFields } from '@/lib/requests/catalog';
+import type {
+  CreateExperienceInput,
+  UpdateExperienceInput,
+} from '@/lib/validations/experience';
 import type { Experience, ExperienceFilters } from '@/types';
 import { displayToast } from '@/utils/toastUtils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,13 +35,13 @@ export function useCreateExperience() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (experience: Partial<Experience>) => {
+    mutationFn: async (experience: Partial<CreateExperienceInput>) => {
       const response = await fetch('/api/experiences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(experience),
+        body: JSON.stringify(experienceEditableFields(experience)),
       });
 
       if (!response.ok) {
@@ -60,13 +65,16 @@ export function useUpdateExperience() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (experience: Partial<Experience> & { _id: string }) => {
+    mutationFn: async (experience: UpdateExperienceInput) => {
       const response = await fetch(`/api/experiences/${experience._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(experience),
+        body: JSON.stringify({
+          ...experienceEditableFields(experience),
+          _id: experience._id,
+        }),
       });
 
       if (!response.ok) {

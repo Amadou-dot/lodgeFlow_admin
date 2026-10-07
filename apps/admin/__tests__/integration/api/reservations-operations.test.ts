@@ -183,7 +183,10 @@ it('includes boundary-crossing cabin stays and excludes checkout-day/cancelled o
     new Date('2030-06-14'),
     'cancelled'
   );
-  const result = await cabinCalendar(day, new Date('2030-07-01'));
+  const result = await cabinCalendar({
+    start: day,
+    end: new Date('2030-07-01'),
+  });
   expect(result.reservations.map(item => String(item._id))).toEqual([
     crossing.id,
     lastDay.id,
@@ -220,7 +223,11 @@ it('counts dining by seating time and experiences by UTC day, preserving uncappe
       status: 'no-show',
     },
   ]);
-  const dining = await capacityCalendar('dining', day, new Date('2030-06-02'));
+  const dining = await capacityCalendar({
+    kind: 'dining',
+    start: day,
+    end: new Date('2030-06-02'),
+  });
   expect(dining.resources[0]).toMatchObject({ isAvailable: true });
   expect(dining.usage.map(row => [row._id.time, row.used])).toEqual([
     ['12:00', 3],
@@ -257,11 +264,11 @@ it('counts dining by seating time and experiences by UTC day, preserving uncappe
       status: 'cancelled',
     },
   ]);
-  const experience = await capacityCalendar(
-    'experience',
-    day,
-    new Date('2030-06-02')
-  );
+  const experience = await capacityCalendar({
+    kind: 'experience',
+    start: day,
+    end: new Date('2030-06-02'),
+  });
   expect(experience.usage[0].used).toBe(5);
   expect(experience.resources[0]).not.toHaveProperty('maxParticipants');
 });
@@ -384,7 +391,7 @@ it('releases capacity with the shared transaction and rejects competing stale st
   expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(
     1
   );
-  const current = await DiningReservation.findById(id);
+  const current = await DiningReservation.findById(id).orFail();
   if (current.status === 'confirmed')
     await transitionCapacityReservation({
       kind: 'dining',

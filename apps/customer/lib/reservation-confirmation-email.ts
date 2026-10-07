@@ -101,11 +101,12 @@ export async function sendReservationConfirmation({
     { idempotencyKey: `reservation-confirmation:${kind}:${id}` }
   );
   if (result.error) throw new Error(result.error.message);
-  const Model = kind === 'dining' ? DiningReservation : ExperienceBooking;
-  await Model.updateOne(
-    { _id: id },
-    { $set: { paymentConfirmationSentAt: new Date() }, $inc: { __v: 1 } }
-  );
+  const update = {
+    $set: { paymentConfirmationSentAt: new Date() },
+    $inc: { __v: 1 },
+  };
+  if (kind === 'dining') await DiningReservation.updateOne({ _id: id }, update);
+  else await ExperienceBooking.updateOne({ _id: id }, update);
 }
 
 function requireDiningReference(

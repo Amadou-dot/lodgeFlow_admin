@@ -1,10 +1,11 @@
+import type { DashboardData } from '@/types/reporting';
+import { logger } from '@/lib/logger';
 import { requireApiAuth } from '@/lib/api-utils';
 import { getClerkUsersBatch } from '@/lib/clerk-users';
 import connectDB from '@/lib/mongodb';
 import type {
   DurationDataItem,
   OccupancyDataItem,
-  RecentBookingPopulated,
   RevenueDataItem,
 } from '@/types/api';
 import { clerkClient } from '@clerk/nextjs/server';
@@ -48,7 +49,7 @@ export async function GET() {
       }),
 
       // Total revenue in last 30 days
-      Booking.aggregate([
+      Booking.aggregate<{ _id: null; total: number }>([
         {
           $match: {
             createdAt: { $gte: thirtyDaysAgo },
@@ -83,7 +84,7 @@ export async function GET() {
       Booking.find({
         createdAt: { $gte: sevenDaysAgo },
       })
-        .populate('cabin', 'name')
+        .populate<{ cabin: { name: string } | null }>('cabin', 'name')
         .sort({ createdAt: -1 })
         .limit(10),
 
@@ -122,7 +123,7 @@ export async function GET() {
       }),
 
       // Occupancy data for last 7 days
-      Booking.aggregate([
+      Booking.aggregate<OccupancyDataItem>([
         {
           $match: {
             checkInDate: { $lte: today },
@@ -159,7 +160,7 @@ export async function GET() {
       ]),
 
       // Revenue data for last 30 days by week
-      Booking.aggregate([
+      Booking.aggregate<RevenueDataItem>([
         {
           $match: {
             createdAt: { $gte: thirtyDaysAgo },
@@ -183,7 +184,7 @@ export async function GET() {
       ]),
 
       // Duration distribution data
-      Booking.aggregate([
+      Booking.aggregate<DurationDataItem>([
         {
           $match: {
             createdAt: { $gte: thirtyDaysAgo },
@@ -224,7 +225,7 @@ export async function GET() {
       ]),
 
       // Total cabin capacity
-      Cabin.aggregate([
+      Cabin.aggregate<{ _id: null; totalCapacity: number }>([
         {
           $group: {
             _id: null,
@@ -234,7 +235,7 @@ export async function GET() {
       ]),
 
       // Current occupancy
-      Booking.aggregate([
+      Booking.aggregate<{ _id: null; occupiedCapacity: number }>([
         {
           $match: {
             checkInDate: { $lte: today },
@@ -260,7 +261,7 @@ export async function GET() {
         : 0;
 
     // Format the response
-    const stats = {
+    const stats: DashboardData = {
       overview: {
         totalBookings,
         totalRevenue: totalRevenue[0]?.total || 0,
@@ -273,8 +274,7 @@ export async function GET() {
       },
       recentActivity: await (async () => {
         // Batch fetch all customer names at once
-        const bookingsList =
-          recentBookings as unknown as RecentBookingPopulated[];
+        const bookingsList = recentBookings;
         const customerIds = bookingsList
           .map(b => b.customer)
           .filter((id): id is string => !!id);
@@ -294,19 +294,19 @@ export async function GET() {
           }
 
           return {
-            id: booking._id,
+            id: booking._id.toHexString(),
             customerName,
             cabinName: booking.cabin?.name || 'Unknown',
-            checkInDate: booking.checkInDate,
-            checkOutDate: booking.checkOutDate,
+            checkInDate: booking.checkInDate.toISOString(),
+            checkOutDate: booking.checkOutDate.toISOString(),
             totalPrice: booking.totalPrice,
             status: booking.status,
-            createdAt: booking.createdAt,
+            createdAt: booking.createdAt.toISOString(),
           };
         });
       })(),
       charts: {
-        occupancy: (occupancyData as OccupancyDataItem[]).map(item => ({
+        occupancy: occupancyData.map(item => ({
           date: item._id,
           occupancyRate:
             item.totalCapacity > 0
@@ -315,7 +315,7 @@ export async function GET() {
           totalGuests: item.totalGuests,
           totalCapacity: item.totalCapacity,
         })),
-        revenue: (revenueData as RevenueDataItem[]).map(item => ({
+        revenue: revenueData.map(item => ({
           week: `Week ${item._id.week}`,
           revenue: item.totalRevenue,
           bookings: item.bookingCount,
@@ -339,9 +339,7 @@ export async function GET() {
 
           return categories
             .map((category, index) => {
-              const found = (durationData as DurationDataItem[]).find(
-                item => item._id === category
-              );
+              const found = durationData.find(item => item._id === category);
               return {
                 name: category,
                 value: found ? found.count : 0,
@@ -358,7 +356,7 @@ export async function GET() {
       data: stats,
     });
   } catch (error) {
-    console.error('Error fetching dashboard statistics:', error);
+    logger.error('Failed to fetch dashboard statistics', error);
     return NextResponse.json(
       {
         success: false,

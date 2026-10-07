@@ -1,9 +1,9 @@
 import { Input } from '@heroui/input';
-import type { FormData } from './types';
+import type { FormData, GuestInputChange } from './types';
 
 interface AddressSectionProps {
   formData: FormData;
-  onInputChange: (field: string, value: string) => void;
+  onInputChange: GuestInputChange;
 }
 
 export default function AddressSection({
@@ -18,32 +18,50 @@ export default function AddressSection({
           label='Street Address'
           placeholder='Enter street address'
           value={formData.address.street}
-          onValueChange={value => onInputChange('address.street', value)}
+          onValueChange={value =>
+            onInputChange({ section: 'address', field: 'street', value: value })
+          }
           className='md:col-span-2'
         />
         <Input
           label='City'
           placeholder='Enter city'
           value={formData.address.city}
-          onValueChange={value => onInputChange('address.city', value)}
+          onValueChange={value =>
+            onInputChange({ section: 'address', field: 'city', value: value })
+          }
         />
         <Input
           label='State/Province'
           placeholder='Enter state/province'
           value={formData.address.state}
-          onValueChange={value => onInputChange('address.state', value)}
+          onValueChange={value =>
+            onInputChange({ section: 'address', field: 'state', value: value })
+          }
         />
         <Input
           label='Country'
           placeholder='Enter country'
           value={formData.address.country}
-          onValueChange={value => onInputChange('address.country', value)}
+          onValueChange={value =>
+            onInputChange({
+              section: 'address',
+              field: 'country',
+              value: value,
+            })
+          }
         />
         <Input
           label='ZIP/Postal Code'
           placeholder='Enter ZIP code'
           value={formData.address.zipCode}
-          onValueChange={value => onInputChange('address.zipCode', value)}
+          onValueChange={value =>
+            onInputChange({
+              section: 'address',
+              field: 'zipCode',
+              value: value,
+            })
+          }
         />
       </div>
     </div>

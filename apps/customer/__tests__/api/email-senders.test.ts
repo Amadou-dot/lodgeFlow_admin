@@ -93,7 +93,7 @@ function request() {
     method: 'POST',
     body: JSON.stringify({
       bookingId: '507f1f77bcf86cd7994390ab',
-      reservationId: 'booking',
+      reservationId: '507f1f77bcf86cd7994390ab',
     }),
   });
 }

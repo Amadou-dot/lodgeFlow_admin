@@ -140,12 +140,12 @@ export default function BookingDetailsPage() {
     );
   }
 
-  const { dateRange, timeInfo } = formatBookingDates(
-    booking.checkInDate.toString(),
-    booking.checkOutDate.toString(),
-    booking.numNights,
-    booking.status
-  );
+  const { dateRange, timeInfo } = formatBookingDates({
+    checkIn: booking.checkInDate.toString(),
+    checkOut: booking.checkOutDate.toString(),
+    numNights: booking.numNights,
+    status: booking.status,
+  });
 
   const isCancelable = booking.status !== 'cancelled';
 

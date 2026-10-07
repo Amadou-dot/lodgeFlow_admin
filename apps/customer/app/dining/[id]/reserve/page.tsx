@@ -96,7 +96,7 @@ export default function DiningReservePage({ params }: { params: Params }) {
                   startContent={<Users className='w-3 h-3' />}
                   variant='flat'
                 >
-                  {dining.minPeople > 1 ? `${dining.minPeople}-` : '1-'}
+                  {(dining.minPeople ?? 1) > 1 ? `${dining.minPeople}-` : '1-'}
                   {dining.maxPeople} guests
                 </Chip>
                 {dining.location && (

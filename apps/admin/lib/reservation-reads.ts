@@ -8,33 +8,19 @@ import {
 } from '@lodgeflow/database';
 import { Types, type PipelineStage } from 'mongoose';
 import {
-  LIFECYCLES,
-  RESERVATION_TYPES,
-  type ReservationType,
-} from './reservation-options';
-
-const DAY = 86_400_000;
-export function calendarRange(params: URLSearchParams) {
-  const now = new Date();
-  const start = params.get('start')
-    ? new Date(params.get('start')!)
-    : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  let end = params.get('end')
-    ? new Date(params.get('end')!)
-    : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
-  if (
-    !Number.isFinite(start.getTime()) ||
-    !Number.isFinite(end.getTime()) ||
-    end <= start
-  )
-    throw new Error('Invalid date range');
-  start.setUTCHours(0, 0, 0, 0);
-  end.setUTCHours(0, 0, 0, 0);
-  if (end <= start) throw new Error('End date must be after start date');
-  if (end.getTime() - start.getTime() > 180 * DAY)
-    end = new Date(start.getTime() + 180 * DAY);
-  return { start, end };
-}
+  parseCalendarRange,
+  parseReservationQuery,
+} from './validations/reservation-reads';
+import {
+  serializeCalendarResource,
+  serializeCalendarStay,
+  serializeCalendarUsage,
+  type CalendarResourceSource,
+  type CalendarStaySource,
+  type CalendarUsageSource,
+} from './serializers/reservation-calendar';
+import type { ReservationType } from './reservation-options';
+export const calendarRange = parseCalendarRange;
 function projection(type: ReservationType): PipelineStage.Project {
   const reference =
     type === 'cabin' ? '$cabin' : type === 'dining' ? '$dining' : '$experience';
@@ -72,49 +58,16 @@ function projection(type: ReservationType): PipelineStage.Project {
   };
 }
 export function reservationPipeline(params: URLSearchParams) {
-  const page = Number(params.get('page') ?? 1),
-    limit = Number(params.get('limit') ?? 25);
-  if (
-    !Number.isInteger(page) ||
-    page < 1 ||
-    page > 10000 ||
-    !Number.isInteger(limit) ||
-    limit < 1 ||
-    limit > 100
-  )
-    throw new Error('Invalid pagination');
-  const filter: Record<string, unknown> = {};
-  const resourceId = params.get('resourceId');
-  if (resourceId) {
-    if (!/^[a-f0-9]{24}$/i.test(resourceId)) throw new Error('Invalid listing');
-    filter.resourceId = new Types.ObjectId(resourceId);
-  }
-  const type = params.get('type'),
-    lifecycle = params.get('lifecycle');
-  if (type) {
-    if (!(RESERVATION_TYPES as readonly string[]).includes(type))
-      throw new Error('Invalid reservation type');
-    filter.type = type;
-  }
-  if (lifecycle) {
-    if (!(LIFECYCLES as readonly string[]).includes(lifecycle))
-      throw new Error('Invalid lifecycle');
-    filter.lifecycle = lifecycle;
-  }
-  const dates: Record<string, Date> = {};
-  for (const [name, operator] of [
-    ['from', '$gte'],
-    ['to', '$lt'],
-  ]) {
-    const value = params.get(name);
-    if (!value) continue;
-    const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) throw new Error('Invalid date');
-    dates[operator] = date;
-  }
-  if (dates.$gte && dates.$lt && dates.$gte >= dates.$lt)
-    throw new Error('Invalid date range');
-  if (Object.keys(dates).length) filter.date = dates;
+  const { page, limit, resourceId, type, lifecycle, from, to } =
+    parseReservationQuery(params);
+  const filter = {
+    ...(resourceId && { resourceId: new Types.ObjectId(resourceId) }),
+    ...(type && { type }),
+    ...(lifecycle && { lifecycle }),
+    ...((from || to) && {
+      date: { ...(from && { $gte: from }), ...(to && { $lt: to }) },
+    }),
+  };
   const rows: PipelineStage.FacetPipelineStage[] = [
     { $skip: (page - 1) * limit },
     { $limit: limit },
@@ -180,9 +133,18 @@ export function reservationPipeline(params: URLSearchParams) {
   ];
   return { pipeline, page, limit };
 }
-export async function cabinCalendar(start: Date, end: Date) {
+export async function cabinCalendar({
+  start,
+  end,
+}: {
+  start: Date;
+  end: Date;
+}) {
   const [resources, reservations] = await Promise.all([
-    Cabin.find({}).select('name status').sort({ name: 1 }).lean(),
+    Cabin.find({})
+      .select('name status')
+      .sort({ name: 1 })
+      .lean<CalendarResourceSource[]>(),
     Booking.find({
       status: { $ne: 'cancelled' },
       checkInDate: { $lt: end },
@@ -190,15 +152,22 @@ export async function cabinCalendar(start: Date, end: Date) {
     })
       .select('cabin checkInDate checkOutDate status customer')
       .sort({ checkInDate: 1, _id: 1 })
-      .lean(),
+      .lean<CalendarStaySource[]>(),
   ]);
-  return { resources, reservations };
+  return {
+    resources: resources.map(serializeCalendarResource),
+    reservations: reservations.map(serializeCalendarStay),
+  };
 }
-export async function capacityCalendar(
-  kind: 'dining' | 'experience',
-  start: Date,
-  end: Date
-) {
+export async function capacityCalendar({
+  kind,
+  start,
+  end,
+}: {
+  kind: 'dining' | 'experience';
+  start: Date;
+  end: Date;
+}) {
   const model = kind === 'dining' ? DiningReservation : ExperienceBooking;
   const field = kind === 'dining' ? 'dining' : 'experience';
   const pipeline: PipelineStage[] = [
@@ -234,11 +203,14 @@ export async function capacityCalendar(
       ? await Dining.find({})
           .select('name maxPeople isAvailable servingTime')
           .sort({ name: 1 })
-          .lean()
+          .lean<CalendarResourceSource[]>()
       : await Experience.find({})
           .select('name maxParticipants')
           .sort({ name: 1 })
-          .lean();
-  const usage = await model.aggregate(pipeline);
-  return { resources, usage };
+          .lean<CalendarResourceSource[]>();
+  const usage = await model.aggregate<CalendarUsageSource>(pipeline);
+  return {
+    resources: resources.map(serializeCalendarResource),
+    usage: usage.map(serializeCalendarUsage),
+  };
 }

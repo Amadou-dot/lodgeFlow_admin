@@ -3,15 +3,16 @@ import {
   type ReservationPaymentState,
 } from '../reservation-payment-state';
 import { EXPERIENCE_BOOKING_STATUSES } from '../config';
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, type Model } from 'mongoose';
 
 export interface IExperienceBooking extends Document, ReservationPaymentState {
-  experience: mongoose.Types.ObjectId | string;
+  _id: mongoose.Types.ObjectId;
+  experience: mongoose.Types.ObjectId;
   customer: string; // Clerk user ID
   date: Date;
   timeSlot?: string;
   numParticipants: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: (typeof EXPERIENCE_BOOKING_STATUSES)[number];
   totalPrice: number;
   isPaid: boolean;
   stripePaymentIntentId?: string;
@@ -85,7 +86,7 @@ ExperienceBookingSchema.index({ customer: 1, createdAt: -1 });
 ExperienceBookingSchema.index({ status: 1, date: 1 });
 
 // Prevent model re-compilation in development
-const ExperienceBooking =
+const ExperienceBooking: Model<IExperienceBooking> =
   mongoose.models.ExperienceBooking ||
   mongoose.model<IExperienceBooking>(
     'ExperienceBooking',

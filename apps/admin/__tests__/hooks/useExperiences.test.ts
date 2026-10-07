@@ -51,7 +51,10 @@ beforeEach(() => {
 
 describe('useExperiences', () => {
   it('uses experiences query key with filters', () => {
-    const filters = { category: 'outdoor', difficulty: 'Easy' };
+    const filters = {
+      category: 'outdoor',
+      difficulty: 'Easy',
+    } satisfies NonNullable<Parameters<typeof useExperiences>[0]>;
     useExperiences(filters);
 
     expect(capturedQueryConfig.queryKey).toEqual(['experiences', filters]);
@@ -284,5 +287,28 @@ describe('useDeleteExperience', () => {
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ['experience-stats'],
     });
+  });
+});
+
+it('selects editable fields from a catalog DTO before updating', async () => {
+  const item = {
+    _id: '507f1f77bcf86cd799439011',
+    name: 'Renamed',
+    createdAt: '2020-01-01T00:00:00.000Z',
+    updatedAt: '2020-01-01T00:00:00.000Z',
+    __v: 3,
+    reservationVersion: 5,
+  };
+  const response = {
+    ok: true,
+    json: async () => ({ success: true, data: item }),
+  } satisfies Pick<Response, 'ok' | 'json'>;
+  global.fetch = jest.fn().mockResolvedValue(response);
+  useUpdateExperience();
+  await capturedMutationConfig.mutationFn(item);
+  const call = jest.mocked(global.fetch).mock.calls[0];
+  expect(JSON.parse(String(call[1]?.body))).toEqual({
+    _id: item._id,
+    name: item.name,
   });
 });

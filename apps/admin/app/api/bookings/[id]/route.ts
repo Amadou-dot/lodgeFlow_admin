@@ -1,3 +1,9 @@
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { bookingIdSchema } from '@/lib/validations/booking';
+import {
+  serializeAdminBooking,
+  type AdminBookingCabinSource,
+} from '@/lib/serializers/booking';
 import {
   auditSnapshot,
   BOOKING_AUDIT_FIELDS,
@@ -8,6 +14,7 @@ import mongoose from 'mongoose';
 import { addBookingPayment, BookingPaymentError } from '@lodgeflow/database';
 import {
   createErrorResponse,
+  flattenZodErrors,
   createSuccessResponse,
   requireApiAuth,
 } from '@/lib/api-utils';
@@ -18,7 +25,10 @@ import connectDB from '@/lib/mongodb';
 import { patchBookingSchema } from '@/lib/validations';
 import { Booking } from '@lodgeflow/database';
 import { IdParam } from '@/types';
-import { isMongooseValidationError, getErrorMessage } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 
 export async function GET(_req: Request, { params }: IdParam) {
   // Require authentication
@@ -27,8 +37,12 @@ export async function GET(_req: Request, { params }: IdParam) {
 
   const bookingId = (await params).id;
   try {
+    if (!bookingIdSchema.safeParse(bookingId).success)
+      return createErrorResponse('Invalid booking ID', 400);
     await connectDB();
-    const booking = await Booking.findById(bookingId).populate('cabin');
+    const booking = await Booking.findById(bookingId).populate<{
+      cabin: AdminBookingCabinSource | null;
+    }>('cabin');
 
     if (!booking) {
       return createErrorResponse('Booking not found', 404);
@@ -45,12 +59,10 @@ export async function GET(_req: Request, { params }: IdParam) {
     }
 
     // Build populated booking response
-    const populatedBooking = {
-      ...booking.toObject(),
-      customer: customer,
-      guest: customer, // For legacy compatibility
-      cabinName: (booking.cabin as unknown as { name?: string })?.name,
-    };
+    const populatedBooking = serializeAdminBooking({
+      booking: booking,
+      customer,
+    });
 
     return createSuccessResponse(populatedBooking);
   } catch (error) {
@@ -66,9 +78,12 @@ export async function PATCH(req: Request, { params }: IdParam) {
 
   const bookingId = (await params).id;
   try {
-    await connectDB();
-    const rawUpdateData = await req.json();
+    const json = await readJsonRequestBody(req);
+    if (!json.success) return createErrorResponse(json.error, 400);
+    const rawUpdateData = json.data;
     if (
+      rawUpdateData !== null &&
+      typeof rawUpdateData === 'object' &&
       ['refundStatus', 'refundAmount', 'refundedAt'].some(key =>
         Object.prototype.hasOwnProperty.call(rawUpdateData, key)
       )
@@ -82,9 +97,12 @@ export async function PATCH(req: Request, { params }: IdParam) {
       return createErrorResponse(
         'Validation failed',
         400,
-        validationResult.error.flatten()
+        flattenZodErrors(validationResult.error)
       );
     }
+    if (!bookingIdSchema.safeParse(bookingId).success)
+      return createErrorResponse('Invalid booking ID', 400);
+    await connectDB();
     const updateData = validationResult.data;
 
     const booking = await Booking.findById(bookingId);
@@ -230,7 +248,9 @@ export async function PATCH(req: Request, { params }: IdParam) {
       auditBefore,
       updatedBooking
     );
-    await updatedBooking.populate('cabin');
+    const populatedUpdated = await updatedBooking.populate<{
+      cabin: AdminBookingCabinSource | null;
+    }>('cabin');
 
     // Get customer data from Clerk (best-effort — don't fail the request
     // since the booking save already succeeded)
@@ -244,12 +264,10 @@ export async function PATCH(req: Request, { params }: IdParam) {
     }
 
     // Build populated booking response
-    const populatedBooking = {
-      ...updatedBooking.toObject(),
-      customer: customer,
-      guest: customer, // For legacy compatibility
-      cabinName: (updatedBooking.cabin as unknown as { name?: string })?.name,
-    };
+    const populatedBooking = serializeAdminBooking({
+      booking: populatedUpdated,
+      customer,
+    });
 
     return createSuccessResponse(populatedBooking);
   } catch (error) {
@@ -272,13 +290,14 @@ export async function PATCH(req: Request, { params }: IdParam) {
           validationErrors: Object.keys(error.errors),
         }
       );
-      return createErrorResponse('Validation failed', 400, error.errors);
+      return createErrorResponse(
+        'Validation failed',
+        400,
+        mongooseValidationDetails(error)
+      );
     }
 
     logger.error('Failed to update booking', error, { bookingId });
-    return createErrorResponse(
-      getErrorMessage(error, 'Failed to update booking'),
-      500
-    );
+    return createErrorResponse('Failed to update booking', 500);
   }
 }

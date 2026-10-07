@@ -1,4 +1,6 @@
-import { getErrorMessage, isMongooseValidationError } from '@/types/errors';
+import { getErrorMessage } from '@/types/errors';
+import { isMongooseValidationError } from '@/lib/mongoose-errors';
+import { Error as MongooseError } from 'mongoose';
 
 describe('types/errors', () => {
   describe('getErrorMessage', () => {
@@ -31,14 +33,20 @@ describe('types/errors', () => {
   });
 
   describe('isMongooseValidationError', () => {
-    it('identifies mongoose-style validation errors', () => {
-      const error = new Error('Validation failed');
-      error.name = 'ValidationError';
-      (error as any).errors = {
-        name: { message: 'Name is required' },
-      };
-
-      expect(isMongooseValidationError(error)).toBe(true);
+    it('identifies real Mongoose validation errors', () => {
+      expect(
+        isMongooseValidationError(new MongooseError.ValidationError())
+      ).toBe(true);
+    });
+    it('rejects errors that only imitate the Mongoose shape', () => {
+      expect(
+        isMongooseValidationError(
+          Object.assign(new Error('private details'), {
+            name: 'ValidationError',
+            errors: {},
+          })
+        )
+      ).toBe(false);
     });
 
     it('rejects regular errors', () => {

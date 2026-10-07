@@ -1,7 +1,7 @@
 import { Card, CardBody, CardHeader } from '@heroui/card';
 
 interface ExtrasCardProps {
-  extras: {
+  extras?: {
     hasBreakfast: boolean;
     breakfastPrice?: number;
     hasPets: boolean;
@@ -16,6 +16,7 @@ interface ExtrasCardProps {
 }
 
 export default function ExtrasCard({ extras }: ExtrasCardProps) {
+  if (!extras) return null;
   const hasAnyExtras =
     extras.hasBreakfast ||
     extras.hasPets ||

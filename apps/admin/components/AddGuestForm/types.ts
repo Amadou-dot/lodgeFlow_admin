@@ -26,6 +26,34 @@ export interface FormData {
   };
 }
 
+export type GuestFormChange =
+  | {
+      section: 'profile';
+      field: keyof Omit<
+        FormData,
+        'address' | 'emergencyContact' | 'preferences'
+      >;
+      value: string;
+    }
+  | { section: 'address'; field: keyof FormData['address']; value: string }
+  | {
+      section: 'emergencyContact';
+      field: keyof FormData['emergencyContact'];
+      value: string;
+    }
+  | {
+      section: 'preferences';
+      field: 'dietaryRestrictions' | 'accessibilityNeeds';
+      value: string;
+    }
+  | {
+      section: 'preferences';
+      field: 'smokingPreference';
+      value: FormData['preferences']['smokingPreference'];
+    };
+
+export type GuestInputChange = (change: GuestFormChange) => void;
+
 export const initialFormData: FormData = {
   firstName: '',
   lastName: '',

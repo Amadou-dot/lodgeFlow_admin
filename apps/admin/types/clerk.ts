@@ -97,9 +97,12 @@ export interface CustomerPublicMetadata {
   [key: string]: unknown;
   nationality?: string;
   preferences?: {
-    smokingPreference: 'smoking' | 'non-smoking' | 'no-preference';
+    smokingPreference?: 'smoking' | 'non-smoking' | 'no-preference';
     dietaryRestrictions?: string[];
     accessibilityNeeds?: string[];
+    roomType?: string;
+    floorPreference?: string;
+    specialRequests?: string;
   };
 }
 
@@ -115,10 +118,11 @@ export interface CustomerPrivateMetadata {
     zipCode?: string;
   };
   emergencyContact?: {
-    firstName: string;
-    lastName: string;
-    phone: string;
-    relationship: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    phone?: string;
+    relationship?: string;
   };
 }
 
@@ -155,15 +159,19 @@ export interface Customer {
     zipCode?: string;
   };
   emergencyContact?: {
-    firstName: string;
-    lastName: string;
-    phone: string;
-    relationship: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    phone?: string;
+    relationship?: string;
   };
   preferences?: {
-    smokingPreference: 'smoking' | 'non-smoking' | 'no-preference';
+    smokingPreference?: 'smoking' | 'non-smoking' | 'no-preference';
     dietaryRestrictions?: string[];
     accessibilityNeeds?: string[];
+    roomType?: string;
+    floorPreference?: string;
+    specialRequests?: string;
   };
   totalBookings: number;
   totalSpent: number;
@@ -176,8 +184,8 @@ export interface Customer {
       name: string;
       image?: string;
     };
-    checkInDate: string | Date;
-    checkOutDate: string | Date;
+    checkInDate: string;
+    checkOutDate: string;
     numNights: number;
     status:
       'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';

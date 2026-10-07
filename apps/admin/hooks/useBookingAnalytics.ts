@@ -1,45 +1,8 @@
+import type { ApiResponse } from '@/lib/api-utils';
 import { useQuery } from '@tanstack/react-query';
 
-export type AnalyticsPeriod = '7d' | '30d' | '90d' | '1y' | 'all';
-
-interface ExtrasStat {
-  count: number;
-  rate: number;
-}
-
-export interface BookingAnalyticsData {
-  summary: {
-    totalRevenue: number;
-    totalBookings: number;
-    avgBookingValue: number;
-    cancellationRate: number;
-  };
-  revenueOverTime: {
-    date: string;
-    revenue: number;
-    bookings: number;
-  }[];
-  statusDistribution: {
-    status: string;
-    count: number;
-  }[];
-  popularCabins: {
-    name: string;
-    bookingCount: number;
-    revenue: number;
-  }[];
-  demographics: {
-    avgPartySize: number;
-    avgStayLength: number;
-    extras: {
-      breakfast: ExtrasStat;
-      pets: ExtrasStat;
-      parking: ExtrasStat;
-      earlyCheckIn: ExtrasStat;
-      lateCheckOut: ExtrasStat;
-    };
-  };
-}
+import type { AnalyticsPeriod, BookingAnalyticsData } from '@/types/reporting';
+export type { AnalyticsPeriod, BookingAnalyticsData } from '@/types/reporting';
 
 export function useBookingAnalytics(period: AnalyticsPeriod = '30d') {
   return useQuery<BookingAnalyticsData>({
@@ -49,8 +12,14 @@ export function useBookingAnalytics(period: AnalyticsPeriod = '30d') {
       if (!response.ok) {
         throw new Error('Failed to fetch booking analytics');
       }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      const result: ApiResponse<BookingAnalyticsData> | BookingAnalyticsData =
+        await response.json();
+      if ('success' in result) {
+        if (!result.success)
+          throw new Error(result.error || 'Failed to fetch booking analytics');
+        return result.data;
+      }
+      return result;
     },
   });
 }

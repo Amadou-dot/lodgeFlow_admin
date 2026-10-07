@@ -1,11 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-interface ExperienceStats {
-  totalExperiences: number;
-  averagePrice: number;
-  popularCount: number;
-  totalCapacity: number;
-}
+import type { ExperienceStats } from '@/types/catalog-stats';
 
 export function useExperienceStats() {
   return useQuery<ExperienceStats>({

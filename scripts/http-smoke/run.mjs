@@ -15,7 +15,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expectJson } from './assert-http.mjs';
+import { expectJson, assertAuthenticationDenied } from './assert-http.mjs';
 import { createClerkFixture } from './clerk-fixture.mjs';
 
 const root = path.resolve(
@@ -238,7 +238,7 @@ async function request({ origin, route, identity: name, ...options }) {
     ...options,
   });
 }
-async function expectAuthenticationRedirect({
+async function expectAuthenticationDenied({
   origin,
   route,
   method = 'GET',
@@ -250,16 +250,14 @@ async function expectAuthenticationRedirect({
     redirect: 'manual',
     signal: AbortSignal.timeout(60000),
     headers: {
+      accept: 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  assert.equal(response.status, 307);
-  const location = new URL(response.headers.get('location'));
-  assert.equal(location.hostname, 'accounts.smoke.test');
-  assert.equal(location.pathname, '/sign-in');
-  console.log('Verified authentication redirect', location.pathname);
+  assertAuthenticationDenied(response);
+  console.log('Verified authentication denial', response.status);
 }
 let cleanupPromise;
 function cleanup() {
@@ -733,6 +731,41 @@ try {
       data: JSON.parse(JSON.stringify(expected)),
     });
   }
+  for (const item of [popularPaidExperience, freeQueryExperience]) {
+    const id = String(item._id);
+    const publicDetail = await request({
+      origin: customer,
+      route: `/api/experiences/${id}`,
+      status: 200,
+    });
+    assert.deepEqual(publicDetail, {
+      success: true,
+      data: JSON.parse(JSON.stringify(await Experience.findById(id).lean())),
+    });
+    const staffDetail = await request({
+      origin: admin,
+      route: `/api/experiences/${id}`,
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.deepEqual(staffDetail, {
+      success: true,
+      data: JSON.parse(JSON.stringify(await Experience.findById(id))),
+    });
+  }
+  const staffExperiences = await request({
+    origin: admin,
+    route: '/api/experiences?sortBy=name',
+    identity: 'front_desk',
+    status: 200,
+  });
+  assert.deepEqual(staffExperiences, {
+    success: true,
+    data: JSON.parse(JSON.stringify(await Experience.find().sort({ name: 1 }))),
+  });
+  console.log(
+    'PASS experience JSON preserves hydrated and lean fields across both apps'
+  );
   const invalidExperienceQuery = await request({
     origin: customer,
     route: '/api/experiences?minPrice=-1',
@@ -871,6 +904,41 @@ try {
       data: JSON.parse(JSON.stringify(expected)),
     });
   }
+  for (const id of [freeDiningId, breakfastDiningId, dinnerDiningId]) {
+    const publicDetail = await request({
+      origin: customer,
+      route: `/api/dining/${id}`,
+      status: 200,
+    });
+    assert.deepEqual(publicDetail, {
+      success: true,
+      data: JSON.parse(JSON.stringify(await Dining.findById(id).lean())),
+    });
+    const staffDetail = await request({
+      origin: admin,
+      route: `/api/dining/${id}`,
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.deepEqual(staffDetail, {
+      success: true,
+      data: JSON.parse(JSON.stringify(await Dining.findById(id))),
+    });
+  }
+  const staffDiningList = await request({
+    origin: admin,
+    route: '/api/dining',
+    identity: 'front_desk',
+    status: 200,
+  });
+  assert.deepEqual(staffDiningList, {
+    success: true,
+    data: JSON.parse(JSON.stringify(await Dining.find().sort({ name: 1 }))),
+  });
+  assert.equal(await diningCatalogSnapshot(), beforeDiningQueries);
+  console.log(
+    'PASS dining JSON preserves full hydrated and lean responses across both apps without writes'
+  );
   const invalidDiningQuery = await request({
     origin: customer,
     route: '/api/dining?minPrice=-1',
@@ -950,13 +1018,13 @@ try {
     numGuests: 2,
     extras: {},
   };
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: '/api/bookings',
     method: 'POST',
     body: selection,
   });
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: '/api/bookings',
     method: 'POST',
@@ -971,7 +1039,7 @@ try {
       sub: 'smoke_admin',
     })
   ).toString('base64url');
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: '/api/bookings',
     method: 'POST',
@@ -989,12 +1057,22 @@ try {
   });
   assert.equal(invalid.success, false);
   assert.equal(await Booking.countDocuments(), 0);
-  const created = await request({
+  const forgedBooking = await request({
     origin: customer,
     route: '/api/bookings',
     identity: 'customer',
     method: 'POST',
     body: { ...selection, totalPrice: 1, customer: 'attacker' },
+    status: 400,
+  });
+  assert.equal(forgedBooking.success, false);
+  assert.equal(await Booking.countDocuments(), 0);
+  const created = await request({
+    origin: customer,
+    route: '/api/bookings',
+    identity: 'customer',
+    method: 'POST',
+    body: selection,
     status: 201,
   });
   assert.equal(created.success, true);
@@ -1137,7 +1215,7 @@ try {
   assert.equal(typeof ownBooking.data.checkInDate, 'string');
   assert.equal(ownBooking.data.cabin.discountedPrice, 100);
   const historyRoute = '/api/bookings/history';
-  await expectAuthenticationRedirect({ origin: customer, route: historyRoute });
+  await expectAuthenticationDenied({ origin: customer, route: historyRoute });
   const history = await request({
     origin: customer,
     route: historyRoute,
@@ -1312,7 +1390,7 @@ try {
     )
   );
   await Booking.deleteOne({ _id: legacyBooking._id });
-  await expectAuthenticationRedirect({ origin: customer, route: detailRoute });
+  await expectAuthenticationDenied({ origin: customer, route: detailRoute });
   assert.deepEqual(
     await request({
       origin: customer,
@@ -1327,9 +1405,9 @@ try {
       origin: customer,
       route: '/api/bookings/invalid-id',
       identity: 'customer',
-      status: 500,
+      status: 404,
     }),
-    { success: false, error: 'Failed to fetch booking' }
+    { success: false, error: 'Booking not found' }
   );
   const beforeReadFailures = JSON.stringify(
     await Booking.findById(bookingId).lean()
@@ -1387,7 +1465,7 @@ try {
     beforeDetails
   );
   const mutationCallsBefore = calls.length;
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: detailRoute,
     method: 'PATCH',
@@ -1442,6 +1520,24 @@ try {
     beforeDetails
   );
   assert.equal(calls.length, mutationCallsBefore);
+  const forgedUpdate = await request({
+    origin: customer,
+    route: detailRoute,
+    identity: 'customer',
+    method: 'PATCH',
+    status: 400,
+    body: {
+      numGuests: 3,
+      totalPrice: 1,
+      checkInDate: '2031-01-01',
+      observations: 'Unsupported edit',
+    },
+  });
+  assert.equal(forgedUpdate.success, false);
+  assert.equal(
+    JSON.stringify(await Booking.findById(bookingId).lean()),
+    beforeDetails
+  );
   const updatedDetails = await request({
     origin: customer,
     route: detailRoute,
@@ -1449,10 +1545,6 @@ try {
     method: 'PATCH',
     body: {
       numGuests: 3,
-      totalPrice: 1,
-      checkInDate: '2031-01-01',
-      checkOutDate: '2031-01-05',
-      observations: 'Unsupported edit',
     },
     status: 200,
   });
@@ -1477,11 +1569,11 @@ try {
   );
   const callsBeforePaymentStatus = calls.length;
   const paymentStatusRoute = `/api/payments/${bookingId}`;
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: paymentStatusRoute,
   });
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: '/api/payments/invalid',
   });
@@ -1605,7 +1697,7 @@ try {
       error: 'Invalid JSON body',
     });
   }
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: '/api/payments/create-checkout',
     method: 'POST',
@@ -1894,7 +1986,7 @@ try {
     await Booking.findById(bookingId).lean()
   );
   const callsBeforeWelcomeAuth = calls.length;
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: '/api/send/welcome',
     method: 'POST',
@@ -2102,7 +2194,7 @@ try {
     },
   });
   assert.equal(estimate.data.estimate.refundAmount, 75);
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: estimateRoute,
   });
@@ -2160,7 +2252,7 @@ try {
   assert.equal(pendingCancellation.data.refund.status, 'pending');
   assert.equal(
     pendingCancellation.data.refund.error,
-    'Injected Stripe failure'
+    'Failed to create refund'
   );
   assert.equal(pendingCancellation.data.refund.amount, 75);
   assert.deepEqual(
@@ -2233,7 +2325,161 @@ try {
     'PASS refund ownership, received-money cap, provider failure/retry, pending accounting and out-of-order signed completion'
   );
 
-  await expectAuthenticationRedirect({ origin: admin, route: '/api/settings' });
+  const bookingReadSnapshot = async () =>
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean());
+  const beforeAdminBookingReads = await bookingReadSnapshot();
+  const adminBookingList = await request({
+    origin: admin,
+    route: '/api/bookings?limit=100',
+    identity: 'front_desk',
+    status: 200,
+  });
+  assert.equal(adminBookingList.success, true);
+  for (const row of adminBookingList.data) {
+    const stored = await Booking.findById(row._id).populate(
+      'cabin',
+      'name image capacity price discount'
+    );
+    assert.equal(row.customer.id, stored.customer);
+    assert.deepEqual(row.guest, row.customer);
+    assert.deepEqual(
+      row,
+      JSON.parse(
+        JSON.stringify({
+          ...stored.toObject(),
+          customer: row.customer,
+          guest: row.customer,
+          cabinName: stored.cabin?.name,
+        })
+      )
+    );
+  }
+  const adminBookingDetail = await request({
+    origin: admin,
+    route: `/api/bookings/${bookingId}`,
+    identity: 'front_desk',
+    status: 200,
+  });
+  const expectedAdminBooking =
+    await Booking.findById(bookingId).populate('cabin');
+  assert.equal(
+    adminBookingDetail.data.customer.id,
+    expectedAdminBooking.customer
+  );
+  assert.equal(
+    adminBookingDetail.data.customer.created_at,
+    new Date(1700000000000).toISOString()
+  );
+  assert.deepEqual(
+    adminBookingDetail.data,
+    JSON.parse(
+      JSON.stringify({
+        ...expectedAdminBooking.toObject(),
+        customer: adminBookingDetail.data.customer,
+        guest: adminBookingDetail.data.customer,
+        cabinName: expectedAdminBooking.cabin?.name,
+      })
+    )
+  );
+  assert.equal(await bookingReadSnapshot(), beforeAdminBookingReads);
+  console.log(
+    'PASS admin booking list/detail JSON preserves projections, receipts, virtuals and customer dates without writes'
+  );
+
+  const customerReadSnapshot = JSON.stringify(
+    await Booking.find().sort({ _id: 1 }).lean()
+  );
+  const customerList = await request({
+    origin: admin,
+    route: '/api/customers?limit=100',
+    identity: 'front_desk',
+    status: 200,
+  });
+  assert.equal(customerList.success, true);
+  for (const row of customerList.data) {
+    assert.equal(row.created_at, new Date(1700000000000).toISOString());
+    const customerDetail = await request({
+      origin: admin,
+      route: `/api/customers/${row.id}`,
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.equal(customerDetail.data.id, row.id);
+    assert.equal(customerDetail.data.created_at, row.created_at);
+    assert.equal(customerDetail.data.totalBookings, row.totalBookings);
+    assert.equal(customerDetail.data.totalSpent, row.totalSpent);
+    const recent = await Booking.find({ customer: row.id })
+      .populate('cabin', 'name image capacity price')
+      .sort({ createdAt: -1 })
+      .limit(10);
+    assert.deepEqual(
+      customerDetail.data.recentBookings,
+      JSON.parse(JSON.stringify(recent))
+    );
+  }
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    customerReadSnapshot
+  );
+  console.log(
+    'PASS customer JSON dates, computed stats and full recent-booking projections without writes'
+  );
+
+  const beforeReporting = JSON.stringify(
+    await Booking.find().sort({ _id: 1 }).lean()
+  );
+  const dashboardReport = await request({
+    origin: admin,
+    route: '/api/dashboard',
+    identity: 'front_desk',
+    status: 200,
+  });
+  for (const row of dashboardReport.data.recentActivity) {
+    const stored = await Booking.findById(row.id).populate('cabin', 'name');
+    assert.equal(row.checkInDate, stored.checkInDate.toISOString());
+    assert.equal(row.checkOutDate, stored.checkOutDate.toISOString());
+    assert.equal(row.createdAt, stored.createdAt.toISOString());
+    assert.equal(row.cabinName, stored.cabin?.name || 'Unknown');
+    assert.equal(row.totalPrice, stored.totalPrice);
+    assert.equal(row.status, stored.status);
+  }
+  for (const period of ['7d', '30d', '90d', '1y', 'all']) {
+    const report = await request({
+      origin: admin,
+      route: `/api/bookings/analytics?period=${period}`,
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.equal(report.success, true);
+    assert.equal(typeof report.data.summary.totalRevenue, 'number');
+    if (period === '7d' || period === '30d')
+      assert.equal(
+        report.data.revenueOverTime.length,
+        Number.parseInt(period, 10)
+      );
+  }
+  await request({
+    origin: admin,
+    route: '/api/bookings/analytics?period=invalid',
+    identity: 'front_desk',
+    status: 400,
+  });
+  const salesReport = await request({
+    origin: admin,
+    route: '/api/sales',
+    identity: 'front_desk',
+    status: 200,
+  });
+  assert.equal(salesReport.length, 30);
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    beforeReporting
+  );
+  console.log(
+    'PASS reporting JSON dates, period validation, sales envelope and no-write contract'
+  );
+
+  await expectAuthenticationDenied({ origin: admin, route: '/api/settings' });
   for (const name of ['wrong_org', 'unassigned', 'revoked']) {
     const denied = await request({
       origin: admin,
@@ -2251,6 +2497,37 @@ try {
   });
   assert.equal(read.success, true);
   assert.equal(read.data.breakfastPrice, 15);
+  const expectedSettings = JSON.parse(JSON.stringify(await Settings.findOne()));
+  assert.deepEqual(read.data, expectedSettings);
+  const customerSettings = await request({
+    origin: customer,
+    route: '/api/settings',
+    status: 200,
+  });
+  assert.deepEqual(customerSettings, { success: true, data: expectedSettings });
+  const beforeInvalidSettings = JSON.stringify(await Settings.findOne().lean());
+  for (const body of [
+    [],
+    null,
+    { $set: { breakfastPrice: 0 } },
+    { 'contactInfo.email': 'injected@example.invalid' },
+    { singleton: 'other' },
+    { minBookingLength: 20, maxBookingLength: 10 },
+  ]) {
+    await request({
+      origin: admin,
+      route: '/api/settings',
+      identity: 'admin',
+      method: 'PUT',
+      body,
+      status: 400,
+    });
+    assert.equal(
+      JSON.stringify(await Settings.findOne().lean()),
+      beforeInvalidSettings
+    );
+  }
+
   clerk.setMembership({ userId: 'smoke_front_desk', member: false });
   await request({
     origin: admin,
@@ -2280,6 +2557,10 @@ try {
   });
   assert.equal(updated.success, true);
   assert.equal(updated.data.breakfastPrice, 19);
+  assert.deepEqual(
+    updated.data,
+    JSON.parse(JSON.stringify(await Settings.findOne()))
+  );
   assert.equal((await Settings.findOne().lean()).breakfastPrice, 19);
   const audits = await mongoose.connection
     .collection('auditlogs')
@@ -2295,6 +2576,135 @@ try {
   console.log(
     'PASS admin proxy org boundary, current membership, assignment, role permission, allowed write and audit'
   );
+  const staffList = await request({
+    origin: admin,
+    route: '/api/staff',
+    identity: 'admin',
+    status: 200,
+  });
+  assert.equal(staffList.success, true);
+  assert.equal(
+    staffList.data.find(member => member.userId === 'smoke_admin').role,
+    'admin'
+  );
+  await request({
+    origin: admin,
+    route: '/api/staff',
+    identity: 'manager',
+    status: 403,
+  });
+  const beforeStaffInvalid = JSON.stringify(
+    await mongoose.connection
+      .collection('staffaccesses')
+      .find({})
+      .sort({ _id: 1 })
+      .toArray()
+  );
+  for (const body of [
+    null,
+    { userId: 'user_guest', role: 'manager', updatedBy: 'forged' },
+    { userId: 'user_guest', role: 'owner' },
+  ]) {
+    await request({
+      origin: admin,
+      route: '/api/staff',
+      identity: 'admin',
+      method: 'PUT',
+      body,
+      status: 400,
+    });
+    assert.equal(
+      JSON.stringify(
+        await mongoose.connection
+          .collection('staffaccesses')
+          .find({})
+          .sort({ _id: 1 })
+          .toArray()
+      ),
+      beforeStaffInvalid
+    );
+  }
+  const auditHistory = await request({
+    origin: admin,
+    route: '/api/audit?action=settings.update',
+    identity: 'admin',
+    status: 200,
+  });
+  assert.deepEqual(
+    auditHistory.data.events,
+    JSON.parse(JSON.stringify(audits))
+  );
+  assert.equal(auditHistory.data.page, 1);
+  assert.equal(auditHistory.data.limit, 25);
+  assert.equal(auditHistory.data.total, 1);
+  await request({
+    origin: admin,
+    route: '/api/audit?from=invalid',
+    identity: 'admin',
+    status: 400,
+  });
+  await request({
+    origin: admin,
+    route: '/api/audit',
+    identity: 'front_desk',
+    status: 403,
+  });
+  console.log(
+    'PASS staff/audit JSON, assignment permission, strict request validation and no-write contract'
+  );
+
+  for (const kind of ['cabins', 'dining', 'experiences']) {
+    const grid = await request({
+      origin: admin,
+      route: `/api/calendar/${kind}?start=2040-06-01&end=2040-07-01`,
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.equal(grid.data.start, '2040-06-01T00:00:00.000Z');
+    assert.equal(grid.data.end, '2040-07-01T00:00:00.000Z');
+    for (const resource of grid.data.resources)
+      assert.equal(typeof resource._id, 'string');
+    if (kind === 'cabins')
+      for (const stay of grid.data.reservations) {
+        assert.equal(typeof stay.cabin, 'string');
+        assert.equal(typeof stay.checkInDate, 'string');
+        assert.equal(typeof stay.checkOutDate, 'string');
+      }
+    else
+      for (const usage of grid.data.usage)
+        assert.equal(typeof usage._id.resourceId, 'string');
+    await request({
+      origin: admin,
+      route: `/api/calendar/${kind}?start=bad`,
+      identity: 'front_desk',
+      status: 400,
+    });
+  }
+  const inbox = await request({
+    origin: admin,
+    route: '/api/reservations?limit=100',
+    identity: 'front_desk',
+    status: 200,
+  });
+  assert.equal(inbox.data.page, 1);
+  assert.equal(inbox.data.limit, 100);
+  for (const row of inbox.data.rows) {
+    assert.equal(typeof row._id, 'string');
+    assert.equal(typeof row.resourceId, 'string');
+    assert.equal(typeof row.date, 'string');
+    assert.equal(typeof row.createdAt, 'string');
+    assert.equal(typeof row.customerName, 'string');
+  }
+  await request({
+    origin: admin,
+    route: '/api/reservations?from=2040-06-01&to=2040-06-01',
+    identity: 'front_desk',
+    status: 400,
+  });
+  console.log(
+    'PASS reservation inbox/calendar JSON projections, UTC dates, query validation and permissions'
+  );
+
   const adminCabinPayload = {
     name: 'Admin JSON fixture',
     description: 'Admin cabin response characterization fixture',
@@ -2363,6 +2773,69 @@ try {
   }
   console.log(
     'PASS admin cabin catalog, detail, create and update preserve full JSON fields and partial updates'
+  );
+  const adminCalendarBooking = await Booking.create({
+    cabin: adminCabinId,
+    customer: 'smoke_customer',
+    checkInDate: new Date('2040-06-03'),
+    checkOutDate: new Date('2040-06-05'),
+    numNights: 2,
+    numGuests: 1,
+    cabinPrice: 250,
+    totalPrice: 500,
+    status: 'confirmed',
+  });
+  const calendarRoute = `/api/cabins/${adminCabinId}/availability?startDate=2040-06-01&endDate=2040-06-10`;
+  const calendarBefore = JSON.stringify(
+    await Booking.findById(adminCalendarBooking._id)
+  );
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: calendarRoute,
+      identity: 'front_desk',
+      status: 200,
+    }),
+    {
+      success: true,
+      data: {
+        cabinId: adminCabinId,
+        unavailableDates: [{ start: '2040-06-03', end: '2040-06-05' }],
+        queryRange: { start: '2040-06-01', end: '2040-06-10' },
+      },
+    }
+  );
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: `${calendarRoute}&excludeBookingId=${adminCalendarBooking._id}`,
+      identity: 'front_desk',
+      status: 200,
+    }),
+    {
+      success: true,
+      data: {
+        cabinId: adminCabinId,
+        unavailableDates: [],
+        queryRange: { start: '2040-06-01', end: '2040-06-10' },
+      },
+    }
+  );
+  assert.deepEqual(
+    await request({
+      origin: admin,
+      route: `/api/cabins/${adminCabinId}/availability?startDate=bad`,
+      identity: 'front_desk',
+      status: 400,
+    }),
+    { success: false, error: 'Invalid startDate' }
+  );
+  assert.equal(
+    JSON.stringify(await Booking.findById(adminCalendarBooking._id)),
+    calendarBefore
+  );
+  console.log(
+    'PASS admin availability date JSON, own-booking exclusion and invalid-date no-write denial'
   );
   const bulkCabin = await Cabin.create({
     name: 'Bulk deletion fixture',
@@ -2537,6 +3010,27 @@ try {
       status: 403,
     });
     assert.equal(calls.length, countBefore);
+    if (route === '/api/send/confirm') {
+      for (const invalid of [
+        undefined,
+        null,
+        {
+          ...body,
+          bookingData: { ...body.bookingData, checkInDate: 'invalid' },
+        },
+      ]) {
+        const rejected = await request({
+          origin: admin,
+          route,
+          identity: 'admin',
+          method: 'POST',
+          body: invalid,
+          status: 400,
+        });
+        assert.equal(typeof rejected.error, 'string');
+        assert.equal(calls.length, countBefore);
+      }
+    }
     if (route === '/api/send/welcome') {
       for (const identity of ['manager', 'front_desk']) {
         await request({
@@ -2587,7 +3081,8 @@ try {
     });
     if (route === '/api/send/welcome')
       assert.deepEqual(failed, { error: 'Failed to send welcome email' });
-    else assert.equal(failed.error.message, 'Injected email failure');
+    else
+      assert.deepEqual(failed, { error: 'Failed to send confirmation email' });
     emailFailure = false;
     const sent = await request({
       origin: admin,
@@ -2629,6 +3124,29 @@ try {
   console.log(
     'PASS existing admin email authorization, failure and success contracts'
   );
+  const mutationsBeforeInvalidUpdate = clerkMutationAttempts;
+  for (const body of [
+    null,
+    [],
+    { firstName: 17 },
+    { banned: true },
+    { role: 'admin' },
+    { 'address.city': 'Injected' },
+    { address: { $set: { city: 'Injected' } } },
+    { preferences: { smokingPreference: 'invalid' } },
+  ]) {
+    const denied = await request({
+      origin: admin,
+      route: '/api/customers/smoke_customer',
+      identity: 'admin',
+      method: 'PUT',
+      body,
+      status: 400,
+    });
+    assert.equal(denied.success, false);
+  }
+  assert.equal(clerkMutationAttempts, mutationsBeforeInvalidUpdate);
+  console.log('PASS invalid customer updates cannot reach Clerk mutations');
   const callsBeforeCustomerLimit = calls.length;
   const clerkMutationsBeforeCustomerLimit = clerkMutationAttempts;
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -2711,12 +3229,81 @@ try {
   ]) {
     const providerCount = calls.length;
     const operationDate = '2030-07-01T18:00:00.000Z';
-    await expectAuthenticationRedirect({
+    const availabilityPath = `/api/${resource.kind === 'dining' ? 'dining' : 'experiences'}/${resource.listing._id}/availability`;
+    for (const query of [
+      'date=invalid',
+      'startDate=invalid',
+      'startDate=2030-07-02&endDate=2030-07-01',
+    ]) {
+      const invalid = await request({
+        origin: customer,
+        route: `${availabilityPath}?${query}`,
+        identity: 'customer',
+        status: 400,
+      });
+      assert.equal(invalid.success, false);
+    }
+    const availability = await request({
+      origin: customer,
+      route: `${availabilityPath}?date=2030-07-01`,
+      identity: 'customer',
+      status: 200,
+    });
+    assert.equal(availability.data.isAvailable, true);
+    assert.equal(
+      availability.data[
+        resource.kind === 'dining' ? 'seatsRemaining' : 'spotsRemaining'
+      ],
+      4
+    );
+    const availabilityRange = await request({
+      origin: customer,
+      route: `${availabilityPath}?startDate=2030-07-01&endDate=2031-07-01`,
+      identity: 'customer',
+      status: 200,
+    });
+    assert.deepEqual(availabilityRange.data.fullyBookedDates, []);
+    assert.equal(
+      availabilityRange.data.queryRange.end,
+      new Date(Date.parse('2030-07-01') + 180 * 86400000)
+        .toISOString()
+        .slice(0, 10)
+    );
+    assert.equal(calls.length, providerCount);
+
+    await expectAuthenticationDenied({
       origin: customer,
       route: resource.route,
       method: 'POST',
       body: { ...resource.input, date: operationDate },
     });
+    const countBeforeInvalid = await resource.model.countDocuments();
+    for (const field of [
+      'customer',
+      'totalPrice',
+      'isPaid',
+      'status',
+      '$set',
+      'checkout.pending',
+      '__proto__',
+    ]) {
+      await request({
+        origin: customer,
+        route: resource.route,
+        identity: 'customer',
+        method: 'POST',
+        body: { ...resource.input, date: operationDate, [field]: 'forged' },
+        status: 400,
+      });
+      assert.equal(await resource.model.countDocuments(), countBeforeInvalid);
+    }
+    for (const listPath of [resource.route, resource.route + '/history'])
+      await request({
+        origin: customer,
+        route: listPath + '?status=unknown',
+        identity: 'customer',
+        status: 400,
+      });
     const saved = await request({
       origin: customer,
       route: resource.route,
@@ -2726,10 +3313,6 @@ try {
       body: {
         ...resource.input,
         date: operationDate,
-        customer: 'smoke_foreign',
-        totalPrice: 0,
-        isPaid: true,
-        status: 'confirmed',
       },
     });
     assert.equal(saved.success, true);
@@ -2741,6 +3324,45 @@ try {
     assert.equal(saved.data.status, 'pending');
     assert.equal(saved.data.isPaid, false);
     assert.deepEqual(saved.data.receipts, []);
+    const expectedReservation = JSON.parse(
+      JSON.stringify(
+        await resource.model.findById(saved.data._id).populate(resource.kind)
+      )
+    );
+    assert.deepEqual(saved.data, expectedReservation);
+    for (const history of [false, true]) {
+      const listPath = resource.route + (history ? '/history' : '');
+      const selection =
+        resource.kind === 'dining'
+          ? 'name image price type mealType servingTime location' +
+            (history ? ' maxPeople' : '')
+          : 'name image price duration category' + (history ? ' location' : '');
+      const list = await request({
+        origin: customer,
+        route: listPath,
+        identity: 'customer',
+        status: 200,
+      });
+      assert.deepEqual(
+        list.data,
+        JSON.parse(
+          JSON.stringify(
+            await resource.model
+              .find({ customer: 'smoke_customer' })
+              .populate(resource.kind, selection)
+              .sort({ createdAt: -1 })
+              .lean()
+          )
+        )
+      );
+    }
+    const customerDetail = await request({
+      origin: customer,
+      route: `${resource.route}/${saved.data._id}`,
+      identity: 'customer',
+      status: 200,
+    });
+    assert.deepEqual(customerDetail.data, expectedReservation);
     const route = `${resource.route}/${saved.data._id}`;
     const snapshot = async () =>
       JSON.stringify(
@@ -2775,6 +3397,25 @@ try {
       }
     }
     assert.equal(await snapshot(), beforeDenied);
+    for (const field of [
+      'customer',
+      'totalPrice',
+      'isPaid',
+      'status',
+      '$set',
+      'checkout.pending',
+      '__proto__',
+    ]) {
+      await request({
+        origin: customer,
+        route,
+        identity: 'customer',
+        method: 'PATCH',
+        body: { specialRequests: [], [field]: 'forged' },
+        status: 400,
+      });
+      assert.equal(await snapshot(), beforeDenied);
+    }
     const edited = await request({
       origin: customer,
       route,
@@ -2784,8 +3425,6 @@ try {
       body: {
         [resource.countKey]: 3,
         specialRequests: ['Window please'],
-        customer: 'smoke_foreign',
-        totalPrice: 0,
       },
     });
     assert.equal(edited.message, 'Reservation updated successfully');
@@ -2835,6 +3474,28 @@ try {
       const beforeReservation = JSON.stringify(
         await resource.model.findById(saved.data._id).lean()
       );
+      for (const protectedField of [
+        'createdAt',
+        'reservationVersion',
+        '$set',
+        'name.value',
+        '__proto__',
+      ]) {
+        const rejected = await request({
+          origin: admin,
+          route: catalogPath,
+          identity: 'admin',
+          method: 'PUT',
+          status: 400,
+          body: {
+            _id: listingId,
+            name: 'Forbidden edit',
+            [protectedField]: 'forged',
+          },
+        });
+        assert.equal(rejected.success, false);
+        assert.equal(await snapshot(), beforeCatalogDenied);
+      }
       const catalogEdited = await request({
         origin: admin,
         route: catalogPath,
@@ -2845,12 +3506,14 @@ try {
           _id: catalogPath === '/api/dining' ? listingId : 'ignored-body-id',
           name: 'Renamed catalog listing',
           price: 12.5,
-          reservationVersion: 999999,
-          createdAt: '2000-01-01T00:00:00.000Z',
         },
       });
       assert.equal(catalogEdited.success, true);
       assert.equal(catalogEdited.data._id, listingId);
+      assert.deepEqual(
+        catalogEdited.data,
+        JSON.parse(JSON.stringify(await resource.catalog.findById(listingId)))
+      );
       assert.equal(catalogEdited.data.price, 12.5);
       assert.equal(catalogEdited.data.isPopular, false);
       assert.equal(
@@ -3116,7 +3779,7 @@ try {
     await ExperienceBooking.findById(experienceId).lean()
   );
   const callsBeforeExperience = calls.length;
-  await expectAuthenticationRedirect({
+  await expectAuthenticationDenied({
     origin: customer,
     route: experienceRoute,
     method: 'POST',
@@ -3475,6 +4138,73 @@ try {
   assert.ok(diningDelivered.paymentConfirmationSentAt instanceof Date);
   console.log(
     'PASS shared confirmation helper retains dining rendering and delivery accounting'
+  );
+  const beforeDiningManual = JSON.stringify(
+    await DiningReservation.findById(diningReservation._id).lean()
+  );
+  const diningManualRoute = '/api/send/dining-confirm';
+  const diningManualBody = { reservationId: String(diningReservation._id) };
+  const callsBeforeDiningManual = calls.length;
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { reservationId: [] },
+    { reservationId: 'invalid' },
+  ]) {
+    await request({
+      origin: customer,
+      route: diningManualRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: invalid,
+      status: 400,
+    });
+    assert.equal(calls.length, callsBeforeDiningManual);
+  }
+  await request({
+    origin: customer,
+    route: diningManualRoute,
+    identity: 'foreign',
+    method: 'POST',
+    body: diningManualBody,
+    status: 403,
+  });
+  assert.equal(calls.length, callsBeforeDiningManual);
+  emailFailure = true;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: diningManualRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: diningManualBody,
+      status: 500,
+    }),
+    { error: 'Failed to send confirmation email' }
+  );
+  emailFailure = false;
+  assert.deepEqual(
+    await request({
+      origin: customer,
+      route: diningManualRoute,
+      identity: 'customer',
+      method: 'POST',
+      body: diningManualBody,
+      status: 200,
+    }),
+    { id: 'email_smoke' }
+  );
+  assert.equal(calls.at(-1).input.from, 'LodgeFlow <payments@lodgeflow.app>');
+  assert.ok(calls.at(-1).input.html.includes('Smoke Dinner'));
+  assert.equal(
+    JSON.stringify(
+      await DiningReservation.findById(diningReservation._id).lean()
+    ),
+    beforeDiningManual
+  );
+  console.log(
+    'PASS dining manual confirmation validation, owner denial, rendering and provider retry without writes'
   );
 
   const beforeConfirmationBoundary = JSON.stringify({

@@ -1,3 +1,5 @@
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { logger } from '@lodgeflow/database/logger';
 import { serializeBookingDetail } from '@/lib/serializers/booking-read';
 import type { BookingDetail } from '@/types/booking-read';
 import type { ApiResponse } from '@/types';
@@ -24,10 +26,9 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
-    const validation = validateRequest(
-      createBookingSchema,
-      await request.json()
-    );
+    const json = await readJsonRequestBody(request);
+    if (!json.success) return validationErrorResponse(json.error);
+    const validation = validateRequest(createBookingSchema, json.data);
     if (!validation.success) return validationErrorResponse(validation.error);
     await connectDB();
     const booking = await createCustomerBooking({
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
         { status }
       );
     }
-    console.error('Error creating booking:', error);
+    logger.error('Error creating booking', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create booking' },
       { status: 500 }

@@ -10,32 +10,11 @@ import { Card, CardBody } from '@heroui/card';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { utcDate } from '@/lib/reservation-options';
-interface Resource {
-  _id: string;
-  name: string;
-  status?: string;
-  isAvailable?: boolean;
-  maxPeople?: number;
-  maxParticipants?: number;
-}
-interface Stay {
-  _id: string;
-  cabin: string;
-  checkInDate: string;
-  checkOutDate: string;
-  status: string;
-}
-interface Usage {
-  _id: { resourceId: string; date: string; time?: string };
-  used: number;
-}
-interface CalendarData {
-  start: string;
-  end: string;
-  resources: Resource[];
-  reservations?: Stay[];
-  usage?: Usage[];
-}
+import type {
+  CalendarJson as CalendarData,
+  CalendarResource as Resource,
+} from '@/types/reservation-calendar';
+import type { ApiResponse } from '@/lib/api-utils';
 const DAY = 86_400_000;
 const colors: Record<string, string> = {
   unconfirmed: 'bg-warning-100',
@@ -70,9 +49,11 @@ export default function CalendarPage() {
       cache: 'no-store',
     })
       .then(async response => {
-        const result = await response.json();
-        if (!response.ok)
-          throw new Error(result.error || 'Unable to load calendar');
+        const result: ApiResponse<CalendarData> = await response.json();
+        if (!response.ok || !result.success)
+          throw new Error(
+            !result.success ? result.error : 'Unable to load calendar'
+          );
         if (!controller.signal.aborted) setData(result.data);
       })
       .catch(e => {
@@ -225,7 +206,14 @@ export default function CalendarPage() {
           <OperationsSelect
             label='View'
             value={kind}
-            onChange={value => setKind(value as typeof kind)}
+            onChange={value => {
+              if (
+                value === 'cabins' ||
+                value === 'dining' ||
+                value === 'experiences'
+              )
+                setKind(value);
+            }}
             className='w-full sm:w-48 sm:ml-auto'
             options={[
               { value: 'cabins', label: 'Cabins' },

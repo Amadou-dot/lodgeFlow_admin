@@ -1,3 +1,4 @@
+import { logger } from '@lodgeflow/database/logger';
 import { sendReservationConfirmation } from '@/lib/reservation-confirmation-email';
 import mongoose from 'mongoose';
 import {
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
                 );
             }
           } catch (error) {
-            console.error('Payment confirmation email failed:', error);
+            logger.error('Payment confirmation email failed:', error);
           }
         }
       }
@@ -205,7 +206,7 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    logger.error('Webhook processing error:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

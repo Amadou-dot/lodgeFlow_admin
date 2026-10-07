@@ -1,3 +1,4 @@
+import { objectRequestSchema } from './object-request';
 import { z } from 'zod';
 
 import { EXPERIENCE_BOOKING_STATUSES } from '@/lib/config';
@@ -12,10 +13,13 @@ export const experienceBookingStatusSchema = z.enum(
 /**
  * Create experience booking request schema (guest-facing)
  */
-export const createExperienceBookingSchema = z
-  .object({
-    experienceId: z.string().min(1, 'Experience ID is required'),
-    date: z.coerce.date(),
+const createBodySchema = z
+  .strictObject({
+    experienceId: z
+      .string()
+      .min(1, 'Experience ID is required')
+      .regex(/^[a-f\d]{24}$/i, 'Invalid listing ID'),
+    date: z.string().pipe(z.coerce.date()),
     timeSlot: z.string().max(50).optional(),
     numParticipants: z
       .number()
@@ -40,30 +44,24 @@ export const createExperienceBookingSchema = z
     }
   );
 
-/**
- * Update experience booking request schema (guest-facing PATCH)
- */
-export const patchExperienceBookingSchema = z.object({
-  status: experienceBookingStatusSchema.optional(),
-  cancellationReason: z.string().max(500).optional(),
-  stripePaymentIntentId: z
-    .string()
-    .startsWith('pi_', 'Invalid Stripe payment intent ID')
-    .max(255)
-    .optional(),
-});
+export const createExperienceBookingSchema =
+  objectRequestSchema.pipe(createBodySchema);
 
 export type CreateExperienceBookingInput = z.infer<
   typeof createExperienceBookingSchema
 >;
-export type PatchExperienceBookingInput = z.infer<
-  typeof patchExperienceBookingSchema
->;
-
-export const updateExperienceDetailsSchema = z.object({
-  date: z.coerce.date().optional(),
+const updateBodySchema = z.strictObject({
+  date: z.string().pipe(z.coerce.date()).optional(),
   timeSlot: z.string().max(50).optional(),
   numParticipants: z.number().int().min(1).max(500).optional(),
   specialRequests: z.array(z.string()).optional(),
   observations: z.string().max(1000).optional(),
 });
+
+export type CreateExperienceBookingRequest = z.input<typeof createBodySchema>;
+
+export const updateExperienceDetailsSchema =
+  objectRequestSchema.pipe(updateBodySchema);
+export type PatchExperienceBookingInput = z.output<
+  typeof updateExperienceDetailsSchema
+>;

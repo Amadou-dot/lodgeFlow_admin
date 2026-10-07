@@ -21,7 +21,7 @@ import { DiningForm } from './DiningForm';
 interface DiningModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dining?: Dining | null;
+  dining?: Dining;
   mode: 'view' | 'create' | 'edit';
   onEdit?: (dining: Dining) => void;
 }
