@@ -9,18 +9,10 @@ import {
 } from '@/components/CabinDetails';
 import type { Cabin } from '@/types';
 import { Tab, Tabs } from '@heroui/tabs';
-
-interface BookingCabin {
-  _id: string;
-  name: string;
-  regularPrice: number;
-  discount?: number;
-  maxCapacity: number;
-  image?: string;
-}
+import type { ComponentProps } from 'react';
 
 interface CabinMobileTabsProps {
-  bookingCabin: BookingCabin;
+  bookingCabin: ComponentProps<typeof BookingForm>['cabin'];
   cabin: Cabin;
   userData?: {
     firstName: string;

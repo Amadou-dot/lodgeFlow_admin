@@ -30,6 +30,7 @@ interface BookingFormProps {
     name: string;
     regularPrice: number;
     discount?: number;
+    extraGuestFee?: number;
     maxCapacity: number;
     image?: string;
   };
@@ -109,21 +110,20 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
     e.preventDefault();
     if (!isLoaded || !isSignedIn) return;
 
-    const data = Object.fromEntries(new FormData(e.currentTarget));
+    const data = new FormData(e.currentTarget);
     const extras = {
-      hasBreakfast: data['breakfast'] === 'on',
-      hasPets: data['pets'] === 'on',
-      hasParking: data['parking'] === 'on',
-      hasEarlyCheckIn: data['early_checkin'] === 'on',
-      hasLateCheckOut: data['late_checkout'] === 'on',
+      hasBreakfast,
+      hasPets,
+      hasParking,
+      hasEarlyCheckIn,
+      hasLateCheckOut,
     };
-    const specialRequests = (data['special_requests'] as string)
-      .split(
-        '\
-'
-      )
+    const requestText = data.get('special_requests');
+    const specialRequests = (typeof requestText === 'string' ? requestText : '')
+      .split(/\r?\n/)
       .map(req => req.trim())
       .filter(req => req.length > 0);
+    const observations = data.get('observations');
 
     if (!dateRange?.start || !dateRange?.end) {
       addToast({
@@ -149,7 +149,7 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
       numGuests: parseInt(numberOfGuests, 10),
       extras,
       specialRequests,
-      observations: (data['observations'] as string) || '',
+      observations: typeof observations === 'string' ? observations : '',
     };
 
     createBooking(bookingData, {
@@ -202,6 +202,10 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
     const totalSavings = hasDiscount ? originalTotal - cabinSubtotal : 0;
 
     const guests = parseInt(numberOfGuests, 10) || 1;
+    const extraGuestFee =
+      guests > 1 && (cabin.extraGuestFee ?? 0) > 0
+        ? (guests - 1) * (cabin.extraGuestFee ?? 0) * nights
+        : 0;
     const breakfastFee =
       hasBreakfast && settings?.breakfastPrice
         ? settings.breakfastPrice * nights * guests
@@ -221,13 +225,19 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
         : 0;
 
     const extrasTotal =
-      breakfastFee + petFee + parkingFee + earlyCheckInFee + lateCheckOutFee;
+      breakfastFee +
+      extraGuestFee +
+      petFee +
+      parkingFee +
+      earlyCheckInFee +
+      lateCheckOutFee;
     const grandTotal = cabinSubtotal + extrasTotal;
 
     return {
       breakfastFee,
       cabinSubtotal,
       earlyCheckInFee,
+      extraGuestFee,
       extrasTotal,
       grandTotal,
       lateCheckOutFee,
@@ -453,6 +463,12 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
                     <div className='flex justify-between items-center text-sm text-green-600 font-semibold bg-green-50 dark:bg-green-950 px-3 py-2 rounded-lg'>
                       <span>Your Savings</span>
                       <span>-${totalInfo.totalSavings}</span>
+                    </div>
+                  )}
+                  {totalInfo.extraGuestFee > 0 && (
+                    <div className='flex justify-between items-center text-sm'>
+                      <span>Extra guests</span>
+                      <span>+${totalInfo.extraGuestFee}</span>
                     </div>
                   )}
                   {totalInfo.breakfastFee > 0 && (

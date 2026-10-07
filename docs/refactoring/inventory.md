@@ -7,6 +7,23 @@ The owning phase is an execution dependency, not an assigned person.
 
 ## Current review checkpoint (2026-10-07)
 
+Customer browser-review follow-up: cabin requests now submit all five controlled
+extra choices and complete nonblank special-request lines. The form receives
+the persisted extra-guest fee on mobile and desktop and includes its existing
+per-guest, per-night charge in the preview. Cabin stay dates display their UTC
+calendar day in confirmation, history and details; cancellation timestamps retain
+local display. Confirmation consumes the shared nullable booking DTO, handles
+sparse optional fields and renders removed cabins without crashing. Confirmation
+and history suppress checkout for removed cabins, matching the server's 404.
+No persistence, authorization, pricing service or provider contract changes.
+
+Regression coverage adds 21 customer cases, including real HeroUI checkbox
+submission, LF/CRLF requests, one/multiple guests, absent fees, Denver/Tokyo date
+display, sparse/null references and existing payment controls. Workspace checks
+pass 2,224 tests; both app type checks, the isolated HTTP gate, frozen installation
+and credential-free production builds pass. Live payment processing, hosted login
+and inbox delivery are separate verification boundaries.
+
 Review follow-up to PR #190: guest updates again accept legacy national ID
 strings verbatim, including spaces, punctuation and older lengths; creation
 validation and null/omission semantics remain unchanged. Dining catalog updates

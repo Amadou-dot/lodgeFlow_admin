@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BookingHistoryItem } from '@/types/booking-read';
 import BookingsPage from '@/app/bookings/page';
+import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 
 const mockUpdateBooking = jest.fn();
 
@@ -107,6 +108,39 @@ jest.mock('@heroui/date-picker', () => ({ DatePicker: () => <div /> }));
 
 describe('booking history JSON in the bookings page', () => {
   beforeEach(() => mockUpdateBooking.mockReset());
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each(['America/Denver', 'Asia/Tokyo'])(
+    'preserves stay dates in the %s history and details',
+    zone => {
+      mockBrowserTimeZone(zone);
+      render(<BookingsPage />);
+      expect(
+        screen.getByText('January 1, 2030 - January 3, 2030')
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+      expect(screen.getByText('January 1, 2030')).toBeInTheDocument();
+      expect(screen.getByText('January 3, 2030')).toBeInTheDocument();
+    }
+  );
+
+  it('keeps cancellation timestamps in the browser local zone', () => {
+    mockBrowserTimeZone('America/Denver');
+    const previous = {
+      status: mockBooking.status,
+      cancelledAt: mockBooking.cancelledAt,
+    };
+    mockBooking.status = 'cancelled';
+    mockBooking.cancelledAt = '2030-01-01T01:00:00.000Z';
+    try {
+      render(<BookingsPage />);
+      expect(
+        screen.getByText('Cancelled on December 31, 2029')
+      ).toBeInTheDocument();
+    } finally {
+      Object.assign(mockBooking, previous);
+    }
+  });
 
   it('only offers supported guest edits and submits no ignored dates or notes', async () => {
     mockUpdateBooking.mockResolvedValue({ success: true });
@@ -142,6 +176,9 @@ describe('booking history JSON in the bookings page', () => {
     try {
       render(<BookingsPage />);
       expect(screen.getByRole('img', { name: 'Cabin' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Pay' })
+      ).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
       expect(screen.getByText('Booking Details')).toBeInTheDocument();
     } finally {

@@ -84,6 +84,12 @@ Phase 1–2 deliveries run through [PR #189](https://github.com/Amadou-dot/lodge
 and base commit `4d3590b`. Their per-slice evidence remains in
 [inventory.md](inventory.md) and [delivery-history.md](delivery-history.md).
 
+The customer browser-review follow-up corrects five existing cabin UI defects:
+dropped extras, omitted extra-guest preview charges, shifted stay dates, split
+request lines and missing-cabin confirmation crashes. The inventory records the
+intentional fixes, regression coverage and verification boundaries. This follow-up
+does not begin Phase 3 or change persistence, server pricing or payment operations.
+
 All remaining Phase 1–2 implementation is now present on the review branch
 `refactor/admin-cabin-availability`. The remaining resource DTOs, request and
 provider/cache validation, named operations, safe errors, affected UI callers and

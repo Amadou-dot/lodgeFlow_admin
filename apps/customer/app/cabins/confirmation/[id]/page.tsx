@@ -12,51 +12,12 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import PaymentButton from '@/components/PaymentButton';
+import { formatBookingStayDate } from '@/lib/booking-date';
+import type { BookingDetail } from '@/types/booking-read';
 
 type Params = Promise<{
   id: string;
 }>;
-
-interface BookingExtras {
-  hasBreakfast: boolean;
-  breakfastPrice: number;
-  hasPets: boolean;
-  petFee: number;
-  hasParking: boolean;
-  parkingFee: number;
-  hasEarlyCheckIn: boolean;
-  earlyCheckInFee: number;
-  hasLateCheckOut: boolean;
-  lateCheckOutFee: number;
-}
-
-interface BookingData {
-  _id: string;
-  cabin: {
-    _id: string;
-    name: string;
-    image: string;
-    capacity: number;
-    price: number;
-    description: string;
-    amenities: string[];
-  };
-  customer: string;
-  checkInDate: string;
-  checkOutDate: string;
-  numNights: number;
-  numGuests: number;
-  status: string;
-  cabinPrice: number;
-  extrasPrice: number;
-  totalPrice: number;
-  isPaid: boolean;
-  extras: BookingExtras;
-  specialRequests: string[];
-  depositAmount: number;
-  amountPaid: number;
-  depositPaid: boolean;
-}
 
 export default function BookingConfirmationPage({
   params,
@@ -64,7 +25,7 @@ export default function BookingConfirmationPage({
   params: Params;
 }) {
   const [bookingId, setBookingId] = useState<string>('');
-  const [booking, setBooking] = useState<BookingData | null>(null);
+  const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
@@ -174,17 +135,11 @@ export default function BookingConfirmationPage({
     );
   }
 
-  const checkInDate = new Date(booking.checkInDate);
-  const checkOutDate = new Date(booking.checkOutDate);
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
+  const cabinName = booking.cabin?.name ?? 'Removed cabin';
+  const extras = booking.extras;
+  const specialRequests = booking.specialRequests ?? [];
+  const extrasPrice = booking.extrasPrice ?? 0;
+  const depositAmount = booking.depositAmount ?? 0;
 
   return (
     <div className='container mx-auto px-4 py-8 max-w-4xl'>
@@ -206,12 +161,12 @@ export default function BookingConfirmationPage({
         {/* Cabin Image */}
         <div className='relative h-64 lg:h-full min-h-75 rounded-lg overflow-hidden'>
           <Image
-            alt={booking.cabin.name}
+            alt={cabinName}
             className='rounded-lg'
             fill
             style={{ objectFit: 'cover' }}
             src={
-              booking.cabin.image ||
+              booking.cabin?.image ||
               'https://images.unsplash.com/photo-1571896349842-33c89424de2d'
             }
           />
@@ -232,17 +187,27 @@ export default function BookingConfirmationPage({
 
             <div>
               <p className='text-sm text-default-500'>Cabin</p>
-              <p className='font-semibold text-lg'>{booking.cabin.name}</p>
+              <p className='font-semibold text-lg'>{cabinName}</p>
             </div>
 
             <div className='grid grid-cols-2 gap-4'>
               <div>
                 <p className='text-sm text-default-500'>Check-in</p>
-                <p className='font-semibold'>{formatDate(checkInDate)}</p>
+                <p className='font-semibold'>
+                  {formatBookingStayDate({
+                    date: booking.checkInDate,
+                    weekday: 'long',
+                  })}
+                </p>
               </div>
               <div>
                 <p className='text-sm text-default-500'>Check-out</p>
-                <p className='font-semibold'>{formatDate(checkOutDate)}</p>
+                <p className='font-semibold'>
+                  {formatBookingStayDate({
+                    date: booking.checkOutDate,
+                    weekday: 'long',
+                  })}
+                </p>
               </div>
             </div>
 
@@ -261,12 +226,12 @@ export default function BookingConfirmationPage({
       </div>
 
       {/* Extras & Special Requests */}
-      {(booking.extras.hasBreakfast ||
-        booking.extras.hasPets ||
-        booking.extras.hasParking ||
-        booking.extras.hasEarlyCheckIn ||
-        booking.extras.hasLateCheckOut ||
-        booking.specialRequests.length > 0) && (
+      {(extras?.hasBreakfast ||
+        extras?.hasPets ||
+        extras?.hasParking ||
+        extras?.hasEarlyCheckIn ||
+        extras?.hasLateCheckOut ||
+        specialRequests.length > 0) && (
         <Card className='mb-6'>
           <CardHeader>
             <h2 className={title({ size: 'sm' })}>
@@ -275,39 +240,39 @@ export default function BookingConfirmationPage({
           </CardHeader>
           <CardBody className='space-y-4'>
             {/* Extras */}
-            {(booking.extras.hasBreakfast ||
-              booking.extras.hasPets ||
-              booking.extras.hasParking ||
-              booking.extras.hasEarlyCheckIn ||
-              booking.extras.hasLateCheckOut) && (
+            {(extras?.hasBreakfast ||
+              extras?.hasPets ||
+              extras?.hasParking ||
+              extras?.hasEarlyCheckIn ||
+              extras?.hasLateCheckOut) && (
               <div>
                 <p className='text-sm text-default-500 mb-2'>
                   Selected Services:
                 </p>
                 <div className='flex flex-wrap gap-2'>
-                  {booking.extras.hasBreakfast && (
+                  {extras?.hasBreakfast && (
                     <Chip color='success' variant='flat'>
-                      Breakfast (${booking.extras.breakfastPrice})
+                      Breakfast (${extras.breakfastPrice})
                     </Chip>
                   )}
-                  {booking.extras.hasPets && (
+                  {extras?.hasPets && (
                     <Chip color='success' variant='flat'>
-                      Pet-Friendly (${booking.extras.petFee})
+                      Pet-Friendly (${extras.petFee})
                     </Chip>
                   )}
-                  {booking.extras.hasParking && (
+                  {extras?.hasParking && (
                     <Chip color='success' variant='flat'>
-                      Parking (${booking.extras.parkingFee})
+                      Parking (${extras.parkingFee})
                     </Chip>
                   )}
-                  {booking.extras.hasEarlyCheckIn && (
+                  {extras?.hasEarlyCheckIn && (
                     <Chip color='success' variant='flat'>
-                      Early Check-in (${booking.extras.earlyCheckInFee})
+                      Early Check-in (${extras.earlyCheckInFee})
                     </Chip>
                   )}
-                  {booking.extras.hasLateCheckOut && (
+                  {extras?.hasLateCheckOut && (
                     <Chip color='success' variant='flat'>
-                      Late Check-out (${booking.extras.lateCheckOutFee})
+                      Late Check-out (${extras.lateCheckOutFee})
                     </Chip>
                   )}
                 </div>
@@ -315,7 +280,7 @@ export default function BookingConfirmationPage({
             )}
 
             {/* Special Requests */}
-            {booking.specialRequests.length > 0 && (
+            {specialRequests.length > 0 && (
               <>
                 <Divider />
                 <div>
@@ -323,7 +288,7 @@ export default function BookingConfirmationPage({
                     Special Requests:
                   </p>
                   <ul className='list-disc list-inside space-y-1'>
-                    {booking.specialRequests.map((request, index) => (
+                    {specialRequests.map((request, index) => (
                       <li key={index} className='text-sm'>
                         {request}
                       </li>
@@ -352,10 +317,10 @@ export default function BookingConfirmationPage({
             </span>
           </div>
 
-          {booking.extrasPrice > 0 && (
+          {extrasPrice > 0 && (
             <div className='flex justify-between items-center'>
               <span className='text-default-600'>Additional Services</span>
-              <span className='font-semibold'>${booking.extrasPrice}</span>
+              <span className='font-semibold'>${extrasPrice}</span>
             </div>
           )}
 
@@ -368,13 +333,13 @@ export default function BookingConfirmationPage({
             </span>
           </div>
 
-          {booking.depositAmount > 0 && (
+          {depositAmount > 0 && (
             <>
               <Divider />
               <div className='flex justify-between items-center'>
                 <span className='text-default-600'>Deposit Required</span>
                 <span className='font-semibold text-warning'>
-                  ${booking.depositAmount}
+                  ${depositAmount}
                 </span>
               </div>
             </>
@@ -388,17 +353,18 @@ export default function BookingConfirmationPage({
       </Card>
 
       {/* Payment Section */}
-      {!booking.isPaid &&
+      {booking.cabin &&
+        !booking.isPaid &&
         booking.status !== 'cancelled' &&
         (() => {
           const amountReceived = booking.amountPaid ?? 0;
-          const isDepositDue = amountReceived < booking.depositAmount;
+          const isDepositDue = amountReceived < depositAmount;
           const remainingBalance = Math.max(
             0,
             booking.totalPrice - amountReceived
           );
           const amountToPay = isDepositDue
-            ? booking.depositAmount - amountReceived
+            ? depositAmount - amountReceived
             : remainingBalance;
 
           if (amountToPay <= 0) return null;
