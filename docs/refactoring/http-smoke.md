@@ -38,6 +38,8 @@ Memory Server binary download. No application credentials are required.
   reporting, staff/audit and reservation/calendar responses and permissions.
 - Strict catalog/booking/reservation request fields, invalid JSON/IDs, denied
   effects, safe provider/database failures and successful retries.
+- Dining catalog updates reject impossible effective party-size ranges without
+  changing the listing or its contention version, even without reservations.
 - Dining/experience availability retains day/range bounds and capacity grouping.
   Manual confirmations exercise rendered templates, owner checks and paid/free
   sender selection without changing reservation accounting.

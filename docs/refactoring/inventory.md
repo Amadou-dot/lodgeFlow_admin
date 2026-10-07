@@ -7,6 +7,15 @@ The owning phase is an execution dependency, not an assigned person.
 
 ## Current review checkpoint (2026-10-07)
 
+Review follow-up to PR #190: guest updates again accept legacy national ID
+strings verbatim, including spaces, punctuation and older lengths; creation
+validation and null/omission semantics remain unchanged. Dining catalog updates
+now validate the effective minimum/maximum guest range inside the catalog
+transaction, including single-field updates with no reservations. Invalid ranges
+return 400 without persisting other fields or advancing `reservationVersion`.
+Regression coverage spans the guest form/request/provider boundaries, both dining
+update routes, shared transaction rollback and the HTTP gate.
+
 The remaining Phase 1–2 implementation is complete on the review branch
 `refactor/admin-cabin-availability`, based on `4d3590b`. Final local gates pass and
 the Phase 1–2 acceptance checklists are complete. The branch is ready for review;

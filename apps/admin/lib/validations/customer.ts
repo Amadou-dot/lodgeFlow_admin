@@ -144,11 +144,9 @@ export const updateCustomerSchema = z
     lastName: z.string().max(50).optional(),
     username: z.string().min(3).max(50).optional(),
     nationality: z.string().max(100).nullable().optional(),
-    nationalId: z
-      .string()
-      .regex(/^[A-Za-z0-9]{5,20}$/)
-      .nullable()
-      .optional(),
+    // Updates retain legacy identifiers verbatim, including separators and
+    // lengths that predate the creation rule. Guest forms resubmit stored IDs.
+    nationalId: z.string().nullable().optional(),
     address: addressPatchSchema.nullable().optional(),
     emergencyContact: emergencyContactPatchSchema.nullable().optional(),
     preferences: preferencesPatchSchema.nullable().optional(),

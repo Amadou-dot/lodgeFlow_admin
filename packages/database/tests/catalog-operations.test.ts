@@ -227,6 +227,49 @@ for (const resource of resources) {
     );
   });
 }
+test('dining rejects impossible effective party-size ranges without reservations or writes', async () => {
+  const listing = await resources[0].create();
+  listing.minPeople = 2;
+  await listing.save();
+  const listingId = String(listing._id);
+  const beforeState = await snapshot();
+  for (const updates of [
+    { minPeople: 5 },
+    { maxPeople: 1 },
+    { minPeople: 5, maxPeople: 4 },
+  ]) {
+    await assert.rejects(
+      updateCapacityCatalog({
+        kind: 'dining',
+        listingId,
+        updates: { ...updates, name: 'Must roll back' },
+      }),
+      rule({
+        status: 400,
+        message: 'Minimum guests cannot exceed maximum guests',
+      })
+    );
+    assert.equal(await snapshot(), beforeState);
+  }
+});
+test('dining accepts equal bounds and coordinated party-size changes', async () => {
+  const listing = await resources[0].create();
+  const listingId = String(listing._id);
+  for (const updates of [
+    { minPeople: 4 },
+    { minPeople: 5, maxPeople: 5 },
+    { minPeople: 2, maxPeople: 4 },
+    { maxPeople: 2 },
+  ]) {
+    await updateCapacityCatalog({ kind: 'dining', listingId, updates });
+    const saved = await Dining.findById(listingId).orFail();
+    if (updates.minPeople !== undefined)
+      assert.equal(saved.minPeople, updates.minPeople);
+    if (updates.maxPeople !== undefined)
+      assert.equal(saved.maxPeople, updates.maxPeople);
+    assert.ok(saved.minPeople <= saved.maxPeople);
+  }
+});
 test('dining serving hours and party-size edits reject conflicts without writes', async () => {
   const resource = resources[0];
   const listing = await resource.create();
