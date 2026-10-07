@@ -356,18 +356,14 @@ describe('Cabin Validation Schemas', () => {
       }
     });
 
-    it('strips $-operator and dotted keys from a valid update payload', () => {
+    it('rejects operator and dotted keys', () => {
       const result = updateCabinSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
         price: 250,
         $set: { price: 1 },
         'amenities.0': 'hacked',
       });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect('$set' in result.data).toBe(false);
-        expect('amenities.0' in result.data).toBe(false);
-      }
+      expect(result.success).toBe(false);
     });
   });
 

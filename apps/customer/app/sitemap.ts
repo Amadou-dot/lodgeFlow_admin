@@ -1,4 +1,11 @@
+import { logger } from '@lodgeflow/database/logger';
 import type { MetadataRoute } from 'next';
+import type { Types } from 'mongoose';
+
+interface CatalogSitemapSource {
+  _id: Types.ObjectId;
+  updatedAt?: Date;
+}
 
 import { siteConfig } from '@/config/site';
 import { connectDB, Cabin, Dining, Experience } from '@lodgeflow/database';
@@ -51,28 +58,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     await connectDB();
     const [cabins, experiences, dining] = await Promise.all([
-      Cabin.find({ status: 'active' }).select('_id updatedAt').lean(),
-      Experience.find({}).select('_id updatedAt').lean(),
-      Dining.find({ isAvailable: true }).select('_id updatedAt').lean(),
+      Cabin.find({ status: 'active' })
+        .select('_id updatedAt')
+        .lean<CatalogSitemapSource[]>(),
+      Experience.find({})
+        .select('_id updatedAt')
+        .lean<CatalogSitemapSource[]>(),
+      Dining.find({ isAvailable: true })
+        .select('_id updatedAt')
+        .lean<CatalogSitemapSource[]>(),
     ]);
 
-    const cabinEntries: MetadataRoute.Sitemap = cabins.map((c: any) => ({
+    const cabinEntries: MetadataRoute.Sitemap = cabins.map(c => ({
       url: `${base}/cabins/${c._id}`,
       lastModified: c.updatedAt ?? now,
       changeFrequency: 'weekly',
       priority: 0.8,
     }));
 
-    const experienceEntries: MetadataRoute.Sitemap = experiences.map(
-      (e: any) => ({
-        url: `${base}/experiences/${e._id}`,
-        lastModified: e.updatedAt ?? now,
-        changeFrequency: 'weekly',
-        priority: 0.7,
-      })
-    );
+    const experienceEntries: MetadataRoute.Sitemap = experiences.map(e => ({
+      url: `${base}/experiences/${e._id}`,
+      lastModified: e.updatedAt ?? now,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    }));
 
-    const diningEntries: MetadataRoute.Sitemap = dining.map((d: any) => ({
+    const diningEntries: MetadataRoute.Sitemap = dining.map(d => ({
       url: `${base}/dining/${d._id}`,
       lastModified: d.updatedAt ?? now,
       changeFrequency: 'weekly',
@@ -86,7 +97,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...diningEntries,
     ];
   } catch (error) {
-    console.error('sitemap: failed to fetch dynamic entries', error);
+    logger.error('sitemap: failed to fetch dynamic entries', error);
     return staticEntries;
   }
 }

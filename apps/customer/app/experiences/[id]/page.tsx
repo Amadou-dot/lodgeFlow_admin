@@ -184,7 +184,7 @@ export default function ExperiencePage({ params }: { params: Params }) {
             </CardHeader>
             <CardBody>
               <ul className='space-y-2'>
-                {experience.includes.map((item, index) => (
+                {(experience.includes ?? []).map((item, index) => (
                   <li key={index} className='flex items-start gap-3'>
                     <Check className='w-5 h-5 text-green-500 mt-0.5' />
                     <span className='text-default-600'>{item}</span>
@@ -303,7 +303,7 @@ export default function ExperiencePage({ params }: { params: Params }) {
                   <div>
                     <div className='font-medium'>Availability</div>
                     <div className='text-sm text-default-600'>
-                      {experience.available.join(', ')}
+                      {(experience.available ?? []).join(', ')}
                     </div>
                   </div>
                 </div>

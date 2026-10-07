@@ -1,3 +1,10 @@
+import { experienceQuerySchema } from '@/lib/validations/catalog-query';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import {
+  serializeExperience,
+  type ExperienceJsonSource,
+} from '@lodgeflow/database/experience-json';
+import type { Model, FilterQuery } from 'mongoose';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -10,8 +17,13 @@ import { logger } from '@/lib/logger';
 import connectToDatabase from '@/lib/mongodb';
 import { createExperienceSchema } from '@/lib/validations';
 import { Experience } from '@lodgeflow/database/models/Experience';
-import { isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest } from 'next/server';
+
+const experienceReader: Model<ExperienceJsonSource> = Experience;
 
 export async function GET(request: NextRequest) {
   // Require authentication
@@ -19,17 +31,20 @@ export async function GET(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
+    const { searchParams } = request.nextUrl;
+    const { search, category, difficulty, sortBy, sortOrder } =
+      experienceQuerySchema.parse({
+        search: searchParams.get('search'),
+        category: searchParams.get('category'),
+        difficulty: searchParams.get('difficulty'),
+        sortBy: searchParams.get('sortBy'),
+        sortOrder: searchParams.get('sortOrder'),
+      });
+
     await connectToDatabase();
 
-    const { searchParams } = request.nextUrl;
-    const search = searchParams.get('search');
-    const category = searchParams.get('category');
-    const difficulty = searchParams.get('difficulty');
-    const sortBy = searchParams.get('sortBy');
-    const sortOrder = searchParams.get('sortOrder') === 'desc' ? -1 : 1;
-
     // Build query
-    const query: Record<string, unknown> = {};
+    const query: FilterQuery<ExperienceJsonSource> = {};
 
     if (search) {
       const regex = { $regex: escapeRegex(search), $options: 'i' };
@@ -49,22 +64,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Build sort (whitelist sortable fields — sortBy is user input)
-    const SORTABLE_FIELDS = new Set([
-      'name',
-      'price',
-      'duration',
-      'difficulty',
-      'category',
-      'isPopular',
-      'createdAt',
-    ]);
-    const sort: Record<string, 1 | -1> = {};
-    if (sortBy && SORTABLE_FIELDS.has(sortBy)) {
-      sort[sortBy] = sortOrder;
-    }
+    const sort: Record<string, 1 | -1> = sortBy ? { [sortBy]: sortOrder } : {};
 
-    const experiences = await Experience.find(query).sort(sort);
-    return createSuccessResponse(experiences);
+    const experiences = await experienceReader.find(query).sort(sort);
+    return createSuccessResponse(experiences.map(serializeExperience));
   } catch (error) {
     logger.error(
       'Error fetching experiences',
@@ -83,24 +86,32 @@ export async function POST(request: Request) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectToDatabase();
-    const data = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const data = json.data;
 
     const validationResult = createExperienceSchema.safeParse(data);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
 
-    const experience = new Experience(validationResult.data);
+    await connectToDatabase();
+
+    const experience = new experienceReader(validationResult.data);
     await experience.save();
 
-    return createSuccessResponse(experience, undefined, HTTP_STATUS.CREATED);
+    return createSuccessResponse(
+      serializeExperience(experience),
+      undefined,
+      HTTP_STATUS.CREATED
+    );
   } catch (error: unknown) {
     if (isMongooseValidationError(error)) {
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 

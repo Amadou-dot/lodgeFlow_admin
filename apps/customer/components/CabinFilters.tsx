@@ -1,6 +1,5 @@
 import { Card, CardBody } from '@heroui/card';
 import { Select, SelectItem } from '@heroui/select';
-import { Input } from '@heroui/input';
 import { Button } from '@heroui/button';
 
 interface CabinFiltersProps {
@@ -16,9 +15,13 @@ export default function CabinFilters({
   onFiltersChange,
   isLoading,
 }: CabinFiltersProps) {
-  const handleFilterChange = (filterType: string, value: string) => {
-    const numValue = value ? parseInt(value) : undefined;
-
+  const handleFilterChange = ({
+    filterType,
+    value,
+  }: {
+    filterType: 'capacity' | 'minPrice' | 'maxPrice';
+    value: string;
+  }) => {
     // Get current URL params to maintain existing filters
     const urlParams = new URLSearchParams(window.location.search);
 
@@ -86,7 +89,12 @@ export default function CabinFilters({
             isDisabled={isLoading}
             label='Capacity'
             placeholder='Select capacity'
-            onChange={e => handleFilterChange('capacity', e.target.value)}
+            onChange={e =>
+              handleFilterChange({
+                filterType: 'capacity',
+                value: e.target.value,
+              })
+            }
           >
             {capacityOptions.map(option => (
               <SelectItem key={option.key}>{option.label}</SelectItem>
@@ -97,7 +105,12 @@ export default function CabinFilters({
             isDisabled={isLoading}
             label='Min Price'
             placeholder='Minimum price'
-            onChange={e => handleFilterChange('minPrice', e.target.value)}
+            onChange={e =>
+              handleFilterChange({
+                filterType: 'minPrice',
+                value: e.target.value,
+              })
+            }
           >
             {priceOptions.map(option => (
               <SelectItem key={option.key}>{option.label}</SelectItem>
@@ -108,7 +121,12 @@ export default function CabinFilters({
             isDisabled={isLoading}
             label='Max Price'
             placeholder='Maximum price'
-            onChange={e => handleFilterChange('maxPrice', e.target.value)}
+            onChange={e =>
+              handleFilterChange({
+                filterType: 'maxPrice',
+                value: e.target.value,
+              })
+            }
           >
             {maxPriceOptions.map(option => (
               <SelectItem key={option.key}>{option.label}</SelectItem>

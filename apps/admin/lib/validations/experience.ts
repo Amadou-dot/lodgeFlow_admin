@@ -1,3 +1,4 @@
+import { objectRequestSchema } from './object-request';
 import { EXPERIENCE_DIFFICULTIES } from '@/lib/config';
 import { z } from 'zod';
 
@@ -9,10 +10,9 @@ export const difficultySchema = z.enum(EXPERIENCE_DIFFICULTIES);
 /**
  * Create experience request schema.
  *
- * Not `.strict()` — matches the cabin/dining create schemas, which silently
- * strip unrecognized keys rather than rejecting the whole payload.
+ * Accept only catalog fields; provider/database metadata is server-owned.
  */
-export const createExperienceSchema = z.object({
+const createFieldsSchema = z.strictObject({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().min(1, 'Description is required').max(2000),
   duration: z.string().min(1, 'Duration is required').max(50),
@@ -48,12 +48,13 @@ export const createExperienceSchema = z.object({
  * there carry `.default()`, which Zod applies even when the key is absent
  * from a partial update, silently resetting them to create-time defaults.
  *
- * Not `.strict()` — matches cabin/dining. Clients round-trip a full
- * `Experience` object (including `_id`, `createdAt`, `updatedAt`) back on
- * save; unknown keys are silently stripped rather than rejecting the update.
+ * Callers select editable fields instead of round-tripping metadata.
  */
-export const updateExperienceSchema = z.object({
-  _id: z.string().min(1, 'Experience ID is required'),
+const updateFieldsSchema = z.strictObject({
+  _id: z
+    .string()
+    .min(1, 'Experience ID is required')
+    .regex(/^[a-f\d]{24}$/i, 'Invalid catalog ID'),
   name: z.string().min(1).max(100).optional(),
   description: z.string().min(1).max(2000).optional(),
   duration: z.string().min(1).max(50).optional(),
@@ -79,6 +80,11 @@ export const updateExperienceSchema = z.object({
   rating: z.number().min(0).max(5).optional(),
   reviewCount: z.number().int().min(0).optional(),
 });
+
+export const createExperienceSchema =
+  objectRequestSchema.pipe(createFieldsSchema);
+export const updateExperienceSchema =
+  objectRequestSchema.pipe(updateFieldsSchema);
 
 export type CreateExperienceInput = z.infer<typeof createExperienceSchema>;
 export type UpdateExperienceInput = z.infer<typeof updateExperienceSchema>;

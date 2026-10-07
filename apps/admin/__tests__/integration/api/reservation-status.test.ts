@@ -31,6 +31,7 @@ const resources = [
     get: getDining,
     patch: patchDining,
     model: DiningReservation,
+    read: (id: string) => DiningReservation.findById(id),
     catalog: Dining,
     async create(state: ProtectedState = {}) {
       const listing = await Dining.create({
@@ -61,6 +62,7 @@ const resources = [
     get: getExperience,
     patch: patchExperience,
     model: ExperienceBooking,
+    read: (id: string) => ExperienceBooking.findById(id),
     catalog: Experience,
     async create(state: ProtectedState = {}) {
       const listing = await Experience.create({
@@ -277,9 +279,9 @@ for (const resource of resources) {
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         success: true,
-        data: JSON.parse(JSON.stringify(await resource.model.findById(id))),
+        data: JSON.parse(JSON.stringify(await resource.read(id))),
       });
-      const stored = await resource.model.findById(id).lean();
+      const stored = await resource.read(id).lean();
       expect(stored).toMatchObject({
         status: 'confirmed',
         customer: 'owner',
@@ -310,7 +312,7 @@ for (const resource of resources) {
       );
       assert.ok(repeated);
       expect(repeated.status).toBe(200);
-      expect(await resource.model.findById(id).lean()).toEqual(stored);
+      expect(await resource.read(id).lean()).toEqual(stored);
       expect(await AuditLog.find({ resourceId: id }).lean()).toEqual(audits);
       const listing = await resource.catalog
         .findById(row.get(resource.kind))
@@ -358,14 +360,14 @@ for (const resource of resources) {
               : 'An online transaction is pending',
         });
         expect(await snapshot()).toBe(before);
-        const beforeRow = await resource.model.findById(id).lean();
+        const beforeRow = await resource.read(id).lean();
         const unchanged = await resource.patch(
           request({ expectedStatus: 'pending', status: 'pending' }),
           params(id)
         );
         assert.ok(unchanged);
         expect(unchanged.status).toBe(200);
-        expect(await resource.model.findById(id).lean()).toEqual(beforeRow);
+        expect(await resource.read(id).lean()).toEqual(beforeRow);
         expect(await AuditLog.countDocuments()).toBe(0);
       }
     });
@@ -384,7 +386,7 @@ for (const resource of resources) {
       expect(responses.map(response => response?.status).sort()).toEqual([
         200, 409,
       ]);
-      const saved = await resource.model.findById(id).lean();
+      const saved = await resource.read(id).lean();
       assert.ok(saved && !Array.isArray(saved));
       const audits = await AuditLog.find({ resourceId: id }).lean();
       expect(audits).toHaveLength(1);

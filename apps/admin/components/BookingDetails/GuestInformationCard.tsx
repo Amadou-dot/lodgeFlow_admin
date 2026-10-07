@@ -1,10 +1,10 @@
-import type { Customer } from '@/types';
+import type { BookingCustomer } from '@/types/booking-read';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Divider } from '@heroui/divider';
 import { User } from '@heroui/user';
 
 interface GuestInformationCardProps {
-  customer?: Customer;
+  customer?: BookingCustomer;
   numGuests: number;
   numNights: number;
 }

@@ -61,6 +61,9 @@ jest.mock('jspdf', () => ({
 
 const mockBooking: PopulatedBooking = {
   _id: '123456789012345678901234',
+  id: '123456789012345678901234',
+  guest: null,
+  amountPaid: 0,
   status: 'confirmed',
   isPaid: false,
   checkInDate: '2024-01-15',
@@ -83,10 +86,10 @@ const mockBooking: PopulatedBooking = {
     image_url: '',
     has_image: false,
     username: null,
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     last_sign_in_at: null,
-    last_active_at: new Date(),
+    last_active_at: new Date().toISOString(),
     banned: false,
     locked: false,
     lockout_expires_in_seconds: null,
@@ -96,6 +99,7 @@ const mockBooking: PopulatedBooking = {
   },
   cabin: {
     _id: 'cabin_123',
+    id: 'cabin_123',
     name: 'Mountain View Cabin',
     capacity: 4,
     price: 100,
@@ -103,9 +107,9 @@ const mockBooking: PopulatedBooking = {
     image: 'cabin.jpg',
     description: 'A beautiful cabin with mountain views',
     amenities: ['WiFi', 'Kitchen'],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as any, // Type cast to avoid complex mock setup
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
   extras: {
     hasBreakfast: true,
     breakfastPrice: 25,
@@ -121,9 +125,9 @@ const mockBooking: PopulatedBooking = {
   observations: 'Guest has dietary restrictions',
   specialRequests: ['Late checkout'],
   paymentMethod: 'card',
-  createdAt: new Date(),
-  updatedAt: new Date(),
-} as PopulatedBooking;
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
 
 const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   const queryClient = new QueryClient({
@@ -259,4 +263,20 @@ describe('Print Functionality', () => {
       expect(screen.getByText('Browser Print')).toBeInTheDocument();
     });
   });
+});
+
+test('print output keeps missing customer/cabin and absent extras renderable', () => {
+  render(
+    <BookingPDFTemplate
+      booking={{
+        ...mockBooking,
+        customer: null,
+        guest: null,
+        cabin: null,
+        extras: null,
+      }}
+    />
+  );
+  expect(screen.getByText('Cabin no longer available')).toBeInTheDocument();
+  expect(screen.getByText('Unknown Guest')).toBeInTheDocument();
 });

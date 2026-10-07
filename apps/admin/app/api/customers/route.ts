@@ -1,5 +1,10 @@
+import { logger } from '@/lib/logger';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { CustomerProviderError } from '@/lib/customer-errors';
+import { serializeCustomer } from '@/lib/serializers/customer';
 import {
   createRateLimitResponse,
+  createErrorResponse,
   createValidationErrorResponse,
   parsePagination,
   requireApiAuth,
@@ -18,7 +23,6 @@ import {
 import { createCustomerSchema } from '@/lib/validations';
 import { Booking } from '@lodgeflow/database';
 import { Customer } from '@/types/clerk';
-import { getErrorMessage } from '@/types/errors';
 import { getLoyaltyTier } from '@/utils/utilityFunctions';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -57,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     let response;
     if (search) {
-      response = await searchClerkUsers(search, limit, offset);
+      response = await searchClerkUsers({ query: search, limit, offset });
     } else {
       response = await getClerkUsers({
         limit,
@@ -74,7 +78,11 @@ export async function GET(request: NextRequest) {
 
     const userIds = response.data.map((customer: Customer) => customer.id);
 
-    const statsResults = await Booking.aggregate([
+    const statsResults = await Booking.aggregate<{
+      _id: string;
+      totalBookings: number;
+      totalSpent: number;
+    }>([
       { $match: { customer: { $in: userIds } } },
       {
         $group: {
@@ -91,10 +99,10 @@ export async function GET(request: NextRequest) {
 
     const statsMap = new Map(
       statsResults.map(stat => [
-        stat._id as string,
+        stat._id,
         {
-          totalBookings: stat.totalBookings as number,
-          totalSpent: stat.totalSpent as number,
+          totalBookings: stat.totalBookings,
+          totalSpent: stat.totalSpent,
         },
       ])
     );
@@ -104,12 +112,12 @@ export async function GET(request: NextRequest) {
         totalBookings: 0,
         totalSpent: 0,
       };
-      return {
+      return serializeCustomer({
         ...customer,
         totalBookings: stats.totalBookings,
         totalSpent: stats.totalSpent,
         loyaltyTier: getLoyaltyTier(stats.totalSpent).tier,
-      };
+      });
     });
 
     return NextResponse.json({
@@ -125,11 +133,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching customers:', error);
+    logger.error('Failed to fetch customers', error);
     return NextResponse.json(
       {
         success: false,
-        error: getErrorMessage(error, 'Failed to fetch customers'),
+        error: 'Failed to fetch customers',
       },
       { status: 500 }
     );
@@ -155,10 +163,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await readJsonRequestBody(request);
+    if (!body.success) return createErrorResponse(body.error, 400);
 
     // Validate request body with Zod
-    const validationResult = createCustomerSchema.safeParse(body);
+    const validationResult = createCustomerSchema.safeParse(body.data);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
@@ -192,18 +201,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: customer,
+      data: serializeCustomer(customer),
       message: 'Customer created successfully',
     });
   } catch (error: unknown) {
-    console.error('Error creating customer:', error);
-
-    const errorMessage = getErrorMessage(error, 'Failed to create customer');
-    const statusCode = errorMessage.includes('already exists') ? 409 : 500;
-
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: statusCode }
-    );
+    if (error instanceof CustomerProviderError && error.kind === 'conflict')
+      return createErrorResponse(error.message, 409);
+    logger.error('Failed to create customer', error);
+    return createErrorResponse('Failed to create customer', 500);
   }
 }

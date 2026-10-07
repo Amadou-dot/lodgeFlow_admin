@@ -83,10 +83,6 @@ describe('Booking Validation Schemas', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.status).toBe('unconfirmed');
-        expect(result.data.isPaid).toBe(false);
-        expect(result.data.depositPaid).toBe(false);
-        expect(result.data.depositAmount).toBe(0);
-        expect(result.data.extrasPrice).toBe(0);
         expect(result.data.specialRequests).toEqual([]);
       }
     });
@@ -151,7 +147,6 @@ describe('Booking Validation Schemas', () => {
         ...validBooking,
         extras: {
           hasBreakfast: true,
-          breakfastPrice: 15,
           hasPets: false,
         },
       };
@@ -186,14 +181,14 @@ describe('Booking Validation Schemas', () => {
       }
     });
 
-    it('accepts negative-free prices', () => {
+    it('rejects client-supplied negative-free prices', () => {
       const booking = {
         ...validBooking,
         cabinPrice: 100,
         totalPrice: 500,
       };
       const result = createBookingSchema.safeParse(booking);
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
 
     it('rejects negative cabinPrice', () => {
@@ -298,7 +293,7 @@ describe('Booking Validation Schemas', () => {
   });
 
   describe('Stripe ID validation', () => {
-    it('accepts valid stripePaymentIntentId with pi_ prefix', () => {
+    it('rejects client-supplied valid stripePaymentIntentId with pi_ prefix', () => {
       const result = createBookingSchema.safeParse({
         cabin: '65a1b2c3d4e5f6a7b8c9d0e1',
         customer: 'user_123abc',
@@ -307,7 +302,7 @@ describe('Booking Validation Schemas', () => {
         numGuests: 2,
         stripePaymentIntentId: 'pi_3abc123def',
       });
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
 
     it('rejects stripePaymentIntentId without pi_ prefix', () => {
@@ -322,7 +317,7 @@ describe('Booking Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('accepts valid stripeSessionId with cs_ prefix', () => {
+    it('rejects client-supplied valid stripeSessionId with cs_ prefix', () => {
       const result = createBookingSchema.safeParse({
         cabin: '65a1b2c3d4e5f6a7b8c9d0e1',
         customer: 'user_123abc',
@@ -331,7 +326,7 @@ describe('Booking Validation Schemas', () => {
         numGuests: 2,
         stripeSessionId: 'cs_test_xyz789',
       });
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
 
     it('rejects stripeSessionId without cs_ prefix', () => {
@@ -409,3 +404,25 @@ describe('Booking Validation Schemas', () => {
     });
   });
 });
+
+test.each([updateBookingSchema, patchBookingSchema])(
+  'rejects a contradictory explicit refund amount and status at parse time',
+  schema => {
+    const input =
+      schema === updateBookingSchema
+        ? {
+            _id: '507f1f77bcf86cd799439011',
+            refundAmount: 1,
+            refundStatus: 'none',
+          }
+        : { refundAmount: 1, refundStatus: 'none' };
+    const result = schema.safeParse(input);
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ['refundStatus'] }),
+        ])
+      );
+  }
+);

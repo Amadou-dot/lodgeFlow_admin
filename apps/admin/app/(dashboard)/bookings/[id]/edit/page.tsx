@@ -106,7 +106,7 @@ export default function EditBookingPage({ params }: EditBookingPageProps) {
             Update booking details for{' '}
             {typeof booking.customer === 'string'
               ? booking.customer
-              : booking.customer.name}
+              : (booking.customer?.name ?? 'Unknown Guest')}
           </p>
         </div>
       </div>

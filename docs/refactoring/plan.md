@@ -72,54 +72,35 @@ endpoint coverage or live provider delivery.
 
 ## Phases and acceptance criteria
 
-The checklists below define the gates. Current execution status and named-commit
-CI evidence are maintained on [tracking issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150).
+The checklists below define the gates. Local execution status is recorded here;
+historical named-commit CI evidence remains on [tracking issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150).
 Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-10-02): Phase 0 is complete in
-[PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151).
-Phase 1 has eleven merged slices (PRs #152–#154, #156–#159, #164, #167–#168 and #187),
-covering customer booking, email, checkout, payment-status and cabin catalog
-boundaries, plus validated cached customer payloads. Phase 1 slice 11 now types
-nullable cabin-name population in admin bulk deletion, preserving denial names,
-missing-reference fallback, deletion counts, history and audit behavior.
-Phase 2 has twenty-two merged slices (PRs #160–#163, #165–#166, #169–#173,
-#175–#183, #185 and #188), covering request
-validation, named helper inputs, unused pagination cleanup, public cabin
-visibility, booking status actions, guest reservation operations and typed
-cancellation guards, named catalog/staff operations, typed experience/dining filters
-and validated customer/admin welcome-email boundaries, plus named rate-limit inputs.
-Sender repair #132 completed separately in PR #155 with production and user inbox
-evidence; PR #174 repaired an order-dependent cache test fixture. The latest
-implementation merge is
-[PR #188](https://github.com/Amadou-dot/lodgeFlow_admin/pull/188) at `a003a5c`,
-with all five main CI jobs passing and both production apps verified Ready at that
-SHA. Documentation handoff #184 preserved that stopping point; work resumed at
-the user's request on 2026-10-02. V06 / Phase 2 slice 21 now represents the admin
-`ApiAuthResult` as separate authenticated identity/role and denied-response states.
-Existing guards narrow callers without auth-field assertions. Checked fixtures
-and characterization cover the permission matrix, default administrator-only
-access, exact HTTP errors, audit attribution/failure policy and production bypass
-protection. This is a type-contract cleanup with no intended policy or HTTP
-behavior change; delivery evidence is recorded in the tracker.
-V07 / Phase 2 slice 22 adds validated bulk cabin operations and contains their
-asynchronous failures. Existing denial precedence and success behavior are
-preserved; malformed/contradictory/unknown payloads and raw error disclosure receive
-focused fixes with failing-before regressions.
-Phase 1 slice 12 shares the existing cabin JSON contract across both apps and
-migrates admin catalog, detail and mutation responses/callers. It also names the
-discount/price predicate inputs and fixes legacy null optional fields crashing
-the cabin editor; response fields and persisted values are preserved.
-The user requested completion of all remaining Phase 1–2 work, followed by a
-review checkpoint before any Phase 3 implementation. Payment-flow readiness
-alone does not satisfy this checkpoint. Keep remaining work visible in the
-inventory and verify the acceptance criteria before stopping for review.
-Other resource/admin DTOs, validation, money and UI work remain open.
-The inventory and tracker retain per-slice validation and delivery evidence;
-the milestone remains open. Historical tracker evidence through #182 is preserved
-in [delivery-history.md](delivery-history.md).
+Current execution status (2026-10-07): Phase 0 is delivered in
+[PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151). The historical
+Phase 1–2 deliveries run through [PR #189](https://github.com/Amadou-dot/lodgeFlow_admin/pull/189)
+and base commit `4d3590b`. Their per-slice evidence remains in
+[inventory.md](inventory.md) and [delivery-history.md](delivery-history.md).
+
+All remaining Phase 1–2 implementation is now present on the review branch
+`refactor/admin-cabin-availability`. The remaining resource DTOs, request and
+provider/cache validation, named operations, safe errors, affected UI callers and
+checked fixtures are complete. Intentional behavior fixes and preserved contracts
+are enumerated in the inventory. Final local verification passes: formatting,
+read-only lint, all 2,192 tests (admin 1,465; customer 658; database 66; email 3),
+both app type checks, separate strict compilation of all 47 touched admin test
+files, the isolated HTTP gate, frozen installation and both app/shared package
+production builds. Remote CI, merge and deployment verification are not part of
+this review checkpoint.
+
+The user requested a review checkpoint after all Phase 1–2 work and before Phase
+3. Stop at that checkpoint. The milestone stays open: money units, UI workflow
+state, remaining provider-origin review and Phase 6 test infrastructure are still
+separate work. The [current syntax review](inventory-current.json) accounts for
+remaining boundary exceptions and concrete later-phase debt; it does not claim
+that the whole repository meets every final milestone criterion.
 
 Each phase may take several PRs. Select one resource/operation at a time, migrate
 its callers in both apps as needed, and finish validation before starting the next
@@ -227,10 +208,10 @@ ensure lesser-used routes, scripts, and fixtures are not forgotten.
 
 Acceptance:
 
-- [ ] Migrated UI/response types no longer inherit Mongoose document methods.
-- [ ] Serializers cover missing references, identifiers, dates, and existing response fields.
-- [ ] Both apps' affected callers and fixtures compile and relevant tests pass.
-- [ ] Inventory accounts for all remaining boundary/type violations.
+- [x] Migrated UI/response types no longer inherit Mongoose document methods.
+- [x] Serializers cover missing references, identifiers, dates, and existing response fields.
+- [x] Both apps' affected callers and fixtures compile and relevant tests pass.
+- [x] Inventory accounts for all remaining boundary/type violations.
 
 ### Phase 2 — Explicit operations, validation, authorization, and errors
 
@@ -248,10 +229,10 @@ Dependencies: Phase 1 for the flow being changed. Preserve the #135 regression e
 
 Acceptance:
 
-- [ ] No caller can swap same-type positional inputs or select contradictory operations in migrated APIs.
-- [ ] Schema tests cover cross-field failures; route tests cover denied access and rejected fields.
-- [ ] Missing and foreign cabin checkout bookings have the same 404 response and cause no provider call or write.
-- [ ] Expected errors use typed narrowing, unexpected errors are safely logged, and audit attribution/redaction remain intact.
+- [x] No caller can swap same-type positional inputs or select contradictory operations in migrated APIs.
+- [x] Schema tests cover cross-field failures; route tests cover denied access and rejected fields.
+- [x] Missing and foreign cabin checkout bookings have the same 404 response and cause no provider call or write.
+- [x] Expected errors use typed narrowing, unexpected errors are safely logged, and audit attribution/redaction remain intact.
 
 ### Phase 3 — Explicit money units and protected accounting
 

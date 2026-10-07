@@ -3,27 +3,15 @@ import {
   ReservationPayments,
   type PaymentSummary,
 } from './ReservationPayments';
-import type { ReservationPaymentState } from '@lodgeflow/database';
+import type {
+  DiningReservationDetail,
+  ExperienceReservationDetail,
+} from '@lodgeflow/database/reservation-json';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import { utcDate } from '@/lib/reservation-options';
-interface Reservation extends ReservationPaymentState {
-  _id: string;
-  date: string;
-  time?: string;
-  timeSlot?: string;
-  status: string;
-  numGuests?: number;
-  numParticipants?: number;
-  totalPrice: number;
-  isPaid: boolean;
-  dining?: { name: string };
-  experience?: { name: string };
-  specialRequests?: string[];
-  dietaryRequirements?: string[];
-  observations?: string;
-}
+type Reservation = DiningReservationDetail | ExperienceReservationDetail;
 export function ReservationDetail({
   kind,
   id,
@@ -78,6 +66,10 @@ export function ReservationDetail({
     }
   }
   const reservation = data?.reservation;
+  const dining =
+    reservation && 'dining' in reservation ? reservation : undefined;
+  const experience =
+    reservation && 'experience' in reservation ? reservation : undefined;
   return (
     <section className='space-y-6 max-w-3xl'>
       <Link href='/reservations' className='text-primary underline'>
@@ -94,8 +86,8 @@ export function ReservationDetail({
       ) : (
         <>
           <h2 className='text-xl'>
-            {reservation.dining?.name ||
-              reservation.experience?.name ||
+            {dining?.dining?.name ||
+              experience?.experience?.name ||
               'Removed listing'}
           </h2>
           <dl className='grid grid-cols-2 gap-3'>
@@ -104,25 +96,23 @@ export function ReservationDetail({
             <dt>Date</dt>
             <dd>{utcDate(reservation.date)}</dd>
             <dt>Time</dt>
-            <dd>
-              {reservation.time || reservation.timeSlot || 'Not specified'}
-            </dd>
+            <dd>{dining?.time || experience?.timeSlot || 'Not specified'}</dd>
             <dt>Party size</dt>
-            <dd>{reservation.numGuests ?? reservation.numParticipants}</dd>
+            <dd>{dining?.numGuests ?? experience?.numParticipants}</dd>
             <dt>Status</dt>
             <dd>{reservation.status}</dd>
             <dt>Payment</dt>
             <dd>{reservation.isPaid ? 'Paid' : 'Balance due'}</dd>
           </dl>
-          {!!reservation.dietaryRequirements?.length && (
+          {!!dining?.dietaryRequirements?.length && (
             <p>
-              Dietary requirements: {reservation.dietaryRequirements.join(', ')}
+              Dietary requirements: {dining?.dietaryRequirements.join(', ')}
             </p>
           )}
           {!!reservation.specialRequests?.length && (
             <p>Special requests: {reservation.specialRequests.join(', ')}</p>
           )}
-          {reservation.observations && <p>Notes: {reservation.observations}</p>}
+          {experience?.observations && <p>Notes: {experience?.observations}</p>}
           <ReservationPayments
             endpoint={endpoint}
             payment={data.payment}

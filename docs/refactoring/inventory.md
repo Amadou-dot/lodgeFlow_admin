@@ -5,6 +5,34 @@ This inventory assigns work; it does not authorize skipping the Phase 0B/0C gate
 All confirmed items below remain open unless their status explicitly says otherwise.
 The owning phase is an execution dependency, not an assigned person.
 
+## Current review checkpoint (2026-10-07)
+
+The remaining Phase 1–2 implementation is complete on the review branch
+`refactor/admin-cabin-availability`, based on `4d3590b`. Final local gates pass and
+the Phase 1–2 acceptance checklists are complete. The branch is ready for review;
+this checkpoint does not claim a merge or verified deployment. Historical PR evidence below
+continues to describe the earlier delivered slices only. Stop before Phase 3 for
+review; the overall refactoring milestone remains open.
+
+The [current candidate review](inventory-current.json) supersedes the baseline
+candidate list for outstanding work. It covers 655 source/test/script files:
+81 generic test-infrastructure `any` candidates remain assigned to Phase 6, while
+49 findings are reviewed persistence, legacy transport or external/value-shape
+exceptions. The baseline JSON retains its original
+locations and counts for comparison. Every current syntax candidate has a
+specific disposition: valid persistence/framework/legacy transport boundary or
+Phase 6 test infrastructure debt (O01). No runtime `any`, double cast, ambiguous
+same-primitive positional signature or Record cast over typed data remains in the
+scanned scope. This is a bounded syntax review, not proof that all Phase 3–6 work
+is finished.
+
+Legacy cabin/booking read DTOs preserve explicit nulls separately from omitted
+fields, including sparse lean rows. This is the existing transport compatibility
+exception, tested against hydrated and lean JSON; new internal component inputs
+use one absence representation. Mongoose `Document` inheritance remains only at
+the persistence layer. URL filter primitives and StatsGrid display values are
+intentional heterogeneous values, not ambiguous date or money representations.
+
 ## Scope and evidence
 
 A TypeScript syntax-tree scan covered 522 tracked JS/TS files across both apps and
@@ -36,17 +64,20 @@ rather than treating counts as the completion gate.
 
 | ID  | Source / symbol                                                                                                  | Rule or observed mismatch                                                                    | Phase    | Next action and validation                                                                                                                                                          |
 | --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Partially complete: booking reads, mutations, cancellation and cabin emails use explicit inputs; `PopulatedBooking` is removed. Cabin catalog migration is recorded in slice 10; other resource aliases remain. |
+| T01 | `apps/customer/types/index.ts`: `Cabin`, `Booking`, `PopulatedBooking`                                           | Transport/UI aliases reuse document interfaces; booking dates mix strings and Dates.         | 1        | Complete locally: all resource aliases now describe JSON; unused Booking/model/event aliases are removed. Booking, cabin, dining, experience, reservation and Settings consumers use string IDs/dates and explicit missing-reference types. |
 | T02 | `apps/customer/app/api/bookings/[id]/route.ts`: `GET`                                                            | `ApiResponse<any>` returns a populated document without an explicit DTO contract.            | 1        | Complete in PR #152: explicit detail DTO/serializer with owner/missing/foreign, ID/date and missing-cabin coverage.                                                                 |
 | T03 | `apps/customer/app/api/payments/create-checkout/route.ts`: cabin name extraction                                 | Double cast conceals the populated-reference shape.                                          | 1        | Implemented in Phase 1 slice 6 below: nullable cabin population, missing-reference denial and characterized quote/session behavior.                                                                           |
 | T04 | `apps/customer/app/api/payments/webhook/route.ts`: confirmation payload                                          | Double cast converts a populated booking to the UI/email type.                               | 1        | Implemented in Phase 1 slice 4 below: explicit payment email inputs, nullable cabin population and preserved settlement/delivery boundaries.                                        |
-| T05 | `apps/admin/types/api.ts` and `apps/admin/types/index.ts`                                                        | Query/aggregation/transport types coexist; serialization contracts need per-flow separation. | 1        | Begin with booking output and its actual callers; test IDs, dates and null references. Do not rewrite every reporting query in one PR.                                              |
-| T06 | `packages/database/src/models/*`: nine `Document`-extending interfaces                                           | Persistence interfaces are re-exported across app boundaries.                                | 1        | Keep persistence behavior tested; add lean/populate/DTO types as each consumer migrates. Inheritance alone is not slated for deletion.                                              |
-| T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Replace with checked input/DTO builders or real documents according to each test's responsibility; preserve behavioral assertions.                                                  |
-| T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Choose one internal absence representation per component, adapting callers without changing PATCH semantics.                                                                        |
+| T05 | `apps/admin/types/api.ts` and `apps/admin/types/index.ts`                                                        | Query/aggregation/transport types coexist; serialization contracts need per-flow separation. | 1        | Complete locally in slices 15–21 and 26: booking/customer/reporting/staff/audit/calendar/reservation/statistics queries and DTOs are separated, with serializers and checked consumer fixtures. |
+| T06 | `packages/database/src/models/*`: nine `Document`-extending interfaces                                           | Persistence interfaces are re-exported across app boundaries.                                | 1        | Reviewed boundary exception: all nine Document interfaces stay within persistence. UI imports use serializable projections; no document methods cross JSON. |
+| T07 | `apps/admin/__tests__/integration/api/bookings.test.ts`: fixture overrides; remaining candidate fixtures         | Fixture `any` hides missing/invalid fields.                                                  | 1        | Complete for migrated booking/DTO fixtures and all touched test files compile in a separate strict check. Remaining generic mocks and model-test infrastructure are itemized as O01 in inventory-current.json. |
+| T08 | `apps/admin/components/BookingForm/PaymentInformation.tsx`, `PriceBreakdown.tsx`; cabin/dining/experience modals | Props permit both omitted and null absence.                                                  | 1        | Complete locally: booking Settings and catalog modal props use optional absence; callers normalize missing selections without changing legacy PATCH semantics. |
 | T09 | `apps/admin/lib/clerk-users.ts`: `reviveCustomerDates`                                                           | Cache boundary uses assertions to reconstruct dates.                                         | 1        | Implemented in Phase 1 slice 8: validated unknown cache payloads and dates, per-entry misses for malformed data, preserved negative cache and transient failures.                                                              |
 | T10 | Admin `app/api/cabins/bulk/route.ts`: `handleBulkDelete` | Populated cabin-name projection is concealed behind a double cast. | 1 | Implemented in Phase 1 slice 11: nullable sparse name projection with preserved active-booking denial, deduplication, Unknown fallback, history, counts and audit attribution. |
-| T11 | Admin cabin catalog/detail/create/update routes, `types/index.ts`, `hooks/useCabins.ts` and cabin UI | JSON cabin responses are typed as Mongoose documents. | 1 | Implemented in Phase 1 slice 12: shared existing cabin DTO/serializer, plain admin read/mutation types, checked fixtures and normalized editor absence. Admin availability remains separate. |
+| T11 | Admin cabin catalog/detail/create/update routes, `types/index.ts`, `hooks/useCabins.ts` and cabin UI | JSON cabin responses are typed as Mongoose documents. | 1 | Implemented in Phase 1 slice 12: shared existing cabin DTO/serializer, plain admin read/mutation types, checked fixtures and normalized editor absence. Admin availability is complete in T12 / V08. |
+| T12 / V08 | Admin cabin availability route and booking calendar | Untyped date projection, unvalidated queries and unchecked calendar responses. | 1–2 | Completed locally in the availability slice below: typed query/projection, validation before database access, safe logging and validated calendar JSON. |
+| T13 | Both dining catalog APIs, aliases, hooks and modal | JSON IDs/dates inherit persistence field types; detail uses an untyped JSON round trip. | 1 | Complete locally in slices 13 and 23–27: shared dining JSON, explicit editable fields, validated writes and queries, typed sort/rendering and normalized modal absence. |
+| T14 | Both experience catalogs, aliases, hooks and modal | JSON IDs/dates and sparse defaulted arrays are described as persistence fields. | 1 | Complete locally in slices 14 and 23–27: shared experience JSON, strict editable inputs, typed read filters, checked fixtures and sparse-page regressions. |
 | F01 | `packages/database/src/booking-payments.ts`: `paymentSummary`                                                    | Adjacent major-unit numeric positionals can be reversed.                                     | 2        | Implemented in Phase 2 slice 2: named inputs at all six call sites; characterization and shared/app accounting gates pass.                                                                                          |
 | F02 | `packages/database/src/reservation-capacity.ts`: create/update reservation helpers                               | Same-type ID/customer positionals and inferred `cancel = false` switch.                      | 2        | Implemented in Phase 2 slice 12: named guest create inputs and tagged update/cancel operations at all callers, with owner/payment/terminal guards and catalog transaction writes preserved.                                    |
 | F03 | `apps/admin/lib/staff-access.ts`: `isOrganizationMember`, `resolveStaffRole`                                     | Organization/user string inputs can be confused.                                             | 2        | Implemented in Phase 2 slice 4: named identity inputs, canonical absent organization and passing membership/assignment/permission gates.                                                                                |
@@ -57,10 +88,10 @@ rather than treating counts as the completion gate.
 | F08 | Admin `lib/rate-limit.ts`: `createRateLimitKey` and API callers | Adjacent user/endpoint strings can be reversed. | 2 | Implemented in Phase 2 slice 20: named inputs at all three runtime callers; anonymous fallback, user/endpoint namespaces, rate limits and retry headers preserved. |
 | F09 | Admin `lib/validations/cabin.ts`: `isDiscountValid` | Discount and price numbers can be swapped. | 2 | Completed alongside Phase 1 slice 12: named inputs at both routes and all three test calls, with unchanged comparison and stored-price validation. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
-| V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Classify each rule first; move payload-only cross-field checks into the schema, keeping ownership/capacity/payment checks in their protected operation.                             |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Partially implemented in Phase 2 slices 1, 6, 9 and 18–19: validated requests for customer confirmations, cabin checkout and public availability search, plus customer/admin welcome-email boundaries. Continue per flow; preserve webhook acknowledgements.                                                                |
-| V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 16: typed filters and a focused zero-price fix, with route/hook/HTTP regressions; response DTOs remain Phase 1. |
-| V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Implemented in Phase 2 slice 17: typed filters and the related zero-price fix, preserving availability/search/JSON and cache behavior. Response DTOs remain Phase 1. |
+| V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Complete locally in slice 24: payload-only date/refund/payment rules live in schemas; IDs/JSON/unknown fields validate before writes. Existing lock, Settings, receipts, refund authorization and stored-state rules remain server-side. |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. General response consolidation remains Phase 6. |
+| V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed filters, explicit zero bounds and shared experience JSON; route/hook/HTTP regressions preserve query/cache behavior. |
+| V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed available-only queries, explicit zero bounds and shared dining JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
 | V07 | Admin `app/api/cabins/bulk/route.ts` and `lib/validations/bulk-cabin.ts` | Raw payloads, raw exception messages and unawaited operations escape the request boundary. | 2 | Implemented in Phase 2 slice 22: validated tagged operations, preserved legacy denial precedence, safe logged failures and rejected contradictory/unknown fields. |
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
@@ -68,7 +99,7 @@ rather than treating counts as the completion gate.
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
 | S01 | `apps/admin/hooks/useBookingForm.ts` and booking UI hooks/components                                             | Local derived price/form state and SWR/mutation invalidation require coordinated review.     | 4        | Identify redundant state and exclusive workflow states in one form; test error/retry/cache refresh. Independent extras booleans remain valid options.                               |
 | E01 | Both apps' existing send routes and customer email helpers                                                       | Ten sender sites migrated to validated `@lodgeflow/email` configuration.                     | 5 / #132 | Complete in PR #155 / merge `9a9c296`: tests, both production deployments, Resend delivery and user inbox confirmation verified. No #139 features.                                  |
-| O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Resolve candidate findings by symbol and add appropriate targeted checks after the code passes; do not blanket-disable diagnostics or rewrite every script now.                     |
+| O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Open for Phase 6: inventory-current.json lists remaining generic test mocks, schema-test fixtures and the test setup factories by path/line. All modified admin tests receive a separate strict type check; no compiler/lint settings are weakened. |
 | D01 | Both `CLAUDE.md` files                                                                                           | Stale model paths, deposit accounting, fixture cast advice, domains and CI description.      | 0A       | Corrected in this Phase 0 tree against source; final format/read-through verification required before review completion.                                                            |
 
 ## Phase 1 slice 1: customer cabin booking reads
@@ -1305,3 +1336,399 @@ Phase 5 origin/contract review remains open.
    checks, not reaching an arbitrary count or percentage.
 
 #136's broad dining coverage and #139's notification features remain excluded.
+
+## Phase 1–2: admin cabin availability boundary (T12 / V08)
+
+- Validate cabin/excluded booking IDs and the effective date range before database
+  access. Preserve the first query value, empty-value six-month defaults, timestamp
+  parsing, UTC date-only output, exclusion-error precedence, strict overlap rules,
+  all non-cancelled statuses and the absence of a cabin-existence lookup.
+- Replace the double-cast date projection with a typed lean result and typed
+  Mongoose filter. Keep `bookings:read` authorization before query validation.
+- Intentional fixes: invalid cabin IDs/dates and non-increasing ranges return safe
+  400 errors; unexpected reads retain the existing 500 envelope and are logged.
+  The booking calendar validates unknown response JSON and surfaces HTTP/malformed
+  response errors before date rendering. Remove its unnecessary date-picker cast.
+- Before runtime changes, 13 route and five calendar characterizations passed;
+  six route and three calendar regressions failed. Afterward all 27 pass, along
+  with admin application and both changed-test strict type checks.
+- Workspace formatting, read-only lint and all 1,855 tests pass (admin 1,253,
+  customer 540, database 59, email 3). Expanded isolated HTTP passes admin date JSON,
+  exclusion, invalid-input no-write denial and existing authorization/accounting
+  checks. This does not exercise hosted login or live provider delivery.
+- Clean frozen installation passes with Node 22 and pnpm 11.17.0. Both credential-free
+  production app builds and shared package builds pass. The broader Phase 1–2 checkpoint
+  remains open; no Phase 3 implementation is included.
+
+## Phase 1 slice 13: dining catalog JSON (T13)
+
+- Both apps' catalog/detail responses and admin create/update responses use an
+  explicit serializer with string ObjectIds and ISO timestamps. Existing hooks,
+  cards and forms consume the shared data-only type, without live database dates.
+  Normalize the modal's absent selection at its caller.
+- Preserve hydrated list/admin defaults versus lean customer-detail omissions,
+  nested beverage IDs, sparse timestamps, existing legacy nulls, version fields,
+  and the creation-only selected `reservationVersion`. Keep response envelopes,
+  filter/sort behavior, permissions, catalog transaction writes and cache keys.
+  Narrow the updater's union at each dining response boundary; domain code is
+  unchanged. Route fixtures now supply checked ObjectIds/Dates and a narrow save
+  dependency rather than JSON-shaped persistence or constructor casts.
+- Before runtime edits, seven new full-JSON characterizations and ten existing
+  integration cases pass. After edits, all 17 pass, along with 38 mocked route/hook
+  cases, 28 customer query/hook cases, and 61 database tests. Serializer tests
+  compare against actual hydrated/lean JSON, including sparse legacy rows, and
+  verify that copied arrays/nested objects do not mutate source data.
+- Both application types and strict checks of the two changed admin tests pass.
+  `pnpm ci:check` passes formatting, lint and 1,864 tests (admin 1,260/customer 540/
+  database 61/email 3). Both production apps and shared packages build with the
+  throwaway public Clerk key and no provider/application credentials.
+- HTTP adds complete JSON comparisons for both list/detail flows and catalog
+  updates. The first run passed these reads then exposed an existing redirect
+  assertion that did not explicitly request HTML navigation. Clerk's installed
+  protection code distinguishes page redirects from API not-found responses;
+  the fixture now explicitly requests JSON and accepts only the known sign-in
+  redirect or a 404 bearing Clerk's `protect-rewrite` marker. Unit probes reject
+  unrelated 404s, successes, server errors and unexpected redirects. The expanded
+  HTTP gate passes, including all existing reservation/accounting checks.
+- Remaining dining work: request/detail error boundaries, reservation DTOs and
+  the unused filter/sort handlers in `apps/customer/app/dining/page.tsx`. No UI
+  controls, permissions, capacity behavior or live provider operations are added.
+
+## Phase 1 slice 14: experience catalog JSON (T14)
+
+- Both apps' catalog/detail routes and admin create/update responses use the shared
+  explicit experience serializer. Both apps' hooks, pages, forms and modal consume
+  string IDs/dates. Read sources distinguish lean omitted defaults from hydrated
+  defaults; dining's sparse minimum-party field receives the same accurate typing.
+- Preserve every existing schema field, timestamps/version, creation-only selected
+  reservationVersion, nullable legacy values, response envelopes and transaction
+  behavior. Normalize absent modal selection at the caller. No filters or controls
+  are added. Model schemas, capacity operations and storage remain unchanged.
+- Before runtime edits, six new full-JSON cases and ten existing integrations pass.
+  Afterward, 52 admin and 31 customer focused cases pass, including four page cases.
+  Two sparse experience page cases failed before rendering fallbacks were added;
+  missing includes/availability arrays now render without crashing. This intentional
+  bug fix leaves the wire's omitted fields intact. Populated pages remain covered.
+- Application and changed-test type checks pass. `pnpm ci:check` passes formatting,
+  read-only lint and 1,876 tests (admin 1,266/customer 544/database 63/email 3).
+  Expanded isolated HTTP passes exact catalog JSON and existing protected flows.
+  Both production apps and shared packages build with the throwaway public Clerk
+  key and no application/provider credentials. Hosted login/live delivery untested.
+- Remaining work includes catalog request/error boundaries, reservation DTOs and
+  the pre-existing unused filter/sort handlers. The broader Phase 1–2 review
+  checkpoint remains open; Phase 3 is untouched.
+
+
+## Phase 1 slice 15: admin booking JSON and customer booking primitives
+
+- Moved the characterized customer booking DTOs/serializers to the shared
+  `booking-json` export, retaining app compatibility re-exports. Admin list,
+  detail, create/update and status responses now use explicit serialized fields
+  and typed nullable cabin populations. List projections and minimal missing-user
+  fallback remain distinct from full detail and its null customer.
+- Preserved receipt values/dates, financial flags, virtuals, legacy omissions,
+  string identifiers and complete response envelopes. The booking form, detail,
+  table, print and email consumers use JSON types rather than Mongoose methods.
+  Missing cabin/customer/extras now render safely in print and form consumers;
+  these corrections have failing-before regressions. Date formatting uses named
+  inputs at every caller with unchanged output.
+- Validation: seven real-Mongo response/authorization characterizations; existing
+  route/mutation/hooks; print and missing-reference component regressions; all
+  date-formatting tests; both app and touched-test type checks. Full checks pass
+  1,887 tests (admin 1,277/customer 544/database 63/email 3). Both production
+  builds and isolated HTTP pass, including exact admin list/detail JSON and
+  no-write checks. A new HTTP snapshot helper initially had the wrong scope;
+  it was corrected and the complete gate rerun successfully.
+- Local changes only. Customer records, Settings, staff/audit,
+  reservations/calendar/reporting and remaining validation remain separate work.
+
+
+## Phase 1-2 slice 16: Settings JSON, request boundary and named range inputs
+
+- Both Settings APIs now serialize an explicit shared Settings JSON shape.
+  Database identifiers/dates are converted at the route boundary; nested
+  minimization, null contact information, timestamps and fullAddress remain
+  compatible. Hooks and booking/settings forms consume data fields without
+  document methods. Payment and price components use narrow optional props.
+- Booking-length comparisons use named inputs. Payload-only rules remain in the
+  schema; effective min/max checks still use stored Settings. Metadata stripping
+  accepts unknown input without turning arrays into update objects. Invalid
+  JSON and invalid payloads now return 400 before database access; this is an
+  intentional correction, protected by seven failing-before regressions.
+  Unexpected errors use the server logger and safe messages.
+- Characterization: 15 existing/new integration checks passed before and after
+  serialization. Focused route/schema/hook checks pass (58 tests), both app and
+  touched-test type checks pass. Full checks pass 1,905 tests (admin 1,293,
+  customer 544, database 65, email 3); both isolated production builds and HTTP
+  pass. HTTP compares complete admin/customer JSON and checks rejected fields,
+  cross-field failures, denied writes, persisted values and audit attribution.
+- Default creation/reset behavior is unchanged and exercised only in disposable
+  databases. No live Settings operation or external delivery was performed.
+
+
+## Phase 1-2 slice 17: customer JSON and validated provider operations
+
+- Customer list/detail/create/update responses use explicit JSON dates and typed
+  aggregates; recent history preserves complete booking fields and nullable cabin
+  projections. UI and hooks no longer claim server-side Date objects. Clerk
+  lookups retain a distinct server Customer type and a narrow SDK read source;
+  converter fixtures no longer cast incomplete objects to SDK users.
+- Create/update schemas now accept the guest form's existing emergency-contact
+  and preference fields, alongside previously supported legacy fields. Previously
+  dropped form values are preserved. Strict payloads reject unknown/server-owned
+  fields, dotted paths, operators and malformed values before provider mutation.
+  Omitted metadata is unchanged; explicit null clears whole or nested keys through
+  named internal change operations and Clerk's existing merge endpoint. Ignored
+  legacy form identity/email/phone/password fields remain ignored on update.
+- Provider errors use typed not-found/conflict/failure states and safe route
+  messages. Duplicate detection uses Clerk's documented `form_identifier_exists`
+  code; lock/unlock no longer match exception text. Unexpected failures are logged.
+  Search pagination uses named inputs. Cache invalidation remains after successful
+  mutations, and create/public/private metadata placement is preserved.
+- Twelve JSON/auth/statistics characterizations passed before DTO changes.
+  Thirteen request/metadata/error regressions failed before the fixes; focused
+  route/schema/provider/cache/hook coverage now passes (166 tests before the final
+  fixture cleanup). Strict app and touched-test types pass. Full checks pass 1,957
+  tests (including the next reporting characterization), isolated HTTP and both
+  credential-free builds pass. The HTTP Clerk fixture now correctly implements
+  the installed SDK's separate user-list and count requests; customer reads and
+  rejected update/no-provider-side-effect assertions pass.
+- This is local validation with controlled providers. It does not exercise hosted
+  login or live Clerk user mutation. Existing nontransactional create-then-metadata
+  behavior is preserved; no compensating deletion workflow was added.
+
+
+## Phase 1-2 slice 18: reporting JSON and typed queries
+
+- Dashboard, booking analytics and sales aggregates now declare their actual
+  result shapes. Removed the dashboard population double cast and array-result
+  assertions. Shared reporting DTOs use string IDs/dates and shared status unions;
+  hooks and charts consume these types without importing route runtime code.
+- Preserved paid-only revenue, cancellation/occupancy scope, historical popular
+  cabin totals, aggregation bucket definitions, zero-filled windows, rounding and
+  the bare sales-array response. Analytics validates periods before database
+  access. Unexpected failures retain safe envelopes and now use the server logger.
+  An analytics error envelope now rejects instead of entering the cache as report
+  data; bare legacy data remains supported.
+- Twelve real-Mongo characterizations pass before/after. Four API regressions and
+  one hook regression failed before correction; all pass now. Typed analytics
+  fixtures replace query mock `any`. Full checks pass 1,963 tests (admin 1,351,
+  customer 544, database 65, email 3), strict app/touched-test types pass, expanded
+  HTTP verifies report dates/windows/envelopes and no writes, and both isolated
+  production builds pass. No report calculation or accounting definition changed.
+
+## Phase 1-2 slice 19: staff access and audit history
+
+- Staff member and audit event JSON now have explicit transport types; the
+  serializer preserves sparse Clerk profiles, nullable roles, IDs, ISO dates,
+  version metadata and opaque redacted snapshots. Both admin pages consume these
+  types without persistence methods.
+- Staff requests parse into assign/revoke operations before provider/database
+  access. Malformed JSON, null and unknown/server-owned fields now return 400.
+  The actor revision write, transaction retries, self-change denial, current
+  membership checks and audit attribution remain intact. Audit query schemas
+  retain pagination, filter/date error messages and inclusive date endpoints.
+- Unexpected failures retain safe 503 responses and now log the underlying error.
+  Six failing-before regressions pass, alongside 28 characterization/access/audit
+  checks. App and strict touched-test types, formatting/lint, all 1,979 tests
+  (1,367 admin, 544 customer, 65 database, 3 email), expanded isolated HTTP and
+  credential-free builds pass. Evidence: `/tmp/lodgeflow-staff-audit-*`.
+- Local implementation only; no PR, CI or deployment is asserted. Reservations
+  and calendars remain the next Phase 1-2 boundary.
+
+## Phase 1-2 slice 20: reservation inbox and calendars
+
+- Typed aggregate/projection sources and explicit JSON serializers now cover the
+  unified inbox and all three calendars. Shared UI types include string IDs,
+  ISO timestamps, nullable end dates/times, the existing `seated` dining status,
+  removed-listing/guest fallbacks and omitted uncapped capacity. The native status
+  and lifecycle filter behavior are preserved; no new transition is added.
+- Named date-window inputs replace calendar positionals. Zod schemas preserve
+  pagination/filter errors, strict inbox date endpoints, UTC midnight calendar
+  normalization and the 180-day cap. Routes map typed query failures and log
+  unexpected errors with safe existing 500 messages.
+- Nineteen before-refactor characterizations pass; two failing-before logging
+  regressions now pass. The expanded focused set has 29 checks. Full validation
+  evidence is recorded in the local handoff; detail/receipt DTOs remain separate.
+
+## Phase 1-2 slice 21: capacity reservation JSON and callers
+
+- Dining/experience reservation schemas remain unchanged; persistence interfaces
+  now use ObjectIds and shared native status unions, including existing `seated`.
+  Shared JSON types/serializers cover all guest create/read/history/update/cancel
+  responses and staff detail/status/receipt responses. IDs, dates, receipt arrays,
+  checkout/refund state, virtual IDs, sparse lean fields and null populations are
+  characterized through MongoDB and real local HTTP.
+- Customer hooks distinguish projected history from full details. Both apps use
+  string payment timestamps and plain response types. Two previously crashing
+  deleted-listing confirmation views retain reservation and checkout details with
+  an explicit missing-listing label; history transforms no longer use `any`.
+- Narrow Stripe model dependencies retain the same queries and writes. The
+  settlement update uses the already validated checkout reference. Test fixtures
+  assert query existence and use checked sources; concurrency/accounting checks
+  remain passing. Request hardening is the following slice.
+- Validation: full format/lint, 2,002 tests, app/shared/strict touched-test types,
+  exact before/after expanded HTTP and credential-free builds pass. Local evidence
+  `/tmp/lodgeflow-reservation-json-*`; no CI/deployment has been asserted.
+
+## Phase 1-2 slice 22: reservation requests and safe failures
+
+- Guest create/update schemas now reject unknown, operator, dotted, prototype and
+  server-owned fields; transport dates are strings and parsed domain dates remain
+  Dates. Creation IDs, detail/mutation IDs and collection/history status filters
+  validate before connection. Invalid reads preserve each missing-resource error;
+  malformed JSON now returns 400. Cancellation still ignores its request body.
+- Forms send ISO date strings; request aliases derive from the schemas. Obsolete
+  guest payment/status PATCH schemas were removed. Server identity, receipt/capacity
+  rules and successful envelopes remain unchanged. These are intentional rejected-
+  input behavior changes, separate from the preceding DTO migration.
+- Staff receipt validation lives in `lib/validations`; receipt/status handlers
+  distinguish malformed JSON from unexpected stream failures. Unexpected errors
+  log safely. Staff/receipt strict objects also reject explicit prototype keys.
+- Thirty-three failing-before regressions cover JSON, IDs/statuses, forbidden
+  fields, prototype keys and diagnostics. The expanded focused customer set has
+  74 checks. Full format/lint, 2,053 tests (1,390 admin, 594 customer, 66 database,
+  3 email), app/touched-test types, HTTP rejection/no-write cases and all builds
+  pass. Evidence `/tmp/lodgeflow-reservation-boundary-*`; local implementation.
+
+## Local Phase 1–2 slices 23–29: remaining boundaries and inventory closure
+
+These changes follow the local slices above and have no new delivery/production
+claim. Existing behavior is characterized before each refactor; intentional fixes
+are listed separately from type-only changes.
+
+### Slice 23: catalog requests
+
+- All six admin catalog route families parse JSON and writable fields before
+  database work. Path IDs retain authority; invalid IDs, non-object JSON,
+  malformed JSON, prototype/operator/dotted keys and server metadata are rejected.
+- Dining payload-only minimum/maximum rules live in Zod. Partial updates that need
+  stored values retain the existing capacity transaction and rollback behavior.
+- Hooks project full editor DTOs to explicit editable fields; cache keys and
+  invalidation remain unchanged. Public invalid detail IDs return the same 404
+  as missing resources. Unexpected failures use the server logger.
+- Before/after regressions cover catalog validation, safe prototype-key error
+  formatting, no writes on denial and editor metadata removal. Focused catalog
+  and hook checks pass; full gates are also included in later slice totals.
+
+### Slice 24: cabin booking requests
+
+- Both apps use strict request fields, string transport dates, validated IDs and
+  guarded object parsing. Admin forms send choices instead of ignored derived
+  prices/payment flags. Customer cancellation retains its optional empty-body
+  behavior while rejecting malformed nonempty JSON.
+- Authorized staff PATCH receipt/payment metadata remains supported. Payload-only
+  contradictory refunds are rejected by the schema; authorization precedence,
+  locks, overlap checks, pricing and receipt-dependent rules remain server-side.
+- Removed error-text overlap guessing; unexpected PATCH errors return a safe
+  message. Invalid customer booking IDs return 404 before database access.
+- New regressions fail before the fixes, including forged pricing/flags,
+  contradictory refunds and malformed bodies. Full checks pass 2,132 tests, both
+  app types and production builds; the next HTTP run verifies the corrected 404.
+
+### Slice 25: confirmation emails
+
+- Admin confirmation validates a narrow read-only projection of the legacy full
+  booking/cabin payload; the template and hook receive only their real fields.
+  Existing extra DTO metadata is ignored here because this endpoint sends an
+  email and does not update a document. Sender, recipient, subject, rate limit,
+  permission and bare provider-success response remain unchanged.
+- Dining confirmation validates IDs before reads, preserves ownership/payment
+  denial and paid/free sender choice, handles missing listings, and maps provider
+  and authentication failures safely. No new notifications or triggers are added.
+- Fifteen failing-before cases pass after the changes. Full checks pass 2,159
+  tests, app/touched-test types, isolated HTTP and credential-free builds.
+
+### Slice 26: provider metadata, statistics and public availability
+
+- Clerk metadata is validated field by field. Supported partial legacy profiles
+  survive the cache; malformed fields are omitted without dropping other valid
+  fields. Cached recent-booking dates are JSON strings.
+- Four statistics aggregates and their hooks have explicit result types; empty
+  values, nullable averages, rounding, permission checks and envelopes remain.
+- Dining/experience availability parses IDs and day/range queries before reads,
+  retaining date precedence, local boundaries, the 180-day cap, capacity grouping
+  and unlimited capacity as JSON null. Named inputs replace availability/time
+  positionals; an unused experience availability hook is removed.
+- The dining form now treats null remaining capacity as unlimited instead of
+  coercing it to zero. A component regression reproduces the previous disabled
+  reservation form. Full checks pass 2,195 tests, types, HTTP and builds.
+
+### Slice 27: remaining UI and helper inputs
+
+- Guest form changes are typed named operations with immutable nested updates.
+  The previous implementation mutated the shared empty form, leaking address,
+  emergency contact and preferences into a new guest. A failing-before remount
+  regression and an editing/normalization characterization protect the fix.
+- URL updates no longer need double casts. Booking date formatters, stay length,
+  retry options and cabin filters have canonical/named inputs. Booking form
+  callbacks retain the relationship between field keys and value types.
+- Cabin sorting, IDs, icons, date-picker callbacks and sitemap projections are
+  typed. Unrendered dining filter state and unused document aliases are removed;
+  actual name ordering, grouping, links, sitemap visibility and fallbacks remain.
+- Focused UI/helper checks and both app type checks pass. All modified admin test
+  files also receive a strict check beyond the app tsconfig's test exclusion.
+
+### Slice 28: safe error contracts
+
+- Refund results are discriminated success/failure objects and refund inputs are
+  named. Provider failures log internally and return `Failed to create refund`;
+  currency conversions, idempotency keys and pending/completed accounting remain.
+- Real Mongoose validation errors narrow with `instanceof`. Existing 400 envelopes
+  retain a field map containing safe message/path feedback, excluding stored
+  values, validator properties and raw database messages. Lookalike errors are
+  unexpected server failures. This is an intentional disclosure fix.
+- Removed unused error-text status guessing, raw-update sanitization and required-
+  field helpers; schemas and explicit route error mapping are authoritative.
+  `createErrorResponse` accepts safe strings rather than raw Error objects.
+- Webhook/refund-estimate/sitemap failures use the shared logger. Invalid refund-
+  estimate IDs return the existing missing-resource 404 before reads. Seed-route
+  errors are safe and its secret/header inputs are named; verification mocks the
+  seed operation and never resets demo or live data.
+- Five disclosure/validation/logging regressions fail before the fixes. Existing
+  signed webhook retries, durable receipts and cancellation recovery remain gated.
+
+### Slice 29: query compatibility and current review
+
+- Admin catalog and booking list queries use schemas to normalize existing scalar
+  filters and allowlisted sorting. Unknown capacity/discount filters remain
+  ignored, unmatched status/category values remain equality filters, and legacy
+  sort/pagination defaults are preserved. These reads do not adopt write-schema
+  restrictions. Literal search remains escaped and database filters are typed.
+- Three real-Mongo characterizations pass before and after parsing migration;
+  existing list, authorization, pricing, overlap and form regressions also pass.
+- The refreshed candidate review records all remaining exceptions and Phase 6
+  test infrastructure debt. Money units/storage/rounding, workflow state, provider
+  origins and broader test infrastructure remain their original later-phase work.
+
+Final local validation and the review checkpoint are recorded in plan.md and the
+ignored progress.md handoff. No hosted login, live provider delivery, CI or new
+production deployment is inferred from these local gates.
+
+
+### Final local gates (2026-10-07)
+
+- Node 22.23.2 / pnpm 11.17.0. `pnpm ci:check` passes formatting, read-only lint
+  and all **2,192 tests**: admin 1,465 (93 suites), customer 658 (57 suites),
+  database 66 and email 3. A new customer prop-order lint warning was corrected;
+  the read-only customer lint and its three affected interaction tests pass.
+- The total is three lower than slice 26: twenty tests for removed unused helpers
+  were removed, and seventeen new behavior/regression cases were added. This is
+  not skipped coverage; no tests are disabled to achieve the gate.
+- `pnpm --filter @lodgeflow/admin exec tsc --noEmit` and the customer equivalent
+  pass. A temporary config extending the unchanged strict admin tsconfig compiles
+  all 47 modified/new admin test files, including their dependency graph and Jest
+  DOM declarations. It does not enable blanket diagnostics for all old tests.
+- `pnpm test:http` passes, including ownership denial, no-write validation,
+  transaction rollback, audit attribution, real local Clerk signature checks,
+  signed settlement, refund recovery and rendered email failure/retry cases.
+- `pnpm install --frozen-lockfile --offline` and `pnpm build` pass in the isolated
+  source copy, using CI's public Clerk key and no app secrets. Expected missing
+  database/auth prerender diagnostics use existing fallbacks; no live database or
+  provider is contacted. Both app and shared package builds complete.
+- Evidence logs are `/tmp/lodgeflow-phase12-final-{check,http,install,build}.log`,
+  the final app/test type logs and customer lint/interaction logs. Tracked tests,
+  HTTP assertions and this inventory preserve the reviewable evidence if temporary
+  logs are cleaned up. The final source scan is captured in inventory-current.json.
+- No browser/hosted-login E2E, live provider delivery, remote CI or production
+  deployment is claimed. Phase 3 is unstarted; wait for the requested review.

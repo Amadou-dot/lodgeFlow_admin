@@ -1,3 +1,8 @@
+import {
+  serializeDining,
+  type DiningJsonSource,
+} from '@lodgeflow/database/dining-json';
+import type { Model } from 'mongoose';
 import { NextResponse } from 'next/server';
 
 import { connectDB, Dining, type IDining } from '@lodgeflow/database';
@@ -8,6 +13,8 @@ import {
   validateRequest,
   validationErrorResponse,
 } from '@/lib/validations/utils';
+
+const diningReader: Model<DiningJsonSource> = Dining;
 
 export async function GET(request: Request) {
   try {
@@ -77,7 +84,7 @@ export async function GET(request: Request) {
       ];
     }
 
-    const dining = await Dining.find(query).sort({
+    const dining = await diningReader.find(query).sort({
       mealType: 1,
       type: 1,
       name: 1,
@@ -85,7 +92,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      data: dining,
+      data: dining.map(serializeDining),
     });
   } catch (error: unknown) {
     logger.error(

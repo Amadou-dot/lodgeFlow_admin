@@ -1,3 +1,5 @@
+import type { BookingStats } from '@/types/catalog-stats';
+import { logger } from '@/lib/logger';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -19,7 +21,9 @@ export async function GET() {
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    const [result] = await Booking.aggregate([
+    const [result] = await Booking.aggregate<{
+      [Key in keyof BookingStats]: { count: number }[];
+    }>([
       {
         $facet: {
           todayCheckIns: [
@@ -61,7 +65,7 @@ export async function GET() {
 
     return createSuccessResponse(stats);
   } catch (error) {
-    console.error('Error fetching booking stats:', error);
+    logger.error('Error fetching booking stats:', error);
     return createErrorResponse(
       'Failed to fetch booking stats',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

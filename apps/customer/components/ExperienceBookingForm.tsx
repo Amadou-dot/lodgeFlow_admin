@@ -68,7 +68,7 @@ export default function ExperienceBookingForm({
 
       const result = await createBooking.mutateAsync({
         experienceId: experience._id.toString(),
-        date: bookingDate,
+        date: bookingDate.toISOString(),
         numParticipants,
         specialRequests: specialRequests
           ? specialRequests.split('\n').filter(Boolean)

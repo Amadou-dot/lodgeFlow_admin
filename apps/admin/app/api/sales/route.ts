@@ -1,14 +1,9 @@
+import type { SalesData } from '@/types/reporting';
+import { logger } from '@/lib/logger';
 import { requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { NextResponse } from 'next/server';
 import { Booking } from '@lodgeflow/database';
-
-export interface SalesData {
-  date: string;
-  fullDate: string;
-  sales: number;
-  bookings: number;
-}
 
 export async function GET() {
   // Require authentication
@@ -23,7 +18,11 @@ export async function GET() {
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Aggregate sales data by day for the last 30 days
-    const salesData = await Booking.aggregate([
+    const salesData = await Booking.aggregate<{
+      _id: string;
+      totalSales: number;
+      bookingCount: number;
+    }>([
       {
         $match: {
           createdAt: { $gte: thirtyDaysAgo },
@@ -75,6 +74,7 @@ export async function GET() {
 
     return NextResponse.json(data);
   } catch (error) {
+    logger.error('Failed to fetch sales data', error);
     return NextResponse.json(
       { error: 'Failed to fetch sales data' },
       { status: 500 }

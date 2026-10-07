@@ -1,8 +1,41 @@
+/** @jest-environment node */
+import type { BookingAnalyticsData } from '@/types/reporting';
+interface QueryConfig {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<BookingAnalyticsData>;
+}
+const mockFetch = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
+const emptyReport: BookingAnalyticsData = {
+  summary: {
+    totalRevenue: 0,
+    totalBookings: 0,
+    avgBookingValue: 0,
+    cancellationRate: 0,
+  },
+  revenueOverTime: [],
+  statusDistribution: [],
+  popularCabins: [],
+  demographics: {
+    avgPartySize: 0,
+    avgStayLength: 0,
+    extras: {
+      breakfast: { count: 0, rate: 0 },
+      pets: { count: 0, rate: 0 },
+      parking: { count: 0, rate: 0 },
+      earlyCheckIn: { count: 0, rate: 0 },
+      lateCheckOut: { count: 0, rate: 0 },
+    },
+  },
+};
 // Mock @tanstack/react-query before imports
-let capturedQueryConfig: any = null;
+let capturedQueryConfig: QueryConfig | null = null;
+function query(): QueryConfig {
+  if (!capturedQueryConfig) throw new Error('Query not initialized');
+  return capturedQueryConfig;
+}
 
 jest.mock('@tanstack/react-query', () => ({
-  useQuery: jest.fn((config: any) => {
+  useQuery: jest.fn((config: QueryConfig) => {
     capturedQueryConfig = config;
     return {
       data: undefined,
@@ -17,7 +50,8 @@ jest.mock('@tanstack/react-query', () => ({
 beforeEach(() => {
   capturedQueryConfig = null;
   jest.clearAllMocks();
-  (global.fetch as jest.Mock) = jest.fn();
+  global.fetch = mockFetch;
+  mockFetch.mockReset();
 });
 
 import {
@@ -26,26 +60,37 @@ import {
 } from '@/hooks/useBookingAnalytics';
 
 describe('useBookingAnalytics', () => {
+  it('keeps compatibility with a bare analytics response', async () => {
+    mockFetch.mockResolvedValue(Response.json(emptyReport));
+    useBookingAnalytics();
+    expect(await query().queryFn()).toEqual(emptyReport);
+  });
+  it('rejects an error envelope even when HTTP transport succeeds', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ success: false, error: 'Report unavailable' })
+    );
+    useBookingAnalytics();
+    await expect(query().queryFn()).rejects.toThrow('Report unavailable');
+  });
   it('uses booking-analytics query key with period', () => {
     useBookingAnalytics('7d');
 
-    expect(capturedQueryConfig.queryKey).toEqual(['booking-analytics', '7d']);
+    expect(query().queryKey).toEqual(['booking-analytics', '7d']);
   });
 
   it('defaults to 30d period', () => {
     useBookingAnalytics();
 
-    expect(capturedQueryConfig.queryKey).toEqual(['booking-analytics', '30d']);
+    expect(query().queryKey).toEqual(['booking-analytics', '30d']);
   });
 
   it('fetches with correct period parameter', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: {} }),
-    });
+    mockFetch.mockResolvedValue(
+      Response.json({ success: true, data: emptyReport }, { status: 200 })
+    );
 
     useBookingAnalytics('90d');
-    await capturedQueryConfig.queryFn();
+    await query().queryFn();
 
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/bookings/analytics?period=90d'
@@ -57,15 +102,12 @@ describe('useBookingAnalytics', () => {
 
     for (const period of periods) {
       useBookingAnalytics(period);
-      expect(capturedQueryConfig.queryKey).toEqual([
-        'booking-analytics',
-        period,
-      ]);
+      expect(query().queryKey).toEqual(['booking-analytics', period]);
     }
   });
 
   it('returns analytics data from success response', async () => {
-    const mockData = {
+    const mockData: BookingAnalyticsData = {
       summary: {
         totalRevenue: 50000,
         totalBookings: 100,
@@ -88,23 +130,22 @@ describe('useBookingAnalytics', () => {
       },
     };
 
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockData }),
-    });
+    mockFetch.mockResolvedValue(
+      Response.json({ success: true, data: mockData }, { status: 200 })
+    );
 
     useBookingAnalytics();
-    const result = await capturedQueryConfig.queryFn();
+    const result = await query().queryFn();
 
     expect(result).toEqual(mockData);
   });
 
   it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    mockFetch.mockResolvedValue(new Response(null, { status: 500 }));
 
     useBookingAnalytics();
 
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
+    await expect(query().queryFn()).rejects.toThrow(
       'Failed to fetch booking analytics'
     );
   });

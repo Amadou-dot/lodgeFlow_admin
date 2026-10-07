@@ -113,11 +113,11 @@ export default function ExperienceBookPage({ params }: { params: Params }) {
                 )}
               </div>
 
-              {experience.includes.length > 0 && (
+              {(experience.includes?.length ?? 0) > 0 && (
                 <div>
                   <p className='text-sm font-medium mb-2'>What's Included:</p>
                   <ul className='text-sm text-default-600 space-y-1'>
-                    {experience.includes.map((item, i) => (
+                    {(experience.includes ?? []).map((item, i) => (
                       <li key={i}>• {item}</li>
                     ))}
                   </ul>

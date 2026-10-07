@@ -2,8 +2,8 @@ import { Card, CardBody, CardHeader } from '@heroui/card';
 import { format } from 'date-fns';
 
 interface BookingHistoryCardProps {
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function BookingHistoryCard({
@@ -19,11 +19,19 @@ export default function BookingHistoryCard({
         <div className='space-y-3 text-sm'>
           <div className='flex justify-between'>
             <span className='text-default-500'>Created</span>
-            <span>{format(new Date(createdAt), 'MMM dd, yyyy')}</span>
+            <span>
+              {createdAt
+                ? format(new Date(createdAt), 'MMM dd, yyyy')
+                : 'Unknown'}
+            </span>
           </div>
           <div className='flex justify-between'>
             <span className='text-default-500'>Last Updated</span>
-            <span>{format(new Date(updatedAt), 'MMM dd, yyyy')}</span>
+            <span>
+              {updatedAt
+                ? format(new Date(updatedAt), 'MMM dd, yyyy')
+                : 'Unknown'}
+            </span>
           </div>
         </div>
       </CardBody>

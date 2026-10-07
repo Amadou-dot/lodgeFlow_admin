@@ -68,16 +68,13 @@ describe('Experience Validation Schemas', () => {
       ).toBe(false);
     });
 
-    it('silently strips unknown legacy keys', () => {
+    it('rejects unknown legacy keys', () => {
       const result = createExperienceSchema.safeParse({
         ...validExperience,
         included: ['Legacy key'],
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect('included' in result.data).toBe(false);
-      }
+      expect(result.success).toBe(false);
     });
 
     it('rejects missing required fields', () => {
@@ -153,23 +150,16 @@ describe('Experience Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('silently strips unknown keys on update', () => {
+    it('rejects unknown keys on update', () => {
       const result = updateExperienceSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
         isFeatured: true,
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect('isFeatured' in result.data).toBe(false);
-      }
+      expect(result.success).toBe(false);
     });
 
-    it('accepts a full round-tripped experience object (as the edit UI sends it)', () => {
-      // The Experiences admin UI fetches an experience, lets the user edit
-      // it, then PUTs the whole object back — including _id, createdAt, and
-      // updatedAt. These aren't schema fields and must be silently dropped
-      // rather than causing the whole update to be rejected.
+    it('rejects server metadata in a round-tripped object', () => {
       const result = updateExperienceSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
         name: 'Updated Tour Name',
@@ -178,25 +168,17 @@ describe('Experience Validation Schemas', () => {
         updatedAt: '2024-01-01T00:00:00.000Z',
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect('createdAt' in result.data).toBe(false);
-        expect('updatedAt' in result.data).toBe(false);
-      }
+      expect(result.success).toBe(false);
     });
 
-    it('strips $-operator and dotted keys from a valid update payload', () => {
+    it('rejects operator and dotted keys', () => {
       const result = updateExperienceSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
         name: 'Updated Tour Name',
         $set: { price: 1 },
         'tags.0': 'hacked',
       });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect('$set' in result.data).toBe(false);
-        expect('tags.0' in result.data).toBe(false);
-      }
+      expect(result.success).toBe(false);
     });
 
     it('does not fill in defaults for fields absent from the update payload', () => {

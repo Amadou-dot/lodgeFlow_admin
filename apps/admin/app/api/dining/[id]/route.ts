@@ -1,3 +1,13 @@
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import {
+  catalogIdSchema,
+  withCatalogPathId,
+} from '@/lib/validations/catalog-request';
+import {
+  serializeDining,
+  type DiningJsonSource,
+} from '@lodgeflow/database/dining-json';
+import type { Model } from 'mongoose';
 import {
   updateCapacityCatalog,
   deleteCapacityCatalog,
@@ -13,8 +23,13 @@ import {
 import { logger } from '@/lib/logger';
 import { updateDiningSchema } from '@/lib/validations';
 import { connectDB, Dining } from '@lodgeflow/database';
-import { isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest } from 'next/server';
+
+const diningReader: Model<DiningJsonSource> = Dining;
 
 export async function GET(
   _req: NextRequest,
@@ -25,10 +40,11 @@ export async function GET(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { id } = await params;
-    const dining = await Dining.findById(id);
+    if (!catalogIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid catalog ID', HTTP_STATUS.BAD_REQUEST);
+    await connectDB();
+    const dining = await diningReader.findById(id);
 
     if (!dining) {
       return createErrorResponse(
@@ -37,7 +53,7 @@ export async function GET(
       );
     }
 
-    return createSuccessResponse(dining);
+    return createSuccessResponse(serializeDining(dining));
   } catch (error) {
     if (error instanceof ReservationRuleError)
       return createErrorResponse(error.message, error.status);
@@ -61,15 +77,20 @@ export async function PUT(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const body = json.data;
     const { id } = await params;
 
-    const validationResult = updateDiningSchema.safeParse({ ...body, _id: id });
+    const validationResult = updateDiningSchema.safeParse(
+      withCatalogPathId({ body, id })
+    );
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     const { _id: _validatedId, ...updateData } = validationResult.data;
 
@@ -86,7 +107,13 @@ export async function PUT(
       );
     }
 
-    return createSuccessResponse(dining, 'Dining item updated successfully');
+    if (!('mealType' in dining))
+      throw new TypeError('Expected a dining catalog');
+
+    return createSuccessResponse(
+      serializeDining(dining),
+      'Dining item updated successfully'
+    );
   } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return createErrorResponse(error.message, error.status);
@@ -94,7 +121,7 @@ export async function PUT(
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 
@@ -118,9 +145,10 @@ export async function DELETE(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { id } = await params;
+    if (!catalogIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid catalog ID', HTTP_STATUS.BAD_REQUEST);
+    await connectDB();
     const dining = await deleteCapacityCatalog({
       kind: 'dining',
       listingId: id,

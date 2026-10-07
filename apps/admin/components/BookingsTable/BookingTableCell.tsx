@@ -57,21 +57,15 @@ export default function BookingTableCell({
     }
 
     case 'dates': {
-      const checkInDate =
-        booking.checkInDate instanceof Date
-          ? booking.checkInDate.toISOString()
-          : booking.checkInDate;
-      const checkOutDate =
-        booking.checkOutDate instanceof Date
-          ? booking.checkOutDate.toISOString()
-          : booking.checkOutDate;
+      const checkInDate = booking.checkInDate;
+      const checkOutDate = booking.checkOutDate;
 
-      const { dateRange, timeInfo, showTimeInfo } = formatBookingDates(
-        checkInDate,
-        checkOutDate,
-        booking.numNights,
-        booking.status
-      );
+      const { dateRange, timeInfo, showTimeInfo } = formatBookingDates({
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        numNights: booking.numNights,
+        status: booking.status,
+      });
 
       return (
         <div

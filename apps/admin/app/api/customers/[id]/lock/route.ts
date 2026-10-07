@@ -1,6 +1,7 @@
 import { requireApiAuth } from '@/lib/api-utils';
 import { lockClerkUser, unlockClerkUser } from '@/lib/clerk-users';
-import { getErrorMessage } from '@/types/errors';
+import { CustomerProviderError } from '@/lib/customer-errors';
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
@@ -26,10 +27,9 @@ export async function POST(
       },
     });
   } catch (error: unknown) {
-    console.error('Error locking user:', error);
+    logger.error('Failed to lock user', error);
 
-    const errorMessage = getErrorMessage(error);
-    if (errorMessage === 'User not found') {
+    if (error instanceof CustomerProviderError && error.kind === 'not-found') {
       return NextResponse.json(
         {
           success: false,
@@ -42,7 +42,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage || 'Failed to lock user',
+        error: 'Failed to lock user',
       },
       { status: 500 }
     );
@@ -72,10 +72,9 @@ export async function DELETE(
       },
     });
   } catch (error: unknown) {
-    console.error('Error unlocking user:', error);
+    logger.error('Failed to unlock user', error);
 
-    const errorMessage = getErrorMessage(error);
-    if (errorMessage === 'User not found') {
+    if (error instanceof CustomerProviderError && error.kind === 'not-found') {
       return NextResponse.json(
         {
           success: false,
@@ -88,7 +87,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage || 'Failed to unlock user',
+        error: 'Failed to unlock user',
       },
       { status: 500 }
     );

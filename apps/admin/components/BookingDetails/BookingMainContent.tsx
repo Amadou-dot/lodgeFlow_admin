@@ -33,22 +33,22 @@ export default function BookingMainContent({
       />
 
       <GuestInformationCard
-        customer={booking.customer}
+        customer={booking.customer ?? undefined}
         numGuests={booking.numGuests}
         numNights={booking.numNights}
       />
 
       <CabinInformationCard
-        cabin={booking.cabin}
+        cabin={booking.cabin ?? undefined}
         cabinPrice={booking.cabinPrice}
       />
 
-      <ExtrasCard extras={booking.extras} />
+      <ExtrasCard extras={booking.extras ?? undefined} />
 
       <NotesCard
-        observations={booking.observations}
+        observations={booking.observations ?? undefined}
         specialRequests={booking.specialRequests}
-        cancellationReason={booking.cancellationReason}
+        cancellationReason={booking.cancellationReason ?? undefined}
       />
     </div>
   );

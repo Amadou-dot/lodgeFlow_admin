@@ -24,7 +24,7 @@ import { getDifficultyColor } from './ExperienceCard';
 interface ExperienceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  experience?: Experience | null;
+  experience?: Experience;
   mode: 'view' | 'create' | 'edit';
   onEdit?: (experience: Experience) => void;
   onCreateSubmit?: (formData: FormData) => void;

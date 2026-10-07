@@ -84,7 +84,7 @@ export function useURLFilters<T extends Record<string, FilterValue>>({
 
   // Helper function to build URL with updated parameters
   const buildURL = useCallback(
-    (updates: Partial<T>) => {
+    (updates: Readonly<Record<string, FilterValue>>) => {
       const params = new URLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
@@ -112,7 +112,7 @@ export function useURLFilters<T extends Record<string, FilterValue>>({
   // Update a single filter
   const updateFilter = useCallback(
     <K extends keyof T>(key: K, value: T[K], addToHistory: boolean = false) => {
-      const updates = { [key]: value } as unknown as Partial<T>;
+      const updates = { [key]: value };
       const newURL = buildURL(updates);
 
       if (addToHistory) {
@@ -144,7 +144,7 @@ export function useURLFilters<T extends Record<string, FilterValue>>({
     Object.entries(filterConfig).forEach(([key, config]) => {
       defaults[key] = config.defaultValue;
     });
-    const newURL = buildURL(defaults as Partial<T>);
+    const newURL = buildURL(defaults);
     router.replace(newURL, { scroll: false });
   }, [router, buildURL, filterConfig]);
 
@@ -153,7 +153,7 @@ export function useURLFilters<T extends Record<string, FilterValue>>({
     (key: keyof T) => {
       const updates = {
         [key]: filterConfig[key as string]?.defaultValue,
-      } as unknown as Partial<T>;
+      };
       const newURL = buildURL(updates);
       router.replace(newURL, { scroll: false });
     },

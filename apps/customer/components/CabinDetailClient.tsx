@@ -30,7 +30,7 @@ export default function CabinDetailClient({ cabin }: CabinDetailClientProps) {
   const { user } = useUser();
   const router = useRouter();
 
-  const cabinId = (cabin as any)._id?.toString?.() ?? (cabin as any)._id;
+  const cabinId = cabin._id;
 
   const userData = user
     ? {

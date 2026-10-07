@@ -1,11 +1,11 @@
 import { Input } from '@heroui/input';
 import { Select, SelectItem } from '@heroui/select';
-import type { FormData } from './types';
+import type { FormData, GuestInputChange } from './types';
 import { relationships } from './types';
 
 interface EmergencyContactSectionProps {
   formData: FormData;
-  onInputChange: (field: string, value: string) => void;
+  onInputChange: GuestInputChange;
 }
 
 export default function EmergencyContactSection({
@@ -21,7 +21,11 @@ export default function EmergencyContactSection({
           placeholder='Enter contact first name'
           value={formData.emergencyContact.firstName}
           onValueChange={value =>
-            onInputChange('emergencyContact.firstName', value)
+            onInputChange({
+              section: 'emergencyContact',
+              field: 'firstName',
+              value: value,
+            })
           }
         />
         <Input
@@ -29,7 +33,11 @@ export default function EmergencyContactSection({
           placeholder='Enter contact last name'
           value={formData.emergencyContact.lastName}
           onValueChange={value =>
-            onInputChange('emergencyContact.lastName', value)
+            onInputChange({
+              section: 'emergencyContact',
+              field: 'lastName',
+              value: value,
+            })
           }
         />
         <Input
@@ -37,7 +45,11 @@ export default function EmergencyContactSection({
           placeholder='Enter contact phone'
           value={formData.emergencyContact.phone}
           onValueChange={value =>
-            onInputChange('emergencyContact.phone', value)
+            onInputChange({
+              section: 'emergencyContact',
+              field: 'phone',
+              value: value,
+            })
           }
         />
         <Select
@@ -50,7 +62,11 @@ export default function EmergencyContactSection({
           }
           onSelectionChange={keys => {
             const selected = Array.from(keys)[0] as string;
-            onInputChange('emergencyContact.relationship', selected || '');
+            onInputChange({
+              section: 'emergencyContact',
+              field: 'relationship',
+              value: selected || '',
+            });
           }}
         >
           {relationships.map(relationship => (

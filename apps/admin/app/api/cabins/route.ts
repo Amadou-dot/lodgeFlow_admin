@@ -1,3 +1,6 @@
+import { cabinQuerySchema } from '@/lib/validations/catalog-query';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { catalogIdSchema } from '@/lib/validations/catalog-request';
 import { serializeCabinDetail } from '@lodgeflow/database/cabin-json';
 import { auditSnapshot, CABIN_AUDIT_FIELDS, recordAudit } from '@/lib/audit';
 import {
@@ -16,7 +19,10 @@ import {
   updateCabinSchema,
 } from '@/lib/validations';
 import type { CabinQueryFilter, MongoSortOrder } from '@/types/api';
-import { isMongooseValidationError } from '@/types/errors';
+import {
+  isMongooseValidationError,
+  mongooseValidationDetails,
+} from '@/lib/mongoose-errors';
 import { NextRequest } from 'next/server';
 import { Cabin } from '@lodgeflow/database';
 
@@ -26,16 +32,19 @@ export async function GET(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
-    const filter = searchParams.get('filter');
-    const search = searchParams.get('search');
-    const capacity = searchParams.get('capacity');
-    const discount = searchParams.get('discount');
-    const status = searchParams.get('status');
-    const sortBy = searchParams.get('sortBy') || 'name';
-    const sortOrder = searchParams.get('sortOrder') || 'asc';
+    const { filter, search, capacity, discount, status, sortBy, sortOrder } =
+      cabinQuerySchema.parse({
+        filter: searchParams.get('filter'),
+        search: searchParams.get('search'),
+        capacity: searchParams.get('capacity'),
+        discount: searchParams.get('discount'),
+        status: searchParams.get('status'),
+        sortBy: searchParams.get('sortBy'),
+        sortOrder: searchParams.get('sortOrder'),
+      });
+
+    await connectDB();
 
     // Build query
     const query: CabinQueryFilter = {};
@@ -99,17 +108,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build sort object (whitelist sortable fields — sortBy is user input)
-    const SORTABLE_FIELDS = new Set([
-      'name',
-      'price',
-      'capacity',
-      'discount',
-      'status',
-      'createdAt',
-    ]);
-    const sort: MongoSortOrder = {};
-    sort[SORTABLE_FIELDS.has(sortBy) ? sortBy : 'name'] =
-      sortOrder === 'desc' ? -1 : 1;
+    const sort: MongoSortOrder = { [sortBy]: sortOrder };
 
     const cabins = await Cabin.find(query).sort(sort);
 
@@ -132,14 +131,17 @@ export async function POST(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const body = json.data;
 
     const validationResult = createCabinSchema.safeParse(body);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     const cabin = await Cabin.create(validationResult.data);
 
@@ -161,7 +163,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 
@@ -182,14 +184,17 @@ export async function PUT(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
-    const body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return createErrorResponse(json.error, HTTP_STATUS.BAD_REQUEST);
+    const body = json.data;
 
     const validationResult = updateCabinSchema.safeParse(body);
     if (!validationResult.success) {
       return createValidationErrorResponse(validationResult.error);
     }
+
+    await connectDB();
 
     const { _id, ...updateData } = validationResult.data;
 
@@ -245,7 +250,7 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse(
         'Validation failed',
         HTTP_STATUS.BAD_REQUEST,
-        error.errors
+        mongooseValidationDetails(error)
       );
     }
 
@@ -266,8 +271,6 @@ export async function DELETE(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -277,6 +280,10 @@ export async function DELETE(request: NextRequest) {
         HTTP_STATUS.BAD_REQUEST
       );
     }
+
+    if (!catalogIdSchema.safeParse(id).success)
+      return createErrorResponse('Invalid catalog ID', HTTP_STATUS.BAD_REQUEST);
+    await connectDB();
 
     const cabin = await Cabin.findByIdAndDelete(id);
 

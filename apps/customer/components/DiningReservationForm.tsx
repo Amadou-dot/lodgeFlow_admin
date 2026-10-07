@@ -24,7 +24,13 @@ interface DiningReservationFormProps {
   dining: Dining;
 }
 
-function generateTimeSlots(start: string, end: string): string[] {
+function generateTimeSlots({
+  start,
+  end,
+}: {
+  start: string;
+  end: string;
+}): string[] {
   const [startHour, startMin] = start.split(':').map(Number);
   const [endHour, endMin] = end.split(':').map(Number);
   const startMinutes = startHour * 60 + startMin;
@@ -65,10 +71,7 @@ export default function DiningReservationForm({
 
   const todayDate = today(getLocalTimeZone());
   const totalPrice = dining.price * numGuests;
-  const timeSlots = generateTimeSlots(
-    dining.servingTime.start,
-    dining.servingTime.end
-  );
+  const timeSlots = generateTimeSlots(dining.servingTime);
 
   // Convert CalendarDate to string for availability check
   const dateString = date
@@ -76,11 +79,16 @@ export default function DiningReservationForm({
     : undefined;
 
   const { data: availability, isLoading: isCheckingAvailability } =
-    useDiningAvailability(dining._id.toString(), dateString, time || undefined);
+    useDiningAvailability({
+      diningId: dining._id,
+      date: dateString,
+      time: time || undefined,
+    });
 
   const isFullyBooked = availability?.isAvailable === false;
   const insufficientSeats =
-    availability && availability.seatsRemaining < numGuests;
+    typeof availability?.seatsRemaining === 'number' &&
+    availability.seatsRemaining < numGuests;
 
   const handleSubmit = async () => {
     if (!user) {
@@ -115,7 +123,7 @@ export default function DiningReservationForm({
 
       const result = await createReservation.mutateAsync({
         diningId: dining._id.toString(),
-        date: reservationDate,
+        date: reservationDate.toISOString(),
         time,
         numGuests,
         dietaryRequirements: dietaryRequirements
@@ -225,8 +233,9 @@ export default function DiningReservationForm({
           !insufficientSeats && (
             <div className='flex items-center gap-2 p-3 bg-success-50 border border-success-200 rounded-lg text-success-700'>
               <span className='text-sm'>
-                {availability.seatsRemaining} seat
-                {availability.seatsRemaining === 1 ? '' : 's'} available
+                {availability.seatsRemaining === null
+                  ? 'Available'
+                  : `${availability.seatsRemaining} seat${availability.seatsRemaining === 1 ? '' : 's'} available`}
               </span>
             </div>
           )}
@@ -248,7 +257,7 @@ export default function DiningReservationForm({
           }}
         />
         <p className='text-xs text-default-400 -mt-4'>
-          {dining.minPeople > 1 ? `${dining.minPeople}-` : '1-'}
+          {(dining.minPeople ?? 1) > 1 ? `${dining.minPeople}-` : '1-'}
           {dining.maxPeople} guests
         </p>
 

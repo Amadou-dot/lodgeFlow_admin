@@ -1,3 +1,4 @@
+import type { CreateBookingInput } from '@/lib/validations/booking';
 import { useCabins } from '@/hooks/useCabins';
 import { useInfiniteCustomers } from '@/hooks/useInfiniteCustomers';
 import { useSettings } from '@/hooks/useSettings';
@@ -15,22 +16,10 @@ export type { BookingFormData, PriceBreakdown };
 const getInitialFormData = (booking?: PopulatedBooking): BookingFormData => {
   if (booking) {
     return {
-      cabin:
-        typeof booking.cabin === 'string'
-          ? booking.cabin
-          : booking.cabin._id.toString(),
-      customer:
-        typeof booking.customer === 'string'
-          ? booking.customer
-          : booking.customer.id,
-      checkInDate:
-        booking.checkInDate instanceof Date
-          ? booking.checkInDate.toISOString().split('T')[0]
-          : booking.checkInDate.split('T')[0],
-      checkOutDate:
-        booking.checkOutDate instanceof Date
-          ? booking.checkOutDate.toISOString().split('T')[0]
-          : booking.checkOutDate.split('T')[0],
+      cabin: booking.cabin?._id ?? '',
+      customer: booking.customer?.id ?? '',
+      checkInDate: booking.checkInDate.split('T')[0],
+      checkOutDate: booking.checkOutDate.split('T')[0],
       numGuests: booking.numGuests,
       hasBreakfast: booking.extras?.hasBreakfast || false,
       hasPets: booking.extras?.hasPets || false,
@@ -135,7 +124,11 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
   );
 
   const numNights = useMemo(
-    () => calcNumNights(formData.checkInDate, formData.checkOutDate),
+    () =>
+      calcNumNights({
+        checkInDate: formData.checkInDate,
+        checkOutDate: formData.checkOutDate,
+      }),
     [formData.checkInDate, formData.checkOutDate]
   );
 
@@ -225,7 +218,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
 
   // Form handlers - memoized to prevent unnecessary re-renders
   const handleInputChange = useCallback(
-    (field: keyof BookingFormData, value: unknown) => {
+    <K extends keyof BookingFormData>(field: K, value: BookingFormData[K]) => {
       setFormData(prev => ({ ...prev, [field]: value }));
     },
     []
@@ -303,46 +296,27 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
   );
 
   // Build booking data for API - memoized
-  const buildBookingData = useCallback(() => {
-    return {
+  const buildBookingData = useCallback(
+    (): CreateBookingInput => ({
       cabin: formData.cabin,
       customer: formData.customer,
-      checkInDate: new Date(formData.checkInDate),
-      checkOutDate: new Date(formData.checkOutDate),
-      numNights,
+      checkInDate: new Date(formData.checkInDate).toISOString(),
+      checkOutDate: new Date(formData.checkOutDate).toISOString(),
       numGuests: formData.numGuests,
-      status: 'unconfirmed' as const,
-      cabinPrice:
-        selectedCabin!.discount > 0
-          ? selectedCabin!.price - selectedCabin!.discount
-          : selectedCabin!.price,
-      extrasPrice: priceBreakdown.extrasPrice,
-      totalPrice: priceBreakdown.totalPrice,
-      isPaid: formData.isPaid,
-      paymentMethod:
-        (formData.paymentMethod as
-          'cash' | 'card' | 'bank-transfer' | 'online') || undefined,
+      status: 'unconfirmed',
+      paymentMethod: formData.paymentMethod || undefined,
       extras: {
         hasBreakfast: formData.hasBreakfast,
-        breakfastPrice: priceBreakdown.breakfastPrice,
         hasPets: formData.hasPets,
-        petFee: priceBreakdown.petFee,
         hasParking: formData.hasParking,
-        parkingFee: priceBreakdown.parkingFee,
         hasEarlyCheckIn: formData.hasEarlyCheckIn,
-        earlyCheckInFee: priceBreakdown.earlyCheckInFee,
         hasLateCheckOut: formData.hasLateCheckOut,
-        lateCheckOutFee: priceBreakdown.lateCheckOutFee,
       },
       observations: formData.observations || undefined,
       specialRequests: formData.specialRequests,
-      depositPaid: formData.depositPaid,
-      depositAmount: priceBreakdown.depositAmount,
-      remainingAmount:
-        priceBreakdown.totalPrice -
-        (formData.depositPaid ? priceBreakdown.depositAmount : 0),
-    };
-  }, [formData, selectedCabin, priceBreakdown, numNights]);
+    }),
+    [formData]
+  );
 
   return {
     // State

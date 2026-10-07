@@ -118,12 +118,24 @@ describe('Settings Validation Schemas', () => {
 
   describe('getBookingLengthRangeError', () => {
     it('returns null when min is less than or equal to max', () => {
-      expect(getBookingLengthRangeError(2, 30)).toBeNull();
-      expect(getBookingLengthRangeError(5, 5)).toBeNull();
+      expect(
+        getBookingLengthRangeError({
+          minBookingLength: 2,
+          maxBookingLength: 30,
+        })
+      ).toBeNull();
+      expect(
+        getBookingLengthRangeError({ minBookingLength: 5, maxBookingLength: 5 })
+      ).toBeNull();
     });
 
     it('returns error message when min exceeds max', () => {
-      expect(getBookingLengthRangeError(10, 5)).toBe(
+      expect(
+        getBookingLengthRangeError({
+          minBookingLength: 10,
+          maxBookingLength: 5,
+        })
+      ).toBe(
         'Maximum booking length must be greater than or equal to minimum booking length'
       );
     });

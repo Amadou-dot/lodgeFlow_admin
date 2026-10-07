@@ -22,7 +22,12 @@
     "./reservation-capacity": "./src/reservation-capacity.ts",
     "./models/StaffAccess": "./src/models/StaffAccess.ts",
     "./models/AuditLog": "./src/models/AuditLog.ts",
-    "./cabin-json": "./src/cabin-json.ts"
+    "./cabin-json": "./src/cabin-json.ts",
+    "./dining-json": "./src/dining-json.ts",
+    "./experience-json": "./src/experience-json.ts",
+    "./booking-json": "./src/booking-json.ts",
+    "./settings-json": "./src/settings-json.ts",
+    "./reservation-json": "./src/reservation-json.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

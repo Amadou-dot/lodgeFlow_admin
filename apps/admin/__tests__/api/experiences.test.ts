@@ -2,6 +2,10 @@
  * @jest-environment node
  */
 
+import { Error as MongooseError } from 'mongoose';
+
+import mongoose, { Types } from 'mongoose';
+import type { ExperienceJsonSource } from '@lodgeflow/database/experience-json';
 import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 jest.mock('@lodgeflow/database/reservation-capacity', () => ({
@@ -19,7 +23,6 @@ const mockDelete = deleteCapacityCatalog as jest.Mock;
 import { GET, POST } from '@/app/api/experiences/route';
 import { GET as getById, PUT, DELETE } from '@/app/api/experiences/[id]/route';
 import connectToDatabase from '@lodgeflow/database/mongodb';
-import { Experience } from '@lodgeflow/database/models/Experience';
 
 // Mock the database connection
 jest.mock('@lodgeflow/database/mongodb');
@@ -27,9 +30,22 @@ const mockConnectToDatabase = connectToDatabase as jest.MockedFunction<
   typeof connectToDatabase
 >;
 
-// Mock the Experience model
-jest.mock('@lodgeflow/database/models/Experience');
-const MockExperience = Experience as jest.MockedClass<typeof Experience>;
+const mockExperienceModel = { find: jest.fn(), findById: jest.fn() };
+const mockExperienceConstructor = jest.fn<
+  ExperienceJsonSource & { save: () => Promise<unknown> },
+  [unknown]
+>();
+jest.mock('@lodgeflow/database/models/Experience', () => ({
+  Experience: Object.assign(
+    function Experience(input: unknown) {
+      return mockExperienceConstructor(input);
+    },
+    {
+      find: (...args: unknown[]) => mockExperienceModel.find(...args),
+      findById: (...args: unknown[]) => mockExperienceModel.findById(...args),
+    }
+  ),
+}));
 
 // Mock auth to bypass authentication
 jest.mock('@/lib/api-utils', () => ({
@@ -42,8 +58,8 @@ jest.mock('@/lib/api-utils', () => ({
 }));
 
 // Mock data
-const mockExperienceData = {
-  _id: '507f1f77bcf86cd799439011',
+const mockExperienceData: ExperienceJsonSource = {
+  _id: new Types.ObjectId('507f1f77bcf86cd799439011'),
   name: 'Mountain Hiking Adventure',
   price: 299,
   duration: '4 hours',
@@ -57,15 +73,15 @@ const mockExperienceData = {
   isPopular: true,
   maxParticipants: 12,
   minAge: 16,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
+  createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
 };
 
 const mockExperienceList = [
   mockExperienceData,
   {
     ...mockExperienceData,
-    _id: '507f1f77bcf86cd799439012',
+    _id: new Types.ObjectId('507f1f77bcf86cd799439012'),
     name: 'River Rafting',
     price: 199,
     category: 'Water Sports',
@@ -75,13 +91,13 @@ const mockExperienceList = [
 describe('/api/experiences', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue({} as any);
+    mockConnectToDatabase.mockResolvedValue(mongoose);
   });
 
   describe('GET /api/experiences', () => {
     it('should return all experiences', async () => {
       // Mock Experience.find to return mock data with sort chaining
-      MockExperience.find = jest.fn().mockReturnValue({
+      mockExperienceModel.find = jest.fn().mockReturnValue({
         sort: jest.fn().mockResolvedValue(mockExperienceList),
       });
 
@@ -90,13 +106,16 @@ describe('/api/experiences', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(MockExperience.find).toHaveBeenCalledWith({});
+      expect(mockExperienceModel.find).toHaveBeenCalledWith({});
       expect(response.status).toBe(200);
-      expect(data).toEqual({ success: true, data: mockExperienceList });
+      expect(data).toEqual({
+        success: true,
+        data: JSON.parse(JSON.stringify(mockExperienceList)),
+      });
     });
 
     it('should handle database errors', async () => {
-      MockExperience.find = jest.fn().mockReturnValue({
+      mockExperienceModel.find = jest.fn().mockReturnValue({
         sort: jest.fn().mockRejectedValue(new Error('Database error')),
       });
 
@@ -115,13 +134,10 @@ describe('/api/experiences', () => {
   describe('POST /api/experiences', () => {
     it('should create a new experience', async () => {
       const mockSave = jest.fn().mockResolvedValue(mockExperienceData);
-      MockExperience.mockImplementation(
-        () =>
-          ({
-            save: mockSave,
-            ...mockExperienceData,
-          }) as any
-      );
+      mockExperienceConstructor.mockImplementation(() => ({
+        ...mockExperienceData,
+        save: mockSave,
+      }));
 
       const request = new NextRequest('http://localhost/api/experiences', {
         method: 'POST',
@@ -144,7 +160,7 @@ describe('/api/experiences', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(MockExperience).toHaveBeenCalledWith({
+      expect(mockExperienceConstructor).toHaveBeenCalledWith({
         name: 'Mountain Hiking Adventure',
         price: 299,
         duration: '4 hours',
@@ -181,12 +197,10 @@ describe('/api/experiences', () => {
     });
 
     it('should handle creation errors', async () => {
-      MockExperience.mockImplementation(
-        () =>
-          ({
-            save: jest.fn().mockRejectedValue(new Error('Validation error')),
-          }) as any
-      );
+      mockExperienceConstructor.mockImplementation(() => ({
+        ...mockExperienceData,
+        save: jest.fn().mockRejectedValue(new Error('Validation error')),
+      }));
 
       const request = new NextRequest('http://localhost/api/experiences', {
         method: 'POST',
@@ -223,29 +237,26 @@ describe('/api/experiences', () => {
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
       expect(data).toEqual({
         success: false,
-        error: 'Failed to create experience',
+        error: 'Invalid JSON body',
       });
     });
 
     it('maps a Mongoose ValidationError to a 400 response', async () => {
-      const validationError = Object.assign(
-        new Error('Experience validation failed'),
-        {
-          name: 'ValidationError',
-          errors: {
-            price: { message: 'Price cannot be negative' },
-          },
-        }
+      const validationError = new MongooseError.ValidationError();
+      validationError.addError(
+        'price',
+        new MongooseError.ValidatorError({
+          path: 'price',
+          message: 'Price cannot be negative',
+        })
       );
-      MockExperience.mockImplementation(
-        () =>
-          ({
-            save: jest.fn().mockRejectedValue(validationError),
-          }) as any
-      );
+      mockExperienceConstructor.mockImplementation(() => ({
+        ...mockExperienceData,
+        save: jest.fn().mockRejectedValue(validationError),
+      }));
 
       const request = new NextRequest('http://localhost/api/experiences', {
         method: 'POST',
@@ -269,7 +280,9 @@ describe('/api/experiences', () => {
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
       expect(data.error).toBe('Validation failed');
-      expect(data.details).toEqual(validationError.errors);
+      expect(data.details).toEqual({
+        price: { message: 'Invalid value', path: 'price' },
+      });
     });
   });
 });
@@ -277,12 +290,14 @@ describe('/api/experiences', () => {
 describe('/api/experiences/[id]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue({} as any);
+    mockConnectToDatabase.mockResolvedValue(mongoose);
   });
 
   describe('GET /api/experiences/[id]', () => {
     it('should return a specific experience', async () => {
-      MockExperience.findById = jest.fn().mockResolvedValue(mockExperienceData);
+      mockExperienceModel.findById = jest
+        .fn()
+        .mockResolvedValue(mockExperienceData);
 
       const request = new NextRequest(
         'http://localhost/api/experiences/507f1f77bcf86cd799439011'
@@ -293,20 +308,23 @@ describe('/api/experiences/[id]', () => {
       const data = await response.json();
 
       expect(mockConnectToDatabase).toHaveBeenCalledTimes(1);
-      expect(MockExperience.findById).toHaveBeenCalledWith(
+      expect(mockExperienceModel.findById).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011'
       );
       expect(response.status).toBe(200);
-      expect(data).toEqual({ success: true, data: mockExperienceData });
+      expect(data).toEqual({
+        success: true,
+        data: JSON.parse(JSON.stringify(mockExperienceData)),
+      });
     });
 
     it('should return 404 when experience not found', async () => {
-      MockExperience.findById = jest.fn().mockResolvedValue(null);
+      mockExperienceModel.findById = jest.fn().mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/experiences/nonexistent'
+        'http://localhost/api/experiences/507f1f77bcf86cd7994390ff'
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await getById(request, { params });
       const data = await response.json();
@@ -316,7 +334,7 @@ describe('/api/experiences/[id]', () => {
     });
 
     it('should handle database errors', async () => {
-      MockExperience.findById = jest
+      mockExperienceModel.findById = jest
         .fn()
         .mockRejectedValue(new Error('Database error'));
 
@@ -360,10 +378,13 @@ describe('/api/experiences/[id]', () => {
         updates: { name: 'Updated Adventure' },
       });
       expect(response.status).toBe(200);
-      expect(data).toEqual({ success: true, data: updatedData });
+      expect(data).toEqual({
+        success: true,
+        data: JSON.parse(JSON.stringify(updatedData)),
+      });
     });
 
-    it('should accept a full round-tripped payload including _id', async () => {
+    it('rejects round-tripped server metadata', async () => {
       const updatedData = { ...mockExperienceData, name: 'Updated Adventure' };
       mockUpdate.mockResolvedValue(updatedData);
 
@@ -382,27 +403,25 @@ describe('/api/experiences/[id]', () => {
       const response = await PUT(request, { params });
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ success: true, data: updatedData });
-      // _id/createdAt/updatedAt from the round-tripped object must not reach
-      // the shared operation as part of the editable fields.
-      const [{ updates: updatePayload }] = mockUpdate.mock.calls.at(-1)!;
-      expect(updatePayload).not.toHaveProperty('_id');
-      expect(updatePayload).not.toHaveProperty('createdAt');
-      expect(updatePayload).not.toHaveProperty('updatedAt');
+      expect(response.status).toBe(400);
+      expect(data).toMatchObject({
+        success: false,
+        error: 'Validation failed',
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it('should return 404 when updating non-existent experience', async () => {
       mockUpdate.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/experiences/nonexistent',
+        'http://localhost/api/experiences/507f1f77bcf86cd7994390ff',
         {
           method: 'PUT',
           body: JSON.stringify({ name: 'Updated Adventure' }),
         }
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await PUT(request, { params });
       const data = await response.json();
@@ -446,10 +465,10 @@ describe('/api/experiences/[id]', () => {
       const response = await PUT(request, { params });
       const data = await response.json();
 
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
       expect(data).toEqual({
         success: false,
-        error: 'Failed to update experience',
+        error: 'Invalid JSON body',
       });
     });
   });
@@ -486,12 +505,12 @@ describe('/api/experiences/[id]', () => {
       mockDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/experiences/nonexistent',
+        'http://localhost/api/experiences/507f1f77bcf86cd7994390ff',
         {
           method: 'DELETE',
         }
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await DELETE(request, { params });
       const data = await response.json();

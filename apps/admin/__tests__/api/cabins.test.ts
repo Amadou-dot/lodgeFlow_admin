@@ -2,6 +2,8 @@
  * @jest-environment node
  */
 
+import { Error as MongooseError } from 'mongoose';
+
 import type { ApiAuthResult } from '@/lib/api-utils';
 import { NextRequest } from 'next/server';
 import mongoose, { Types } from 'mongoose';
@@ -236,14 +238,13 @@ describe('/api/cabins', () => {
     });
 
     it('maps a Mongoose ValidationError to a 400 response', async () => {
-      const validationError = Object.assign(
-        new Error('Cabin validation failed'),
-        {
-          name: 'ValidationError',
-          errors: {
-            image: { message: 'Please provide a valid image URL' },
-          },
-        }
+      const validationError = new MongooseError.ValidationError();
+      validationError.addError(
+        'image',
+        new MongooseError.ValidatorError({
+          path: 'image',
+          message: 'Please provide a valid image URL',
+        })
       );
       mockCabinModel.create.mockRejectedValue(validationError);
 
@@ -258,7 +259,9 @@ describe('/api/cabins', () => {
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
       expect(data.error).toBe('Validation failed');
-      expect(data.details).toEqual(validationError.errors);
+      expect(data.details).toEqual({
+        image: { message: 'Invalid value', path: 'image' },
+      });
     });
   });
 
@@ -290,7 +293,7 @@ describe('/api/cabins', () => {
       const request = new NextRequest('http://localhost/api/cabins', {
         method: 'PUT',
         body: JSON.stringify({
-          _id: 'nonexistent',
+          _id: '507f1f77bcf86cd7994390ff',
           name: 'Updated Cabin',
         }),
       });
@@ -329,7 +332,7 @@ describe('/api/cabins', () => {
       mockCabinModel.findByIdAndDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/cabins?id=nonexistent',
+        'http://localhost/api/cabins?id=507f1f77bcf86cd7994390ff',
         {
           method: 'DELETE',
         }
@@ -376,9 +379,9 @@ describe('/api/cabins/[id]', () => {
       mockCabinModel.findById.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/cabins/nonexistent'
+        'http://localhost/api/cabins/507f1f77bcf86cd7994390ff'
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await getById(request, { params });
       const data = await response.json();
@@ -470,12 +473,12 @@ describe('/api/cabins/[id]', () => {
       mockCabinModel.findByIdAndDelete.mockResolvedValue(null);
 
       const request = new NextRequest(
-        'http://localhost/api/cabins/nonexistent',
+        'http://localhost/api/cabins/507f1f77bcf86cd7994390ff',
         {
           method: 'DELETE',
         }
       );
-      const params = Promise.resolve({ id: 'nonexistent' });
+      const params = Promise.resolve({ id: '507f1f77bcf86cd7994390ff' });
 
       const response = await deleteById(request, { params });
       const data = await response.json();

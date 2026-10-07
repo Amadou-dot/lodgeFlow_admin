@@ -1,3 +1,4 @@
+import { objectRequestSchema } from './object-request';
 import { z } from 'zod';
 
 import { DINING_RESERVATION_STATUSES, TABLE_PREFERENCES } from '@/lib/config';
@@ -22,10 +23,13 @@ export const tablePreferenceSchema = z.enum(TABLE_PREFERENCES);
 /**
  * Create dining reservation request schema (guest-facing)
  */
-export const createDiningReservationSchema = z
-  .object({
-    diningId: z.string().min(1, 'Dining ID is required'),
-    date: z.coerce.date(),
+const createBodySchema = z
+  .strictObject({
+    diningId: z
+      .string()
+      .min(1, 'Dining ID is required')
+      .regex(/^[a-f\d]{24}$/i, 'Invalid listing ID'),
+    date: z.string().pipe(z.coerce.date()),
     time: z
       .string()
       .regex(timeRegex, 'Time must be in HH:MM format (e.g., 14:30)'),
@@ -50,28 +54,14 @@ export const createDiningReservationSchema = z
     }
   );
 
-/**
- * Update dining reservation request schema (guest-facing PATCH)
- */
-export const patchDiningReservationSchema = z.object({
-  status: diningReservationStatusSchema.optional(),
-  cancellationReason: z.string().max(500).optional(),
-  stripePaymentIntentId: z
-    .string()
-    .startsWith('pi_', 'Invalid Stripe payment intent ID')
-    .max(255)
-    .optional(),
-});
+export const createDiningReservationSchema =
+  objectRequestSchema.pipe(createBodySchema);
 
 export type CreateDiningReservationInput = z.infer<
   typeof createDiningReservationSchema
 >;
-export type PatchDiningReservationInput = z.infer<
-  typeof patchDiningReservationSchema
->;
-
-export const updateDiningDetailsSchema = z.object({
-  date: z.coerce.date().optional(),
+const updateBodySchema = z.strictObject({
+  date: z.string().pipe(z.coerce.date()).optional(),
   time: z.string().regex(timeRegex).optional(),
   numGuests: z.number().int().min(1).max(100).optional(),
   dietaryRequirements: z.array(z.string()).optional(),
@@ -79,3 +69,11 @@ export const updateDiningDetailsSchema = z.object({
   tablePreference: tablePreferenceSchema.optional(),
   occasion: z.string().max(100).optional(),
 });
+
+export type CreateDiningReservationRequest = z.input<typeof createBodySchema>;
+
+export const updateDiningDetailsSchema =
+  objectRequestSchema.pipe(updateBodySchema);
+export type PatchDiningReservationInput = z.output<
+  typeof updateDiningDetailsSchema
+>;

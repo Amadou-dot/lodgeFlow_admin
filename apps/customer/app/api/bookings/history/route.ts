@@ -1,3 +1,5 @@
+import { bookingHistoryQuerySchema } from '@/lib/validations/booking';
+import { logger } from '@lodgeflow/database/logger';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -28,10 +30,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
+    const parsed = bookingHistoryQuerySchema.safeParse({
+      status: searchParams.get('status') || undefined,
+    });
+    if (!parsed.success)
+      return NextResponse.json(
+        { success: false, error: 'Invalid booking status' },
+        { status: 400 }
+      );
+    const { status } = parsed.data;
+    await connectDB();
 
     // Build query
     const query: FilterQuery<IBooking> = { customer: userId };
@@ -55,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    console.error('Error fetching booking history:', error);
+    logger.error('Error fetching booking history:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: 'Failed to fetch booking history',

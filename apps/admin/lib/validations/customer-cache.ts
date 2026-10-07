@@ -1,3 +1,8 @@
+import {
+  customerAddressSchema,
+  customerEmergencyContactSchema,
+  customerPreferencesSchema,
+} from './customer-metadata';
 import { BOOKING_STATUSES } from '@lodgeflow/database/config';
 import { z } from 'zod';
 
@@ -24,30 +29,9 @@ const cachedCustomerSchema = z.object({
   lockout_expires_in_seconds: z.number().nullable(),
   nationality: z.string().optional(),
   nationalId: z.string().optional(),
-  address: z
-    .object({
-      street: z.string().optional(),
-      city: z.string().optional(),
-      state: z.string().optional(),
-      country: z.string().optional(),
-      zipCode: z.string().optional(),
-    })
-    .optional(),
-  emergencyContact: z
-    .object({
-      firstName: z.string(),
-      lastName: z.string(),
-      phone: z.string(),
-      relationship: z.string(),
-    })
-    .optional(),
-  preferences: z
-    .object({
-      smokingPreference: z.enum(['smoking', 'non-smoking', 'no-preference']),
-      dietaryRestrictions: z.array(z.string()).optional(),
-      accessibilityNeeds: z.array(z.string()).optional(),
-    })
-    .optional(),
+  address: customerAddressSchema.optional(),
+  emergencyContact: customerEmergencyContactSchema.optional(),
+  preferences: customerPreferencesSchema.optional(),
   totalBookings: z.number(),
   totalSpent: z.number(),
   lastBookingDate: dateSchema.optional(),

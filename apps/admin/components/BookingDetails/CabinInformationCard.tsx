@@ -1,8 +1,8 @@
-import type { Cabin } from '@/types';
+import type { BookingCabin } from '@/types/booking-read';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 
 interface CabinInformationCardProps {
-  cabin: Pick<Cabin, 'image' | 'name' | 'capacity' | 'description'>;
+  cabin?: Pick<BookingCabin, 'image' | 'name' | 'capacity' | 'description'>;
   cabinPrice: number;
 }
 
@@ -10,6 +10,15 @@ export default function CabinInformationCard({
   cabin,
   cabinPrice,
 }: CabinInformationCardProps) {
+  if (!cabin)
+    return (
+      <Card>
+        <CardHeader>
+          <h2 className='text-lg font-semibold'>Cabin Information</h2>
+        </CardHeader>
+        <CardBody>Cabin no longer available</CardBody>
+      </Card>
+    );
   return (
     <Card>
       <CardHeader>

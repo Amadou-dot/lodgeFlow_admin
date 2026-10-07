@@ -3,15 +3,16 @@ import {
   type ReservationPaymentState,
 } from '../reservation-payment-state';
 import { DINING_RESERVATION_STATUSES, TABLE_PREFERENCES } from '../config';
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, type Model } from 'mongoose';
 
 export interface IDiningReservation extends Document, ReservationPaymentState {
-  dining: mongoose.Types.ObjectId | string;
+  _id: mongoose.Types.ObjectId;
+  dining: mongoose.Types.ObjectId;
   customer: string; // Clerk user ID
   date: Date;
   time: string; // HH:MM format
   numGuests: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
+  status: (typeof DINING_RESERVATION_STATUSES)[number];
   totalPrice: number;
   isPaid: boolean;
   stripePaymentIntentId?: string;
@@ -98,7 +99,7 @@ DiningReservationSchema.index({ customer: 1, createdAt: -1 });
 DiningReservationSchema.index({ status: 1, date: 1 });
 
 // Prevent model re-compilation in development
-const DiningReservation =
+const DiningReservation: Model<IDiningReservation> =
   mongoose.models.DiningReservation ||
   mongoose.model<IDiningReservation>(
     'DiningReservation',

@@ -1,14 +1,15 @@
+import type {
+  DiningDayAvailability,
+  DiningRangeAvailability,
+} from '@/types/reservation-availability';
+import type { FilterQuery } from 'mongoose';
+import type { IDiningReservation } from '@lodgeflow/database/models/DiningReservation';
+import { logger } from '@lodgeflow/database/logger';
+import { catalogIdSchema } from '@/lib/validations/catalog';
+import { reservationAvailabilityQuerySchema } from '@/lib/validations/reservation-availability';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { connectDB, Dining, DiningReservation } from '@lodgeflow/database';
-
-/**
- * Validates HH:MM time format
- */
-function isValidTimeFormat(time: string): boolean {
-  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-  return timeRegex.test(time);
-}
 
 /**
  * Converts HH:MM to minutes since midnight for comparison
@@ -21,11 +22,15 @@ function timeToMinutes(time: string): number {
 /**
  * Checks if a time falls within the serving window
  */
-function isWithinServingWindow(
-  time: string,
-  servingStart: string,
-  servingEnd: string
-): boolean {
+function isWithinServingWindow({
+  time,
+  servingStart,
+  servingEnd,
+}: {
+  time: string;
+  servingStart: string;
+  servingEnd: string;
+}): boolean {
   const timeMinutes = timeToMinutes(time);
   const startMinutes = timeToMinutes(servingStart);
   const endMinutes = timeToMinutes(servingEnd);
@@ -37,14 +42,26 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await connectDB();
-
     const { id: diningId } = await context.params;
     const url = new URL(request.url);
-    const dateParam = url.searchParams.get('date');
-    const timeParam = url.searchParams.get('time');
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
+    if (!catalogIdSchema.safeParse(diningId).success)
+      return NextResponse.json(
+        { success: false, error: 'Dining item not found' },
+        { status: 404 }
+      );
+    const parsed = reservationAvailabilityQuerySchema.safeParse({
+      date: url.searchParams.get('date') || undefined,
+      time: url.searchParams.get('time') || undefined,
+      startDate: url.searchParams.get('startDate') || undefined,
+      endDate: url.searchParams.get('endDate') || undefined,
+    });
+    if (!parsed.success)
+      return NextResponse.json(
+        { success: false, error: parsed.error.issues[0].message },
+        { status: 400 }
+      );
+    const selection = parsed.data;
+    await connectDB();
 
     const dining = await Dining.findById(diningId);
     if (!dining) {
@@ -55,35 +72,20 @@ export async function GET(
     }
 
     // If checking a specific date (and optionally time)
-    if (dateParam) {
-      const checkDate = new Date(dateParam);
-      if (isNaN(checkDate.getTime())) {
-        return NextResponse.json(
-          { success: false, error: 'Invalid date parameter' },
-          { status: 400 }
-        );
-      }
-
-      // Validate time format and serving window if time is provided
+    if (selection.kind === 'day') {
+      const { dateParam, checkDate, timeParam } = selection;
       if (timeParam) {
-        if (!isValidTimeFormat(timeParam)) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'Invalid time format. Expected HH:MM (e.g., 14:30)',
-            },
-            { status: 400 }
-          );
-        }
-
         if (
-          !isWithinServingWindow(
-            timeParam,
-            dining.servingTime.start,
-            dining.servingTime.end
-          )
+          !isWithinServingWindow({
+            time: timeParam,
+            servingStart: dining.servingTime.start,
+            servingEnd: dining.servingTime.end,
+          })
         ) {
-          return NextResponse.json({
+          return NextResponse.json<{
+            success: true;
+            data: DiningDayAvailability;
+          }>({
             success: true,
             data: {
               diningId,
@@ -104,7 +106,7 @@ export async function GET(
       const dayEnd = new Date(checkDate);
       dayEnd.setHours(23, 59, 59, 999);
 
-      const query: Record<string, unknown> = {
+      const query: FilterQuery<IDiningReservation> = {
         dining: diningId,
         date: { $gte: dayStart, $lt: dayEnd },
         status: { $nin: ['cancelled', 'no-show'] },
@@ -122,7 +124,7 @@ export async function GET(
       const maxPeople = dining.maxPeople || Infinity;
       const seatsRemaining = Math.max(0, maxPeople - totalGuests);
 
-      return NextResponse.json({
+      return NextResponse.json<{ success: true; data: DiningDayAvailability }>({
         success: true,
         data: {
           diningId,
@@ -136,33 +138,7 @@ export async function GET(
       });
     }
 
-    // If checking a date range (for calendar display)
-    const defaultStart = new Date();
-    const defaultEnd = new Date();
-    defaultEnd.setMonth(defaultEnd.getMonth() + 3);
-
-    const queryStart = startDate ? new Date(startDate) : defaultStart;
-    let queryEnd = endDate ? new Date(endDate) : defaultEnd;
-
-    if (isNaN(queryStart.getTime()) || isNaN(queryEnd.getTime())) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid date range parameters' },
-        { status: 400 }
-      );
-    }
-
-    // Clamp range to maximum 6 months to prevent heavy queries
-    const maxRangeMs = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
-    if (queryEnd.getTime() - queryStart.getTime() > maxRangeMs) {
-      queryEnd = new Date(queryStart.getTime() + maxRangeMs);
-    }
-
-    if (queryEnd <= queryStart) {
-      return NextResponse.json(
-        { success: false, error: 'End date must be after start date' },
-        { status: 400 }
-      );
-    }
+    const { queryStart, queryEnd } = selection;
 
     const reservations = await DiningReservation.find({
       dining: diningId,
@@ -188,7 +164,7 @@ export async function GET(
       }
     });
 
-    return NextResponse.json({
+    return NextResponse.json<{ success: true; data: DiningRangeAvailability }>({
       success: true,
       data: {
         diningId,
@@ -202,7 +178,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching dining availability:', error);
+    logger.error('Error fetching dining availability:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch dining availability' },
       { status: 500 }

@@ -1,10 +1,10 @@
 import { Textarea } from '@heroui/input';
 import { Select, SelectItem } from '@heroui/select';
-import type { FormData } from './types';
+import type { FormData, GuestInputChange } from './types';
 
 interface PreferencesSectionProps {
   formData: FormData;
-  onInputChange: (field: string, value: string) => void;
+  onInputChange: GuestInputChange;
 }
 
 export default function PreferencesSection({
@@ -20,11 +20,16 @@ export default function PreferencesSection({
           placeholder='Select smoking preference'
           selectedKeys={[formData.preferences.smokingPreference]}
           onSelectionChange={keys => {
-            const selected = Array.from(keys)[0] as string;
-            onInputChange(
-              'preferences.smokingPreference',
-              selected || 'no-preference'
-            );
+            const selected = Array.from(keys)[0];
+            const value =
+              selected === 'smoking' || selected === 'non-smoking'
+                ? selected
+                : 'no-preference';
+            onInputChange({
+              section: 'preferences',
+              field: 'smokingPreference',
+              value: value,
+            });
           }}
         >
           <SelectItem key='smoking'>Smoking</SelectItem>
@@ -36,7 +41,11 @@ export default function PreferencesSection({
           placeholder='Enter dietary restrictions (comma-separated)'
           value={formData.preferences.dietaryRestrictions}
           onValueChange={(value: string) =>
-            onInputChange('preferences.dietaryRestrictions', value)
+            onInputChange({
+              section: 'preferences',
+              field: 'dietaryRestrictions',
+              value: value,
+            })
           }
           minRows={2}
         />
@@ -45,7 +54,11 @@ export default function PreferencesSection({
           placeholder='Enter accessibility needs (comma-separated)'
           value={formData.preferences.accessibilityNeeds}
           onValueChange={(value: string) =>
-            onInputChange('preferences.accessibilityNeeds', value)
+            onInputChange({
+              section: 'preferences',
+              field: 'accessibilityNeeds',
+              value: value,
+            })
           }
           minRows={2}
         />

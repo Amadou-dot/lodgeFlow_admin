@@ -217,6 +217,7 @@ for (const resource of resources) {
 
   test(`${resource.kind}: unpaid edits recalculate price and cancellation preserves the saved selection`, async () => {
     const created = await resource.create();
+    assert.ok(created);
     const identity = {
       reservationId: String(created._id),
       customerId: 'owner',
@@ -226,13 +227,20 @@ for (const resource of resources) {
     assert.equal(created.totalPrice, resource.total);
     assert.equal(created.isPaid, false);
     const edited = await resource.reprice(identity);
+    assert.ok(edited);
     assert.equal(edited.totalPrice, resource.total * 2);
     const noted = await resource.note(identity);
-    assert.deepEqual(Array.from(noted.specialRequests), ['Window please']);
+    assert.ok(noted);
+    assert.deepEqual(Array.from(noted.specialRequests ?? []), [
+      'Window please',
+    ]);
     const cancelled = await resource.cancel(identity);
+    assert.ok(cancelled);
     assert.equal(cancelled.status, 'cancelled');
     assert.equal(cancelled.totalPrice, resource.total * 2);
-    assert.deepEqual(Array.from(cancelled.specialRequests), ['Window please']);
+    assert.deepEqual(Array.from(cancelled.specialRequests ?? []), [
+      'Window please',
+    ]);
     assert.equal(cancelled.date.getTime(), date.getTime());
     assert.equal(cancelled.customer, 'owner');
     assert.equal(cancelled.isPaid, false);
@@ -297,6 +305,7 @@ for (const resource of resources) {
     ];
     for (const scenario of cases) {
       const created = await resource.create();
+      assert.ok(created);
       const identity = {
         reservationId: String(created._id),
         customerId: 'owner',
@@ -320,6 +329,7 @@ for (const resource of resources) {
 
   test(`${resource.kind}: note edits on a partially paid reservation retain receipts and price`, async () => {
     const created = await resource.create();
+    assert.ok(created);
     const identity = {
       reservationId: String(created._id),
       customerId: 'owner',
@@ -329,12 +339,15 @@ for (const resource of resources) {
       changes: { receipts: [payment] },
     });
     const edited = await resource.note(identity);
+    assert.ok(edited);
     assert.equal(edited.totalPrice, resource.total);
     assert.equal(edited.isPaid, false);
     assert.equal(edited.status, 'pending');
     assert.deepEqual(JSON.parse(JSON.stringify(edited.receipts)), [
       { ...payment, recordedAt: date.toISOString() },
     ]);
-    assert.deepEqual(Array.from(edited.specialRequests), ['Window please']);
+    assert.deepEqual(Array.from(edited.specialRequests ?? []), [
+      'Window please',
+    ]);
   });
 }

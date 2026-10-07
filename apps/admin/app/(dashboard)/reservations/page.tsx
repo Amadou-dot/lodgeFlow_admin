@@ -29,8 +29,9 @@ import {
   RESERVATION_TYPES,
   reservationHref,
   utcDate,
-  type ReservationRow,
 } from '@/lib/reservation-options';
+import type { ReservationInboxJson } from '@/types/reservation-calendar';
+import type { ApiResponse } from '@/lib/api-utils';
 export default function ReservationsPage() {
   const search = useSearchParams();
   const [filters, setFilters] = useState({
@@ -41,7 +42,9 @@ export default function ReservationsPage() {
     to: search.get('to') ?? '',
   });
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<{ rows: ReservationRow[]; total: number }>({
+  const [data, setData] = useState<
+    Pick<ReservationInboxJson, 'rows' | 'total'>
+  >({
     rows: [],
     total: 0,
   });
@@ -60,9 +63,11 @@ export default function ReservationsPage() {
       cache: 'no-store',
     })
       .then(async response => {
-        const result = await response.json();
-        if (!response.ok)
-          throw new Error(result.error || 'Unable to load reservations');
+        const result: ApiResponse<ReservationInboxJson> = await response.json();
+        if (!response.ok || !result.success)
+          throw new Error(
+            !result.success ? result.error : 'Unable to load reservations'
+          );
         if (!controller.signal.aborted) setData(result.data);
       })
       .catch(e => {

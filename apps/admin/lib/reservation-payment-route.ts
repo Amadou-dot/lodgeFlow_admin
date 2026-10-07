@@ -1,5 +1,8 @@
+import { serializeUnpopulatedReservation } from '@lodgeflow/database/reservation-json';
 import Stripe from 'stripe';
-import { z } from 'zod';
+import { reservationReceiptSchema } from './validations/reservation-payment';
+import { readJsonRequestBody } from './validations/request-body';
+import { logger } from './logger';
 import {
   recordReservationReceipt,
   refundReservationStripe,
@@ -13,51 +16,24 @@ import {
 import { recordAudit } from './audit';
 import connectDB from './mongodb';
 
-const receiptSchema = z
-  .object({
-    id: z.uuid(),
-    type: z.enum(['payment', 'refund']),
-    amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-    method: z.enum(['cash', 'bank_transfer', 'card', 'stripe']),
-    reference: z.string().trim().max(200),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    if (value.method === 'stripe' && value.type !== 'refund')
-      context.addIssue({
-        code: 'custom',
-        message: 'Use customer checkout to collect online payments',
-      });
-    if (
-      (value.method !== 'cash' || value.type === 'refund') &&
-      !value.reference
-    )
-      context.addIssue({
-        code: 'custom',
-        path: ['reference'],
-        message: 'Provide a receipt reference or refund reason',
-      });
-  });
 export async function reservationPayment(
   request: Request,
   { id, kind }: { id: string; kind: 'dining' | 'experience' }
 ) {
   const access = await requireApiAuth({ permission: 'bookings:manage' });
   if (!access.authenticated) return access.error;
-  let body;
   try {
-    body = await request.json();
-  } catch {
-    return createErrorResponse('Invalid JSON', 400);
-  }
-  const parsed = receiptSchema.safeParse(body);
-  if (!parsed.success)
-    return createErrorResponse(parsed.error.issues[0].message, 400);
-  if (parsed.data.type === 'refund') {
-    const refundAccess = await requireApiAuth({ permission: 'refunds:issue' });
-    if (!refundAccess.authenticated) return refundAccess.error;
-  }
-  try {
+    const body = await readJsonRequestBody(request);
+    if (!body.success) return createErrorResponse('Invalid JSON', 400);
+    const parsed = reservationReceiptSchema.safeParse(body.data);
+    if (!parsed.success)
+      return createErrorResponse(parsed.error.issues[0].message, 400);
+    if (parsed.data.type === 'refund') {
+      const refundAccess = await requireApiAuth({
+        permission: 'refunds:issue',
+      });
+      if (!refundAccess.authenticated) return refundAccess.error;
+    }
     await connectDB();
     if (parsed.data.method === 'stripe') {
       const result = await refundReservationStripe({
@@ -94,10 +70,13 @@ export async function reservationPayment(
         before: {},
         after: { receipt: parsed.data },
       });
-    return createSuccessResponse(result.reservation);
-  } catch (error) {
+    return createSuccessResponse(
+      serializeUnpopulatedReservation(result.reservation)
+    );
+  } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return createErrorResponse(error.message, error.status);
+    logger.error('Unable to record transaction', error);
     return createErrorResponse('Unable to record transaction', 500);
   }
 }

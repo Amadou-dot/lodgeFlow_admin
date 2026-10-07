@@ -1,3 +1,5 @@
+import type { DiningStats } from '@/types/catalog-stats';
+import { logger } from '@/lib/logger';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -14,7 +16,7 @@ export async function GET() {
   try {
     await connectDB();
 
-    const [result] = await Dining.aggregate([
+    const [result] = await Dining.aggregate<DiningStats>([
       {
         $group: {
           _id: null,
@@ -49,7 +51,7 @@ export async function GET() {
 
     return createSuccessResponse(stats);
   } catch (error) {
-    console.error('Error fetching dining stats:', error);
+    logger.error('Error fetching dining stats:', error);
     return createErrorResponse(
       'Failed to fetch dining stats',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

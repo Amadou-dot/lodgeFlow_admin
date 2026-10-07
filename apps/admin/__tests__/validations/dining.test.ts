@@ -336,12 +336,7 @@ describe('Dining Validation Schemas', () => {
     it('does not accept a calories field that does not exist on the model', () => {
       const dining = { ...validDining, calories: 500 };
       const result = createDiningSchema.safeParse(dining);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(
-          (result.data as Record<string, unknown>).calories
-        ).toBeUndefined();
-      }
+      expect(result.success).toBe(false);
     });
   });
 
@@ -445,18 +440,14 @@ describe('Dining Validation Schemas', () => {
       }
     });
 
-    it('strips $-operator and dotted keys from a valid update payload', () => {
+    it('rejects operator and dotted keys', () => {
       const result = updateDiningSchema.safeParse({
         _id: '65a1b2c3d4e5f6a7b8c9d0e1',
         name: 'Renamed Item',
         $set: { price: 1 },
         'tags.0': 'hacked',
       });
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect('$set' in result.data).toBe(false);
-        expect('tags.0' in result.data).toBe(false);
-      }
+      expect(result.success).toBe(false);
     });
   });
 });

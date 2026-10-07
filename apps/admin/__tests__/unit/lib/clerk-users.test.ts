@@ -5,17 +5,22 @@ const mockGetUserList = jest.fn();
 jest.mock('@clerk/nextjs/server', () => ({
   clerkClient: jest.fn().mockResolvedValue({
     users: {
-      getUser: (...args: any[]) => mockGetUser(...args),
-      getUserList: (...args: any[]) => mockGetUserList(...args),
+      getUser: (...args: unknown[]) => mockGetUser(...args),
+      getUserList: (...args: unknown[]) => mockGetUserList(...args),
     },
   }),
   User: {},
 }));
 
-import { convertClerkUserToCustomer } from '@/lib/clerk-users';
+import {
+  convertClerkUserToCustomer,
+  type CustomerClerkSource,
+} from '@/lib/clerk-users';
 
 // Inline mock Clerk user factory (avoids ESM faker import issue)
-function createMockClerkUser(overrides: Record<string, any> = {}) {
+function createMockClerkUser(
+  overrides: Partial<CustomerClerkSource> = {}
+): CustomerClerkSource {
   return {
     id: 'user_abc123',
     firstName: 'John',
@@ -47,7 +52,7 @@ describe('clerk-users', () => {
         lastName: 'Doe',
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.id).toBe('user_123');
       expect(customer.name).toBe('John Doe');
@@ -62,7 +67,7 @@ describe('clerk-users', () => {
         username: 'johndoe',
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.name).toBe('johndoe');
     });
@@ -74,7 +79,7 @@ describe('clerk-users', () => {
         username: null,
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.name).toBe('Unknown User');
     });
@@ -88,7 +93,7 @@ describe('clerk-users', () => {
         primaryEmailAddressId: 'email_1',
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.email).toBe('john@example.com');
     });
@@ -99,7 +104,7 @@ describe('clerk-users', () => {
         primaryEmailAddressId: 'email_999',
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.email).toBe('');
     });
@@ -109,7 +114,7 @@ describe('clerk-users', () => {
         phoneNumbers: [{ phoneNumber: '+1234567890' }],
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.phone).toBe('+1234567890');
     });
@@ -124,7 +129,7 @@ describe('clerk-users', () => {
         },
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.nationality).toBe('US');
       expect(customer.preferences?.smokingPreference).toBe('non-smoking');
@@ -144,7 +149,7 @@ describe('clerk-users', () => {
         },
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.nationalId).toBe('ABC123');
       expect(customer.fullAddress).toBe('123 Main St, New York, NY, US, 10001');
@@ -152,7 +157,7 @@ describe('clerk-users', () => {
 
     it('defaults totalBookings and totalSpent to 0', () => {
       const clerkUser = createMockClerkUser();
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.totalBookings).toBe(0);
       expect(customer.totalSpent).toBe(0);
@@ -160,7 +165,7 @@ describe('clerk-users', () => {
 
     it('defaults loyaltyTier to Bronze', () => {
       const clerkUser = createMockClerkUser();
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.loyaltyTier).toBe('Bronze');
     });
@@ -170,7 +175,7 @@ describe('clerk-users', () => {
         phoneNumbers: [],
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.phone).toBeUndefined();
     });
@@ -183,7 +188,7 @@ describe('clerk-users', () => {
         lastSignInAt: now,
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.created_at).toBeInstanceOf(Date);
       expect(customer.updated_at).toBeInstanceOf(Date);
@@ -195,9 +200,33 @@ describe('clerk-users', () => {
         lastSignInAt: null,
       });
 
-      const customer = convertClerkUserToCustomer(clerkUser as any);
+      const customer = convertClerkUserToCustomer(clerkUser);
 
       expect(customer.last_sign_in_at).toBeNull();
     });
   });
+});
+
+test('validates provider metadata while retaining independent valid fields', () => {
+  const customer = convertClerkUserToCustomer(
+    createMockClerkUser({
+      publicMetadata: {
+        nationality: 'US',
+        preferences: {
+          smokingPreference: 'unknown',
+          dietaryRestrictions: 'bad',
+        },
+      },
+      privateMetadata: {
+        nationalId: { invalid: true },
+        address: { city: ['bad'] },
+        emergencyContact: { name: 'Guardian', phone: '555' },
+      },
+    })
+  );
+  expect(customer.nationality).toBe('US');
+  expect(customer.preferences).toBeUndefined();
+  expect(customer.nationalId).toBeUndefined();
+  expect(customer.address).toBeUndefined();
+  expect(customer.emergencyContact).toEqual({ name: 'Guardian', phone: '555' });
 });

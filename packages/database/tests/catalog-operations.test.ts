@@ -47,7 +47,8 @@ const resources = [
   {
     kind: 'dining',
     catalog: Dining,
-    reservations: DiningReservation,
+    readReservations: () => DiningReservation.find().lean(),
+    countReservations: () => DiningReservation.countDocuments(),
     async create() {
       return Dining.create({
         name: 'Dinner',
@@ -89,7 +90,8 @@ const resources = [
   {
     kind: 'experience',
     catalog: Experience,
-    reservations: ExperienceBooking,
+    readReservations: () => ExperienceBooking.find().lean(),
+    countReservations: () => ExperienceBooking.countDocuments(),
     async create() {
       return Experience.create({
         name: 'Hiking',
@@ -196,9 +198,7 @@ for (const resource of resources) {
     const listing = await resource.create();
     const listingId = String(listing._id);
     await resource.reference({ listingId, slot: '18:00' });
-    const beforeRows = JSON.stringify(
-      await resource.reservations.find().lean()
-    );
+    const beforeRows = JSON.stringify(await resource.readReservations());
     const updated = await updateCapacityCatalog({
       kind: resource.kind,
       listingId,
@@ -208,10 +208,7 @@ for (const resource of resources) {
     assert.equal(updated.name, 'Renamed');
     assert.equal(updated.price, 12.5);
     assert.equal(updated.isPopular, true);
-    assert.equal(
-      JSON.stringify(await resource.reservations.find().lean()),
-      beforeRows
-    );
+    assert.equal(JSON.stringify(await resource.readReservations()), beforeRows);
   });
   test(`${resource.kind}: concurrent creation and deletion cannot leave an orphan reservation`, async () => {
     const listing = await resource.create();
@@ -226,7 +223,7 @@ for (const resource of resources) {
     );
     assert.equal(
       await resource.catalog.countDocuments(),
-      await resource.reservations.countDocuments()
+      await resource.countReservations()
     );
   });
 }

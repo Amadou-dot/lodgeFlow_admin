@@ -136,12 +136,17 @@ export function createClerkFixture({ organizationId, users }) {
       reply({ response, body: { data, total_count: data.length } });
       return true;
     }
-    if (url.pathname === '/v1/users') {
+    if (url.pathname === '/v1/users' || url.pathname === '/v1/users/count') {
       const selected = url.searchParams.getAll('user_id');
       const data = [...identities.values()]
         .filter(user => !selected.length || selected.includes(user.id))
         .map(userPayload);
-      reply({ response, body: { data, total_count: data.length } });
+      reply({
+        response,
+        body: url.pathname.endsWith('/count')
+          ? { object: 'total_count', total_count: data.length }
+          : data,
+      });
       return true;
     }
     if (url.pathname.startsWith('/v1/users/')) {

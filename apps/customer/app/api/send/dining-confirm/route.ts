@@ -1,3 +1,7 @@
+import { logger } from '@lodgeflow/database/logger';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { diningConfirmationSchema } from '@/lib/validations/confirmation-email';
+import type { ComponentProps } from 'react';
 import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 
@@ -11,25 +15,37 @@ function validateEmail(email: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return Response.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  const { reservationId } = await request.json();
-
   try {
-    if (!reservationId) {
+    const { userId } = await auth();
+    if (!userId) {
       return Response.json(
-        { error: 'Reservation ID is required' },
-        { status: 400 }
+        { error: 'Authentication required' },
+        { status: 401 }
       );
     }
 
+    const json = await readJsonRequestBody(request);
+    if (!json.success)
+      return Response.json({ error: json.error }, { status: 400 });
+    const parsed = diningConfirmationSchema.safeParse(json.data);
+    if (!parsed.success)
+      return Response.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      );
+    const { reservationId } = parsed.data;
+
     await connectDB();
 
-    const reservation =
-      await DiningReservation.findById(reservationId).populate('dining');
+    const reservation = await DiningReservation.findById(
+      reservationId
+    ).populate<{
+      dining:
+        | ComponentProps<
+            typeof DiningReservationConfirmationEmail
+          >['diningData']
+        | null;
+    }>('dining');
     if (!reservation) {
       return Response.json({ error: 'Reservation not found' }, { status: 404 });
     }
@@ -55,6 +71,9 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    if (!reservation.dining)
+      return Response.json({ error: 'Dining item not found' }, { status: 404 });
+
     const { data, error } = await getResend().emails.send({
       from: getEmailSender({
         kind: reservation.totalPrice > 0 ? 'payment' : 'notification',
@@ -75,11 +94,23 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return Response.json({ error }, { status: 500 });
+      logger.error('Confirmation provider rejected the send', error, {
+        route: 'dining-confirm',
+      });
+      return Response.json(
+        { error: 'Failed to send confirmation email' },
+        { status: 500 }
+      );
     }
 
     return Response.json(data);
-  } catch (error) {
-    return Response.json({ error }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('Confirmation request failed', error, {
+      route: 'dining-confirm',
+    });
+    return Response.json(
+      { error: 'Failed to send confirmation email' },
+      { status: 500 }
+    );
   }
 }

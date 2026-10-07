@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { test } from 'node:test';
-import { expectJson } from './assert-http.mjs';
+import { expectJson, assertAuthenticationDenied } from './assert-http.mjs';
 
 test('HTTP gate rejects status, redirect, non-JSON, malformed JSON, and timeout failures', async () => {
   const server = createServer((request, response) => {
@@ -53,7 +53,7 @@ test('HTTP gate rejects status, redirect, non-JSON, malformed JSON, and timeout 
     }
     // Prove these failures propagate to a nonzero process exit, as required by CI.
     for (const route of ['failure', 'timeout', 'bad-body']) {
-      const script = `import assert from 'node:assert/strict'; import { expectJson } from ${JSON.stringify(new URL('./assert-http.mjs', import.meta.url).href)}; const body = await expectJson({url:${JSON.stringify(`${base}/${route}`)},status:200,timeoutMs:100}); assert.deepEqual(body,{success:true});`;
+      const script = `import assert from 'node:assert/strict'; import { expectJson, assertAuthenticationDenied } from ${JSON.stringify(new URL('./assert-http.mjs', import.meta.url).href)}; const body = await expectJson({url:${JSON.stringify(`${base}/${route}`)},status:200,timeoutMs:100}); assert.deepEqual(body,{success:true});`;
       const exitCode = await new Promise((resolve, reject) => {
         const child = spawn(
           process.execPath,
@@ -79,4 +79,33 @@ test('HTTP gate rejects status, redirect, non-JSON, malformed JSON, and timeout 
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   }
+});
+
+test('authentication checks reject missing routes, unexpected redirects and success', () => {
+  assertAuthenticationDenied(
+    new Response(null, {
+      status: 404,
+      headers: { 'x-clerk-auth-reason': 'protect-rewrite' },
+    })
+  );
+  assertAuthenticationDenied(
+    new Response(null, {
+      status: 307,
+      headers: { location: 'https://accounts.smoke.test/sign-in' },
+    })
+  );
+  for (const response of [
+    new Response(null, { status: 404 }),
+    new Response(null, { status: 500 }),
+    new Response(null, { status: 200 }),
+    new Response(null, {
+      status: 307,
+      headers: { location: 'https://accounts.smoke.test/other' },
+    }),
+    new Response(null, {
+      status: 307,
+      headers: { location: 'https://unexpected.test/sign-in' },
+    }),
+  ])
+    assert.throws(() => assertAuthenticationDenied(response));
 });

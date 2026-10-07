@@ -1,3 +1,8 @@
+import {
+  serializeExperience,
+  type ExperienceJsonSource,
+} from '@lodgeflow/database/experience-json';
+import type { Model } from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { connectDB, Experience, type IExperience } from '@lodgeflow/database';
@@ -9,6 +14,8 @@ import {
   validateRequest,
   validationErrorResponse,
 } from '@/lib/validations/utils';
+
+const experienceReader: Model<ExperienceJsonSource> = Experience;
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,14 +62,14 @@ export async function GET(request: NextRequest) {
       query.tags = { $in: tagArray };
     }
 
-    const experiences = await Experience.find(query).sort({
+    const experiences = await experienceReader.find(query).sort({
       isPopular: -1,
       price: 1,
     });
 
     const response: ApiResponse<ExperienceType[]> = {
       success: true,
-      data: experiences,
+      data: experiences.map(serializeExperience),
     };
 
     return NextResponse.json(response);

@@ -1,11 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-interface CabinStats {
-  totalCabins: number;
-  totalCapacity: number;
-  averagePrice: number;
-  cabinsWithDiscount: number;
-}
+import type { CabinStats } from '@/types/catalog-stats';
 
 export function useCabinStats() {
   return useQuery<CabinStats>({

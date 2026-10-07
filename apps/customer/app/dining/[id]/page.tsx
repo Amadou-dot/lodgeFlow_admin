@@ -130,7 +130,7 @@ export default function DiningDetailPage({ params }: { params: Params }) {
               <div className='flex items-center gap-2'>
                 <Users className='w-4 h-4' />
                 <span>
-                  {dining.minPeople > 1 ? dining.minPeople + '-' : '1-'}
+                  {(dining.minPeople ?? 1) > 1 ? dining.minPeople + '-' : '1-'}
                   {dining.maxPeople} guests
                 </span>
               </div>
@@ -351,7 +351,9 @@ export default function DiningDetailPage({ params }: { params: Params }) {
                   <div>
                     <div className='font-medium'>Party Size</div>
                     <div className='text-sm text-default-600'>
-                      {dining.minPeople > 1 ? dining.minPeople + '-' : '1-'}
+                      {(dining.minPeople ?? 1) > 1
+                        ? dining.minPeople + '-'
+                        : '1-'}
                       {dining.maxPeople} guests
                     </div>
                   </div>

@@ -16,8 +16,8 @@ import {
   TableCell,
 } from '@heroui/table';
 import { Spinner } from '@heroui/spinner';
-import type { StaffRole } from '@/lib/permissions';
-type Member = { userId: string; name: string; role: StaffRole | null };
+import type { StaffMemberJson as Member } from '@/types/staff-audit';
+import type { ApiResponse } from '@/lib/api-utils';
 export default function StaffPage() {
   const access = useStaffAccess();
   const [members, setMembers] = useState<Member[]>([]);
@@ -26,8 +26,9 @@ export default function StaffPage() {
   const [busy, setBusy] = useState(false);
   async function load() {
     const response = await fetch('/api/staff', { cache: 'no-store' });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Unable to load staff');
+    const result: ApiResponse<Member[]> = await response.json();
+    if (!response.ok || !result.success)
+      throw new Error(!result.success ? result.error : 'Unable to load staff');
     setMembers(result.data);
   }
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function StaffPage() {
       .finally(() => setLoading(false));
   }, []);
   async function change(member: Member, role: string) {
+    if (!member.userId) return;
     setBusy(true);
     setError('');
     try {
@@ -94,9 +96,9 @@ export default function StaffPage() {
               : 'No organization members found.'
           }
         >
-          {members.map(member => (
+          {members.map((member, index) => (
             <TableRow
-              key={member.userId}
+              key={member.userId ?? `missing-${index}`}
               className='border-t border-default-200'
             >
               <TableCell className='p-3'>
@@ -107,7 +109,9 @@ export default function StaffPage() {
                 <OperationsSelect
                   label={`Access for ${member.name || member.userId}`}
                   value={member.role ?? ''}
-                  isDisabled={busy || member.userId === access?.userId}
+                  isDisabled={
+                    busy || !member.userId || member.userId === access?.userId
+                  }
                   className='min-w-48 max-w-xs'
                   onChange={value => void change(member, value)}
                   options={[

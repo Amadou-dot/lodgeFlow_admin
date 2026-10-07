@@ -1,14 +1,13 @@
+import type { CustomerJson as Customer } from './customer-json';
+import type { RecentCustomerBooking } from './booking-read';
+import type { SettingsJson } from '@lodgeflow/database/settings-json';
+import type { ExperienceJson } from '@lodgeflow/database/experience-json';
+import type { DiningJson } from '@lodgeflow/database/dining-json';
 import type { CabinDetail } from '@lodgeflow/database/cabin-json';
-import type { IBooking } from '@lodgeflow/database/models/Booking';
-import type { ICabin } from '@lodgeflow/database/models/Cabin';
-import type { IDining } from '@lodgeflow/database/models/Dining';
-import type { IExperience } from '@lodgeflow/database/models/Experience';
-import type { ISettings } from '@lodgeflow/database/models/Settings';
 import { SVGProps } from 'react';
 import type {
   ClerkUser,
   ClerkUserListParams,
-  Customer,
   CustomerPrivateMetadata,
   CustomerPublicMetadata,
 } from './clerk';
@@ -19,9 +18,9 @@ export type IconSvgProps = SVGProps<SVGSVGElement> & {
 
 export type IdParam = { params: Promise<{ id: string }> };
 
-// Re-export model types for easier importing
+// Serializable application data shapes.
 export type Cabin = CabinDetail;
-// Customer is now imported from clerk.ts instead of the model
+// Customer uses the JSON projection; server-side Clerk types remain explicit.
 export type {
   ClerkUser,
   ClerkUserListParams,
@@ -29,45 +28,17 @@ export type {
   CustomerPrivateMetadata,
   CustomerPublicMetadata,
 };
-export type Booking = IBooking;
-export type Dining = IDining;
-export type Settings = ISettings;
-export type Experience = IExperience;
+export type Dining = DiningJson;
+export type Settings = SettingsJson;
+export type Experience = ExperienceJson;
 
 // Type for recent bookings from customer data
-export interface RecentBooking {
-  _id: string;
-  cabin?: {
-    name: string;
-    image?: string;
-    capacity?: number;
-    price?: number;
-  };
-  checkInDate: string | Date;
-  checkOutDate: string | Date;
-  numNights: number;
-  status:
-    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
-  totalPrice: number;
-  isPaid?: boolean;
-}
+export type RecentBooking = RecentCustomerBooking;
 
-// Extended types for populated models (used in API responses)
-export interface PopulatedBooking extends Omit<
-  IBooking,
-  '_id' | 'cabin' | 'customer' | 'checkInDate' | 'checkOutDate'
-> {
-  _id: string;
-  cabin: ICabin;
-  customer: Customer; // Updated to use new Customer type from Clerk
-  checkInDate: string | Date; // API returns string, but might be Date in some contexts
-  checkOutDate: string | Date; // API returns string, but might be Date in some contexts
-  cabinName?: string; // For legacy compatibility
-  guest?: Customer; // For legacy compatibility - updated to use new Customer type
-}
+export type { AdminBooking as PopulatedBooking } from './booking-read';
 
 // Legacy type aliases for backward compatibility
-export type AppSettings = ISettings;
+export type AppSettings = SettingsJson;
 
 // Additional types for API requests
 export interface CreateCabinData {
@@ -161,7 +132,7 @@ export interface CustomerResponse {
   data: CustomerWithStats;
 }
 
-export interface CustomerWithStats extends Customer {
+export interface CustomerWithStats extends Omit<Customer, 'recentBookings'> {
   // Additional calculated stats that aren't stored in the database
   completedBookings: number;
   totalRevenue: number;

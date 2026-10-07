@@ -7,7 +7,11 @@ import {
   createSuccessResponse,
   requireApiAuth,
 } from '@/lib/api-utils';
-import { isStaffRole } from '@/lib/permissions';
+import type { StaffRole } from '@/lib/permissions';
+import type { StaffMemberJson } from '@/types/staff-audit';
+import { logger } from '@/lib/logger';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { staffRoleRequestSchema } from '@/lib/validations/staff-audit';
 import { isOrganizationMember, staffOrganizationId } from '@/lib/staff-access';
 import connectDB from '@/lib/mongodb';
 
@@ -15,7 +19,9 @@ export async function GET() {
   const access = await requireApiAuth({ permission: 'staff:manage' });
   if (!access.authenticated) return access.error;
   try {
-    const organizationId = staffOrganizationId()!;
+    const organizationId = staffOrganizationId();
+    if (!organizationId)
+      throw new Error('Staff organization is not configured');
     await connectDB();
     const assignments = await StaffAccess.find({ organizationId }).lean();
     const client = await clerkClient();
@@ -34,7 +40,7 @@ export async function GET() {
         break;
     }
     return createSuccessResponse(
-      members.map(member => ({
+      members.map((member): StaffMemberJson => ({
         userId: member.publicUserData?.userId,
         name:
           [member.publicUserData?.firstName, member.publicUserData?.lastName]
@@ -46,7 +52,8 @@ export async function GET() {
           )?.role ?? null,
       }))
     );
-  } catch {
+  } catch (error: unknown) {
+    logger.error('Unable to load staff access', error);
     return createErrorResponse('Unable to load staff access', 503);
   }
 }
@@ -55,19 +62,21 @@ export async function PUT(request: Request) {
   const access = await requireApiAuth({ permission: 'staff:manage' });
   if (!access.authenticated) return access.error;
   try {
-    const body = await request.json();
-    if (
-      typeof body.userId !== 'string' ||
-      !body.userId.startsWith('user_') ||
-      (body.role !== null && !isStaffRole(body.role))
-    ) {
+    const json = await readJsonRequestBody(request);
+    const parsed = staffRoleRequestSchema.safeParse(
+      json.success ? json.data : undefined
+    );
+    if (!parsed.success)
       return createErrorResponse('Choose a member and a valid staff role', 400);
-    }
+    const body = parsed.data;
+    const role = body.action === 'assign' ? body.role : null;
     if (body.userId === access.userId)
       return createErrorResponse('You cannot change your own access', 409);
-    const organizationId = staffOrganizationId()!;
+    const organizationId = staffOrganizationId();
+    if (!organizationId)
+      throw new Error('Staff organization is not configured');
     if (
-      body.role !== null &&
+      role !== null &&
       !(await isOrganizationMember({
         organizationId: organizationId,
         userId: body.userId,
@@ -81,7 +90,7 @@ export async function PUT(request: Request) {
     await connectDB();
     await StaffAccess.init();
     let authorized = false;
-    let previousRole: string | null = null;
+    let previousRole: StaffRole | null = null;
     await mongoose.connection.transaction(async session => {
       // Write to the actor as well as the target: concurrent revocation of this
       // administrator conflicts and retries with fresh authorization.
@@ -99,7 +108,7 @@ export async function PUT(request: Request) {
             userId: body.userId,
           }).session(session)
         )?.role ?? null;
-      if (body.role === null) {
+      if (role === null) {
         await StaffAccess.deleteOne(
           { organizationId, userId: body.userId },
           { session }
@@ -107,7 +116,7 @@ export async function PUT(request: Request) {
       } else {
         await StaffAccess.findOneAndUpdate(
           { organizationId, userId: body.userId },
-          { $set: { role: body.role, updatedBy: access.userId } },
+          { $set: { role, updatedBy: access.userId } },
           { upsert: true, runValidators: true, session }
         );
       }
@@ -122,10 +131,11 @@ export async function PUT(request: Request) {
       resourceType: 'staff',
       resourceId: body.userId,
       before: { role: previousRole },
-      after: { role: body.role },
+      after: { role },
     });
-    return createSuccessResponse({ userId: body.userId, role: body.role });
-  } catch {
+    return createSuccessResponse({ userId: body.userId, role });
+  } catch (error: unknown) {
+    logger.error('Unable to update staff access', error);
     return createErrorResponse('Unable to update staff access', 503);
   }
 }

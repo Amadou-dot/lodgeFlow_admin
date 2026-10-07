@@ -1,3 +1,6 @@
+import type { CabinDetailSource } from '@lodgeflow/database/cabin-json';
+import type { BookingReadSource } from '@lodgeflow/database/booking-json';
+import type { Customer } from '@/types/clerk';
 import mongoose from 'mongoose';
 import { NextRequest } from 'next/server';
 
@@ -19,8 +22,35 @@ const mockGetClerkUsersBatch = getClerkUsersBatch as jest.MockedFunction<
   typeof getClerkUsersBatch
 >;
 
+function customerFixture({
+  id,
+  name,
+  email,
+}: Pick<Customer, 'id' | 'name' | 'email'>): Customer {
+  return {
+    id,
+    name,
+    email,
+    username: null,
+    first_name: name,
+    last_name: null,
+    image_url: '',
+    has_image: false,
+    created_at: new Date('2030-01-01'),
+    updated_at: new Date('2030-01-01'),
+    last_sign_in_at: null,
+    last_active_at: new Date('2030-01-01'),
+    banned: false,
+    locked: false,
+    lockout_expires_in_seconds: null,
+    totalBookings: 0,
+    totalSpent: 0,
+    loyaltyTier: 'Bronze',
+  };
+}
+
 // Helper to create a test cabin
-async function createTestCabin(overrides: Record<string, any> = {}) {
+async function createTestCabin(overrides: Partial<CabinDetailSource> = {}) {
   return Cabin.create({
     name: 'Test Cabin',
     description: 'A test cabin for booking tests',
@@ -37,7 +67,7 @@ async function createTestCabin(overrides: Record<string, any> = {}) {
 // Helper to create a booking directly in DB
 async function createTestBooking(
   cabinId: mongoose.Types.ObjectId,
-  overrides: Record<string, any> = {}
+  overrides: Partial<BookingReadSource> = {}
 ) {
   return Booking.create({
     cabin: cabinId,
@@ -63,8 +93,13 @@ async function createTestBooking(
 }
 
 // Helper to build NextRequest
-function createRequest(url: string, options?: { method?: string; body?: any }) {
-  const init: RequestInit = { method: options?.method || 'GET' };
+function createRequest(
+  url: string,
+  options?: { method?: string; body?: unknown }
+) {
+  const init: NonNullable<ConstructorParameters<typeof NextRequest>[1]> = {
+    method: options?.method || 'GET',
+  };
   if (options?.body) {
     init.body = JSON.stringify(options.body);
     init.headers = { 'Content-Type': 'application/json' };
@@ -79,11 +114,11 @@ describe('Bookings API Routes', () => {
       users: new Map([
         [
           'user_test123',
-          {
+          customerFixture({
             id: 'user_test123',
             name: 'Test User',
             email: 'test@example.com',
-          } as any,
+          }),
         ],
       ]),
       errors: 0,
@@ -105,19 +140,19 @@ describe('Bookings API Routes', () => {
         users: new Map([
           [
             'user_test123',
-            {
+            customerFixture({
               id: 'user_test123',
               name: 'Test User',
               email: 'test@example.com',
-            } as any,
+            }),
           ],
           [
             'user_test456',
-            {
+            customerFixture({
               id: 'user_test456',
               name: 'Other User',
               email: 'other@example.com',
-            } as any,
+            }),
           ],
         ]),
         errors: 0,
@@ -180,10 +215,7 @@ describe('Bookings API Routes', () => {
           customer: 'user_test123',
           checkInDate: '2027-08-01',
           checkOutDate: '2027-08-05',
-          numNights: 4,
           numGuests: 2,
-          cabinPrice: 800,
-          totalPrice: 800,
         },
       });
 
@@ -205,10 +237,7 @@ describe('Bookings API Routes', () => {
           customer: 'user_test123',
           checkInDate: '2027-08-01',
           checkOutDate: '2027-08-05',
-          numNights: 4,
           numGuests: 2,
-          cabinPrice: 800,
-          totalPrice: 800,
         },
       });
 
@@ -229,10 +258,7 @@ describe('Bookings API Routes', () => {
           customer: 'user_test123',
           checkInDate: '2027-08-01',
           checkOutDate: '2027-08-05',
-          numNights: 4,
           numGuests: 2,
-          cabinPrice: 800,
-          totalPrice: 800,
         },
       });
 
@@ -266,10 +292,7 @@ describe('Bookings API Routes', () => {
           customer: 'user_test123',
           checkInDate: '2027-08-01',
           checkOutDate: '2027-08-05',
-          numNights: 4,
           numGuests: settingsData.maxGuestsPerBooking + 1,
-          cabinPrice: 800,
-          totalPrice: 800,
         },
       });
 
@@ -292,10 +315,7 @@ describe('Bookings API Routes', () => {
           customer: 'user_test123',
           checkInDate: '2027-08-01',
           checkOutDate: '2027-08-05',
-          numNights: 4,
           numGuests: 3,
-          cabinPrice: 800,
-          totalPrice: 800,
         },
       });
 
@@ -306,7 +326,7 @@ describe('Bookings API Routes', () => {
       expect(body.error).toContain('Number of guests cannot exceed 2');
     });
 
-    it('ignores client-supplied pricing fields and computes them from the cabin price', async () => {
+    it('rejects client-supplied pricing fields without creating a booking', async () => {
       // Cabin is $200/night with no discount; 4-night stay should price at $800.
       const cabin = await createTestCabin({ price: 200, discount: 0 });
 
@@ -327,16 +347,12 @@ describe('Bookings API Routes', () => {
       });
 
       const response = await POST(request);
-      const body = await response.json();
 
-      expect(response.status).toBe(201);
-      expect(body.data.numNights).toBe(4);
-      expect(body.data.cabinPrice).toBe(200);
-      expect(body.data.extrasPrice).toBe(0);
-      expect(body.data.totalPrice).toBe(800);
+      expect(response.status).toBe(400);
+      expect(await Booking.countDocuments()).toBe(0);
     });
 
-    it('ignores a client-supplied depositAmount and derives it from settings', async () => {
+    it('rejects a client-supplied depositAmount without creating a booking', async () => {
       const cabin = await createTestCabin({ price: 200, discount: 0 });
 
       const request = createRequest('http://localhost:3000/api/bookings', {
@@ -355,13 +371,9 @@ describe('Bookings API Routes', () => {
       });
 
       const response = await POST(request);
-      const body = await response.json();
 
-      expect(response.status).toBe(201);
-      expect(body.data.totalPrice).toBe(800);
-      // Default seeded settings: requireDeposit true, depositPercentage 25.
-      expect(body.data.depositAmount).toBe(200);
-      expect(body.data.remainingAmount).toBe(800); // Deposit due is not a payment
+      expect(response.status).toBe(400);
+      expect(await Booking.countDocuments()).toBe(0);
     });
 
     it('sets depositAmount to 0 when settings do not require a deposit', async () => {
@@ -375,8 +387,7 @@ describe('Bookings API Routes', () => {
           customer: 'user_test123',
           checkInDate: '2027-08-01',
           checkOutDate: '2027-08-05',
-          numGuests: 2,
-          depositAmount: 800, // tampered — should be ignored
+          numGuests: 2, // tampered — should be ignored
         },
       });
 
@@ -410,7 +421,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(600); // 150 * 4 nights
     });
 
-    it('computes extras pricing from settings, ignoring a client-supplied extras fee amount', async () => {
+    it('computes extras pricing from settings and validated choices', async () => {
       const cabin = await createTestCabin({ price: 200, discount: 0 });
 
       const request = createRequest('http://localhost:3000/api/bookings', {
@@ -422,8 +433,7 @@ describe('Bookings API Routes', () => {
           checkOutDate: '2027-08-05', // 4 nights
           numGuests: 2,
           extras: {
-            hasBreakfast: true,
-            breakfastPrice: 999999, // tampered — should be ignored
+            hasBreakfast: true, // tampered — should be ignored
           },
         },
       });
@@ -440,7 +450,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(800 + expectedBreakfastPrice);
     });
 
-    it('computes pet, parking, early check-in, and late check-out fees from settings, ignoring tampered client amounts', async () => {
+    it('computes pet, parking, early check-in, and late check-out fees from settings', async () => {
       const cabin = await createTestCabin({ price: 200, discount: 0 });
 
       const request = createRequest('http://localhost:3000/api/bookings', {
@@ -453,13 +463,9 @@ describe('Bookings API Routes', () => {
           numGuests: 2,
           extras: {
             hasPets: true,
-            petFee: 999999,
             hasParking: true,
-            parkingFee: 999999,
             hasEarlyCheckIn: true,
-            earlyCheckInFee: 999999,
             hasLateCheckOut: true,
-            lateCheckOutFee: 999999,
           },
         },
       });
@@ -650,7 +656,7 @@ describe('Bookings API Routes', () => {
       expect(new Date(body.data.cancelledAt).toISOString()).toBe(explicitDate);
     });
 
-    it('ignores a forged paid flag without recording a payment', async () => {
+    it('rejects a forged paid flag without recording a payment', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, { isPaid: false });
 
@@ -662,12 +668,13 @@ describe('Bookings API Routes', () => {
         },
       });
 
+      const before = JSON.stringify(await Booking.findById(booking._id).lean());
       const response = await PUT(request);
-      const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.data.paidAt).toBeUndefined();
-      expect(body.data.isPaid).toBe(false);
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(await Booking.findById(booking._id).lean())).toBe(
+        before
+      );
     });
 
     it('does not overwrite paidAt on already-paid bookings', async () => {
@@ -682,7 +689,6 @@ describe('Bookings API Routes', () => {
         method: 'PUT',
         body: {
           _id: booking._id.toString(),
-          isPaid: true,
           observations: 'Updated notes',
         },
       });
@@ -769,7 +775,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(1400); // cabin price 200 * 7 nights
     });
 
-    it('ignores a client-supplied totalPrice/cabinPrice/extrasPrice/numNights/remainingAmount and keeps the existing values', async () => {
+    it('rejects a client-supplied totalPrice/cabinPrice/extrasPrice/numNights/remainingAmount and keeps the existing values', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
         numNights: 3,
@@ -794,15 +800,13 @@ describe('Bookings API Routes', () => {
         },
       });
 
+      const before = JSON.stringify(await Booking.findById(booking._id).lean());
       const response = await PUT(request);
-      const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.data.numNights).toBe(3);
-      expect(body.data.cabinPrice).toBe(600);
-      expect(body.data.extrasPrice).toBe(0);
-      expect(body.data.totalPrice).toBe(600);
-      expect(body.data.remainingAmount).toBe(600); // No receipt has been recorded
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(await Booking.findById(booking._id).lean())).toBe(
+        before
+      );
     });
 
     it('recomputes totalPrice and remainingAmount from the cabin price when numGuests changes', async () => {
@@ -824,9 +828,6 @@ describe('Bookings API Routes', () => {
         body: {
           _id: booking._id.toString(),
           numGuests: 2,
-          // A tampered totalPrice sent alongside the legitimate change must
-          // still be ignored in favor of the server-computed value.
-          totalPrice: 1,
         },
       });
 
@@ -840,7 +841,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.remainingAmount).toBe(660); // No receipt has been recorded
     });
 
-    it('ignores tampered extras.*Fee values and computes fees from settings', async () => {
+    it('computes updated extras fees from settings', async () => {
       const cabin = await createTestCabin({ price: 200 });
       const booking = await createTestBooking(cabin._id, {
         checkInDate: new Date('2027-06-01'),
@@ -856,12 +857,9 @@ describe('Bookings API Routes', () => {
         body: {
           _id: booking._id.toString(),
           extras: {
-            hasBreakfast: true,
-            breakfastPrice: 999999, // tampered — should be ignored
+            hasBreakfast: true, // tampered — should be ignored
             hasPets: true,
-            petFee: 999999,
             hasParking: true,
-            parkingFee: 999999,
           },
         },
       });
@@ -914,7 +912,7 @@ describe('Bookings API Routes', () => {
       expect(body.data.totalPrice).toBe(1050); // 350 * 3 nights
     });
 
-    it('ignores a client-supplied depositAmount and leaves the recorded deposit untouched', async () => {
+    it('rejects a client-supplied depositAmount and leaves the recorded deposit untouched', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id, {
         totalPrice: 600,
@@ -931,13 +929,13 @@ describe('Bookings API Routes', () => {
         },
       });
 
+      const before = JSON.stringify(await Booking.findById(booking._id).lean());
       const response = await PUT(request);
-      const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.data.totalPrice).toBe(600);
-      expect(body.data.depositAmount).toBe(200); // not the tampered 600
-      expect(body.data.remainingAmount).toBe(600); // No receipt has been recorded
+      expect(response.status).toBe(400);
+      expect(JSON.stringify(await Booking.findById(booking._id).lean())).toBe(
+        before
+      );
     });
 
     it('recomputes the required deposit when an unpaid booking price changes', async () => {

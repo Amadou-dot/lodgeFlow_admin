@@ -306,7 +306,6 @@ export const useCheckInBooking = () => {
         body: JSON.stringify({
           _id: bookingId,
           status: 'checked-in',
-          checkInTime: new Date(),
         }),
       });
 
@@ -339,7 +338,6 @@ export const useCheckOutBooking = () => {
         body: JSON.stringify({
           _id: bookingId,
           status: 'checked-out',
-          checkOutTime: new Date(),
         }),
       });
 

@@ -256,7 +256,7 @@ export default function DiningPage() {
       <DiningModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        dining={selectedDining}
+        dining={selectedDining ?? undefined}
         mode={modalMode}
         onEdit={handleEditDining}
       />

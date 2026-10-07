@@ -37,7 +37,6 @@ import {
   useExperienceBookingHistory,
 } from '@/hooks/useExperienceBooking';
 import type { BookingHistoryItem } from '@/types/booking-read';
-import type { ExperienceBooking } from '@/types';
 import type { UpdateBookingDetailsInput } from '@/lib/validations/booking';
 
 const statusFilters = [
@@ -210,7 +209,7 @@ export default function BookingsPage() {
     }
   };
 
-  const formatDate = (date: Date | string) => {
+  const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -517,7 +516,7 @@ export default function BookingsPage() {
               experienceBookings &&
               experienceBookings.length > 0 && (
                 <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-2'>
-                  {experienceBookings.map((booking: any) => (
+                  {experienceBookings.map(booking => (
                     <Card key={booking._id.toString()} className='w-full'>
                       <CardHeader className='flex gap-3'>
                         <div className='relative w-24 h-24 shrink-0 rounded-lg overflow-hidden'>
@@ -698,7 +697,7 @@ export default function BookingsPage() {
               diningReservations &&
               diningReservations.length > 0 && (
                 <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-2'>
-                  {diningReservations.map((reservation: any) => (
+                  {diningReservations.map(reservation => (
                     <Card key={reservation._id.toString()} className='w-full'>
                       <CardHeader className='flex gap-3'>
                         <div className='relative w-24 h-24 shrink-0 rounded-lg overflow-hidden'>

@@ -3,6 +3,9 @@
  */
 
 import type { ApiAuthResult } from '@/lib/api-utils';
+import { Types } from 'mongoose';
+import mongoose from 'mongoose';
+import type { SettingsJsonSource } from '@lodgeflow/database/settings-json';
 import { NextRequest } from 'next/server';
 import connectToDatabase from '@lodgeflow/database/mongodb';
 
@@ -43,14 +46,16 @@ const mockSettings = Settings as jest.Mocked<typeof Settings>;
 
 // Mock settings data
 const mockSettingsData = {
-  _id: '507f1f77bcf86cd799439011',
+  _id: new Types.ObjectId('507f1f77bcf86cd799439011'),
+  singleton: 'global',
+  fullAddress: '',
   minBookingLength: 1,
   maxBookingLength: 30,
   maxGuestsPerBooking: 10,
   breakfastPrice: 15,
   checkInTime: '15:00',
   checkOutTime: '11:00',
-  cancellationPolicy: '48 hours before check-in',
+  cancellationPolicy: 'moderate',
   requireDeposit: true,
   depositPercentage: 20,
   allowPets: true,
@@ -66,30 +71,38 @@ const mockSettingsData = {
   businessHours: {
     open: '08:00',
     close: '22:00',
+    daysOpen: ['monday'],
   },
   contactInfo: {
     email: 'contact@lodgeflow.com',
     phone: '+1234567890',
   },
   notifications: {
-    emailOnBooking: true,
-    emailOnCancellation: true,
-    emailOnCheckIn: true,
+    emailEnabled: true,
+    smsEnabled: false,
+    bookingConfirmation: true,
+    paymentReminders: true,
+    checkInReminders: true,
   },
+} satisfies SettingsJsonSource;
+
+const mockSettingsDocument = {
+  ...mockSettingsData,
   save: mockSave,
+  toObject: () => ({ ...mockSettingsData }),
 };
 
 describe('/api/settings', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnectToDatabase.mockResolvedValue(
-      {} as ReturnType<typeof connectToDatabase>
-    );
+    mockConnectToDatabase.mockResolvedValue(mongoose);
   });
 
   describe('GET /api/settings', () => {
     it('should return settings when they exist', async () => {
-      (mockSettings.findOne as jest.Mock).mockResolvedValue(mockSettingsData);
+      (mockSettings.findOne as jest.Mock).mockResolvedValue(
+        mockSettingsDocument
+      );
 
       const response = await GET();
       const data = await response.json();
@@ -108,7 +121,9 @@ describe('/api/settings', () => {
     it('should create default settings when none exist', async () => {
       (mockSettings.findOne as jest.Mock).mockResolvedValue(null);
       (mockSettings.deleteMany as jest.Mock).mockResolvedValue({});
-      (mockSettings.create as jest.Mock).mockResolvedValue(mockSettingsData);
+      (mockSettings.create as jest.Mock).mockResolvedValue(
+        mockSettingsDocument
+      );
 
       const response = await GET();
       const data = await response.json();
@@ -135,8 +150,8 @@ describe('/api/settings', () => {
   describe('PUT /api/settings', () => {
     it('should update settings successfully', async () => {
       const settingsWithSave = {
-        ...mockSettingsData,
-        save: mockSave.mockResolvedValue(mockSettingsData),
+        ...mockSettingsDocument,
+        save: mockSave.mockResolvedValue(mockSettingsDocument),
       };
       (mockSettings.findOne as jest.Mock).mockResolvedValue(settingsWithSave);
 
@@ -157,8 +172,8 @@ describe('/api/settings', () => {
 
     it('should reject invalid settings payload with structured errors', async () => {
       const settingsWithSave = {
-        ...mockSettingsData,
-        save: mockSave.mockResolvedValue(mockSettingsData),
+        ...mockSettingsDocument,
+        save: mockSave.mockResolvedValue(mockSettingsDocument),
       };
       (mockSettings.findOne as jest.Mock).mockResolvedValue(settingsWithSave);
 
@@ -179,7 +194,9 @@ describe('/api/settings', () => {
 
     it('should create new settings if none exist on update', async () => {
       (mockSettings.findOne as jest.Mock).mockResolvedValue(null);
-      (mockSettings.create as jest.Mock).mockResolvedValue(mockSettingsData);
+      (mockSettings.create as jest.Mock).mockResolvedValue(
+        mockSettingsDocument
+      );
 
       const request = new NextRequest('http://localhost/api/settings', {
         method: 'PUT',
@@ -197,7 +214,7 @@ describe('/api/settings', () => {
 
     it('should handle update errors', async () => {
       const settingsWithSave = {
-        ...mockSettingsData,
+        ...mockSettingsDocument,
         save: jest.fn().mockRejectedValue(new Error('Update failed')),
       };
       (mockSettings.findOne as jest.Mock).mockResolvedValue(settingsWithSave);
@@ -223,8 +240,8 @@ describe('/api/settings', () => {
       const response = await PUT(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.success).toBe(false);
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ success: false, error: 'Invalid JSON body' });
     });
   });
 });

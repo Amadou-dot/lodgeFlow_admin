@@ -20,7 +20,7 @@ export default function CabinsListClient({
 }: CabinsListClientProps) {
   const [filters, setFilters] = useState<CabinsFilters>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'capacity'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const sortOptions = [
@@ -45,12 +45,8 @@ export default function CabinsListClient({
   });
 
   const sortedCabins = [...filtered].sort((a, b) => {
-    let aValue: any = a[sortBy as keyof Cabin];
-    let bValue: any = b[sortBy as keyof Cabin];
-    if (typeof aValue === 'string') {
-      aValue = aValue.toLowerCase();
-      bValue = bValue.toLowerCase();
-    }
+    const aValue = sortBy === 'name' ? a.name.toLowerCase() : a[sortBy];
+    const bValue = sortBy === 'name' ? b.name.toLowerCase() : b[sortBy];
     if (sortOrder === 'asc') return aValue > bValue ? 1 : -1;
     return aValue < bValue ? 1 : -1;
   });
@@ -157,8 +153,11 @@ export default function CabinsListClient({
         sortOrder={sortOrder}
         totalCount={sortedCabins.length}
         onSearchChange={setSearchTerm}
-        onSortChange={setSortBy}
         onSortOrderChange={setSortOrder}
+        onSortChange={value => {
+          if (value === 'name' || value === 'price' || value === 'capacity')
+            setSortBy(value);
+        }}
       />
 
       {sortedCabins.length > 0 ? (

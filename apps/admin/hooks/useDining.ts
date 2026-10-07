@@ -1,3 +1,8 @@
+import { diningEditableFields } from '@/lib/requests/catalog';
+import type {
+  CreateDiningInput,
+  UpdateDiningInput,
+} from '@/lib/validations/dining';
 import type { Dining, DiningFilters } from '@/types';
 import { displayToast } from '@/utils/toastUtils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,13 +36,13 @@ export function useCreateDining() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (dining: Partial<Dining>) => {
+    mutationFn: async (dining: Partial<CreateDiningInput>) => {
       const response = await fetch('/api/dining', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dining),
+        body: JSON.stringify(diningEditableFields(dining)),
       });
 
       if (!response.ok) {
@@ -61,13 +66,16 @@ export function useUpdateDining() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (dining: Partial<Dining> & { _id: string }) => {
+    mutationFn: async (dining: UpdateDiningInput) => {
       const response = await fetch(`/api/dining/${dining._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dining),
+        body: JSON.stringify({
+          ...diningEditableFields(dining),
+          _id: dining._id,
+        }),
       });
 
       if (!response.ok) {

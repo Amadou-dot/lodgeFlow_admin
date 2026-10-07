@@ -1,6 +1,11 @@
+import type { FilterQuery } from 'mongoose';
+import type { AuditHistoryJson } from '@/types/staff-audit';
+import { serializeAuditEvent } from '@/lib/serializers/audit';
+import { parseAuditQuery } from '@/lib/validations/staff-audit';
+import { logger } from '@/lib/logger';
 import AuditLog, {
   AUDIT_ACTIONS,
-  type AuditAction,
+  type IAuditLog,
 } from '@lodgeflow/database/models/AuditLog';
 import {
   createErrorResponse,
@@ -13,50 +18,29 @@ export async function GET(request: Request) {
   const access = await requireApiAuth({ permission: 'audit:read' });
   if (!access.authenticated) return access.error;
   try {
-    const params = new URL(request.url).searchParams;
-    const page = Number(params.get('page') ?? 1);
-    const limit = Number(params.get('limit') ?? 25);
-    if (
-      !Number.isInteger(page) ||
-      page < 1 ||
-      page > 10000 ||
-      !Number.isInteger(limit) ||
-      limit < 1 ||
-      limit > 100
-    )
-      return createErrorResponse('Invalid pagination', 400);
-    const filter: Record<string, unknown> = {
-      organizationId: staffOrganizationId(),
-    };
-    for (const key of ['actor', 'resourceId']) {
-      const value = params.get(key);
-      if (value) {
-        if (value.length > 150)
-          return createErrorResponse('Invalid filter', 400);
-        filter[key] = value;
-      }
+    const parsed = parseAuditQuery(new URL(request.url).searchParams);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return createErrorResponse(
+        issue.path[0] === 'page' || issue.path[0] === 'limit'
+          ? 'Invalid pagination'
+          : issue.message,
+        400
+      );
     }
-    const action = params.get('action');
-    if (action) {
-      if (!AUDIT_ACTIONS.includes(action as AuditAction))
-        return createErrorResponse('Invalid action', 400);
-      filter.action = action;
-    }
-    const dates: Record<string, Date> = {};
-    for (const [key, operator] of [
-      ['from', '$gte'],
-      ['to', '$lte'],
-    ]) {
-      const value = params.get(key);
-      if (!value) continue;
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime()))
-        return createErrorResponse('Invalid date', 400);
-      dates[operator] = date;
-    }
-    if (dates.$gte && dates.$lte && dates.$gte > dates.$lte)
-      return createErrorResponse('Invalid date range', 400);
-    if (Object.keys(dates).length) filter.createdAt = dates;
+    const { page, limit, actor, resourceId, action, from, to } = parsed.data;
+    const organizationId = staffOrganizationId();
+    if (!organizationId)
+      throw new Error('Staff organization is not configured');
+    const filter: FilterQuery<IAuditLog> = { organizationId };
+    if (actor) filter.actor = actor;
+    if (resourceId) filter.resourceId = resourceId;
+    if (action) filter.action = action;
+    if (from || to)
+      filter.createdAt = {
+        ...(from && { $gte: from }),
+        ...(to && { $lte: to }),
+      };
     await connectDB();
     const [events, total] = await Promise.all([
       AuditLog.find(filter)
@@ -66,14 +50,15 @@ export async function GET(request: Request) {
         .lean(),
       AuditLog.countDocuments(filter),
     ]);
-    return createSuccessResponse({
-      events,
+    return createSuccessResponse<AuditHistoryJson>({
+      events: events.map(serializeAuditEvent),
       total,
       page,
       limit,
       actions: AUDIT_ACTIONS,
     });
-  } catch {
+  } catch (error: unknown) {
+    logger.error('Unable to load audit history', error);
     return createErrorResponse('Unable to load audit history', 503);
   }
 }

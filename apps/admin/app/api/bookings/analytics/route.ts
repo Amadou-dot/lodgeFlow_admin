@@ -1,3 +1,10 @@
+import { logger } from '@/lib/logger';
+import { analyticsPeriodSchema } from '@/lib/validations/reporting';
+import type {
+  AnalyticsPeriod as Period,
+  BookingAnalyticsData,
+  ReportBookingStatus,
+} from '@/types/reporting';
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -8,7 +15,18 @@ import connectDB from '@/lib/mongodb';
 import { Booking } from '@lodgeflow/database';
 import { NextRequest } from 'next/server';
 
-type Period = '7d' | '30d' | '90d' | '1y' | 'all';
+interface SummaryResult {
+  totalRevenue: number;
+  totalBookings: number;
+  avgBookingValue: number;
+  avgNumGuests: number;
+  avgNumNights: number;
+  breakfastCount: number;
+  petCount: number;
+  parkingCount: number;
+  earlyCheckInCount: number;
+  lateCheckOutCount: number;
+}
 
 function getPeriodDays(period: Period): number | null {
   switch (period) {
@@ -34,14 +52,14 @@ export async function GET(request: NextRequest) {
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { searchParams } = new URL(request.url);
-    const period = (searchParams.get('period') || '30d') as Period;
-    const validPeriods: Period[] = ['7d', '30d', '90d', '1y', 'all'];
-    if (!validPeriods.includes(period)) {
+    const parsed = analyticsPeriodSchema.safeParse(
+      searchParams.get('period') || '30d'
+    );
+    if (!parsed.success)
       return createErrorResponse('Invalid period', HTTP_STATUS.BAD_REQUEST);
-    }
+    const period = parsed.data;
+    await connectDB();
 
     const days = getPeriodDays(period);
     const now = new Date();
@@ -59,7 +77,7 @@ export async function GET(request: NextRequest) {
       popularCabins,
     ] = await Promise.all([
       // 1. Summary stats (exclude cancelled)
-      Booking.aggregate([
+      Booking.aggregate<SummaryResult>([
         {
           $match: {
             ...dateFilter,
@@ -100,7 +118,7 @@ export async function GET(request: NextRequest) {
       }),
 
       // 3. Revenue over time
-      Booking.aggregate([
+      Booking.aggregate<{ _id: string; revenue: number; bookings: number }>([
         {
           $match: {
             ...dateFilter,
@@ -135,7 +153,7 @@ export async function GET(request: NextRequest) {
       ]),
 
       // 4. Status distribution
-      Booking.aggregate([
+      Booking.aggregate<{ _id: ReportBookingStatus; count: number }>([
         { $match: dateFilter },
         {
           $group: {
@@ -146,7 +164,7 @@ export async function GET(request: NextRequest) {
       ]),
 
       // 5. Popular cabins
-      Booking.aggregate([
+      Booking.aggregate<BookingAnalyticsData['popularCabins'][number]>([
         {
           $match: {
             ...dateFilter,
@@ -205,15 +223,13 @@ export async function GET(request: NextRequest) {
     const filledRevenue: { date: string; revenue: number; bookings: number }[] =
       [];
 
-    if (getGroupFormat(period) === 'daily' && startDate) {
-      const totalDays = days!;
+    if (getGroupFormat(period) === 'daily' && startDate && days !== null) {
+      const totalDays = days;
       for (let i = totalDays - 1; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
         const dateString = date.toISOString().split('T')[0];
-        const dayData = revenueOverTime.find(
-          (item: { _id: string }) => item._id === dateString
-        );
+        const dayData = revenueOverTime.find(item => item._id === dateString);
         filledRevenue.push({
           date: date.toLocaleDateString('en-US', {
             month: 'short',
@@ -236,7 +252,7 @@ export async function GET(request: NextRequest) {
 
     const totalBookings = summary.totalBookings || 1; // Avoid division by zero
 
-    return createSuccessResponse({
+    return createSuccessResponse<BookingAnalyticsData>({
       summary: {
         totalRevenue: Math.round(summary.totalRevenue),
         totalBookings: summary.totalBookings,
@@ -244,12 +260,10 @@ export async function GET(request: NextRequest) {
         cancellationRate,
       },
       revenueOverTime: filledRevenue,
-      statusDistribution: statusDist.map(
-        (item: { _id: string; count: number }) => ({
-          status: item._id,
-          count: item.count,
-        })
-      ),
+      statusDistribution: statusDist.map(item => ({
+        status: item._id,
+        count: item.count,
+      })),
       popularCabins,
       demographics: {
         avgPartySize: Math.round((summary.avgNumGuests || 0) * 10) / 10,
@@ -279,7 +293,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching booking analytics:', error);
+    logger.error('Failed to fetch booking analytics', error);
     return createErrorResponse(
       'Failed to fetch booking analytics',
       HTTP_STATUS.INTERNAL_SERVER_ERROR

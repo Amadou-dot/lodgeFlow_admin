@@ -23,31 +23,7 @@ import { title, subtitle } from '@/components/primitives';
 
 type Params = Promise<{ id: string }>;
 
-interface DiningReservationData {
-  _id: string;
-  dining: {
-    _id: string;
-    name: string;
-    image: string;
-    price: number;
-    type: string;
-    mealType: string;
-    servingTime: { start: string; end: string };
-    location?: string;
-  };
-  customer: string;
-  date: string;
-  time: string;
-  numGuests: number;
-  status: string;
-  totalPrice: number;
-  isPaid: boolean;
-  dietaryRequirements: string[];
-  specialRequests: string[];
-  tablePreference: string;
-  occasion?: string;
-}
-
+import type { DiningReservationDetail as DiningReservationData } from '@lodgeflow/database/reservation-json';
 export default function DiningConfirmationPage({ params }: { params: Params }) {
   const [reservationId, setReservationId] = useState<string>('');
   const [reservation, setReservation] = useState<DiningReservationData | null>(
@@ -183,10 +159,10 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
         {/* Dining Image */}
         <div className='relative h-64 lg:h-full min-h-[300px] rounded-lg overflow-hidden'>
           <Image
-            alt={reservation.dining.name}
+            alt={reservation.dining?.name ?? 'Removed listing'}
             className='rounded-lg'
             fill
-            src={reservation.dining.image}
+            src={reservation.dining?.image ?? '/placeholder-dining.jpg'}
             style={{ objectFit: 'cover' }}
           />
         </div>
@@ -206,7 +182,9 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
 
             <div>
               <p className='text-sm text-default-500'>Dining</p>
-              <p className='font-semibold text-lg'>{reservation.dining.name}</p>
+              <p className='font-semibold text-lg'>
+                {reservation.dining?.name ?? 'Removed listing'}
+              </p>
             </div>
 
             <div className='flex items-center gap-2'>
@@ -237,7 +215,11 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
               <div>
                 <p className='text-sm text-default-500'>Table Preference</p>
                 <p className='font-semibold'>
-                  {tablePreferenceLabels[reservation.tablePreference]}
+                  {
+                    tablePreferenceLabels[
+                      reservation.tablePreference ?? 'no-preference'
+                    ]
+                  }
                 </p>
               </div>
             )}
@@ -253,20 +235,20 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
       </div>
 
       {/* Additional Info */}
-      {(reservation.dietaryRequirements.length > 0 ||
-        reservation.specialRequests.length > 0) && (
+      {((reservation.dietaryRequirements?.length ?? 0) > 0 ||
+        (reservation.specialRequests?.length ?? 0) > 0) && (
         <Card className='mb-6'>
           <CardHeader>
             <h2 className={title({ size: 'sm' })}>Additional Information</h2>
           </CardHeader>
           <CardBody className='space-y-4'>
-            {reservation.dietaryRequirements.length > 0 && (
+            {(reservation.dietaryRequirements?.length ?? 0) > 0 && (
               <div>
                 <p className='text-sm text-default-500 mb-2'>
                   Dietary Requirements:
                 </p>
                 <ul className='list-disc list-inside space-y-1'>
-                  {reservation.dietaryRequirements.map((req, index) => (
+                  {reservation.dietaryRequirements?.map((req, index) => (
                     <li key={index} className='text-sm'>
                       {req}
                     </li>
@@ -274,13 +256,13 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
                 </ul>
               </div>
             )}
-            {reservation.specialRequests.length > 0 && (
+            {(reservation.specialRequests?.length ?? 0) > 0 && (
               <div>
                 <p className='text-sm text-default-500 mb-2'>
                   Special Requests:
                 </p>
                 <ul className='list-disc list-inside space-y-1'>
-                  {reservation.specialRequests.map((req, index) => (
+                  {reservation.specialRequests?.map((req, index) => (
                     <li key={index} className='text-sm'>
                       {req}
                     </li>
@@ -306,8 +288,14 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
           />
           <div className='flex justify-between items-center'>
             <span className='text-default-600'>
-              ${reservation.dining.price} x {reservation.numGuests} guest
-              {reservation.numGuests > 1 ? 's' : ''}
+              {reservation.dining ? (
+                <>
+                  ${reservation.dining.price} x {reservation.numGuests} guest
+                  {reservation.numGuests > 1 ? 's' : ''}
+                </>
+              ) : (
+                'Listing price unavailable'
+              )}
             </span>
             <span className='font-semibold'>${reservation.totalPrice}</span>
           </div>

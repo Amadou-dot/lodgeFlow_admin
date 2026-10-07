@@ -4,136 +4,26 @@ import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
 import { Link } from '@heroui/link';
-import { Select, SelectItem } from '@heroui/select';
 import { Spinner } from '@heroui/spinner';
 
 import { subtitle, title } from '@/components/primitives';
 import { useDining } from '@/hooks/useDining';
-import type { Dining, DiningQueryParams } from '@/types';
+import type { Dining } from '@/types';
 import Image from 'next/image';
 import NextLink from 'next/link';
-import { useState } from 'react';
 import { Mail, Phone } from 'lucide-react';
 
 export default function DiningPage() {
-  const [filters, setFilters] = useState<DiningQueryParams>({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  // Combine filters with search and sorting
-  const queryParams: DiningQueryParams = {
-    ...filters,
-    search: searchTerm || undefined,
-  };
-
-  const { data: diningData, isLoading, error } = useDining(queryParams);
-
-  // Sort options for the filters
-  const sortOptions = [
-    { key: 'name', label: 'Name', value: 'name' },
-    { key: 'price', label: 'Price', value: 'price' },
-    { key: 'mealType', label: 'Meal Type', value: 'mealType' },
-    { key: 'type', label: 'Type', value: 'type' },
-  ];
-
-  // Handle search change
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-  };
-
-  // Handle sort change
-  const handleSortChange = (sortValue: string) => {
-    setSortBy(sortValue);
-  };
-
-  // Handle sort order change
-  const handleSortOrderChange = (order: 'asc' | 'desc') => {
-    setSortOrder(order);
-  };
-
-  // Sort the data based on current sort settings
+  const {
+    data: diningData,
+    isLoading,
+    error,
+  } = useDining({ search: undefined });
   const sortedData = diningData
-    ? [...diningData].sort((a, b) => {
-        let aValue: any = a[sortBy as keyof Dining];
-        let bValue: any = b[sortBy as keyof Dining];
-
-        // Handle different data types
-        if (typeof aValue === 'string') {
-          aValue = aValue.toLowerCase();
-          bValue = bValue.toLowerCase();
-        }
-
-        if (sortOrder === 'asc') {
-          return aValue > bValue ? 1 : -1;
-        } else {
-          return aValue < bValue ? 1 : -1;
-        }
-      })
+    ? [...diningData].sort((a, b) =>
+        a.name.toLowerCase() > b.name.toLowerCase() ? 1 : -1
+      )
     : [];
-
-  // Additional filters component
-  const additionalFilters = (
-    <div className='flex flex-wrap gap-2'>
-      <Select
-        className='w-40'
-        placeholder='Filter by type'
-        selectedKeys={filters.type ? [filters.type] : []}
-        size='sm'
-        onSelectionChange={keys => {
-          const selected = Array.from(keys)[0] as string;
-          setFilters(prev => ({ ...prev, type: selected as any }));
-        }}
-      >
-        <SelectItem key='menu'>Menu Items</SelectItem>
-        <SelectItem key='experience'>Experiences</SelectItem>
-      </Select>
-
-      <Select
-        className='w-40'
-        placeholder='Filter by meal'
-        selectedKeys={filters.mealType ? [filters.mealType] : []}
-        size='sm'
-        onSelectionChange={keys => {
-          const selected = Array.from(keys)[0] as string;
-          setFilters(prev => ({ ...prev, mealType: selected as any }));
-        }}
-      >
-        <SelectItem key='breakfast'>Breakfast</SelectItem>
-        <SelectItem key='lunch'>Lunch</SelectItem>
-        <SelectItem key='dinner'>Dinner</SelectItem>
-        <SelectItem key='all-day'>All Day</SelectItem>
-      </Select>
-
-      <Select
-        className='w-40'
-        placeholder='Filter by category'
-        selectedKeys={filters.category ? [filters.category] : []}
-        size='sm'
-        onSelectionChange={keys => {
-          const selected = Array.from(keys)[0] as string;
-          setFilters(prev => ({ ...prev, category: selected as any }));
-        }}
-      >
-        <SelectItem key='regular'>Regular</SelectItem>
-        <SelectItem key='craft-beer'>Craft Beer</SelectItem>
-        <SelectItem key='wine'>Wine</SelectItem>
-        <SelectItem key='spirits'>Spirits</SelectItem>
-        <SelectItem key='non-alcoholic'>Non-Alcoholic</SelectItem>
-      </Select>
-
-      <Button
-        size='sm'
-        variant='bordered'
-        onPress={() => {
-          setFilters({});
-          setSearchTerm('');
-        }}
-      >
-        Clear Filters
-      </Button>
-    </div>
-  );
 
   if (isLoading) {
     return (

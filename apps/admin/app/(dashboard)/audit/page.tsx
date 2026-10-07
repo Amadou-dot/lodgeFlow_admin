@@ -10,17 +10,8 @@ import { Card, CardBody } from '@heroui/card';
 import { Input } from '@heroui/input';
 import { Chip } from '@heroui/chip';
 import { useEffect, useState } from 'react';
-type Event = {
-  _id: string;
-  actor: string;
-  actorRole: string;
-  action: string;
-  resourceType: string;
-  resourceId: string;
-  createdAt: string;
-  before: Record<string, unknown>;
-  after: Record<string, unknown>;
-};
+import type { AuditHistoryJson } from '@/types/staff-audit';
+import type { ApiResponse } from '@/lib/api-utils';
 export default function AuditPage() {
   const [filters, setFilters] = useState({
     actor: '',
@@ -30,11 +21,9 @@ export default function AuditPage() {
     to: '',
   });
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<{
-    events: Event[];
-    total: number;
-    actions: string[];
-  }>({ events: [], total: 0, actions: [] });
+  const [data, setData] = useState<
+    Pick<AuditHistoryJson, 'events' | 'total' | 'actions'>
+  >({ events: [], total: 0, actions: [] });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -50,9 +39,11 @@ export default function AuditPage() {
       cache: 'no-store',
     })
       .then(async response => {
-        const result = await response.json();
-        if (!response.ok)
-          throw new Error(result.error || 'Unable to load history');
+        const result: ApiResponse<AuditHistoryJson> = await response.json();
+        if (!response.ok || !result.success)
+          throw new Error(
+            !result.success ? result.error : 'Unable to load history'
+          );
         if (!controller.signal.aborted) setData(result.data);
       })
       .catch(e => {

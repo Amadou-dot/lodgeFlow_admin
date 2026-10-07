@@ -1,3 +1,10 @@
+import { ReservationReadError } from '@/lib/validations/reservation-reads';
+import { logger } from '@/lib/logger';
+import {
+  serializeReservationRow,
+  type ReservationInboxSource,
+} from '@/lib/serializers/reservation-calendar';
+import type { ReservationInboxJson } from '@/types/reservation-calendar';
 import { Booking } from '@lodgeflow/database';
 import {
   createErrorResponse,
@@ -14,32 +21,35 @@ export async function GET(request: Request) {
   try {
     query = reservationPipeline(new URL(request.url).searchParams);
   } catch (error) {
-    return createErrorResponse(
-      error instanceof Error ? error.message : 'Invalid query',
-      400
-    );
+    if (error instanceof ReservationReadError)
+      return createErrorResponse(error.message, 400);
+    logger.error('Unable to load reservations', error);
+    return createErrorResponse('Unable to load reservations', 500);
   }
   try {
     await connectDB();
-    const [result] = await Booking.aggregate(query.pipeline).allowDiskUse(true);
+    const [result] = await Booking.aggregate<ReservationInboxSource>(
+      query.pipeline
+    ).allowDiskUse(true);
     const ids: string[] = Array.from(
-      new Set<string>(
-        result.rows.map((row: { customer: string }) => row.customer)
-      )
+      new Set<string>(result.rows.map(row => row.customer))
     );
     const customers = await getClerkUsersBatch(ids);
-    const rows = result.rows.map((row: { customer: string }) => ({
-      ...row,
-      customerName:
-        customers.users.get(row.customer)?.name || 'Unavailable guest',
-    }));
-    return createSuccessResponse({
+    const rows = result.rows.map(row =>
+      serializeReservationRow({
+        row,
+        customerName:
+          customers.users.get(row.customer)?.name || 'Unavailable guest',
+      })
+    );
+    return createSuccessResponse<ReservationInboxJson>({
       rows,
       total: result.total[0]?.count ?? 0,
       page: query.page,
       limit: query.limit,
     });
-  } catch {
+  } catch (error: unknown) {
+    logger.error('Unable to load reservations', error);
     return createErrorResponse('Unable to load reservations', 500);
   }
 }

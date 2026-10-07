@@ -1,7 +1,10 @@
 import { requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import Booking from '@lodgeflow/database/models/Booking';
-import mongoose from 'mongoose';
+import mongoose, { type FilterQuery } from 'mongoose';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
+import { cabinAvailabilityQuerySchema } from '@/lib/validations/cabin-availability';
+import { logger } from '@/lib/logger';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface BookingDateRange {
@@ -18,8 +21,6 @@ export async function GET(
   if (!authResult.authenticated) return authResult.error;
 
   try {
-    await connectDB();
-
     const { id: cabinId } = await context.params;
     const url = new URL(request.url);
     const startDate = url.searchParams.get('startDate');
@@ -31,12 +32,23 @@ export async function GET(
     const defaultEnd = new Date();
     defaultEnd.setMonth(defaultEnd.getMonth() + 6);
 
-    const queryStartDate = startDate ? new Date(startDate) : defaultStart;
-    const queryEndDate = endDate ? new Date(endDate) : defaultEnd;
+    const parsed = cabinAvailabilityQuerySchema.safeParse({
+      cabinId,
+      excludeBookingId: excludeBookingId || undefined,
+      startDate: startDate || defaultStart.toISOString(),
+      endDate: endDate || defaultEnd.toISOString(),
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: parsed.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+    const { startDate: queryStartDate, endDate: queryEndDate } = parsed.data;
+    await connectDB();
 
     // Find all bookings that overlap with the query date range
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: Record<string, any> = {
+    const query: FilterQuery<IBooking> = {
       cabin: cabinId,
       status: { $nin: ['cancelled'] },
       $or: [
@@ -48,27 +60,21 @@ export async function GET(
     };
 
     // When editing a booking, exclude its own dates from the unavailable list
-    if (excludeBookingId) {
-      if (!mongoose.Types.ObjectId.isValid(excludeBookingId)) {
-        return NextResponse.json(
-          { success: false, error: 'Invalid excludeBookingId format' },
-          { status: 400 }
-        );
-      }
-      query._id = { $ne: new mongoose.Types.ObjectId(excludeBookingId) };
+    if (parsed.data.excludeBookingId) {
+      query._id = {
+        $ne: new mongoose.Types.ObjectId(parsed.data.excludeBookingId),
+      };
     }
 
     const bookings = await Booking.find(query)
       .select('checkInDate checkOutDate')
-      .lean();
+      .lean<BookingDateRange[]>();
 
     // Create array of unavailable date ranges
-    const unavailableDates = (bookings as unknown as BookingDateRange[]).map(
-      booking => ({
-        start: booking.checkInDate.toISOString().split('T')[0],
-        end: booking.checkOutDate.toISOString().split('T')[0],
-      })
-    );
+    const unavailableDates = bookings.map(booking => ({
+      start: booking.checkInDate.toISOString().split('T')[0],
+      end: booking.checkOutDate.toISOString().split('T')[0],
+    }));
 
     return NextResponse.json({
       success: true,
@@ -81,7 +87,8 @@ export async function GET(
         },
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    logger.error('Failed to fetch cabin availability', error);
     return NextResponse.json(
       {
         success: false,

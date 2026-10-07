@@ -1,3 +1,4 @@
+import { objectRequestSchema } from './object-request';
 import { CABIN_STATUSES } from '@/lib/config';
 import { z } from 'zod';
 
@@ -17,8 +18,8 @@ const CABIN_DESCRIPTION_MAX = 1000;
 /**
  * Create cabin request schema
  */
-export const createCabinSchema = z
-  .object({
+const createFieldsSchema = z
+  .strictObject({
     name: z.string().min(1, 'Name is required').max(100),
     image: z.string().url('Invalid image URL'),
     images: z.array(z.string().url('Invalid image URL')).optional().default([]),
@@ -53,9 +54,12 @@ export const createCabinSchema = z
  * there carry `.default()`, which Zod applies even when the key is absent
  * from a partial update, silently resetting them to create-time defaults.
  */
-export const updateCabinSchema = z
-  .object({
-    _id: z.string().min(1, 'Cabin ID is required'),
+const updateFieldsSchema = z
+  .strictObject({
+    _id: z
+      .string()
+      .min(1, 'Cabin ID is required')
+      .regex(/^[a-f\d]{24}$/i, 'Invalid catalog ID'),
     name: z.string().min(1).max(100).optional(),
     image: z.string().url('Invalid image URL').optional(),
     images: z.array(z.string().url('Invalid image URL')).optional(),
@@ -102,6 +106,9 @@ export function isDiscountValid({
 }): boolean {
   return discount < price;
 }
+
+export const createCabinSchema = objectRequestSchema.pipe(createFieldsSchema);
+export const updateCabinSchema = objectRequestSchema.pipe(updateFieldsSchema);
 
 export type CreateCabinInput = z.infer<typeof createCabinSchema>;
 export type UpdateCabinInput = z.infer<typeof updateCabinSchema>;

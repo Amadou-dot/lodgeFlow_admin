@@ -10,6 +10,8 @@ import {
 import type { ApiResponse } from '@/types';
 import type { RefundEstimateResponse } from '@/types/cancellation';
 import { serializeCancellationDeadlines } from '@/lib/serializers/cancellation';
+import { bookingIdSchema } from '@/lib/validations/booking';
+import { logger } from '@lodgeflow/database/logger';
 
 export async function GET(
   request: NextRequest,
@@ -25,6 +27,12 @@ export async function GET(
     }
 
     const { id } = await params;
+    if (!bookingIdSchema.safeParse(id).success) {
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
     await connectDB();
 
     const booking = await Booking.findById(id);
@@ -105,7 +113,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error calculating refund estimate:', error);
+    logger.error('Error calculating refund estimate', error);
     return NextResponse.json(
       { success: false, error: 'Failed to calculate refund estimate' },
       { status: 500 }

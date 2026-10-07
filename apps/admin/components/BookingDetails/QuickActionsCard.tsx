@@ -89,12 +89,12 @@ export default function QuickActionsCard({
     try {
       const firstName =
         booking.customer.first_name || booking.customer.name || 'Guest';
-      await sendConfirmationEmail(
+      await sendConfirmationEmail({
         firstName,
-        booking.customer.email,
+        email: booking.customer.email,
         bookingData,
-        cabinData
-      );
+        cabinData,
+      });
       addToast({
         color: 'success',
         description: 'Confirmation email sent successfully',

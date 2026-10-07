@@ -34,3 +34,18 @@ export async function readBookingConfirmationRequest(
     return { success: false, error: result.error.issues[0].message };
   return { success: true, data: result.data };
 }
+
+export const diningConfirmationSchema = z.object(
+  {
+    reservationId: z
+      .string({
+        error: issue =>
+          issue.input == null
+            ? 'Reservation ID is required'
+            : 'Invalid reservation ID',
+      })
+      .min(1, 'Reservation ID is required')
+      .regex(/^[a-f\d]{24}$/i, 'Invalid reservation ID'),
+  },
+  { error: 'Invalid request body' }
+);

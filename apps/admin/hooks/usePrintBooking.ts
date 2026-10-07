@@ -34,7 +34,7 @@ export const usePrintBooking = (
 
       const bookingId = booking._id.toString().slice(-8).toUpperCase();
       const guestName =
-        `${booking.customer.first_name}-${booking.customer.last_name}`.replace(
+        `${booking.customer?.first_name ?? 'Unknown'}-${booking.customer?.last_name ?? 'Guest'}`.replace(
           /\s+/g,
           '-'
         );

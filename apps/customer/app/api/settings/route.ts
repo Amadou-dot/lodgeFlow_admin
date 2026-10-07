@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@lodgeflow/database/logger';
+import { serializeSettings } from '@lodgeflow/database/settings-json';
+import { NextResponse } from 'next/server';
 import { connectDB, Settings } from '@lodgeflow/database';
 import type { ApiResponse, Settings as SettingsType } from '@/types';
 
@@ -10,12 +12,12 @@ export async function GET() {
 
     const response: ApiResponse<SettingsType> = {
       success: true,
-      data: settings,
+      data: serializeSettings(settings.toObject()),
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching settings:', error);
+    logger.error('Failed to fetch settings', error);
 
     const response: ApiResponse<never> = {
       success: false,

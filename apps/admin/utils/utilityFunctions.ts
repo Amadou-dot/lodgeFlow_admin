@@ -4,25 +4,28 @@ type LoyaltyColor = 'secondary' | 'warning' | 'default' | 'primary';
 
 export const getLoyaltyTier = (
   totalSpent: number
-): { tier: string; color: LoyaltyColor } => {
+): {
+  tier: (typeof LOYALTY_TIERS)[keyof typeof LOYALTY_TIERS]['name'];
+  color: LoyaltyColor;
+} => {
   if (totalSpent >= LOYALTY_TIERS.DIAMOND.threshold)
     return {
       tier: LOYALTY_TIERS.DIAMOND.name,
-      color: LOYALTY_TIERS.DIAMOND.color as LoyaltyColor,
+      color: LOYALTY_TIERS.DIAMOND.color,
     };
   if (totalSpent >= LOYALTY_TIERS.GOLD.threshold)
     return {
       tier: LOYALTY_TIERS.GOLD.name,
-      color: LOYALTY_TIERS.GOLD.color as LoyaltyColor,
+      color: LOYALTY_TIERS.GOLD.color,
     };
   if (totalSpent >= LOYALTY_TIERS.SILVER.threshold)
     return {
       tier: LOYALTY_TIERS.SILVER.name,
-      color: LOYALTY_TIERS.SILVER.color as LoyaltyColor,
+      color: LOYALTY_TIERS.SILVER.color,
     };
   return {
     tier: LOYALTY_TIERS.BRONZE.name,
-    color: LOYALTY_TIERS.BRONZE.color as LoyaltyColor,
+    color: LOYALTY_TIERS.BRONZE.color,
   };
 };
 
@@ -35,7 +38,13 @@ export const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-export const calcNumNights = (checkInDate: string, checkOutDate: string) => {
+export const calcNumNights = ({
+  checkInDate,
+  checkOutDate,
+}: {
+  checkInDate: string;
+  checkOutDate: string;
+}) => {
   return checkInDate && checkOutDate
     ? Math.ceil(
         (new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) /

@@ -74,20 +74,3 @@ export interface DurationDataItem {
   _id: string;
   count: number;
 }
-
-/**
- * Booking populated for dashboard recent activity
- */
-export interface RecentBookingPopulated {
-  _id: string;
-  customer: string;
-  cabin: {
-    _id: string;
-    name: string;
-  } | null;
-  checkInDate: Date;
-  checkOutDate: Date;
-  totalPrice: number;
-  status: IBooking['status'];
-  createdAt: Date;
-}

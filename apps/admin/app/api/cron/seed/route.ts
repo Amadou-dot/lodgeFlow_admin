@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { timingSafeEqual } from 'node:crypto';
 import { seedDatabase } from '@/lib/seed-database';
 import { NextResponse } from 'next/server';
@@ -17,10 +18,13 @@ function getBearerToken(authorizationHeader: string | null): string | null {
   return token;
 }
 
-function isAuthorizedSeedRequest(
-  seedSecret: string,
-  authorizationHeader: string | null
-): boolean {
+function isAuthorizedSeedRequest({
+  seedSecret,
+  authorizationHeader,
+}: {
+  seedSecret: string;
+  authorizationHeader: string | null;
+}): boolean {
   const bearerToken = getBearerToken(authorizationHeader);
 
   if (!bearerToken) {
@@ -41,7 +45,7 @@ export async function GET(request: Request) {
     const seedSecret = process.env.SEED_SECRET;
 
     if (!seedSecret) {
-      console.error('SEED_SECRET is not configured for /api/cron/seed');
+      logger.error('SEED_SECRET is not configured for /api/cron/seed');
       return NextResponse.json(
         {
           success: false,
@@ -52,7 +56,10 @@ export async function GET(request: Request) {
     }
 
     if (
-      !isAuthorizedSeedRequest(seedSecret, request.headers.get('authorization'))
+      !isAuthorizedSeedRequest({
+        seedSecret,
+        authorizationHeader: request.headers.get('authorization'),
+      })
     ) {
       return NextResponse.json(
         {
@@ -75,11 +82,11 @@ export async function GET(request: Request) {
       results,
     });
   } catch (error: unknown) {
-    console.error('Error seeding database:', error);
+    logger.error('Error seeding database', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: 'Failed to seed database',
       },
       { status: 500 }
     );

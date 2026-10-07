@@ -1,3 +1,8 @@
+import { reservationIdSchema } from '@/lib/validations/reservation-id';
+import { readJsonRequestBody } from '@/lib/validations/request-body';
+import { logger } from '@lodgeflow/database/logger';
+import { serializeExperienceReservationDetail } from '@lodgeflow/database/reservation-json';
+import type { ExperienceJsonSource } from '@lodgeflow/database/experience-json';
 import {
   updateExperienceReservation,
   ReservationRuleError,
@@ -25,10 +30,16 @@ export async function GET(
       return NextResponse.json(response, { status: 401 });
     }
 
-    await connectDB();
-
     const { id } = await params;
-    const booking = await ExperienceBooking.findById(id).populate('experience');
+    if (!reservationIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Experience booking not found' },
+        { status: 404 }
+      );
+    await connectDB();
+    const booking = await ExperienceBooking.findById(id).populate<{
+      experience: ExperienceJsonSource | null;
+    }>('experience');
 
     if (!booking) {
       const response: ApiResponse<never> = {
@@ -46,14 +57,16 @@ export async function GET(
       return NextResponse.json(response, { status: 404 });
     }
 
-    const response: ApiResponse<typeof booking> = {
+    const response: ApiResponse<
+      ReturnType<typeof serializeExperienceReservationDetail>
+    > = {
       success: true,
-      data: booking,
+      data: serializeExperienceReservationDetail(booking.toObject()),
     };
 
     return NextResponse.json(response);
-  } catch (error) {
-    console.error('Error fetching experience booking:', error);
+  } catch (error: unknown) {
+    logger.error('Error fetching experience booking:', error);
     const response: ApiResponse<never> = {
       success: false,
       error: 'Failed to fetch experience booking',
@@ -78,16 +91,28 @@ async function change({
         { success: false, error: 'Authentication required' },
         { status: 401 }
       );
-    const parsed = updateExperienceDetailsSchema.safeParse(
-      action === 'cancel' ? {} : await request.json()
-    );
+    const body =
+      action === 'cancel'
+        ? { success: true as const, data: {} }
+        : await readJsonRequestBody(request);
+    if (!body.success)
+      return NextResponse.json(
+        { success: false, error: body.error },
+        { status: 400 }
+      );
+    const parsed = updateExperienceDetailsSchema.safeParse(body.data);
     if (!parsed.success)
       return NextResponse.json(
         { success: false, error: 'Invalid reservation details' },
         { status: 400 }
       );
-    await connectDB();
     const { id } = await params;
+    if (!reservationIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Reservation or listing not found' },
+        { status: 404 }
+      );
+    await connectDB();
     const data = await updateExperienceReservation({
       reservationId: id,
       customerId: userId,
@@ -95,19 +120,22 @@ async function change({
     });
     return NextResponse.json({
       success: true,
-      data,
+      data:
+        data === null
+          ? null
+          : serializeExperienceReservationDetail(data.toObject()),
       message:
         action === 'cancel'
           ? 'Reservation cancelled successfully'
           : 'Reservation updated successfully',
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ReservationRuleError)
       return NextResponse.json(
         { success: false, error: error.message },
         { status: error.status }
       );
-    console.error('Failed to change reservation:', error);
+    logger.error('Failed to change reservation:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to change reservation' },
       { status: 500 }

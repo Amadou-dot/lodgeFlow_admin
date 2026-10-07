@@ -1,12 +1,12 @@
 import { Input } from '@heroui/input';
 import { Select, SelectItem } from '@heroui/select';
-import type { FormData } from './types';
+import type { FormData, GuestInputChange } from './types';
 import { countries } from './types';
 
 interface BasicInformationSectionProps {
   formData: FormData;
   errors: Record<string, string>;
-  onInputChange: (field: string, value: string) => void;
+  onInputChange: GuestInputChange;
   isEditing?: boolean; // Add prop to hide password field when editing
 }
 
@@ -24,7 +24,13 @@ export default function BasicInformationSection({
           label='First Name'
           placeholder='Enter first name'
           value={formData.firstName}
-          onValueChange={value => onInputChange('firstName', value)}
+          onValueChange={value =>
+            onInputChange({
+              section: 'profile',
+              field: 'firstName',
+              value: value,
+            })
+          }
           isInvalid={!!errors.firstName}
           errorMessage={errors.firstName}
           isRequired
@@ -34,7 +40,13 @@ export default function BasicInformationSection({
           label='Last Name'
           placeholder='Enter last name'
           value={formData.lastName}
-          onValueChange={value => onInputChange('lastName', value)}
+          onValueChange={value =>
+            onInputChange({
+              section: 'profile',
+              field: 'lastName',
+              value: value,
+            })
+          }
           isInvalid={!!errors.lastName}
           errorMessage={errors.lastName}
           isRequired
@@ -45,7 +57,9 @@ export default function BasicInformationSection({
           placeholder='Enter email address'
           type='email'
           value={formData.email}
-          onValueChange={value => onInputChange('email', value)}
+          onValueChange={value =>
+            onInputChange({ section: 'profile', field: 'email', value: value })
+          }
           isInvalid={!!errors.email}
           errorMessage={errors.email}
           isRequired
@@ -55,7 +69,9 @@ export default function BasicInformationSection({
           label='Phone'
           placeholder='Enter phone number'
           value={formData.phone}
-          onValueChange={value => onInputChange('phone', value)}
+          onValueChange={value =>
+            onInputChange({ section: 'profile', field: 'phone', value: value })
+          }
           name='phone'
         />
         {!isEditing && (
@@ -64,7 +80,13 @@ export default function BasicInformationSection({
             placeholder='Enter password (min 8 characters)'
             type='password'
             value={formData.password}
-            onValueChange={value => onInputChange('password', value)}
+            onValueChange={value =>
+              onInputChange({
+                section: 'profile',
+                field: 'password',
+                value: value,
+              })
+            }
             isInvalid={!!errors.password}
             errorMessage={errors.password}
             isRequired
@@ -78,7 +100,11 @@ export default function BasicInformationSection({
           selectedKeys={formData.nationality ? [formData.nationality] : []}
           onSelectionChange={keys => {
             const selected = Array.from(keys)[0] as string;
-            onInputChange('nationality', selected || '');
+            onInputChange({
+              section: 'profile',
+              field: 'nationality',
+              value: selected || '',
+            });
           }}
           isInvalid={!!errors.nationality}
           errorMessage={errors.nationality}
@@ -93,7 +119,13 @@ export default function BasicInformationSection({
           label='National ID'
           placeholder='Enter ID/passport number'
           value={formData.nationalId}
-          onValueChange={value => onInputChange('nationalId', value)}
+          onValueChange={value =>
+            onInputChange({
+              section: 'profile',
+              field: 'nationalId',
+              value: value,
+            })
+          }
           isInvalid={!!errors.nationalId}
           errorMessage={errors.nationalId}
           isRequired

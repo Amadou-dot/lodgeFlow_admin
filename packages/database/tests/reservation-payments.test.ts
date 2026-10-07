@@ -164,9 +164,10 @@ for (const kind of ['dining', 'experience'] as const) {
       settleReservationCheckout(settlement),
       settleReservationCheckout(settlement),
     ]);
-    let current = await (
-      kind === 'dining' ? DiningReservation : ExperienceBooking
-    ).findById(row.id);
+    let current =
+      kind === 'dining'
+        ? await DiningReservation.findById(row.id).orFail()
+        : await ExperienceBooking.findById(row.id).orFail();
     assert.equal(current.receipts.length, 1);
     assert.equal(current.isPaid, true);
     let calls = 0;
@@ -201,9 +202,10 @@ for (const kind of ['dining', 'experience'] as const) {
       stripe,
     };
     await refundReservationStripe(refund);
-    current = await (
-      kind === 'dining' ? DiningReservation : ExperienceBooking
-    ).findById(row.id);
+    current =
+      kind === 'dining'
+        ? await DiningReservation.findById(row.id).orFail()
+        : await ExperienceBooking.findById(row.id).orFail();
     assert.equal(reservationPaymentSummary(current).refundedCents, 0);
     await assert.rejects(
       refundReservationStripe({ ...refund, token: 'another' }),
@@ -211,9 +213,10 @@ for (const kind of ['dining', 'experience'] as const) {
     );
     await refundReservationStripe(refund);
     await refundReservationStripe(refund);
-    current = await (
-      kind === 'dining' ? DiningReservation : ExperienceBooking
-    ).findById(row.id);
+    current =
+      kind === 'dining'
+        ? await DiningReservation.findById(row.id).orFail()
+        : await ExperienceBooking.findById(row.id).orFail();
     assert.equal(reservationPaymentSummary(current).refundedCents, 5000);
     assert.equal(calls, 1);
   });

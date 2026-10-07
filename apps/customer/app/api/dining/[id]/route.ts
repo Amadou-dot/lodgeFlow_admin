@@ -1,6 +1,15 @@
+import { logger } from '@lodgeflow/database/logger';
+import { catalogIdSchema } from '@/lib/validations/catalog';
+import {
+  serializeDining,
+  type DiningJsonSource,
+} from '@lodgeflow/database/dining-json';
+import type { Model } from 'mongoose';
 import { connectDB, Dining } from '@lodgeflow/database';
 import type { ApiResponse, Dining as DiningType } from '@/types';
 import { NextRequest, NextResponse } from 'next/server';
+
+const diningReader: Model<DiningJsonSource> = Dining;
 
 export async function GET(
   request: NextRequest,
@@ -9,8 +18,14 @@ export async function GET(
   try {
     const { id } = await params;
 
+    if (!catalogIdSchema.safeParse(id).success)
+      return NextResponse.json(
+        { success: false, error: 'Dining item not found' },
+        { status: 404 }
+      );
+
     await connectDB();
-    const dining = await Dining.findById(id).lean();
+    const dining = await diningReader.findById(id).lean();
 
     if (!dining) {
       const response: ApiResponse<never> = {
@@ -22,7 +37,7 @@ export async function GET(
     }
 
     // Convert MongoDB document to plain object
-    const serializedDining = JSON.parse(JSON.stringify(dining));
+    const serializedDining = serializeDining(dining);
 
     const response: ApiResponse<DiningType> = {
       success: true,
@@ -31,7 +46,10 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching dining item:', error);
+    logger.error(
+      'Error fetching dining item',
+      error instanceof Error ? error : undefined
+    );
 
     const response: ApiResponse<never> = {
       success: false,

@@ -1,12 +1,17 @@
+import type { BOOKING_STATUSES } from '@lodgeflow/database/config';
 import { format, formatDistanceToNow, isAfter } from 'date-fns';
 
-export const formatBookingDates = (
-  checkIn: string,
-  checkOut: string,
-  numNights: number,
-  status:
-    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled'
-) => {
+export const formatBookingDates = ({
+  checkIn,
+  checkOut,
+  numNights,
+  status,
+}: {
+  checkIn: string;
+  checkOut: string;
+  numNights: number;
+  status: (typeof BOOKING_STATUSES)[number];
+}) => {
   const checkInDate = new Date(checkIn);
   const checkOutDate = new Date(checkOut);
   const now = new Date();

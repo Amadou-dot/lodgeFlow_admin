@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { logger } from '@lodgeflow/database/logger';
 
 // Singleton Stripe instance
 let stripeInstance: Stripe | null = null;
@@ -58,18 +59,19 @@ export async function createCheckoutSession(
   return session;
 }
 
-export interface RefundResult {
-  success: boolean;
-  refundId?: string;
-  amount?: number;
-  error?: string;
-}
+export type RefundResult =
+  | { success: true; refundId: string; amount: number }
+  | { success: false; error: string };
 
-export async function createRefund(
-  paymentIntentId: string,
-  amount?: number,
-  idempotencyKey?: string
-): Promise<RefundResult> {
+export async function createRefund({
+  paymentIntentId,
+  amount,
+  idempotencyKey,
+}: {
+  paymentIntentId: string;
+  amount?: number;
+  idempotencyKey?: string;
+}): Promise<RefundResult> {
   const stripe = getStripe();
 
   try {
@@ -92,10 +94,10 @@ export async function createRefund(
       amount: refund.amount / 100,
     };
   } catch (error) {
-    console.error('Stripe refund error:', error);
+    logger.error('Stripe refund error', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to create refund',
+      error: 'Failed to create refund',
     };
   }
 }
@@ -108,7 +110,7 @@ export async function getPaymentIntent(
   try {
     return await stripe.paymentIntents.retrieve(paymentIntentId);
   } catch (error) {
-    console.error('Error retrieving payment intent:', error);
+    logger.error('Error retrieving payment intent', error);
     return null;
   }
 }

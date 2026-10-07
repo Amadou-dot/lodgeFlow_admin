@@ -73,19 +73,13 @@ export function createSuccessResponse<T>(
  * Create a standardized error response
  */
 export function createErrorResponse(
-  error: string | Error,
+  errorMessage: string,
   status: number = 500,
   details?: unknown
 ): NextResponse<ApiErrorResponse> {
-  const errorMessage = error instanceof Error ? error.message : error;
-
   const context = { status, message: errorMessage, details };
   if (status >= 500) {
-    logger.error(
-      'API Error',
-      error instanceof Error ? error : undefined,
-      context
-    );
+    logger.error('API Error', undefined, context);
   } else {
     // Expected denials and invalid requests are not server failures. In a
     // server layout, console.error also triggers Next's development overlay.
@@ -189,89 +183,11 @@ export function escapeRegex(str: string): string {
 }
 
 /**
- * Sanitize a client-supplied update payload before passing it to
- * findByIdAndUpdate / findOneAndUpdate. Strips MongoDB operator keys
- * ($set, $inc, ...), dotted paths, and immutable fields so a request
- * body can't smuggle update operators past schema validation.
- */
-export function sanitizeUpdatePayload(
-  payload: Record<string, unknown>
-): Record<string, unknown> {
-  const sanitized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(payload)) {
-    if (key.startsWith('$') || key.includes('.')) continue;
-    if (key === '_id' || key === '__v') continue;
-    sanitized[key] = value;
-  }
-
-  return sanitized;
-}
-
-/**
  * Parse an integer query param, falling back when missing or malformed
  */
 export function parseIntParam(value: string | null, fallback: number): number {
   const parsed = parseInt(value ?? '', 10);
   return Number.isNaN(parsed) ? fallback : parsed;
-}
-
-/**
- * Handle common API errors with appropriate status codes
- */
-export function handleApiError(error: unknown): NextResponse<ApiErrorResponse> {
-  if (error instanceof Error) {
-    // Handle specific error types
-    if (error.message.includes('not found')) {
-      return createErrorResponse(error, HTTP_STATUS.NOT_FOUND);
-    }
-    if (
-      error.message.includes('unauthorized') ||
-      error.message.includes('authentication')
-    ) {
-      return createErrorResponse(error, HTTP_STATUS.UNAUTHORIZED);
-    }
-    if (
-      error.message.includes('forbidden') ||
-      error.message.includes('permission')
-    ) {
-      return createErrorResponse(error, HTTP_STATUS.FORBIDDEN);
-    }
-    if (
-      error.message.includes('validation') ||
-      error.message.includes('invalid')
-    ) {
-      return createErrorResponse(error, HTTP_STATUS.BAD_REQUEST);
-    }
-
-    // Default to internal server error
-    return createErrorResponse(error, HTTP_STATUS.INTERNAL_SERVER_ERROR);
-  }
-
-  // Unknown error type
-  return createErrorResponse(
-    'An unexpected error occurred',
-    HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    error
-  );
-}
-
-/**
- * Validate required fields in request body
- */
-export function validateRequiredFields<T extends Record<string, unknown>>(
-  body: T,
-  requiredFields: (keyof T)[]
-): { isValid: boolean; missingFields: string[] } {
-  const missingFields = requiredFields.filter(
-    field =>
-      body[field] === undefined || body[field] === null || body[field] === ''
-  );
-
-  return {
-    isValid: missingFields.length === 0,
-    missingFields: missingFields as string[],
-  };
 }
 
 /**
@@ -302,17 +218,32 @@ export function createRateLimitResponse(resetTime: number) {
 export function formatZodErrors(
   error: import('zod').ZodError
 ): Record<string, string[]> {
-  const formatted: Record<string, string[]> = {};
+  const formatted = new Map<string, string[]>();
 
   for (const issue of error.issues) {
     const path = issue.path.join('.') || '_root';
-    if (!formatted[path]) {
-      formatted[path] = [];
-    }
-    formatted[path].push(issue.message);
+    const messages = formatted.get(path) ?? [];
+    messages.push(issue.message);
+    formatted.set(path, messages);
   }
 
-  return formatted;
+  return Object.fromEntries(formatted);
+}
+
+/** Preserve flattened PATCH details without indexing inherited object keys. */
+export function flattenZodErrors(error: import('zod').ZodError) {
+  const formErrors: string[] = [];
+  const fields = new Map<string, string[]>();
+  for (const issue of error.issues) {
+    if (issue.path.length === 0) formErrors.push(issue.message);
+    else {
+      const key = String(issue.path[0]);
+      const messages = fields.get(key) ?? [];
+      messages.push(issue.message);
+      fields.set(key, messages);
+    }
+  }
+  return { formErrors, fieldErrors: Object.fromEntries(fields) };
 }
 
 /**

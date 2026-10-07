@@ -92,6 +92,7 @@ test('dining edits enforce capacity and cancellation releases seats', async () =
       numGuests: 1,
     },
   });
+  assert.ok(one);
   const two = await createDiningReservation({
     diningId: id,
     customerId: 'two',
@@ -100,6 +101,7 @@ test('dining edits enforce capacity and cancellation releases seats', async () =
       numGuests: 1,
     },
   });
+  assert.ok(two);
   await assert.rejects(
     updateDiningReservation({
       reservationId: String(one._id),
@@ -137,6 +139,7 @@ test('dining edits enforce capacity and cancellation releases seats', async () =
       numGuests: 2,
     },
   });
+  assert.ok(updated);
   assert.equal(updated.totalPrice, 50);
   await assert.rejects(
     updateCapacityCatalog({
@@ -160,6 +163,7 @@ test('moving two parties to the same final dining slot cannot oversell', async (
       time: '19:00',
     },
   });
+  assert.ok(one);
   const two = await createDiningReservation({
     diningId: id,
     customerId: 'two',
@@ -168,6 +172,7 @@ test('moving two parties to the same final dining slot cannot oversell', async (
       time: '20:00',
     },
   });
+  assert.ok(two);
   const results = await Promise.allSettled([
     updateDiningReservation({
       reservationId: String(one._id),
@@ -202,6 +207,7 @@ test('experience creation and edits share the daily capacity limit', async () =>
   );
   assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
   const booking = await ExperienceBooking.findOne();
+  assert.ok(booking);
   await assert.rejects(
     updateExperienceReservation({
       reservationId: String(booking._id),
@@ -232,6 +238,7 @@ test('experience creation and edits share the daily capacity limit', async () =>
       numParticipants: 1,
     },
   });
+  assert.ok(fresh);
   const updated = await updateExperienceReservation({
     reservationId: String(fresh._id),
     customerId: 'new',
@@ -240,6 +247,7 @@ test('experience creation and edits share the daily capacity limit', async () =>
       numParticipants: 2,
     },
   });
+  assert.ok(updated);
   assert.equal(updated.totalPrice, 100);
 });
 test('simultaneous capacity reduction and reservation creation preserve the capacity invariant', async () => {
