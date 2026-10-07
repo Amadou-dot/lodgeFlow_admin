@@ -2,6 +2,7 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AddGuestForm from '@/components/AddGuestForm';
 import type { GuestFormCustomer } from '@/types/customer-json';
+import { updateCustomerSchema } from '@/lib/validations/customer';
 
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
@@ -32,6 +33,10 @@ test('new guests start with empty nested fields after another form is discarded'
 });
 
 test('editing nested fields preserves other profile fields and normalized preferences', async () => {
+  mockUpdate.mockImplementation(async (input: unknown) =>
+    updateCustomerSchema.parse(input)
+  );
+  const onSuccess = jest.fn();
   const guest: GuestFormCustomer = {
     id: 'user_guest',
     first_name: 'Grace',
@@ -47,7 +52,9 @@ test('editing nested fields preserves other profile fields and normalized prefer
       dietaryRestrictions: ['Vegetarian'],
     },
   };
-  const { container } = render(<AddGuestForm initialData={guest} isEditing />);
+  const { container } = render(
+    <AddGuestForm initialData={guest} isEditing onSuccess={onSuccess} />
+  );
   fireEvent.change(screen.getByLabelText('City'), {
     target: { value: 'Denver' },
   });
@@ -66,6 +73,7 @@ test('editing nested fields preserves other profile fields and normalized prefer
         id: 'user_guest',
         firstName: 'Grace',
         lastName: 'Hopper',
+        nationalId: 'guest-id',
         address: {
           street: '10 Main Street',
           city: 'Denver',
@@ -87,6 +95,7 @@ test('editing nested fields preserves other profile fields and normalized prefer
       })
     )
   );
+  await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
   expect(mockCreate).not.toHaveBeenCalled();
   expect(guest.address?.city).toBe('Boulder');
 });

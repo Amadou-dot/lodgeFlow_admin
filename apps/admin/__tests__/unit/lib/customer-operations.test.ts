@@ -134,6 +134,24 @@ test('partial update sends only selected values and invalidates cached customer'
   expect(mockInvalidate).toHaveBeenCalledTimes(1);
 });
 
+test('address edits send a resubmitted legacy national ID to Clerk verbatim', async () => {
+  await updateCompleteCustomer(
+    customer.id,
+    updateCustomerSchema.parse({
+      nationalId: 'AB 123-456',
+      address: { city: 'Denver' },
+    })
+  );
+  expect(mockUpdate).not.toHaveBeenCalled();
+  expect(mockMetadata).toHaveBeenCalledWith(customer.id, {
+    publicMetadata: {},
+    privateMetadata: {
+      nationalId: 'AB 123-456',
+      address: { city: 'Denver' },
+    },
+  });
+});
+
 test('explicit null clears whole or nested metadata keys without changing omitted keys', async () => {
   await updateCompleteCustomer(
     customer.id,

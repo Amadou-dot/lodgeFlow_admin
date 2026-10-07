@@ -248,11 +248,11 @@ describe('Customer Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('validates nationalId format on update', () => {
-      const result = updateCustomerSchema.safeParse({
-        nationalId: 'INVALID-ID',
+    it('preserves legacy nationalId strings on update', () => {
+      const result = updateCustomerSchema.parse({
+        nationalId: 'LEGACY-ID',
       });
-      expect(result.success).toBe(false);
+      expect(result.nationalId).toEqual({ kind: 'set', value: 'LEGACY-ID' });
     });
 
     it('accepts address update', () => {

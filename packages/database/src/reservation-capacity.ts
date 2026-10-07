@@ -440,6 +440,10 @@ export async function updateCapacityCatalog({
     start.setUTCHours(0, 0, 0, 0);
     if (kind === 'dining') {
       const dining = catalog as IDining;
+      if (dining.minPeople > dining.maxPeople)
+        throw new ReservationRuleError(
+          'Minimum guests cannot exceed maximum guests'
+        );
       const reservations = await DiningReservation.find({
         dining: id,
         date: { $gte: start },

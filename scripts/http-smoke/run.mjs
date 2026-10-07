@@ -3129,6 +3129,8 @@ try {
     null,
     [],
     { firstName: 17 },
+    { nationalId: 123456 },
+    { nationalId: { $set: 'forged' } },
     { banned: true },
     { role: 'admin' },
     { 'address.city': 'Injected' },
@@ -3586,9 +3588,35 @@ try {
       assert.equal(await snapshot(), beforeHistoryDenied);
       const unused = await resource.catalog.create({
         ...resource.listing.toObject(),
+        ...(resource.kind === 'dining' ? { minPeople: 2 } : {}),
         _id: new mongoose.Types.ObjectId(),
       });
       const unusedId = String(unused._id);
+      if (resource.kind === 'dining') {
+        const unusedSnapshot = async () =>
+          JSON.stringify(
+            await Dining.findById(unusedId).select('+reservationVersion').lean()
+          );
+        const beforeInvalidRange = await unusedSnapshot();
+        for (const updates of [
+          { minPeople: unused.maxPeople + 1 },
+          { maxPeople: 1 },
+        ]) {
+          const rejected = await request({
+            origin: admin,
+            route:
+              catalogPath === '/api/dining'
+                ? catalogPath
+                : catalogPath.replace(listingId, unusedId),
+            identity: 'admin',
+            method: 'PUT',
+            status: 400,
+            body: { _id: unusedId, ...updates, name: 'Must roll back' },
+          });
+          assert.equal(rejected.success, false);
+          assert.equal(await unusedSnapshot(), beforeInvalidRange);
+        }
+      }
       const removed = await request({
         origin: admin,
         route:

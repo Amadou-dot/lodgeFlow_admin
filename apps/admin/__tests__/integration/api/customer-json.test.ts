@@ -248,6 +248,8 @@ test.each([
   null,
   [],
   { firstName: 17 },
+  { nationalId: 123456 },
+  { nationalId: { $set: 'forged' } },
   { banned: true },
   { role: 'admin' },
   { totalSpent: 10000 },
@@ -265,6 +267,43 @@ test.each([
   expect(response.status).toBe(400);
   expect(updateCompleteCustomer).not.toHaveBeenCalled();
 });
+
+test.each([
+  'guest-id',
+  'AB 123456',
+  '123',
+  'legacy-identifier-longer-than-twenty',
+])(
+  'PUT preserves the legacy national ID %s while editing an address',
+  async nationalId => {
+    const updated = { ...customer, nationalId, address: { city: 'Denver' } };
+    jest.mocked(updateCompleteCustomer).mockResolvedValueOnce(updated);
+    const response = await PUT(
+      new NextRequest('https://admin.test/api/customers', {
+        method: 'PUT',
+        body: JSON.stringify({
+          firstName: customer.first_name,
+          lastName: customer.last_name,
+          nationalId,
+          address: { city: 'Denver' },
+        }),
+      }),
+      params()
+    );
+    expect(response.status).toBe(200);
+    expect(updateCompleteCustomer).toHaveBeenCalledWith(
+      customer.id,
+      expect.objectContaining({
+        nationalId: { kind: 'set', value: nationalId },
+        address: { kind: 'set', value: { city: 'Denver' } },
+      })
+    );
+    expect(await response.json()).toEqual({
+      success: true,
+      data: json(updated),
+    });
+  }
+);
 
 test('creation retains the metadata entered by the guest form', async () => {
   const input = {

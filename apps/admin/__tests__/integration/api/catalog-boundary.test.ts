@@ -205,6 +205,44 @@ test('dining payload-only count bounds reject impossible create ranges before co
   expect(connectDB).not.toHaveBeenCalled();
 });
 
+test.each(['collection', 'detail'])(
+  'dining %s updates reject partial party-size conflicts without writes',
+  async endpoint => {
+    const dining = await Dining.create({
+      ...createInputs[1].data,
+      minPeople: 2,
+    });
+    const listingId = String(dining._id);
+    const before = await Dining.findById(listingId)
+      .select('+reservationVersion')
+      .lean();
+    for (const updates of [{ minPeople: 5 }, { maxPeople: 1 }]) {
+      const input = new NextRequest('https://admin.test/api/dining', {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...(endpoint === 'collection' ? { _id: listingId } : {}),
+          ...updates,
+          name: 'Must roll back',
+        }),
+      });
+      const response =
+        endpoint === 'collection'
+          ? await updateDining(input)
+          : await updateDiningById(input, {
+              params: Promise.resolve({ id: listingId }),
+            });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Minimum guests cannot exceed maximum guests',
+      });
+      expect(
+        await Dining.findById(listingId).select('+reservationVersion').lean()
+      ).toEqual(before);
+    }
+  }
+);
+
 test.each(mutations)(
   '%s rejects explicit prototype keys without a server failure',
   async (_name, invoke) => {
