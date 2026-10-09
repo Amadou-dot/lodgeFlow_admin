@@ -47,7 +47,7 @@ export default function ExperiencesPage() {
       />
 
       {/* Loading State */}
-      {isLoading && (
+      {!error && isLoading && (
         <div className='flex flex-col justify-center items-center py-12 gap-4'>
           <Spinner label='Loading experiences...' size='lg' />
         </div>
@@ -64,7 +64,7 @@ export default function ExperiencesPage() {
       )}
 
       {/* Content - only show if not loading */}
-      {!isLoading && (
+      {!error && !isLoading && (
         <>
           {/* Categories Overview */}
           <section className='bg-green-50 dark:bg-green-950 rounded-2xl p-8'>

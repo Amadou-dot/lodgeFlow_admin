@@ -1,3 +1,7 @@
+import {
+  fetchConfirmationDetail,
+  type ConfirmationDetailOptions,
+} from '@/hooks/useConfirmation';
 import { diningDayAvailabilitySchema } from '@/lib/validations/reservation-availability';
 import type { DiningDayAvailability } from '@/types/reservation-availability';
 import type { DiningReservationHistory } from '@lodgeflow/database/reservation-json';
@@ -37,6 +41,7 @@ export const useCreateDiningReservation = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dining-reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['dining-availability'] });
       queryClient.invalidateQueries({
         queryKey: ['dining-reservations-history'],
       });
@@ -71,10 +76,22 @@ export const useDiningReservationHistory = (status?: string) => {
 /**
  * Hook to fetch a single dining reservation by ID
  */
-export const useDiningReservationById = (reservationId: string) => {
+export const useDiningReservationById = (
+  reservationId: string,
+  options: ConfirmationDetailOptions = {}
+) => {
   return useQuery({
-    enabled: !!reservationId,
+    enabled: !!reservationId && options.enabled !== false,
+    ...(options.mode === 'confirmation' ? { retry: false } : {}),
     queryFn: async (): Promise<PopulatedDiningReservation | null> => {
+      if (options.mode === 'confirmation') {
+        return fetchConfirmationDetail<PopulatedDiningReservation>({
+          url: `/api/dining-reservations/${reservationId}`,
+          loadError: 'Failed to load reservation',
+          notFoundError: 'Reservation not found',
+        });
+      }
+
       const response = await fetch(`/api/dining-reservations/${reservationId}`);
 
       if (!response.ok) {
@@ -113,11 +130,15 @@ export const useCancelDiningReservation = () => {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, reservationId) => {
+      queryClient.invalidateQueries({
+        queryKey: ['dining-reservation', reservationId],
+      });
       queryClient.invalidateQueries({
         queryKey: ['dining-reservations-history'],
       });
       queryClient.invalidateQueries({ queryKey: ['dining-reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['dining-availability'] });
     },
   });
 };

@@ -1,7 +1,11 @@
 'use client';
 
 import { ReservationCheckout } from '@/components/ReservationCheckout';
-import { useEffect, useState } from 'react';
+import {
+  useConfirmationId,
+  isUnavailableConfirmationError,
+} from '@/hooks/useConfirmation';
+import { useExperienceBookingById } from '@/hooks/useExperienceBooking';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
@@ -23,50 +27,26 @@ import { title, subtitle } from '@/components/primitives';
 
 type Params = Promise<{ id: string }>;
 
-import type { ExperienceReservationDetail as ExperienceBookingData } from '@lodgeflow/database/reservation-json';
 export default function ExperienceConfirmationPage({
   params,
 }: {
   params: Params;
 }) {
-  const [bookingId, setBookingId] = useState<string>('');
-  const [booking, setBooking] = useState<ExperienceBookingData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
-
-  useEffect(() => {
-    const getId = async () => {
-      const { id } = await params;
-      setBookingId(id);
-    };
-    getId();
-  }, [params]);
-
-  useEffect(() => {
-    const fetchBooking = async () => {
-      if (!bookingId || !isLoaded) return;
-
-      try {
-        const response = await fetch(`/api/experience-bookings/${bookingId}`);
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          setError(data.error || 'Booking not found');
-          setIsLoading(false);
-          return;
-        }
-
-        setBooking(data.data);
-        setIsLoading(false);
-      } catch {
-        setError('Failed to load booking');
-        setIsLoading(false);
-      }
-    };
-
-    fetchBooking();
-  }, [bookingId, isLoaded]);
+  const bookingId = useConfirmationId(params);
+  const {
+    data: booking,
+    isPending: isLoading,
+    error: queryError,
+    refetch,
+  } = useExperienceBookingById(bookingId, {
+    enabled: isLoaded,
+    mode: 'confirmation',
+  });
+  const error =
+    !booking || isUnavailableConfirmationError(queryError)
+      ? queryError?.message
+      : undefined;
 
   if (isLoading || !isLoaded) {
     return (
@@ -76,7 +56,7 @@ export default function ExperienceConfirmationPage({
     );
   }
 
-  if (user && booking && booking.customer !== user.id) {
+  if (!error && (!user || (booking && booking.customer !== user.id))) {
     return (
       <div className='flex flex-col justify-center items-center min-h-screen gap-6 px-4'>
         <Card className='max-w-md w-full p-6'>
@@ -107,6 +87,15 @@ export default function ExperienceConfirmationPage({
             <p className='text-default-600'>
               {error || 'The booking does not exist or has been removed.'}
             </p>
+            <Button
+              color='primary'
+              variant='flat'
+              onPress={() => {
+                void refetch();
+              }}
+            >
+              Try Again
+            </Button>
             <Link className='w-full' href='/experiences'>
               <Button className='w-full' color='primary' variant='flat'>
                 Browse Experiences

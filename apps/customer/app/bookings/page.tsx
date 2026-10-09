@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
@@ -11,7 +11,6 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  useDisclosure,
 } from '@heroui/modal';
 import { Select, SelectItem } from '@heroui/select';
 import { Spinner } from '@heroui/spinner';
@@ -80,37 +79,35 @@ const diningStatusFilters = [
   { key: 'no-show', label: 'No Show' },
 ];
 
+type BookingDialog =
+  | { kind: 'closed' }
+  | { kind: 'details' | 'cancel'; bookingId: string }
+  | { kind: 'edit'; bookingId: string; numGuests: number };
+
 export default function BookingsPage() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedBooking, setSelectedBooking] =
-    useState<BookingHistoryItem | null>(null);
-  const {
-    isOpen: isDetailsOpen,
-    onOpen: onDetailsOpen,
-    onClose: onDetailsClose,
-  } = useDisclosure();
-  const {
-    isOpen: isCancelOpen,
-    onOpen: onCancelOpen,
-    onClose: onCancelClose,
-  } = useDisclosure();
-  const {
-    isOpen: isEditOpen,
-    onOpen: onEditOpen,
-    onClose: onEditClose,
-  } = useDisclosure();
-
-  // Edit form state
-  const [editFormData, setEditFormData] = useState({
-    numGuests: 0,
-  });
+  const [dialog, setDialog] = useState<BookingDialog>({ kind: 'closed' });
+  // Retain the last available query record when a filter hides the selection.
+  const bookingContext = useRef(new Map<string, BookingHistoryItem>());
+  const closeDialog = () => setDialog({ kind: 'closed' });
 
   const {
     data: bookings,
     isLoading,
     error,
   } = useBookingHistory(statusFilter === 'all' ? undefined : statusFilter);
+
+  useEffect(() => {
+    bookings?.forEach(booking =>
+      bookingContext.current.set(booking._id, booking)
+    );
+  }, [bookings]);
+  const selectedBooking =
+    dialog.kind === 'closed'
+      ? undefined
+      : (bookings?.find(booking => booking._id === dialog.bookingId) ??
+        bookingContext.current.get(dialog.bookingId));
 
   const cancelBooking = useCancelBooking();
   const updateBooking = useUpdateBooking();
@@ -138,33 +135,35 @@ export default function BookingsPage() {
   const cancelDiningReservation = useCancelDiningReservation();
 
   const handleViewDetails = (booking: BookingHistoryItem) => {
-    setSelectedBooking(booking);
-    onDetailsOpen();
+    bookingContext.current.set(booking._id, booking);
+    setDialog({ kind: 'details', bookingId: booking._id });
   };
 
   const handleEditBooking = (booking: BookingHistoryItem) => {
-    setSelectedBooking(booking);
-    setEditFormData({
+    bookingContext.current.set(booking._id, booking);
+    setDialog({
+      kind: 'edit',
+      bookingId: booking._id,
       numGuests: booking.numGuests,
     });
-    onEditOpen();
   };
 
   const handleCancelBooking = (booking: BookingHistoryItem) => {
-    setSelectedBooking(booking);
-    onCancelOpen();
+    bookingContext.current.set(booking._id, booking);
+    setDialog({ kind: 'cancel', bookingId: booking._id });
   };
 
   const confirmUpdateBooking = async () => {
-    if (!selectedBooking) return;
+    if (dialog.kind !== 'edit') return;
+    const submittedDialog = dialog;
 
     try {
       const updates: UpdateBookingDetailsInput = {
-        numGuests: editFormData.numGuests,
+        numGuests: submittedDialog.numGuests,
       };
 
       await updateBooking.mutateAsync({
-        bookingId: selectedBooking._id.toString(),
+        bookingId: submittedDialog.bookingId,
         updates,
       });
 
@@ -173,8 +172,9 @@ export default function BookingsPage() {
         description: 'Your booking has been successfully updated.',
         color: 'success',
       });
-      onEditClose();
-      setSelectedBooking(null);
+      setDialog(current =>
+        current === submittedDialog ? { kind: 'closed' } : current
+      );
     } catch (error) {
       addToast({
         title: 'Error',
@@ -188,19 +188,21 @@ export default function BookingsPage() {
   };
 
   const confirmCancelBooking = async () => {
-    if (!selectedBooking) return;
+    if (dialog.kind !== 'cancel') return;
+    const submittedDialog = dialog;
 
     try {
       await cancelBooking.mutateAsync({
-        bookingId: selectedBooking._id.toString(),
+        bookingId: submittedDialog.bookingId,
       });
       addToast({
         title: 'Booking Cancelled',
         description: 'Your booking has been successfully cancelled.',
         color: 'success',
       });
-      onCancelClose();
-      setSelectedBooking(null);
+      setDialog(current =>
+        current === submittedDialog ? { kind: 'closed' } : current
+      );
     } catch (error) {
       addToast({
         title: 'Error',
@@ -829,10 +831,10 @@ export default function BookingsPage() {
 
       {/* Booking Details Modal */}
       <Modal
-        isOpen={isDetailsOpen}
+        isOpen={dialog.kind === 'details'}
         scrollBehavior='inside'
         size='2xl'
-        onClose={onDetailsClose}
+        onClose={closeDialog}
       >
         <ModalContent>
           {(onClose: () => void) => (
@@ -1133,7 +1135,7 @@ export default function BookingsPage() {
       </Modal>
 
       {/* Cancel Booking Modal */}
-      <Modal isOpen={isCancelOpen} onClose={onCancelClose}>
+      <Modal isOpen={dialog.kind === 'cancel'} onClose={closeDialog}>
         <ModalContent>
           {(onClose: () => void) => (
             <>
@@ -1172,10 +1174,10 @@ export default function BookingsPage() {
 
       {/* Edit Booking Modal */}
       <Modal
-        isOpen={isEditOpen}
+        isOpen={dialog.kind === 'edit'}
         scrollBehavior='inside'
         size='2xl'
-        onClose={onEditClose}
+        onClose={closeDialog}
       >
         <ModalContent>
           {(onClose: () => void) => (
@@ -1198,12 +1200,20 @@ export default function BookingsPage() {
                       max={selectedBooking?.cabin?.capacity || 10}
                       min={1}
                       type='number'
-                      value={editFormData.numGuests.toString()}
+                      value={
+                        dialog.kind === 'edit'
+                          ? dialog.numGuests.toString()
+                          : ''
+                      }
                       onChange={e =>
-                        setEditFormData(prev => ({
-                          ...prev,
-                          numGuests: parseInt(e.target.value) || 1,
-                        }))
+                        setDialog(current =>
+                          current.kind === 'edit'
+                            ? {
+                                ...current,
+                                numGuests: parseInt(e.target.value) || 1,
+                              }
+                            : current
+                        )
                       }
                     />
                     {selectedBooking?.cabin?.capacity && (

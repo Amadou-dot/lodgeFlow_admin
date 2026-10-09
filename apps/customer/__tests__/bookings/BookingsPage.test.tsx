@@ -1,9 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type { BookingHistoryItem } from '@/types/booking-read';
 import BookingsPage from '@/app/bookings/page';
 import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 
 const mockUpdateBooking = jest.fn();
+let mockBookings: BookingHistoryItem[];
 
 const mockBooking: BookingHistoryItem = {
   _id: '507f1f77bcf86cd799439011',
@@ -74,7 +81,7 @@ jest.mock('@heroui/tabs', () => ({
 }));
 jest.mock('@/hooks/useBooking', () => ({
   useBookingHistory: () => ({
-    data: [mockBooking],
+    data: mockBookings,
     isLoading: false,
     error: null,
   }),
@@ -106,10 +113,13 @@ jest.mock('@/components/PaymentButton', () => ({
 }));
 jest.mock('@heroui/date-picker', () => ({ DatePicker: () => <div /> }));
 
-describe('booking history JSON in the bookings page', () => {
-  beforeEach(() => mockUpdateBooking.mockReset());
-  afterEach(() => jest.restoreAllMocks());
+beforeEach(() => {
+  mockUpdateBooking.mockReset();
+  mockBookings = [mockBooking];
+});
+afterEach(() => jest.restoreAllMocks());
 
+describe('booking history JSON in the bookings page', () => {
   it.each(['America/Denver', 'Asia/Tokyo'])(
     'preserves stay dates in the %s history and details',
     zone => {
@@ -185,4 +195,61 @@ describe('booking history JSON in the bookings page', () => {
       mockBooking.cabin = cabin;
     }
   });
+});
+
+it('details follow refreshed query records rather than the originally selected object', () => {
+  const view = render(<BookingsPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+  mockBookings = [{ ...mockBooking, numGuests: 4 }];
+  view.rerender(<BookingsPage />);
+  expect(screen.getByText('2 nights • 4 guests')).toBeInTheDocument();
+});
+it('opening another workflow replaces the previous dialog', () => {
+  render(<BookingsPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  expect(screen.queryByText('Booking Details')).not.toBeInTheDocument();
+  expect(screen.getByRole('spinbutton')).toBeInTheDocument();
+});
+it('an older update completion does not close a newer details dialog', async () => {
+  let finish: (value: unknown) => void = () => {};
+  mockUpdateBooking.mockReturnValue(
+    new Promise(resolve => {
+      finish = resolve;
+    })
+  );
+  render(<BookingsPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update Booking' }));
+  fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+  await act(async () => finish({ success: true }));
+  await waitFor(() =>
+    expect(screen.getByText('Booking Details')).toBeInTheDocument()
+  );
+  expect(screen.getByText('January 1, 2030')).toBeInTheDocument();
+});
+it('preserves draft changes made while an update is pending', async () => {
+  let finish: (value: unknown) => void = () => {};
+  mockUpdateBooking.mockReturnValue(
+    new Promise(resolve => {
+      finish = resolve;
+    })
+  );
+  render(<BookingsPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update Booking' }));
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '3' } });
+  await act(async () => finish({ success: true }));
+  await waitFor(() => expect(screen.getByRole('spinbutton')).toHaveValue(3));
+});
+it('preserves selected context and draft when the filtered query no longer contains it', () => {
+  const view = render(<BookingsPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '3' } });
+  mockBookings = [];
+  view.rerender(<BookingsPage />);
+  expect(screen.getByRole('spinbutton')).toHaveValue(3);
+  expect(
+    screen.getByText(/Update the number of guests for Pine/)
+  ).toBeInTheDocument();
 });

@@ -35,6 +35,7 @@ test('sends only the booking ID and refreshes existing payment/history caches', 
     body: JSON.stringify({ bookingId }),
   });
   expect(invalidate.mock.calls).toEqual([
+    [{ queryKey: ['booking', bookingId] }],
     [{ queryKey: ['payment-status'] }],
     [{ queryKey: ['bookings-history'] }],
   ]);
@@ -59,5 +60,5 @@ test('keeps caches on denial and retries the same booking successfully', async (
   expect(invalidate).not.toHaveBeenCalled();
   await expect(result.current.mutateAsync(bookingId)).resolves.toEqual({ url });
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(invalidate).toHaveBeenCalledTimes(2);
+  expect(invalidate).toHaveBeenCalledTimes(3);
 });
