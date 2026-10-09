@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/__tests__/shared/test-utils';
 import BookingConfirmation from '@/app/cabins/confirmation/[id]/page';
 import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';

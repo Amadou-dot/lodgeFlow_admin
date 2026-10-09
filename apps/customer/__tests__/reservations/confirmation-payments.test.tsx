@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/__tests__/shared/test-utils';
 import DiningConfirmation from '@/app/dining/confirmation/[id]/page';
 import ExperienceConfirmation from '@/app/experiences/confirmation/[id]/page';
 jest.mock('@clerk/nextjs', () => ({

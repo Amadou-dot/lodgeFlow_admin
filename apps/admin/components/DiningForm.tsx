@@ -9,7 +9,7 @@ import {
   DiningServingDetails,
   DiningSettingsToggles,
   DiningTagsManager,
-} from './DiningForm/';
+} from './DiningForm/index';
 
 interface DiningFormProps {
   dining?: Partial<Dining>;

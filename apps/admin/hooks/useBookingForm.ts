@@ -63,19 +63,6 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
   );
 
   const [specialRequestInput, setSpecialRequestInput] = useState('');
-  const [priceBreakdown, setPriceBreakdown] = useState<PriceBreakdown>({
-    cabinPrice: 0,
-    breakfastPrice: 0,
-    extraGuestFee: 0,
-    petFee: 0,
-    parkingFee: 0,
-    earlyCheckInFee: 0,
-    lateCheckOutFee: 0,
-    extrasPrice: 0,
-    totalPrice: 0,
-    depositAmount: 0,
-  });
-
   // Data fetching hooks
   const { data: cabins } = useCabins();
   const {
@@ -136,10 +123,9 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     [formData.checkInDate, formData.checkOutDate]
   );
 
-  // Price calculation effect
-  useEffect(() => {
+  const priceBreakdown = useMemo<PriceBreakdown>(() => {
     if (!selectedCabin || !settings || numNights <= 0) {
-      setPriceBreakdown({
+      return {
         cabinPrice: 0,
         breakfastPrice: 0,
         extraGuestFee: 0,
@@ -150,8 +136,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
         extrasPrice: 0,
         totalPrice: 0,
         depositAmount: 0,
-      });
-      return;
+      };
     }
 
     const discountedPrice =
@@ -203,7 +188,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
         })
       : 0;
 
-    setPriceBreakdown({
+    return {
       cabinPrice,
       breakfastPrice,
       extraGuestFee,
@@ -214,7 +199,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
       extrasPrice,
       totalPrice,
       depositAmount,
-    });
+    };
   }, [
     selectedCabin,
     settings,

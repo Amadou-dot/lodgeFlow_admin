@@ -22,7 +22,8 @@ import { formatCurrency } from '@/utils/utilityFunctions';
 import { getStatusColor } from '@/utils/bookingUtils';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useResourceLoad } from '@/hooks/useResourceLoad';
 import { useSettings } from '@/hooks/useSettings';
 import {
   LIFECYCLES,
@@ -42,42 +43,29 @@ export default function ReservationsPage() {
     to: search.get('to') ?? '',
   });
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<
-    Pick<ReservationInboxJson, 'rows' | 'total'>
-  >({
-    rows: [],
-    total: 0,
-  });
-  const [error, setError] = useState(''),
-    [loading, setLoading] = useState(true);
   const { data: settings } = useSettings();
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError('');
-    const params = new URLSearchParams({ page: String(page), limit: '25' });
-    for (const [key, value] of Object.entries(filters))
-      if (value) params.set(key, value);
-    fetch('/api/reservations?' + params, {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-      .then(async response => {
-        const result: ApiResponse<ReservationInboxJson> = await response.json();
-        if (!response.ok || !result.success)
-          throw new Error(
-            !result.success ? result.error : 'Unable to load reservations'
-          );
-        if (!controller.signal.aborted) setData(result.data);
-      })
-      .catch(e => {
-        if (!controller.signal.aborted) setError(e.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [filters, page]);
+  const params = new URLSearchParams({ page: String(page), limit: '25' });
+  for (const [key, value] of Object.entries(filters))
+    if (value) params.set(key, value);
+  const endpoint = '/api/reservations?' + params;
+  const request = useCallback(
+    async (
+      signal: AbortSignal
+    ): Promise<Pick<ReservationInboxJson, 'rows' | 'total'>> => {
+      const response = await fetch(endpoint, { signal, cache: 'no-store' });
+      const result: ApiResponse<ReservationInboxJson> = await response.json();
+      if (!response.ok || !result.success)
+        throw new Error(
+          !result.success ? result.error : 'Unable to load reservations'
+        );
+      return result.data;
+    },
+    [endpoint]
+  );
+  const { state, reload } = useResourceLoad({ resourceKey: endpoint, request });
+  const data = state.data ?? { rows: [], total: 0 };
+  const error = state.kind === 'error' ? state.message : '';
+  const loading = state.kind === 'loading';
   const setFilter = (key: keyof typeof filters, value: string) => {
     setFilters({ ...filters, [key]: value });
     setPage(1);
@@ -146,6 +134,9 @@ export default function ReservationsPage() {
         </Button>
       )}
       <OperationsError message={error} />
+      {error && (
+        <Button onPress={() => void reload().catch(() => {})}>Retry</Button>
+      )}
       {loading ? (
         <OperationsLoading label='Loading reservations…' />
       ) : (

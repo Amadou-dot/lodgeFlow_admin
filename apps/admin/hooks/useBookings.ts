@@ -19,22 +19,39 @@
  *    - Provides automatic cache invalidation after mutations
  *    - Enables optimistic updates when needed
  *
- * Cache Invalidation Flow:
- * ------------------------
- * When a mutation succeeds, we invalidate related React Query caches.
- * SWR caches are revalidated automatically on focus, or can be manually
- * triggered via the mutate() function returned by each read hook.
+ * Successful mutations invalidate related React Query caches and revalidate
+ * mounted SWR booking reads in the current provider.
  *
  * @see hooks/useCabins.ts - Same pattern for cabin operations
  * @see hooks/useCustomers.ts - Same pattern for customer operations
  */
 
 import { SWR_CONFIG } from '@/lib/config';
+import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type { BookingsFilters, PopulatedBooking } from '@/types';
 import type { CreateBookingInput, UpdateBookingInput } from '@/types/api';
 import { addToast } from '@heroui/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
+
+const isBookingReadKey = resourceReadKey('/api/bookings');
+
+const useRefreshBookingCaches = () => {
+  const queryClient = useQueryClient();
+  const { mutate } = useSWRConfig();
+
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['activities'] });
+    queryClient.invalidateQueries({ queryKey: ['overview'] });
+    queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
+    queryClient.invalidateQueries({ queryKey: ['booking-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['sales'] });
+    queryClient.invalidateQueries({ queryKey: ['durations'] });
+    // A read refresh failure must not turn the successful write into a retry.
+    void mutate(isBookingReadKey).catch(() => {});
+  };
+};
 
 interface BookingsResponse {
   bookings: PopulatedBooking[];
@@ -161,7 +178,7 @@ export const useBookingByEmail = (email: string) => {
 
 // Create a new booking
 export const useCreateBooking = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (
@@ -180,20 +197,13 @@ export const useCreateBooking = () => {
       const result = await response.json();
       return result.success ? result.data : result;
     },
-    onSuccess: () => {
-      // Invalidate React Query cache and revalidate SWR
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
-      // Note: SWR will be revalidated automatically on focus or manually via mutate
-    },
+    onSuccess: refreshBookingCaches,
   });
 };
 
 // Record payment for a booking
 export const useRecordPayment = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (data: {
@@ -220,18 +230,13 @@ export const useRecordPayment = () => {
       const result = await response.json();
       return result.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
-    },
+    onSuccess: refreshBookingCaches,
   });
 };
 
 // Update an existing booking
 export const useUpdateBooking = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (
@@ -251,10 +256,7 @@ export const useUpdateBooking = () => {
       return result.success ? result.data : result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
+      refreshBookingCaches();
       addToast({
         title: 'Booking updated',
         description: 'The booking has been updated successfully.',
@@ -273,7 +275,7 @@ export const useUpdateBooking = () => {
 
 // Delete a booking
 export const useDeleteBooking = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (bookingId: string): Promise<void> => {
@@ -285,18 +287,13 @@ export const useDeleteBooking = () => {
         throw new Error('Failed to delete booking');
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
-    },
+    onSuccess: refreshBookingCaches,
   });
 };
 
 // Check in a booking
 export const useCheckInBooking = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (bookingId: string): Promise<PopulatedBooking> => {
@@ -317,18 +314,13 @@ export const useCheckInBooking = () => {
       const result = await response.json();
       return result.success ? result.data : result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
-    },
+    onSuccess: refreshBookingCaches,
   });
 };
 
 // Check out a booking
 export const useCheckOutBooking = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (bookingId: string): Promise<PopulatedBooking> => {
@@ -349,18 +341,13 @@ export const useCheckOutBooking = () => {
       const result = await response.json();
       return result.success ? result.data : result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
-    },
+    onSuccess: refreshBookingCaches,
   });
 };
 
 // Confirm a booking
 export const useConfirmBooking = () => {
-  const queryClient = useQueryClient();
+  const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
     mutationFn: async (bookingId: string): Promise<PopulatedBooking> => {
@@ -381,11 +368,6 @@ export const useConfirmBooking = () => {
       const result = await response.json();
       return result.success ? result.data : result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['activities'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
-      queryClient.invalidateQueries({ queryKey: ['booking-analytics'] });
-    },
+    onSuccess: refreshBookingCaches,
   });
 };

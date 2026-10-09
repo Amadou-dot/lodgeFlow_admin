@@ -2,8 +2,11 @@
 
 import { usePermission } from '@/components/AuthGuard';
 
-import { useCreateDining, useUpdateDining } from '@/hooks/useDining';
-import { Dining } from '@/types';
+import type {
+  CreateDiningInput,
+  UpdateDiningInput,
+} from '@/lib/validations/dining';
+import type { Dining } from '@/types';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
 import {
@@ -24,6 +27,9 @@ interface DiningModalProps {
   dining?: Dining;
   mode: 'view' | 'create' | 'edit';
   onEdit?: (dining: Dining) => void;
+  onCreateSubmit: (data: Partial<CreateDiningInput>) => Promise<unknown>;
+  onUpdateSubmit: (data: UpdateDiningInput) => Promise<unknown>;
+  isSaving: boolean;
 }
 
 const formatTime = (time: string) => {
@@ -40,20 +46,21 @@ export const DiningModal = ({
   dining,
   mode,
   onEdit,
+  onCreateSubmit,
+  onUpdateSubmit,
+  isSaving,
 }: DiningModalProps) => {
   const canWrite = usePermission('cabins:write');
-  const createDining = useCreateDining();
-  const updateDining = useUpdateDining();
 
   const isViewMode = mode === 'view';
-  const isLoading = createDining.isPending || updateDining.isPending;
 
   const handleSubmit = async (data: Partial<Dining>) => {
+    if (isSaving) return;
     try {
       if (mode === 'create') {
-        await createDining.mutateAsync(data);
+        await onCreateSubmit(data);
       } else if (mode === 'edit' && dining?._id) {
-        await updateDining.mutateAsync({ ...data, _id: dining._id });
+        await onUpdateSubmit({ ...data, _id: dining._id });
       }
       onClose();
     } catch (error) {
@@ -276,7 +283,7 @@ export const DiningModal = ({
               dining={dining || undefined}
               onSubmit={handleSubmit}
               onCancel={onClose}
-              isLoading={isLoading}
+              isLoading={isSaving}
             />
           )}
         </ModalBody>

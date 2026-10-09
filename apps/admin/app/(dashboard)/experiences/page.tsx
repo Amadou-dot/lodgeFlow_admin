@@ -1,5 +1,6 @@
 'use client';
 
+import type { CatalogDialog } from '@/types/catalog-dialog';
 import { usePermission } from '@/components/AuthGuard';
 
 import DeletionModal from '@/components/DeletionModal';
@@ -13,6 +14,7 @@ import {
   useCreateExperience,
   useDeleteExperience,
   useExperiences,
+  useUpdateExperience,
 } from '@/hooks/useExperiences';
 import type { FormData } from '@/components/AddExperienceForm/types';
 import type {
@@ -47,14 +49,9 @@ function ExperienceCardSkeleton() {
 export default function ExperiencesPage() {
   const canWrite = usePermission('cabins:write');
   const [filters, setFilters] = useState<ExperienceFiltersType>({});
-  const [selectedExperience, setSelectedExperience] =
-    useState<Experience | null>(null);
-  const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>(
-    'view'
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [experienceToDelete, setExperienceToDelete] =
-    useState<Experience | null>(null);
+  const [dialog, setDialog] = useState<CatalogDialog<Experience>>({
+    kind: 'closed',
+  });
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   useEffect(() => {
@@ -78,33 +75,28 @@ export default function ExperiencesPage() {
     refetch,
   } = useExperiences(filters);
   const createExperience = useCreateExperience();
+  const updateExperience = useUpdateExperience();
   const deleteExperience = useDeleteExperience();
 
   const handleViewExperience = (item: Experience) => {
-    setSelectedExperience(item);
-    setModalMode('view');
-    setIsModalOpen(true);
+    setDialog({ kind: 'view', item: item });
   };
 
   const handleCreateExperience = () => {
-    setSelectedExperience(null);
-    setModalMode('create');
-    setIsModalOpen(true);
+    setDialog({ kind: 'create' });
   };
 
   const handleEditExperience = (item: Experience) => {
-    setSelectedExperience(item);
-    setModalMode('edit');
-    setIsModalOpen(true);
+    setDialog({ kind: 'edit', item: item });
   };
 
   const handleDeleteExperience = (item: Experience) => {
-    setExperienceToDelete(item);
+    setDialog({ kind: 'delete', item: item });
   };
 
+  // A completed request may close only the dialog that started it.
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedExperience(null);
+    setDialog(current => (current === dialog ? { kind: 'closed' } : current));
   };
 
   const handleResetFilters = () => {
@@ -357,26 +349,39 @@ export default function ExperiencesPage() {
         </>
       )}
 
-      {/* Modal */}
-      <ExperienceModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        experience={selectedExperience ?? undefined}
-        mode={modalMode}
-        onEdit={handleEditExperience}
-        onCreateSubmit={handleCreateSubmit}
-      />
+      {(dialog.kind === 'create' ||
+        dialog.kind === 'view' ||
+        dialog.kind === 'edit') && (
+        <ExperienceModal
+          key={
+            dialog.kind === 'create'
+              ? 'create'
+              : `${dialog.kind}:${dialog.item._id}`
+          }
+          isOpen
+          onClose={handleCloseModal}
+          experience={dialog.kind === 'create' ? undefined : dialog.item}
+          mode={dialog.kind}
+          onEdit={handleEditExperience}
+          onCreateSubmit={handleCreateSubmit}
+          isCreating={createExperience.isPending}
+          onUpdateSubmit={updateExperience.mutateAsync}
+          isUpdating={updateExperience.isPending}
+        />
+      )}
 
-      {/* Delete Confirmation Modal */}
-      {experienceToDelete && experienceToDelete._id && (
+      {dialog.kind === 'delete' && (
         <DeletionModal
-          resourceId={experienceToDelete._id}
+          key={dialog.item._id}
+          resourceId={dialog.item._id}
           resourceName='Experience'
-          itemName={experienceToDelete.name}
+          itemName={dialog.item.name}
           onDelete={deleteExperience}
-          onResourceDeleted={() => setExperienceToDelete(null)}
-          isOpen={true}
-          onOpenChange={open => !open && setExperienceToDelete(null)}
+          onResourceDeleted={handleCloseModal}
+          isOpen
+          onOpenChange={open => {
+            if (!open) handleCloseModal();
+          }}
         />
       )}
     </div>

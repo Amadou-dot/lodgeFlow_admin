@@ -78,16 +78,16 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-10-09): Phase 3 is prepared for review on
-`refactor/phase3-money`, based on `2aa8756`. The
-[money boundary inventory and evidence](phase-3-money.md) records preserved units,
-rounding and accounting, plus the focused invalid-value and payment-input fixes.
-Final validation passes formatting/read-only lint, 2,387 tests (admin 1,520;
-customer 771; database 93; email 3), strict compilation of all eight touched admin
-test files, the isolated HTTP gate, frozen installation and all
-credential-free production builds. Independent review has no remaining findings.
-This is local implementation evidence. Remote CI and preview status are recorded
-on the review PR; merge and production verification remain pending.
+Current execution status (2026-10-09): Phase 3 merged in
+[PR #194](https://github.com/Amadou-dot/lodgeFlow_admin/pull/194) at `9f8b1a8`.
+Phase 4 is implemented on `refactor/phase4-ui-state` from that base. The
+[UI state/cache inventory and evidence](phase-4-ui-state.md) separates migrated
+families, intentional fixes and verification boundaries. Final local gates pass
+formatting/read-only lint, 2,497 tests, both app type checks, strict compilation of
+20 changed admin test files, isolated HTTP checks, frozen installation and all
+credential-free production builds. Representative browser checks remain unrun:
+CUA is unavailable and this checkout has no existing Playwright runner. Remote CI and review status are recorded on
+the draft PR; merge and production verification remain separate.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151). The historical
@@ -113,9 +113,12 @@ production builds. Remote CI, merge and deployment verification are not part of
 this review checkpoint.
 
 The earlier Phase 1–2 review checkpoint preceded the user's 2026-10-08
-authorization to implement Phase 3. Phase 3 is now complete locally; stop before
-Phase 4. The milestone stays open: UI workflow state, remaining provider-origin
-review and Phase 6 test infrastructure are still separate work.
+authorization to implement Phase 3, now merged at `9f8b1a8`. The user authorized
+Phase 4 implementation and a draft PR on 2026-10-09. Its scope and verification
+are recorded in [phase-4-ui-state.md](phase-4-ui-state.md). Phase 4's implementation
+and automated validation are complete; browser verification remains unchecked.
+Remaining provider-origin review and Phase 6 verification stay separate, and the
+milestone remains open.
 The [Phase 1–2 syntax review](inventory-current.json) accounts for
 remaining boundary exceptions and concrete later-phase debt; it does not claim
 that the whole repository meets every final milestone criterion.
@@ -286,9 +289,13 @@ Dependencies: Phases 1–2 for each flow; Phase 3 for payment UI.
 
 Acceptance:
 
-- [ ] Invalid workflow-state combinations cannot be constructed in migrated components.
-- [ ] Focused hook/component tests cover success, failure, retry and cache refresh.
+- [x] Invalid workflow-state combinations cannot be constructed in migrated components.
+- [x] Focused hook/component tests cover success, failure, retry and cache refresh.
 - [ ] Representative customer/staff interactions are checked in-browser where credentials permit; blockers remain explicit.
+
+Implementation, regression evidence and the browser verification limits are
+recorded in [phase-4-ui-state.md](phase-4-ui-state.md). The draft PR retains this
+manual gate for review; automated checks do not substitute for browser sign-off.
 
 ### Phase 5 — Provider configuration and existing email repair
 

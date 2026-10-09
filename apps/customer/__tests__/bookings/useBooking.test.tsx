@@ -100,6 +100,7 @@ describe('useCreateBooking', () => {
       [{ queryKey: ['bookings-history'] }],
       [{ queryKey: ['activities'] }],
       [{ queryKey: ['overview'] }],
+      [{ queryKey: ['cabin-availability'] }],
     ]);
   });
 
@@ -385,9 +386,11 @@ describe('useCancelBooking', () => {
     const response = await result.current.mutateAsync({ bookingId: '1' });
     expect(response).toEqual(mockResponse);
     expect(invalidate.mock.calls).toEqual([
+      [{ queryKey: ['booking', '1'] }],
       [{ queryKey: ['bookings-history'] }],
       [{ queryKey: ['bookings'] }],
       [{ queryKey: ['refund-estimate', '1'] }],
+      [{ queryKey: ['cabin-availability'] }],
     ]);
 
     expect(global.fetch).toHaveBeenCalledWith('/api/bookings/1', {

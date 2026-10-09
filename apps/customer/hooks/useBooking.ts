@@ -1,3 +1,8 @@
+import { useSWRConfig } from 'swr';
+import {
+  fetchConfirmationDetail,
+  type ConfirmationDetailOptions,
+} from '@/hooks/useConfirmation';
 import type {
   CreateBookingRequest,
   UpdateBookingDetailsInput,
@@ -16,6 +21,7 @@ import type {
  */
 export const useCreateBooking = () => {
   const queryClient = useQueryClient();
+  const { mutate } = useSWRConfig();
 
   return useMutation({
     mutationFn: async (
@@ -38,7 +44,12 @@ export const useCreateBooking = () => {
       queryClient.invalidateQueries({ queryKey: ['bookings-history'] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
       queryClient.invalidateQueries({ queryKey: ['overview'] });
-      // Note: SWR will be revalidated automatically on focus or manually via mutate
+      queryClient.invalidateQueries({ queryKey: ['cabin-availability'] });
+      void mutate(
+        key =>
+          typeof key === 'string' &&
+          /^\/api\/cabins\/[^/]+\/availability$/.test(key)
+      );
     },
   });
 };
@@ -70,10 +81,29 @@ export const useBookingHistory = (status?: string) => {
 /**
  * Hook to fetch a single booking by ID
  */
-export const useBookingById = (bookingId: string) => {
+export const useBookingById = (
+  bookingId: string,
+  options: ConfirmationDetailOptions = {}
+) => {
+  const queryClient = useQueryClient();
   return useQuery({
-    enabled: !!bookingId,
-    queryFn: async (): Promise<BookingDetail | null> => {
+    enabled: !!bookingId && options.enabled !== false,
+    ...(options.mode === 'confirmation' ? { retry: false } : {}),
+    queryFn: async (context): Promise<BookingDetail | null> => {
+      if (options.mode === 'confirmation') {
+        const { signal } = context;
+        return fetchConfirmationDetail<BookingDetail>({
+          url: `/api/bookings/${bookingId}`,
+          loadError: 'Failed to load booking',
+          notFoundError: 'Booking not found',
+          statusError: 'Failed to load booking',
+          onUnavailable: () => {
+            if (!signal.aborted)
+              queryClient.setQueryData(['booking', bookingId], null);
+          },
+        });
+      }
+
       const response = await fetch(`/api/bookings/${bookingId}`);
 
       if (!response.ok) {
@@ -153,6 +183,7 @@ export const useRefundEstimate = (bookingId: string) => {
  */
 export const useCancelBooking = () => {
   const queryClient = useQueryClient();
+  const { mutate } = useSWRConfig();
 
   return useMutation({
     mutationFn: async ({
@@ -176,12 +207,21 @@ export const useCancelBooking = () => {
       return response.json();
     },
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['booking', variables.bookingId],
+      });
       // Invalidate all booking-related queries
       queryClient.invalidateQueries({ queryKey: ['bookings-history'] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({
         queryKey: ['refund-estimate', variables.bookingId],
       });
+      queryClient.invalidateQueries({ queryKey: ['cabin-availability'] });
+      void mutate(
+        key =>
+          typeof key === 'string' &&
+          /^\/api\/cabins\/[^/]+\/availability$/.test(key)
+      );
     },
   });
 };

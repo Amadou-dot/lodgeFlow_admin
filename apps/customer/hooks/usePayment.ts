@@ -26,7 +26,8 @@ export const useCreateCheckoutSession = () => {
       const data: ApiResponse<{ url: string }> = await response.json();
       return data.data!;
     },
-    onSuccess: () => {
+    onSuccess: (_, bookingId) => {
+      queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['payment-status'] });
       queryClient.invalidateQueries({ queryKey: ['bookings-history'] });
     },

@@ -9,11 +9,14 @@ import { Spinner } from '@heroui/spinner';
 import { CheckCircle, Home, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import {
+  useConfirmationId,
+  isUnavailableConfirmationError,
+} from '@/hooks/useConfirmation';
+import { useBookingById } from '@/hooks/useBooking';
 
 import PaymentButton from '@/components/PaymentButton';
 import { formatBookingStayDate } from '@/lib/booking-date';
-import type { BookingDetail } from '@/types/booking-read';
 
 type Params = Promise<{
   id: string;
@@ -24,51 +27,18 @@ export default function BookingConfirmationPage({
 }: {
   params: Params;
 }) {
-  const [bookingId, setBookingId] = useState<string>('');
-  const [booking, setBooking] = useState<BookingDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
-
-  useEffect(() => {
-    const getBookingId = async () => {
-      const { id } = await params;
-      setBookingId(id);
-    };
-
-    getBookingId();
-  }, [params]);
-
-  useEffect(() => {
-    const fetchBooking = async () => {
-      if (!bookingId || !isLoaded) return;
-
-      try {
-        const response = await fetch(`/api/bookings/${bookingId}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || 'Failed to load booking');
-          setIsLoading(false);
-          return;
-        }
-
-        if (!data.success) {
-          setError(data.error || 'Booking not found');
-          setIsLoading(false);
-          return;
-        }
-
-        setBooking(data.data);
-        setIsLoading(false);
-      } catch (err) {
-        setError('Failed to load booking');
-        setIsLoading(false);
-      }
-    };
-
-    fetchBooking();
-  }, [bookingId, isLoaded]);
+  const bookingId = useConfirmationId(params);
+  const {
+    data: booking,
+    isPending: isLoading,
+    error: queryError,
+    refetch,
+  } = useBookingById(bookingId, { enabled: isLoaded, mode: 'confirmation' });
+  const error =
+    !booking || isUnavailableConfirmationError(queryError)
+      ? queryError?.message
+      : undefined;
 
   if (isLoading || !isLoaded) {
     return (
@@ -79,7 +49,7 @@ export default function BookingConfirmationPage({
   }
 
   // Check if user is authorized
-  if (user && booking && booking.customer !== user.id) {
+  if (!error && (!user || (booking && booking.customer !== user.id))) {
     return (
       <div className='flex flex-col justify-center items-center min-h-screen gap-6 px-4'>
         <Card className='max-w-md w-full p-6'>
@@ -119,6 +89,15 @@ export default function BookingConfirmationPage({
                 'The booking you are looking for does not exist or has been removed.'}
             </p>
             <Divider className='my-2' />
+            <Button
+              color='primary'
+              variant='flat'
+              onPress={() => {
+                void refetch();
+              }}
+            >
+              Try Again
+            </Button>
             <Link className='w-full' href='/cabins'>
               <Button
                 className='w-full'

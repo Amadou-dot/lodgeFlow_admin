@@ -3,6 +3,11 @@ let capturedMutationConfig: any = null;
 
 const mockInvalidateQueries = jest.fn();
 const mockQueryClient = { invalidateQueries: mockInvalidateQueries };
+const mockMutate = jest.fn(() => Promise.resolve());
+
+jest.mock('swr', () => ({
+  useSWRConfig: () => ({ mutate: mockMutate }),
+}));
 
 jest.mock('@tanstack/react-query', () => ({
   useMutation: jest.fn((config: any) => {

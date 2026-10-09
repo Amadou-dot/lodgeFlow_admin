@@ -1,7 +1,11 @@
 'use client';
 
 import { ReservationCheckout } from '@/components/ReservationCheckout';
-import { useEffect, useState } from 'react';
+import {
+  useConfirmationId,
+  isUnavailableConfirmationError,
+} from '@/hooks/useConfirmation';
+import { useDiningReservationById } from '@/hooks/useDiningReservation';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
@@ -23,50 +27,22 @@ import { title, subtitle } from '@/components/primitives';
 
 type Params = Promise<{ id: string }>;
 
-import type { DiningReservationDetail as DiningReservationData } from '@lodgeflow/database/reservation-json';
 export default function DiningConfirmationPage({ params }: { params: Params }) {
-  const [reservationId, setReservationId] = useState<string>('');
-  const [reservation, setReservation] = useState<DiningReservationData | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user, isLoaded } = useUser();
-
-  useEffect(() => {
-    const getId = async () => {
-      const { id } = await params;
-      setReservationId(id);
-    };
-    getId();
-  }, [params]);
-
-  useEffect(() => {
-    const fetchReservation = async () => {
-      if (!reservationId || !isLoaded) return;
-
-      try {
-        const response = await fetch(
-          `/api/dining-reservations/${reservationId}`
-        );
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          setError(data.error || 'Reservation not found');
-          setIsLoading(false);
-          return;
-        }
-
-        setReservation(data.data);
-        setIsLoading(false);
-      } catch {
-        setError('Failed to load reservation');
-        setIsLoading(false);
-      }
-    };
-
-    fetchReservation();
-  }, [reservationId, isLoaded]);
+  const reservationId = useConfirmationId(params);
+  const {
+    data: reservation,
+    isPending: isLoading,
+    error: queryError,
+    refetch,
+  } = useDiningReservationById(reservationId, {
+    enabled: isLoaded,
+    mode: 'confirmation',
+  });
+  const error =
+    !reservation || isUnavailableConfirmationError(queryError)
+      ? queryError?.message
+      : undefined;
 
   if (isLoading || !isLoaded) {
     return (
@@ -76,7 +52,7 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
     );
   }
 
-  if (user && reservation && reservation.customer !== user.id) {
+  if (!error && (!user || (reservation && reservation.customer !== user.id))) {
     return (
       <div className='flex flex-col justify-center items-center min-h-screen gap-6 px-4'>
         <Card className='max-w-md w-full p-6'>
@@ -107,6 +83,15 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
             <p className='text-default-600'>
               {error || 'The reservation does not exist or has been removed.'}
             </p>
+            <Button
+              color='primary'
+              variant='flat'
+              onPress={() => {
+                void refetch();
+              }}
+            >
+              Try Again
+            </Button>
             <Link className='w-full' href='/dining'>
               <Button className='w-full' color='primary' variant='flat'>
                 Browse Dining

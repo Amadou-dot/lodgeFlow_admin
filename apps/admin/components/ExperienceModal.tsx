@@ -2,8 +2,8 @@
 
 import { usePermission } from '@/components/AuthGuard';
 
-import { useUpdateExperience } from '@/hooks/useExperiences';
-import { Experience } from '@/types';
+import type { UpdateExperienceInput } from '@/lib/validations/experience';
+import type { Experience } from '@/types';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
 import {
@@ -23,32 +23,46 @@ import { getDifficultyColor } from './ExperienceCard';
 
 interface ExperienceModalProps {
   isOpen: boolean;
+  isCreating?: boolean;
   onClose: () => void;
   experience?: Experience;
   mode: 'view' | 'create' | 'edit';
   onEdit?: (experience: Experience) => void;
   onCreateSubmit?: (formData: FormData) => void;
+  onUpdateSubmit: (data: UpdateExperienceInput) => Promise<unknown>;
+  isUpdating: boolean;
 }
 
 export const ExperienceModal = ({
   isOpen,
+  isCreating = false,
   onClose,
   experience,
   mode,
   onEdit,
   onCreateSubmit,
+  onUpdateSubmit,
+  isUpdating,
 }: ExperienceModalProps) => {
   const canWrite = usePermission('cabins:write');
-  const updateExperience = useUpdateExperience();
-  const [formData, setFormData] = useState<FormData>({} as FormData);
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    title: '',
+    description: '',
+    category: '',
+    duration: '',
+    price: 0,
+    capacity: 0,
+    location: '',
+  });
 
   const isViewMode = mode === 'view';
-  const isLoading = updateExperience.isPending;
+  const isLoading = mode === 'create' ? isCreating : isUpdating;
 
   const handleEditSave = async (updatedExperience: Experience) => {
-    if (!experience?._id) return;
+    if (!experience?._id || isUpdating) return;
     try {
-      await updateExperience.mutateAsync({
+      await onUpdateSubmit({
         ...updatedExperience,
         _id: experience._id,
       });
@@ -63,10 +77,7 @@ export const ExperienceModal = ({
   };
 
   const handleCreateSubmit = () => {
-    if (onCreateSubmit) {
-      onCreateSubmit(formData);
-      setFormData({} as FormData);
-    }
+    if (onCreateSubmit && !isLoading) onCreateSubmit(formData);
   };
 
   return (
