@@ -2,8 +2,7 @@
 
 import { usePermission } from '@/components/AuthGuard';
 
-import { useCreateCabin, useUpdateCabin } from '@/hooks/useCabins';
-import type { Cabin } from '@/types';
+import type { Cabin, CreateCabinData, UpdateCabinData } from '@/types';
 import { isImageUrl } from '@/utils/utilityFunctions';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
@@ -27,6 +26,9 @@ interface CabinModalProps {
   cabin: Cabin | null;
   mode: 'view' | 'create' | 'edit';
   onEdit?: (cabin: Cabin) => void;
+  onCreateSubmit: (data: CreateCabinData) => Promise<unknown>;
+  onUpdateSubmit: (data: UpdateCabinData) => Promise<unknown>;
+  isSaving: boolean;
 }
 
 export default function CabinModal({
@@ -35,6 +37,9 @@ export default function CabinModal({
   cabin,
   mode,
   onEdit,
+  onCreateSubmit,
+  onUpdateSubmit,
+  isSaving,
 }: CabinModalProps) {
   const canWrite = usePermission('cabins:write');
   const [formData, setFormData] = useState({
@@ -62,8 +67,6 @@ export default function CabinModal({
   });
   const isValidImage =
     imageValidation.url === formData.image && imageValidation.valid;
-  const createCabin = useCreateCabin();
-  const updateCabin = useUpdateCabin();
 
   useEffect(() => {
     if (cabin && (mode === 'edit' || mode === 'view')) {
@@ -128,11 +131,12 @@ export default function CabinModal({
   }, [formData.image, isOpen]);
 
   const handleSubmit = async () => {
+    if (isSaving) return;
     try {
       if (mode === 'create') {
-        await createCabin.mutateAsync(formData);
+        await onCreateSubmit(formData);
       } else if (mode === 'edit' && cabin) {
-        await updateCabin.mutateAsync({
+        await onUpdateSubmit({
           ...formData,
           _id: cabin._id,
         });
@@ -191,7 +195,6 @@ export default function CabinModal({
   } as const;
 
   const isViewMode = mode === 'view';
-  const isLoading = createCabin.isPending || updateCabin.isPending;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size='2xl' scrollBehavior='inside'>
@@ -704,7 +707,7 @@ export default function CabinModal({
             <Button
               color='primary'
               onPress={handleSubmit}
-              isLoading={isLoading}
+              isLoading={isSaving}
               isDisabled={!formData.name.trim() || !formData.image.trim()}
             >
               {mode === 'create' ? 'Create Cabin' : 'Save Changes'}

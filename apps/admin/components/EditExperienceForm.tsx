@@ -10,7 +10,7 @@ import {
   FormActions,
   MediaVisualsSection,
   type EditExperienceFormProps,
-} from './EditExperienceForm/';
+} from './EditExperienceForm/index';
 import { Experience } from '@/types';
 
 export default function EditExperienceForm({

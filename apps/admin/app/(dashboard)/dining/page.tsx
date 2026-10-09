@@ -10,7 +10,12 @@ import DiningStats from '@/components/DiningStats';
 import DiningTableView from '@/components/DiningTableView';
 import DeletionModal from '@/components/DeletionModal';
 import { GridIcon, ListIcon, PlusIcon } from '@/components/icons';
-import { useDining, useDeleteDining } from '@/hooks/useDining';
+import {
+  useDining,
+  useCreateDining,
+  useDeleteDining,
+  useUpdateDining,
+} from '@/hooks/useDining';
 import type { Dining, DiningFilters as DiningFiltersType } from '@/types';
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
@@ -57,6 +62,8 @@ export default function DiningPage() {
   };
 
   const { data: dining, isLoading, error, refetch } = useDining(filters);
+  const createDining = useCreateDining();
+  const updateDining = useUpdateDining();
   const deleteDining = useDeleteDining();
 
   const handleViewDining = (item: Dining) => {
@@ -258,6 +265,9 @@ export default function DiningPage() {
           dining={dialog.kind === 'create' ? undefined : dialog.item}
           mode={dialog.kind}
           onEdit={handleEditDining}
+          onCreateSubmit={createDining.mutateAsync}
+          onUpdateSubmit={updateDining.mutateAsync}
+          isSaving={createDining.isPending || updateDining.isPending}
         />
       )}
 

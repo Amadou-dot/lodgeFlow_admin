@@ -80,15 +80,24 @@ export const useDiningReservationById = (
   reservationId: string,
   options: ConfirmationDetailOptions = {}
 ) => {
+  const queryClient = useQueryClient();
   return useQuery({
     enabled: !!reservationId && options.enabled !== false,
     ...(options.mode === 'confirmation' ? { retry: false } : {}),
-    queryFn: async (): Promise<PopulatedDiningReservation | null> => {
+    queryFn: async (context): Promise<PopulatedDiningReservation | null> => {
       if (options.mode === 'confirmation') {
+        const { signal } = context;
         return fetchConfirmationDetail<PopulatedDiningReservation>({
           url: `/api/dining-reservations/${reservationId}`,
           loadError: 'Failed to load reservation',
           notFoundError: 'Reservation not found',
+          onUnavailable: () => {
+            if (!signal.aborted)
+              queryClient.setQueryData(
+                ['dining-reservation', reservationId],
+                null
+              );
+          },
         });
       }
 

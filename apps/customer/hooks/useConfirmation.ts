@@ -48,11 +48,13 @@ export async function fetchConfirmationDetail<T>({
   loadError,
   notFoundError,
   statusError = notFoundError,
+  onUnavailable,
 }: {
   url: string;
   loadError: string;
   notFoundError: string;
   statusError?: string;
+  onUnavailable: () => void;
 }): Promise<T | null> {
   let response: Response;
   let result: ApiResponse<T>;
@@ -62,22 +64,29 @@ export async function fetchConfirmationDetail<T>({
     throw new Error(loadError);
   }
   try {
-    result = await response.json();
-  } catch {
-    throw new ConfirmationRequestError({
-      message: loadError,
-      status: response.status,
-    });
+    try {
+      result = await response.json();
+    } catch {
+      throw new ConfirmationRequestError({
+        message: loadError,
+        status: response.status,
+      });
+    }
+    if (!response.ok)
+      throw new ConfirmationRequestError({
+        message: result.error || statusError,
+        status: response.status,
+      });
+    if (!result.success)
+      throw new ConfirmationRequestError({
+        message: result.error || notFoundError,
+        status: response.status,
+      });
+  } catch (error) {
+    // Clear denied data immediately before rejection so later transient retries
+    // and remounts cannot restore it, while preserving the server's error.
+    if (isUnavailableConfirmationError(error)) onUnavailable();
+    throw error;
   }
-  if (!response.ok)
-    throw new ConfirmationRequestError({
-      message: result.error || statusError,
-      status: response.status,
-    });
-  if (!result.success)
-    throw new ConfirmationRequestError({
-      message: result.error || notFoundError,
-      status: response.status,
-    });
   return result.data || null;
 }

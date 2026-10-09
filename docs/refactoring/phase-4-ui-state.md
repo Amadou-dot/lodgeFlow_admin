@@ -115,7 +115,7 @@ touched-file read-only lint. Fifteen confirmation cases cover cached sign-out,
 test that review found dependent on earlier tests also passes independently after
 moving fixture/reset hooks to file scope. Scoped re-review approves both fixes.
 
-Final automated gates on the reviewed source:
+Automated gates on the original PR head (`dfa137b`):
 
 | Gate | Result |
 | --- | --- |
@@ -133,6 +133,52 @@ runtime, proxy, dependency, configuration or HTTP-harness source changed in this
 phase. The HTTP result therefore covers the unchanged server contracts consumed
 by the final client code.
 
+## PR #195 review corrections
+
+The subsequent review reproduced three sequence-dependent regressions missed by
+the original tests:
+
+- Opening a completed popup document for writing clears its event handlers.
+  `usePrintBooking` now explicitly opens the stream before registering load and
+  lifecycle handlers. The regression models that missing jsdom behavior while
+  retaining real HTML parsing. A separate Chromium check executes the hook with
+  native popup/document operations: printing occurs once, the popup closes, the
+  promise resolves and the operation returns to idle. Only the system print call
+  and React hook plumbing are substituted in that check.
+- Catalog mutation hooks now belong to their pages, so closing or changing a
+  dialog does not discard a pending request's state. Cabin/dining creates and all
+  three catalog edits stay disabled across dialog remounts. Tests use the actual
+  pages, forms and mutation hooks with delayed transport, covering failed saves,
+  retries, successful completion and protection of the newer dialog. Two form
+  imports now explicitly name their `index` module so these real components also
+  resolve through the existing Jest transformer.
+- A definitive confirmation denial removes the affected record from its shared
+  detail cache. Later transient retries or page remounts cannot restore that
+  record without a successful read. The regression covers all three resources,
+  401/403/404 denials, network/503 failures and authorized recovery, while retaining
+  cached data on transient-only failures. Canceled requests cannot evict a newer
+  successful read.
+
+These corrections preserve server/API authorization and payment accounting.
+Catalog regression transport is controlled; it does not establish browser or
+MongoDB concurrency behavior. The targeted Chromium check establishes the popup
+lifecycle, not hosted login or the full application's browser acceptance.
+
+Post-correction validation with Node 22.23.2 and pnpm 11.17.0:
+
+- Workspace formatting and read-only ESLint checks pass. The four package test
+  suites pass separately: admin 1,583, customer 845, database 93 and email 3
+  (2,524 total, including 27 new regressions that failed before their fixes).
+- Both app type checks pass, as does separate strict compilation of the five
+  admin test files touched by these corrections; no compiler settings weakened.
+- `pnpm test:http` passes with disposable databases and controlled providers.
+- Offline frozen installation and both production app builds pass in a clean
+  source copy with a credential-free environment and CI's throwaway public Clerk
+  key. The builds retain their expected static-generation fallback warnings.
+- The native Chromium popup lifecycle check and `git diff --check` pass.
+- Independent integration review finds no remaining actionable issues and
+  independently passes the catalog, confirmation and print regression suites.
+
 ## Review and verification boundary
 
 Each of the three implementation slices received independent spec and quality
@@ -140,15 +186,13 @@ review, followed by a bounded fix round and scoped re-review. Final integration
 review is recorded with the draft PR. Remote CI and preview status belong to the
 exact pushed commit; the local results above do not assert those outcomes.
 
-Representative browser interactions remain unchecked. The connected CUA workflow
-exposes no browser, and opening its in-app browser reports that it is unavailable.
-This is not a finding that all browser testing on the computer is unavailable:
-Chromium is cached locally. This checkout has no Playwright configuration, test
-script or installed Playwright runner; the lockfile mentions only Next's optional
-peer. No runner was installed or security setting changed. Hosted Clerk
-login/sign-out, real popup behavior, responsive layout, keyboard/focus behavior
-and visual rendering still need browser review. jsdom and the HTTP harness cover
-their stated local boundaries only.
+Representative application browser interactions remain unchecked. The original
+implementation reported an unavailable connected CUA workflow and no installed
+Playwright runner in this checkout. Review and the corrections above used cached
+Chromium directly for the isolated native popup lifecycle check; no runner was
+installed or security setting changed. Hosted Clerk login/sign-out, responsive
+layout, keyboard/focus behavior and visual rendering still need browser review.
+jsdom and the HTTP harness cover their stated local boundaries only.
 
 The unchanged `apps/customer/app/payments/success/page.tsx` displays static payment
 success wording without checking settlement; correcting that page is separate

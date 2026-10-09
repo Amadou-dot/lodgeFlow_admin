@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CabinConfirmation from '@/app/cabins/confirmation/[id]/page';
 import DiningConfirmation from '@/app/dining/confirmation/[id]/page';
 import ExperienceConfirmation from '@/app/experiences/confirmation/[id]/page';
+import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 
 let mockLoaded = true;
 let mockSignedIn = true;
@@ -23,6 +24,8 @@ jest.mock('@clerk/nextjs', () => ({
     isLoaded: mockLoaded,
   }),
 }));
+// The shared framer-motion mock cannot render HeroUI's click ripple.
+// Keep our payment components and their query hooks real.
 jest.mock('@heroui/button', () => ({
   Button: ({
     children,
@@ -31,13 +34,6 @@ jest.mock('@heroui/button', () => ({
     children: React.ReactNode;
     onPress?: () => void;
   }) => <button onClick={onPress}>{children}</button>,
-}));
-jest.mock('@/components/PaymentButton', () => ({
-  __esModule: true,
-  default: () => <button>Checkout</button>,
-}));
-jest.mock('@/components/ReservationCheckout', () => ({
-  ReservationCheckout: () => <button>Checkout</button>,
 }));
 
 const cases = [
@@ -76,7 +72,7 @@ function fixture({
     return {
       ...common,
       id,
-      cabin: null,
+      cabin: createCabinFixture(),
       checkInDate: '2030-06-01',
       checkOutDate: '2030-06-03',
       numGuests: 2,
@@ -115,6 +111,7 @@ function setup(Page: typeof CabinConfirmation, id = 'first', retry = 0) {
   return {
     client,
     ...view,
+    element,
     change: (params: Promise<{ id: string }>) => view.rerender(element(params)),
   };
 }
@@ -217,7 +214,7 @@ for (const { kind, Page, key, noun } of cases) {
     });
     expect(await screen.findByText('Unauthorized Access')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Checkout' })
+      screen.queryByRole('button', { name: /^Pay / })
     ).not.toBeInTheDocument();
   });
   test(`${kind} waits for Clerk before fetching`, async () => {
@@ -325,7 +322,7 @@ for (const { kind, Page, key } of cases) {
       ).toBeInTheDocument();
       expect(screen.queryByText('private-record')).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Checkout' })
+        screen.queryByRole('button', { name: /^Pay / })
       ).not.toBeInTheDocument();
     }
   );
@@ -343,5 +340,140 @@ for (const { kind, Page, key } of cases) {
     });
     expect(screen.getByText('private-record')).toBeInTheDocument();
     expect(screen.queryByText(/Not Found/)).not.toBeInTheDocument();
+  });
+}
+
+for (const { kind, Page, key, noun } of cases) {
+  test(`${kind} ignores a canceled request's denial after a newer authorized read`, async () => {
+    const data = fixture({ kind, id: 'private-record' });
+    jest.mocked(fetch).mockResolvedValue({
+      ...response({ success: true, data }),
+      status: 200,
+    } as Response);
+    const view = setup(Page, 'private-record');
+    await screen.findByText('private-record');
+
+    let finishOlderRequest: (value: Response) => void = () => {};
+    jest.mocked(fetch).mockReturnValueOnce(
+      new Promise(resolve => {
+        finishOlderRequest = resolve;
+      })
+    );
+    await act(async () => {
+      void view.client.invalidateQueries({
+        queryKey: [key, 'private-record'],
+      });
+    });
+    const authorizedData = {
+      ...data,
+      specialRequests: ['Fresh authorized details'],
+    };
+    jest.mocked(fetch).mockResolvedValue({
+      ...response({ success: true, data: authorizedData }),
+      status: 200,
+    } as Response);
+    await act(async () => {
+      await view.client.invalidateQueries({
+        queryKey: [key, 'private-record'],
+      });
+    });
+    expect(
+      await screen.findByText('Fresh authorized details')
+    ).toBeInTheDocument();
+    await act(async () => {
+      finishOlderRequest({
+        ...response(
+          { success: false, error: 'Record no longer accessible' },
+          false
+        ),
+        status: 404,
+      } as Response);
+    });
+    expect(view.client.getQueryData([key, 'private-record'])).toEqual(
+      authorizedData
+    );
+    expect(screen.getByText('Fresh authorized details')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Pay / })).toBeInTheDocument();
+  });
+
+  describe.each([401, 403, 404])(`${kind} after HTTP %s`, status => {
+    test.each(['network failure', 'HTTP 503'] as const)(
+      'keeps denied detail and checkout hidden through a %s retry and remount until an authorized read succeeds',
+      async failure => {
+        const data = fixture({ kind, id: 'private-record' });
+        jest.mocked(fetch).mockResolvedValue({
+          ...response({ success: true, data }),
+          status: 200,
+        } as Response);
+        const view = setup(Page, 'private-record');
+        await screen.findByText('private-record');
+        expect(
+          screen.getByRole('button', { name: /^Pay / })
+        ).toBeInTheDocument();
+
+        jest.mocked(fetch).mockResolvedValue({
+          ...response(
+            { success: false, error: 'Record no longer accessible' },
+            false
+          ),
+          status,
+        } as Response);
+        await act(async () => {
+          await view.client.invalidateQueries({
+            queryKey: [key, 'private-record'],
+          });
+        });
+        expect(
+          await screen.findByText('Record no longer accessible')
+        ).toBeInTheDocument();
+        expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: /^Pay / })
+        ).not.toBeInTheDocument();
+
+        if (failure === 'network failure') {
+          jest.mocked(fetch).mockRejectedValue(new Error('offline'));
+        } else {
+          jest.mocked(fetch).mockResolvedValue({
+            ...response(
+              { success: false, error: 'Temporarily unavailable' },
+              false
+            ),
+            status: 503,
+          } as Response);
+        }
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+        });
+        expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: /^Pay / })
+        ).not.toBeInTheDocument();
+        const retryError =
+          failure === 'network failure'
+            ? `Failed to load ${noun}`
+            : 'Temporarily unavailable';
+        expect(await screen.findByText(retryError)).toBeInTheDocument();
+
+        view.unmount();
+        render(view.element(Promise.resolve({ id: 'private-record' })));
+        expect(await screen.findByText(retryError)).toBeInTheDocument();
+        expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: /^Pay / })
+        ).not.toBeInTheDocument();
+
+        jest.mocked(fetch).mockResolvedValue({
+          ...response({ success: true, data }),
+          status: 200,
+        } as Response);
+        fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+        expect(await screen.findByText('private-record')).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: /^Pay / })
+        ).toBeInTheDocument();
+        expect(screen.queryByText(retryError)).not.toBeInTheDocument();
+      }
+    );
   });
 }

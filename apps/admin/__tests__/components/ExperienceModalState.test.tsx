@@ -2,9 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { FormProps, FormData } from '@/components/AddExperienceForm/types';
 import { ExperienceModal } from '@/components/ExperienceModal';
 jest.mock('@/components/AuthGuard', () => ({ usePermission: () => true }));
-jest.mock('@/hooks/useExperiences', () => ({
-  useUpdateExperience: () => ({ isPending: false }),
-}));
 jest.mock('@/components/EditExperienceForm', () => ({
   __esModule: true,
   default: () => null,
@@ -33,6 +30,8 @@ test('a failed create handled by the page keeps the entered modal draft for retr
       mode='create'
       onClose={jest.fn()}
       onCreateSubmit={submit}
+      onUpdateSubmit={async () => undefined}
+      isUpdating={false}
     />
   );
   fireEvent.change(await screen.findByLabelText('Title'), {
@@ -54,6 +53,8 @@ test('create pending follows the page mutation and prevents submission', async (
       isCreating
       onClose={jest.fn()}
       onCreateSubmit={submit}
+      onUpdateSubmit={async () => undefined}
+      isUpdating={false}
     />
   );
   const button = await screen.findByRole('button', {

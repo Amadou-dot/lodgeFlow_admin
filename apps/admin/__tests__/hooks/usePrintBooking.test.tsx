@@ -166,6 +166,63 @@ test('popup printing remains busy until load and print complete, then permits an
   jest.useRealTimers();
 });
 
+test('popup printing survives the document stream clearing existing load handlers', async () => {
+  jest.useFakeTimers();
+  const frame = document.createElement('iframe');
+  document.body.appendChild(frame);
+  const popup = frame.contentWindow;
+  if (!popup) throw new Error('Missing popup window');
+  jest.spyOn(window, 'open').mockReturnValue(popup);
+  const print = jest.spyOn(popup, 'print').mockImplementation(() => {});
+  jest.spyOn(popup, 'close').mockImplementation(() => {});
+
+  // jsdom does not model document.open clearing window event handlers or
+  // document.write implicitly opening a completed about:blank document.
+  // Keep the real HTML parsing, and model only those browser stream semantics.
+  let streamOpen = false;
+  const stream: { open: () => Document } = popup.document;
+  const openDocument = stream.open.bind(popup.document);
+  const writeDocument = popup.document.write.bind(popup.document);
+  jest.spyOn(stream, 'open').mockImplementation(() => {
+    streamOpen = true;
+    popup.onload = null;
+    return openDocument();
+  });
+  jest.spyOn(popup.document, 'write').mockImplementation((...content) => {
+    if (!streamOpen) popup.document.open();
+    writeDocument(...content);
+  });
+  jest.spyOn(popup.document, 'close').mockImplementation(() => {
+    streamOpen = false;
+    popup.dispatchEvent(new Event('load'));
+  });
+
+  const { result } = renderHook(() => usePrintBooking(booking));
+  let completed = false;
+  act(() => {
+    void result.current.handlePrint('booking-pdf-template').then(() => {
+      completed = true;
+    });
+  });
+  expect(result.current.isPrinting).toBe(true);
+  expect(popup.document.body).toHaveTextContent('Booking');
+  await act(async () => {
+    jest.advanceTimersByTime(500);
+  });
+  try {
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(completed).toBe(true);
+    expect(result.current.isPrinting).toBe(false);
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    // Also release the pending operation when the regression is present.
+    Object.defineProperty(popup, 'closed', { configurable: true, value: true });
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+    });
+  }
+});
+
 test.each([true, false])(
   'pre-load popup closure settles and permits PDF retry (pagehide=%p)',
   async emitPagehide => {

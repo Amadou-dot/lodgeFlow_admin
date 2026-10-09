@@ -54,18 +54,23 @@ jest.mock('@/components/AuthGuard', () => ({
 }));
 jest.mock('@/hooks/useCabins', () => ({
   useCabins: () => ({ data: [mockCabin], isLoading: false }),
+  useCreateCabin: () => ({ isPending: false, mutateAsync: jest.fn() }),
+  useUpdateCabin: () => ({ isPending: false, mutateAsync: jest.fn() }),
   useDeleteCabin: () => ({}),
   useBulkDeleteCabins: () => ({}),
   useBulkUpdateDiscount: () => ({}),
 }));
 jest.mock('@/hooks/useDining', () => ({
   useDining: () => ({ data: [mockDining], isLoading: false }),
+  useCreateDining: () => ({ isPending: false, mutateAsync: jest.fn() }),
+  useUpdateDining: () => ({ isPending: false, mutateAsync: jest.fn() }),
   useDeleteDining: () => ({}),
 }));
 jest.mock('@/hooks/useExperiences', () => ({
   useExperiences: () => ({ data: [mockExperience], isLoading: false }),
   useDeleteExperience: () => ({}),
   useCreateExperience: () => ({}),
+  useUpdateExperience: () => ({ isPending: false, mutateAsync: jest.fn() }),
 }));
 jest.mock('@/components/CabinStats', () => ({
   __esModule: true,

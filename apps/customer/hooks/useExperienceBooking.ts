@@ -77,15 +77,21 @@ export const useExperienceBookingById = (
   bookingId: string,
   options: ConfirmationDetailOptions = {}
 ) => {
+  const queryClient = useQueryClient();
   return useQuery({
     enabled: !!bookingId && options.enabled !== false,
     ...(options.mode === 'confirmation' ? { retry: false } : {}),
-    queryFn: async (): Promise<PopulatedExperienceBooking | null> => {
+    queryFn: async (context): Promise<PopulatedExperienceBooking | null> => {
       if (options.mode === 'confirmation') {
+        const { signal } = context;
         return fetchConfirmationDetail<PopulatedExperienceBooking>({
           url: `/api/experience-bookings/${bookingId}`,
           loadError: 'Failed to load booking',
           notFoundError: 'Booking not found',
+          onUnavailable: () => {
+            if (!signal.aborted)
+              queryClient.setQueryData(['experience-booking', bookingId], null);
+          },
         });
       }
 

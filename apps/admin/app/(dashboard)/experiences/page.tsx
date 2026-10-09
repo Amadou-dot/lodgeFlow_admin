@@ -14,6 +14,7 @@ import {
   useCreateExperience,
   useDeleteExperience,
   useExperiences,
+  useUpdateExperience,
 } from '@/hooks/useExperiences';
 import type { FormData } from '@/components/AddExperienceForm/types';
 import type {
@@ -74,6 +75,7 @@ export default function ExperiencesPage() {
     refetch,
   } = useExperiences(filters);
   const createExperience = useCreateExperience();
+  const updateExperience = useUpdateExperience();
   const deleteExperience = useDeleteExperience();
 
   const handleViewExperience = (item: Experience) => {
@@ -363,6 +365,8 @@ export default function ExperiencesPage() {
           onEdit={handleEditExperience}
           onCreateSubmit={handleCreateSubmit}
           isCreating={createExperience.isPending}
+          onUpdateSubmit={updateExperience.mutateAsync}
+          isUpdating={updateExperience.isPending}
         />
       )}
 

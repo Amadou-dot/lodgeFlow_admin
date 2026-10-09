@@ -205,6 +205,10 @@ export const usePrintBooking = (
         </html>
       `;
 
+        // Opening the stream clears the popup's event handlers. Do this before
+        // registering them so document.write cannot implicitly erase onload.
+        printWindow.document.open();
+
         // Keep the operation busy until the popup has loaded and printed.
         await new Promise<void>((resolve, reject) => {
           let settled = false;

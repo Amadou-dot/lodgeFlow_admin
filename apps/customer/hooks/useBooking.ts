@@ -85,16 +85,22 @@ export const useBookingById = (
   bookingId: string,
   options: ConfirmationDetailOptions = {}
 ) => {
+  const queryClient = useQueryClient();
   return useQuery({
     enabled: !!bookingId && options.enabled !== false,
     ...(options.mode === 'confirmation' ? { retry: false } : {}),
-    queryFn: async (): Promise<BookingDetail | null> => {
+    queryFn: async (context): Promise<BookingDetail | null> => {
       if (options.mode === 'confirmation') {
+        const { signal } = context;
         return fetchConfirmationDetail<BookingDetail>({
           url: `/api/bookings/${bookingId}`,
           loadError: 'Failed to load booking',
           notFoundError: 'Booking not found',
           statusError: 'Failed to load booking',
+          onUnavailable: () => {
+            if (!signal.aborted)
+              queryClient.setQueryData(['booking', bookingId], null);
+          },
         });
       }
 

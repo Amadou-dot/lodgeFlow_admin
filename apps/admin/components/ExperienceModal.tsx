@@ -2,8 +2,8 @@
 
 import { usePermission } from '@/components/AuthGuard';
 
-import { useUpdateExperience } from '@/hooks/useExperiences';
-import { Experience } from '@/types';
+import type { UpdateExperienceInput } from '@/lib/validations/experience';
+import type { Experience } from '@/types';
 import { Button } from '@heroui/button';
 import { Chip } from '@heroui/chip';
 import {
@@ -29,6 +29,8 @@ interface ExperienceModalProps {
   mode: 'view' | 'create' | 'edit';
   onEdit?: (experience: Experience) => void;
   onCreateSubmit?: (formData: FormData) => void;
+  onUpdateSubmit: (data: UpdateExperienceInput) => Promise<unknown>;
+  isUpdating: boolean;
 }
 
 export const ExperienceModal = ({
@@ -39,9 +41,10 @@ export const ExperienceModal = ({
   mode,
   onEdit,
   onCreateSubmit,
+  onUpdateSubmit,
+  isUpdating,
 }: ExperienceModalProps) => {
   const canWrite = usePermission('cabins:write');
-  const updateExperience = useUpdateExperience();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     title: '',
@@ -54,12 +57,12 @@ export const ExperienceModal = ({
   });
 
   const isViewMode = mode === 'view';
-  const isLoading = mode === 'create' ? isCreating : updateExperience.isPending;
+  const isLoading = mode === 'create' ? isCreating : isUpdating;
 
   const handleEditSave = async (updatedExperience: Experience) => {
-    if (!experience?._id) return;
+    if (!experience?._id || isUpdating) return;
     try {
-      await updateExperience.mutateAsync({
+      await onUpdateSubmit({
         ...updatedExperience,
         _id: experience._id,
       });

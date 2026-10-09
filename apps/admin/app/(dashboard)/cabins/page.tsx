@@ -15,7 +15,9 @@ import {
   useBulkDeleteCabins,
   useBulkUpdateDiscount,
   useCabins,
+  useCreateCabin,
   useDeleteCabin,
+  useUpdateCabin,
 } from '@/hooks/useCabins';
 import type { Cabin, CabinFilters as CabinFiltersType } from '@/types';
 import { Button } from '@heroui/button';
@@ -71,6 +73,8 @@ export default function CabinsPage() {
   };
 
   const { data: cabins, isLoading, error, refetch } = useCabins(filters);
+  const createCabin = useCreateCabin();
+  const updateCabin = useUpdateCabin();
   const deleteCabin = useDeleteCabin();
   const bulkDelete = useBulkDeleteCabins();
   const bulkUpdateDiscount = useBulkUpdateDiscount();
@@ -356,6 +360,9 @@ export default function CabinsPage() {
           cabin={dialog.kind === 'create' ? null : dialog.item}
           mode={dialog.kind}
           onEdit={handleEditCabin}
+          onCreateSubmit={createCabin.mutateAsync}
+          onUpdateSubmit={updateCabin.mutateAsync}
+          isSaving={createCabin.isPending || updateCabin.isPending}
         />
       )}
 

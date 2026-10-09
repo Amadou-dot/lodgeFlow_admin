@@ -11,10 +11,11 @@ import type { Cabin, CreateCabinData, UpdateCabinData } from '@/types';
 
 const mockCreate = jest.fn<Promise<void>, [CreateCabinData]>();
 const mockUpdate = jest.fn<Promise<void>, [UpdateCabinData]>();
-jest.mock('@/hooks/useCabins', () => ({
-  useCreateCabin: () => ({ mutateAsync: mockCreate, isPending: false }),
-  useUpdateCabin: () => ({ mutateAsync: mockUpdate, isPending: false }),
-}));
+const mutationProps = {
+  onCreateSubmit: mockCreate,
+  onUpdateSubmit: mockUpdate,
+  isSaving: false,
+};
 jest.mock('@/components/AuthGuard', () => ({ usePermission: () => true }));
 jest.mock('@/utils/utilityFunctions', () => ({
   isImageUrl: jest.fn().mockResolvedValue(true),
@@ -56,7 +57,15 @@ beforeEach(() => {
 
 test('edits JSON data with omitted legacy null options and only writable fields', async () => {
   const close = jest.fn();
-  render(<CabinModal isOpen onClose={close} cabin={cabin} mode='edit' />);
+  render(
+    <CabinModal
+      {...mutationProps}
+      isOpen
+      onClose={close}
+      cabin={cabin}
+      mode='edit'
+    />
+  );
   fireEvent.change(await screen.findByDisplayValue('Pine Cabin'), {
     target: { value: 'Renamed Cabin' },
   });
@@ -83,6 +92,7 @@ test('view mode passes the same JSON cabin to the edit action', async () => {
   const edit = jest.fn();
   render(
     <CabinModal
+      {...mutationProps}
       isOpen
       onClose={jest.fn()}
       cabin={cabin}
@@ -96,7 +106,15 @@ test('view mode passes the same JSON cabin to the edit action', async () => {
 });
 
 test('create mode accepts explicit absent cabin data', async () => {
-  render(<CabinModal isOpen onClose={jest.fn()} cabin={null} mode='create' />);
+  render(
+    <CabinModal
+      {...mutationProps}
+      isOpen
+      onClose={jest.fn()}
+      cabin={null}
+      mode='create'
+    />
+  );
   expect(
     await screen.findByRole('button', { name: 'Create Cabin' })
   ).toBeDisabled();
@@ -114,7 +132,15 @@ test('ignores a late image validation from the previous URL', async () => {
         })
       : Promise.resolve(false)
   );
-  render(<CabinModal isOpen onClose={jest.fn()} cabin={cabin} mode='edit' />);
+  render(
+    <CabinModal
+      {...mutationProps}
+      isOpen
+      onClose={jest.fn()}
+      cabin={cabin}
+      mode='edit'
+    />
+  );
   fireEvent.change(await screen.findByDisplayValue(cabin.image), {
     target: { value: 'https://example.invalid/broken.jpg' },
   });
