@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { useMutation } from '@tanstack/react-query';
 import { AppSettings } from '@/types';
 
@@ -42,6 +42,7 @@ export const useSettings = () => {
 
 // Update settings
 export const useUpdateSettings = () => {
+  const { mutate } = useSWRConfig();
   return useMutation({
     mutationFn: async (settings: Partial<AppSettings>) => {
       const response = await fetch('/api/settings', {
@@ -61,11 +62,15 @@ export const useUpdateSettings = () => {
       }
       throw new Error(result.error || 'Failed to update settings');
     },
+    onSuccess: () => {
+      void mutate('/api/settings').catch(() => {});
+    },
   });
 };
 
 // Reset settings to defaults
 export const useResetSettings = () => {
+  const { mutate } = useSWRConfig();
   return useMutation({
     mutationFn: async (): Promise<AppSettings> => {
       const response = await fetch('/api/settings', {
@@ -80,6 +85,9 @@ export const useResetSettings = () => {
         return result.data;
       }
       throw new Error(result.error || 'Failed to reset settings');
+    },
+    onSuccess: () => {
+      void mutate('/api/settings').catch(() => {});
     },
   });
 };

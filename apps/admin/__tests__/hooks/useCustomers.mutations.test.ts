@@ -10,6 +10,11 @@ interface MutationConfig {
   mutationFn: (input: MutationInput) => Promise<unknown>;
 }
 const mockFetch = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
+const mockMutate = jest.fn(() => Promise.resolve());
+
+jest.mock('swr', () => ({
+  useSWRConfig: () => ({ mutate: mockMutate }),
+}));
 
 // Mock @tanstack/react-query before imports
 let capturedMutationConfig: MutationConfig | null = null;

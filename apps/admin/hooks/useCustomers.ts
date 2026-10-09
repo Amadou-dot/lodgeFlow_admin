@@ -6,6 +6,7 @@ import type {
 } from '@/lib/validations/customer';
 
 import { SWR_CONFIG } from '@/lib/config';
+import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type {
   Customer,
   CustomersFilters,
@@ -15,8 +16,35 @@ import type {
   CustomerPaginationMeta,
   ApiResponse,
 } from '@/types';
-import { useMutation } from '@tanstack/react-query';
-import useSWR from 'swr';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import useSWR, { useSWRConfig } from 'swr';
+
+const isCustomerReadKey = resourceReadKey('/api/customers');
+const isBookingReadKey = resourceReadKey('/api/bookings');
+type DashboardRefresh = 'overview' | 'activities' | 'both';
+type CustomerRefreshOptions = {
+  dashboard?: DashboardRefresh;
+  populatedBookings?: boolean;
+};
+
+const useRefreshCustomerCaches = () => {
+  const queryClient = useQueryClient();
+  const { mutate } = useSWRConfig();
+
+  return ({ dashboard, populatedBookings }: CustomerRefreshOptions = {}) => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    if (dashboard === 'overview' || dashboard === 'both') {
+      queryClient.invalidateQueries({ queryKey: ['overview'] });
+    }
+    if (dashboard === 'activities' || dashboard === 'both') {
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    }
+    void mutate(isCustomerReadKey).catch(() => {});
+    if (populatedBookings) {
+      void mutate(isBookingReadKey).catch(() => {});
+    }
+  };
+};
 
 interface CustomersListResponse {
   customers: Customer[];
@@ -112,6 +140,7 @@ export const useCustomer = (id: string) => {
 
 // Create customer
 export const useCreateCustomer = () => {
+  const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<Customer, Error, CreateCustomerInput>({
     mutationFn: async (
       customerData: CreateCustomerInput
@@ -135,11 +164,13 @@ export const useCreateCustomer = () => {
       }
       throw new Error(result.error || 'Failed to create customer');
     },
+    onSuccess: () => refreshCustomerCaches({ dashboard: 'overview' }),
   });
 };
 
 // Update customer
 export const useUpdateCustomer = () => {
+  const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<Customer, Error, UpdateCustomerRequest & { id: string }>({
     mutationFn: async (
       customerData: UpdateCustomerRequest & { id: string }
@@ -163,11 +194,17 @@ export const useUpdateCustomer = () => {
       }
       throw new Error(result.error || 'Failed to update customer');
     },
+    onSuccess: () =>
+      refreshCustomerCaches({
+        dashboard: 'activities',
+        populatedBookings: true,
+      }),
   });
 };
 
 // Delete customer
 export const useDeleteCustomer = () => {
+  const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<{ success: boolean }, Error, string>({
     mutationFn: async (id: string): Promise<{ success: boolean }> => {
       const response = await fetch(`/api/customers/${id}`, {
@@ -185,11 +222,13 @@ export const useDeleteCustomer = () => {
       }
       throw new Error(result.error || 'Failed to delete customer');
     },
+    onSuccess: () => refreshCustomerCaches({ dashboard: 'both' }),
   });
 };
 
 // Lock customer
 export const useLockCustomer = () => {
+  const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<{ success: boolean }, Error, string>({
     mutationFn: async (id: string): Promise<{ success: boolean }> => {
       const response = await fetch(`/api/customers/${id}/lock`, {
@@ -207,11 +246,13 @@ export const useLockCustomer = () => {
       }
       throw new Error(result.error || 'Failed to lock customer');
     },
+    onSuccess: () => refreshCustomerCaches(),
   });
 };
 
 // Unlock customer
 export const useUnlockCustomer = () => {
+  const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<{ success: boolean }, Error, string>({
     mutationFn: async (id: string): Promise<{ success: boolean }> => {
       const response = await fetch(`/api/customers/${id}/lock`, {
@@ -229,5 +270,6 @@ export const useUnlockCustomer = () => {
       }
       throw new Error(result.error || 'Failed to unlock customer');
     },
+    onSuccess: () => refreshCustomerCaches(),
   });
 };

@@ -174,3 +174,43 @@ test('preview formatter rejects invalid transport amounts', () => {
   const { result } = renderHook(() => useBookingForm());
   expect(() => result.current.formatCurrency(Infinity)).toThrow();
 });
+
+test('draft changes and refreshed settings render with their current price, without a stale preview', () => {
+  mockSettings = settings;
+  const previews: Array<{
+    guests: number;
+    breakfastRate?: number;
+    price: number;
+  }> = [];
+  const { result, rerender } = renderHook(() => {
+    const form = useBookingForm();
+    previews.push({
+      guests: form.formData.numGuests,
+      breakfastRate: form.settings?.breakfastPrice,
+      price: form.priceBreakdown.breakfastPrice,
+    });
+    return form;
+  });
+
+  act(() => {
+    result.current.handleInputChange('cabin', mockCabins[0]._id);
+    result.current.handleInputChange('checkInDate', '2040-01-01');
+    result.current.handleInputChange('checkOutDate', '2040-01-03');
+    result.current.handleInputChange('hasBreakfast', true);
+    result.current.handleInputChange('numGuests', 2);
+  });
+  expect(result.current.priceBreakdown.breakfastPrice).toBe(10);
+
+  const beforeRefresh = previews.length;
+  mockSettings = { ...settings, breakfastPrice: 3 };
+  rerender();
+  expect(previews.slice(beforeRefresh)).toEqual([
+    { guests: 2, breakfastRate: 3, price: 12 },
+  ]);
+
+  const beforeDraft = previews.length;
+  act(() => result.current.handleInputChange('numGuests', 3));
+  expect(previews.slice(beforeDraft)).toEqual([
+    { guests: 3, breakfastRate: 3, price: 18 },
+  ]);
+});

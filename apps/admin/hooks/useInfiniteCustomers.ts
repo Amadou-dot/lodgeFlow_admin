@@ -1,99 +1,88 @@
-import type { Customer } from '@/types';
-import { useCallback, useEffect, useState } from 'react';
+import type { Customer, CustomersResponse } from '@/types';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
-// Custom hook for infinite scrolling customers with search support
+const PAGE_SIZE = 20;
+
+async function fetchCustomersPage({
+  page,
+  search,
+}: {
+  page: number;
+  search: string;
+}): Promise<CustomersResponse> {
+  const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+  const response = await fetch(
+    `/api/customers?page=${page}&limit=${PAGE_SIZE}${searchParam}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch customers');
+  const result: CustomersResponse = await response.json();
+  if (!result.success) throw new Error('Failed to fetch customers');
+  return result;
+}
+
+// Search and pagination are one query per search term, so late responses cannot
+// replace the visible result for a newer term.
 export function useInfiniteCustomers() {
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<Customer[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const limit = 20; // Items per page
+  const loadingNextFor = useRef<string | null>(null);
+  const query = useInfiniteQuery({
+    queryKey: ['customers', searchTerm],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      fetchCustomersPage({ page: pageParam, search: searchTerm }),
+    getNextPageParam: lastPage =>
+      lastPage.pagination.hasNextPage
+        ? lastPage.pagination.currentPage + 1
+        : undefined,
+    retry: false,
+  });
 
-  const loadCustomers = async (currentPage: number, search?: string) => {
-    try {
-      setIsLoading(true);
-      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-      const response = await fetch(
-        `/api/customers?page=${currentPage}&limit=${limit}${searchParam}`
-      );
-      const result = await response.json();
+  const customers = useMemo(() => {
+    const seen = new Set<string>();
+    return (query.data?.pages ?? []).flatMap(page =>
+      page.data.filter((customer: Customer) => {
+        if (seen.has(customer.id)) return false;
+        seen.add(customer.id);
+        return true;
+      })
+    );
+  }, [query.data]);
 
-      if (result.success) {
-        const newCustomers = result.data || [];
-        setHasMore(result.pagination?.hasNextPage || false);
-
-        if (search) {
-          // For search, replace results completely
-          if (currentPage === 1) {
-            setSearchResults(newCustomers);
-          } else {
-            setSearchResults(prev => [...prev, ...newCustomers]);
-          }
-        } else {
-          // For normal loading, append to allCustomers
-          if (currentPage === 1) {
-            setAllCustomers(newCustomers);
-          } else {
-            // Ensure no duplicates when infinite scrolling
-            setAllCustomers(prev => {
-              const existingIds = new Set(
-                prev.map((customer: Customer) => customer.id)
-              );
-              const uniqueNewCustomers = newCustomers.filter(
-                (customer: Customer) => !existingIds.has(customer.id)
-              );
-              return [...prev, ...uniqueNewCustomers];
-            });
-          }
-        }
+  const searchCustomers = useCallback(
+    async (search: string) => {
+      const nextSearch = search.trim();
+      if (nextSearch === searchTerm && query.isError) {
+        await query.refetch();
+      } else {
+        setSearchTerm(nextSearch);
       }
-    } catch (error) {
-      // Handle error silently for production
-      setHasMore(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [query, searchTerm]
+  );
 
-  // Search customers with debouncing
-  const searchCustomers = useCallback(async (search: string) => {
-    if (!search.trim()) {
-      setIsSearching(false);
-      setSearchResults([]);
-      setSearchTerm('');
+  const onLoadMore = useCallback(() => {
+    if (
+      !query.hasNextPage ||
+      query.isFetching ||
+      loadingNextFor.current === searchTerm
+    )
       return;
-    }
-
-    setIsSearching(true);
-    setSearchTerm(search);
-    setPage(1);
-    await loadCustomers(1, search);
-    setIsSearching(false);
-  }, []);
-
-  useEffect(() => {
-    loadCustomers(1);
-  }, []);
-
-  const onLoadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    loadCustomers(nextPage, searchTerm || undefined);
-  };
-
-  // Return search results if searching, otherwise return all customers
-  const customers = searchTerm ? searchResults : allCustomers;
+    loadingNextFor.current = searchTerm;
+    void query.fetchNextPage().finally(() => {
+      if (loadingNextFor.current === searchTerm) loadingNextFor.current = null;
+    });
+  }, [query, searchTerm]);
 
   return {
     customers,
-    hasMore,
-    isLoading: isLoading || isSearching,
+    hasMore:
+      (!query.isError || query.isFetchNextPageError) &&
+      (query.hasNextPage ?? true),
+    isLoading: query.isFetching,
     onLoadMore,
     searchCustomers,
-    isSearching,
+    isSearching: Boolean(searchTerm) && query.isFetching,
     searchTerm,
   };
 }
