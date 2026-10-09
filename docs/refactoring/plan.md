@@ -78,7 +78,18 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-10-07): Phase 0 is delivered in
+Current execution status (2026-10-09): Phase 3 is prepared for review on
+`refactor/phase3-money`, based on `2aa8756`. The
+[money boundary inventory and evidence](phase-3-money.md) records preserved units,
+rounding and accounting, plus the focused invalid-value and payment-input fixes.
+Final validation passes formatting/read-only lint, 2,387 tests (admin 1,520;
+customer 771; database 93; email 3), strict compilation of all eight touched admin
+test files, the isolated HTTP gate, frozen installation and all
+credential-free production builds. Independent review has no remaining findings.
+This is local implementation evidence. Remote CI and preview status are recorded
+on the review PR; merge and production verification remain pending.
+
+Historical execution status (2026-10-07): Phase 0 is delivered in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151). The historical
 Phase 1–2 deliveries run through [PR #189](https://github.com/Amadou-dot/lodgeFlow_admin/pull/189)
 and base commit `4d3590b`. Their per-slice evidence remains in
@@ -101,10 +112,11 @@ files, the isolated HTTP gate, frozen installation and both app/shared package
 production builds. Remote CI, merge and deployment verification are not part of
 this review checkpoint.
 
-The user requested a review checkpoint after all Phase 1–2 work and before Phase
-3. Stop at that checkpoint. The milestone stays open: money units, UI workflow
-state, remaining provider-origin review and Phase 6 test infrastructure are still
-separate work. The [current syntax review](inventory-current.json) accounts for
+The earlier Phase 1–2 review checkpoint preceded the user's 2026-10-08
+authorization to implement Phase 3. Phase 3 is now complete locally; stop before
+Phase 4. The milestone stays open: UI workflow state, remaining provider-origin
+review and Phase 6 test infrastructure are still separate work.
+The [Phase 1–2 syntax review](inventory-current.json) accounts for
 remaining boundary exceptions and concrete later-phase debt; it does not claim
 that the whole repository meets every final milestone criterion.
 
@@ -256,10 +268,10 @@ Dependencies: Phases 1–2 for payment flows.
 
 Acceptance:
 
-- [ ] Money crossings are explicit and typed; no scattered raw conversion remains in migrated flows.
-- [ ] Tests cover precision, non-finite values, safe-integer bounds and sign rules.
-- [ ] Deposit due remains distinct from received money; retries cannot duplicate receipts or exceed balances/refunds.
-- [ ] Existing amounts and rounding remain unchanged; database tests and both app suites/builds pass.
+- [x] Money crossings are explicit and typed; no scattered raw conversion remains in migrated flows.
+- [x] Tests cover precision, non-finite values, safe-integer bounds and sign rules.
+- [x] Deposit due remains distinct from received money; retries cannot duplicate receipts or exceed balances/refunds.
+- [x] Existing amounts and rounding remain unchanged; database tests and both app suites/builds pass.
 
 ### Phase 4 — UI state, hooks, and cache consistency
 

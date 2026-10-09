@@ -1089,6 +1089,32 @@ try {
   assert.equal(persisted.totalPrice, 300);
   assert.equal(persisted.depositAmount, 75);
   assert.equal(persisted.payments.length, 0);
+  const beforeInvalidMoney = JSON.stringify(persisted);
+  const callsBeforeInvalidMoney = calls.length;
+  for (const amount of [0.001, 1.005, Number.MAX_SAFE_INTEGER]) {
+    for (const body of [
+      { recordPayment: { paymentMethod: 'cash', amountPaid: amount } },
+      { status: 'cancelled', refundStatus: 'partial', refundAmount: amount },
+    ]) {
+      const rejected = await request({
+        origin: admin,
+        route: `/api/bookings/${bookingId}`,
+        identity: 'admin',
+        method: 'PATCH',
+        body,
+        status: 400,
+      });
+      assert.equal(rejected.success, false);
+      assert.equal(
+        JSON.stringify(await Booking.findById(bookingId).lean()),
+        beforeInvalidMoney
+      );
+    }
+  }
+  assert.equal(calls.length, callsBeforeInvalidMoney);
+  console.log(
+    'PASS exact-cent receipt/refund and safe-range rejection without booking or provider effects'
+  );
   const beforeOccupiedAvailability = JSON.stringify(persisted);
   assert.deepEqual(
     await request({
@@ -2513,6 +2539,7 @@ try {
     { 'contactInfo.email': 'injected@example.invalid' },
     { singleton: 'other' },
     { minBookingLength: 20, maxBookingLength: 10 },
+    { breakfastPrice: Number.MAX_SAFE_INTEGER },
   ]) {
     await request({
       origin: admin,

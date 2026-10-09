@@ -1,4 +1,6 @@
 import { Schema } from 'mongoose';
+import { cents, majorAmount, majorToCents, type Cents } from './money';
+import { reservationMoney } from './reservation-errors';
 
 export interface ReservationReceipt {
   id: string;
@@ -87,28 +89,62 @@ export function reservationPaymentSummary(
     totalPrice: number;
     isPaid: boolean;
   }
-) {
-  const totalCents = Math.round(reservation.totalPrice * 100);
-  const receipts = reservation.receipts ?? [];
-  // Existing paid flags remain historical evidence; never invent refundable receipts.
-  const legacyPaid =
-    reservation.isPaid && !receipts.some(row => row.type === 'payment');
-  const paidCents = legacyPaid
-    ? totalCents
-    : receipts.reduce(
-        (sum, row) => sum + (row.type === 'payment' ? row.amountCents : 0),
-        0
-      );
-  const refundedCents = receipts.reduce(
-    (sum, row) => sum + (row.type === 'refund' ? row.amountCents : 0),
-    0
-  );
-  return {
-    totalCents,
-    paidCents,
-    refundedCents,
-    balanceCents: Math.max(0, totalCents - paidCents),
-    refundableCents: legacyPaid ? 0 : paidCents - refundedCents,
-    legacyPaid,
-  };
+): {
+  totalCents: Cents;
+  paidCents: Cents;
+  refundedCents: Cents;
+  balanceCents: Cents;
+  refundableCents: Cents;
+  legacyPaid: boolean;
+} {
+  return reservationMoney(() => {
+    const totalCents = majorToCents({
+      amount: majorAmount(reservation.totalPrice, { precision: 'preserve' }),
+      rounding: 'nearest',
+    });
+    if (reservation.checkout)
+      cents(reservation.checkout.amountCents, { sign: 'positive' });
+    if (reservation.stripeRefund)
+      cents(reservation.stripeRefund.amountCents, { sign: 'positive' });
+    const receipts = reservation.receipts ?? [];
+    // Existing paid flags remain historical evidence; never invent refundable receipts.
+    const legacyPaid =
+      reservation.isPaid && !receipts.some(row => row.type === 'payment');
+    let paidCents = cents(0);
+    let refundedCents = cents(0);
+    for (const row of receipts) {
+      const amount = cents(row.amountCents, { sign: 'positive' });
+      if (row.type === 'payment') paidCents = cents(paidCents + amount);
+      else refundedCents = cents(refundedCents + amount);
+    }
+    if (legacyPaid) paidCents = totalCents;
+    return {
+      totalCents,
+      paidCents,
+      refundedCents,
+      balanceCents: cents(Math.max(0, totalCents - paidCents)),
+      refundableCents: cents(legacyPaid ? 0 : paidCents - refundedCents),
+      legacyPaid,
+    };
+  });
+}
+
+export function reservationTenderBalance({
+  receipts,
+  method,
+}: {
+  receipts: readonly ReservationReceipt[];
+  method: ReservationReceipt['method'];
+}): Cents {
+  return reservationMoney(() => {
+    let paid = cents(0);
+    let refunded = cents(0);
+    for (const receipt of receipts) {
+      if (receipt.method !== method) continue;
+      const amount = cents(receipt.amountCents, { sign: 'positive' });
+      if (receipt.type === 'payment') paid = cents(paid + amount);
+      else refunded = cents(refunded + amount);
+    }
+    return cents(paid - refunded);
+  });
 }

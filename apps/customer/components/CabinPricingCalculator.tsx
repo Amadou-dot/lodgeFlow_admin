@@ -9,6 +9,7 @@ import { Link } from '@heroui/link';
 import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date';
 import { useState } from 'react';
 import { useSettings } from '@/hooks/useSettings';
+import { formatFixedMajorAmount as formatPrice } from '@/lib/money-display';
 
 interface CabinPricingCalculatorProps {
   discount: number;
@@ -81,15 +82,15 @@ export default function CabinPricingCalculator({
       <span className='text-base font-bold'>Price Calculator</span>
       {hasDiscount && (
         <span className='text-sm text-default-400 line-through'>
-          ${price.toFixed(2)}/night
+          ${formatPrice(price)}/night
         </span>
       )}
       <span className='font-bold text-success'>
-        ${effectiveRate.toFixed(2)}/night
+        ${formatPrice(effectiveRate)}/night
       </span>
       {hasDiscount && (
         <span className='font-semibold text-sm text-success'>
-          Save ${discount.toFixed(2)}/night
+          Save ${formatPrice(discount)}/night
         </span>
       )}
     </div>
@@ -180,47 +181,47 @@ export default function CabinPricingCalculator({
               <div className='space-y-2'>
                 <div className='flex items-center justify-between text-sm'>
                   <span>
-                    ${effectiveRate.toFixed(2)} &times; {validNights} night
+                    ${formatPrice(effectiveRate)} &times; {validNights} night
                     {validNights > 1 ? 's' : ''}
                   </span>
-                  <span>${cabinSubtotal!.toFixed(2)}</span>
+                  <span>${formatPrice(cabinSubtotal!)}</span>
                 </div>
 
                 {savings !== null && savings > 0 && (
                   <div className='flex items-center justify-between rounded-lg bg-success-50 px-3 py-2 text-sm font-semibold text-success'>
                     <span>Savings</span>
-                    <span>-${savings.toFixed(2)}</span>
+                    <span>-${formatPrice(savings)}</span>
                   </div>
                 )}
 
                 {breakfastFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Breakfast</span>
-                    <span>+${breakfastFee.toFixed(2)}</span>
+                    <span>+${formatPrice(breakfastFee)}</span>
                   </div>
                 )}
                 {petFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Pet fee</span>
-                    <span>+${petFee.toFixed(2)}</span>
+                    <span>+${formatPrice(petFee)}</span>
                   </div>
                 )}
                 {parkingFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Parking</span>
-                    <span>+${parkingFee.toFixed(2)}</span>
+                    <span>+${formatPrice(parkingFee)}</span>
                   </div>
                 )}
                 {earlyCheckInFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Early check-in</span>
-                    <span>+${earlyCheckInFee.toFixed(2)}</span>
+                    <span>+${formatPrice(earlyCheckInFee)}</span>
                   </div>
                 )}
                 {lateCheckOutFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Late check-out</span>
-                    <span>+${lateCheckOutFee.toFixed(2)}</span>
+                    <span>+${formatPrice(lateCheckOutFee)}</span>
                   </div>
                 )}
 
@@ -228,7 +229,9 @@ export default function CabinPricingCalculator({
 
                 <div className='flex items-center justify-between font-bold text-base'>
                   <span>Total</span>
-                  <span className='text-success'>${grandTotal.toFixed(2)}</span>
+                  <span className='text-success'>
+                    ${formatPrice(grandTotal)}
+                  </span>
                 </div>
               </div>
             </>

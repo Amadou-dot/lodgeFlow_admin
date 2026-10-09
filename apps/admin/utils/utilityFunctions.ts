@@ -1,4 +1,5 @@
 import { CURRENCY, LOYALTY_TIERS } from '@/lib/config';
+import { formatMajorAmount, majorAmount } from '@lodgeflow/database/money';
 
 type LoyaltyColor = 'secondary' | 'warning' | 'default' | 'primary';
 
@@ -57,10 +58,11 @@ export const formatCurrency = (
   amount: number,
   currency: string = CURRENCY.DEFAULT
 ): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
+  return formatMajorAmount({
+    amount: majorAmount(amount, { precision: 'preserve', sign: 'signed' }),
+    locale: 'en-US',
     currency: currency || CURRENCY.DEFAULT,
-  }).format(amount);
+  });
 };
 
 export async function isImageUrl(url: string | undefined): Promise<boolean> {

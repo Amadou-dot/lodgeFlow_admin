@@ -574,3 +574,45 @@ it('rejects malformed payment payloads and unauthorized collection', async () =>
     (await reservationPayment(req({}), { kind: 'experience', id }))?.status
   ).toBe(403);
 });
+
+it('rejects invalid receipt cents and unsafe stored balances without recording or auditing a payment', async () => {
+  const { reservationPayment } =
+    await import('@/lib/reservation-payment-route');
+  const f = await fixtures();
+  const row = await createDiningReservation({
+    diningId: String(f.dining._id),
+    customerId: 'guest',
+    selection: { date: day, time: '19:00', numGuests: 2 },
+  });
+  expect(row).not.toBeNull();
+  const id = String(row!._id);
+  const payload = {
+    id: '780b7330-b62d-4b6e-80cb-7c9f588ce19b',
+    type: 'payment',
+    method: 'cash',
+    reference: '',
+    amountCents: 2500,
+  };
+  for (const amountCents of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const response = await reservationPayment(
+      req({ ...payload, amountCents }),
+      { kind: 'dining', id }
+    );
+    expect(response.status).toBe(400);
+  }
+  await DiningReservation.updateOne(
+    { _id: id },
+    { $set: { totalPrice: Infinity } }
+  );
+  const response = await reservationPayment(req(payload), {
+    kind: 'dining',
+    id,
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    success: false,
+    error: 'Money must be finite',
+  });
+  expect((await DiningReservation.findById(id))?.receipts).toHaveLength(0);
+  expect(await AuditLog.countDocuments({ resourceId: id })).toBe(0);
+});

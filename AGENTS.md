@@ -168,6 +168,15 @@ Reject sub-cent input where the contract requires exact cents; distinguish that
 from an explicit business rounding rule. Keep unit casts inside validated
 constructors. Use typed money errors and translate them at route boundaries.
 
+Phase 3 implements these boundaries in `@lodgeflow/database/money`, which is safe
+to import from browser code. `majorAmount` requires an explicit `exact` or
+`preserve` precision policy; `cents` validates safe integers. Conversion and
+rounding policies are named explicitly. Keep legacy price precision and the
+ordinary-versus-epsilon rounding distinction; new receipts require exact cents.
+Model and JSON fields remain numeric adapters, while validated calculations and
+conversions carry `MajorCurrencyAmount` or `Cents`. See
+`docs/refactoring/phase-3-money.md` for the boundary inventory and error contracts.
+
 Do not silently reinterpret existing numeric fields, change deposit rounding, or
 migrate storage as part of a type-only edit. Inventory all readers/writers across
 both apps, characterize current rounding, and plan compatibility and reconciliation

@@ -1,6 +1,7 @@
 import { getEmailSender } from '@lodgeflow/email';
 import { getResend } from '@/lib/resend';
 import { clerkClient } from '@clerk/nextjs/server';
+import { formatFixedMajorAmount } from '@/lib/money-display';
 
 import { PaymentConfirmationEmail } from '@/components/EmailTemplates';
 import type {
@@ -115,7 +116,7 @@ export async function sendCancellationConfirmationEmail(
     const refundMessage =
       refundType === 'none'
         ? 'No refund is applicable based on our cancellation policy.'
-        : `You will receive a ${refundType} refund of $${refundAmount.toFixed(2)}.`;
+        : `You will receive a ${refundType} refund of $${formatFixedMajorAmount(refundAmount)}.`;
 
     const { data, error } = await getResend().emails.send({
       from: getEmailSender({ kind: 'payment' }),
@@ -141,7 +142,7 @@ export async function sendCancellationConfirmationEmail(
               <p><strong>Property:</strong> ${cabin.name}</p>
               <p><strong>Check-in:</strong> ${booking.checkInDate.toLocaleDateString()}</p>
               <p><strong>Check-out:</strong> ${booking.checkOutDate.toLocaleDateString()}</p>
-              <p><strong>Original Total:</strong> $${booking.totalPrice.toFixed(2)}</p>
+              <p><strong>Original Total:</strong> $${formatFixedMajorAmount(booking.totalPrice)}</p>
             </div>
 
             <div style="background-color: ${refundType === 'none' ? '#fef3c7' : '#dcfce7'}; padding: 15px; border-radius: 8px; margin: 20px 0;">

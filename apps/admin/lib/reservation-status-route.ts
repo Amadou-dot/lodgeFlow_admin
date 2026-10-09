@@ -69,6 +69,8 @@ export async function reservationDetails({
       allowedStatuses: transitions[reservation.status] ?? [],
     });
   } catch (error: unknown) {
+    if (error instanceof ReservationRuleError)
+      return createErrorResponse(error.message, error.status);
     logger.error(
       'Error loading reservation',
       error instanceof Error ? error : undefined

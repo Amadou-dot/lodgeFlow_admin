@@ -109,6 +109,13 @@ all production provider behavior are covered. The existing full suite and build
 jobs remain required. A local pass does not establish a named-commit CI pass;
 record the workflow run after these changes are committed and pushed.
 
+Phase 3 adds real HTTP rejection of sub-cent and unsafe cabin receipt/refund
+requests, plus unsafe Settings prices. Assertions verify unchanged booking data
+and provider calls. Existing checkout, signed settlement, refund retry, ownership,
+authorization, reservation and email checks continue to pass. See
+[the Phase 3 inventory](phase-3-money.md) for local verification and the distinction
+between exact-cent validation and existing business rounding.
+
 ## Sender repair verification (2026-09-20)
 
 `pnpm test:http` passed with actual SDK rendering and intercepted transport.

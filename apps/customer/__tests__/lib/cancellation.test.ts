@@ -5,6 +5,7 @@ import {
 } from '@/lib/cancellation';
 import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { ISettings } from '@lodgeflow/database/models/Settings';
+import { MoneyError } from '@lodgeflow/database/money';
 
 // Plain calculation inputs; these fixtures do not pretend to be documents.
 type BookingFixture = Pick<
@@ -233,6 +234,51 @@ describe('calculateRefund', () => {
   });
 
   describe('edge cases', () => {
+    it.each([NaN, Infinity, -1, 1.005, Number.MAX_SAFE_INTEGER])(
+      'rejects invalid received money %s instead of returning a refund estimate',
+      amountPaid => {
+        expect(() =>
+          calculateRefund(
+            createMockBooking({ amountPaid }),
+            createMockSettings('flexible'),
+            new Date('2026-02-10')
+          )
+        ).toThrow(MoneyError);
+      }
+    );
+
+    it.each([NaN, Infinity, -1, 1.005, Number.MAX_SAFE_INTEGER])(
+      'rejects invalid completed refunds %s instead of changing the refundable balance',
+      refundAmount => {
+        expect(() =>
+          calculateRefund(
+            createMockBooking({ refundAmount }),
+            createMockSettings('flexible'),
+            new Date('2026-02-10')
+          )
+        ).toThrow(MoneyError);
+      }
+    );
+
+    it('keeps ordinary cent rounding for a half refund instead of epsilon rounding', () => {
+      const result = calculateRefund(
+        createMockBooking({ amountPaid: 2.01 }),
+        createMockSettings('moderate'),
+        new Date('2026-02-12')
+      );
+      expect(result.refundAmount).toBe(1);
+      expect(result.refundType).toBe('partial');
+    });
+
+    it('subtracts completed refunds before applying the policy', () => {
+      const result = calculateRefund(
+        createMockBooking({ amountPaid: 10.29, refundAmount: 0.29 }),
+        createMockSettings('flexible'),
+        new Date('2026-02-10')
+      );
+      expect(result.refundAmount).toBe(10);
+    });
+
     it('returns 0 refund when no payment has been made', () => {
       const booking = createMockBooking({
         isPaid: false,

@@ -19,6 +19,7 @@
     "./cabin-booking-lock": "./src/cabin-booking-lock.ts",
     "./settings-defaults": "./src/settings-defaults.ts",
     "./booking-payments": "./src/booking-payments.ts",
+    "./money": "./src/money.ts",
     "./reservation-capacity": "./src/reservation-capacity.ts",
     "./models/StaffAccess": "./src/models/StaffAccess.ts",
     "./models/AuditLog": "./src/models/AuditLog.ts",

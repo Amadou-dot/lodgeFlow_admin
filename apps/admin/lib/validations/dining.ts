@@ -1,3 +1,4 @@
+import { priceAmountSchema } from './money';
 import { objectRequestSchema } from './object-request';
 import {
   BEVERAGE_CATEGORIES,
@@ -47,7 +48,7 @@ export const dietaryOptionSchema = z.enum(DIETARY_OPTIONS);
 const beverageSchema = z.strictObject({
   name: z.string().min(1, 'Beverage name is required'),
   description: z.string().optional(),
-  price: z.number().min(0).optional(),
+  price: z.number().min(0).pipe(priceAmountSchema).optional(),
   alcoholContent: z.number().min(0).optional(),
   category: z.enum(BEVERAGE_CATEGORIES),
 });
@@ -73,7 +74,10 @@ const createFieldsSchema = z
     mealType: mealTypeSchema,
     category: diningCategorySchema,
     subCategory: z.string().max(50).optional(),
-    price: z.number().positive('Price must be positive'),
+    price: z
+      .number()
+      .positive('Price must be positive')
+      .pipe(priceAmountSchema),
     servingTime: servingTimeSchema,
     maxPeople: z.number().int().min(1).max(100),
     minPeople: z.number().int().min(1).optional().default(1),
@@ -122,7 +126,7 @@ const updateFieldsSchema = z
     mealType: mealTypeSchema.optional(),
     category: diningCategorySchema.optional(),
     subCategory: z.string().max(50).optional(),
-    price: z.number().positive().optional(),
+    price: z.number().positive().pipe(priceAmountSchema).optional(),
     servingTime: servingTimeSchema.optional(),
     maxPeople: z.number().int().min(1).max(100).optional(),
     minPeople: z.number().int().min(1).optional(),
@@ -157,5 +161,5 @@ const updateFieldsSchema = z
 export const createDiningSchema = objectRequestSchema.pipe(createFieldsSchema);
 export const updateDiningSchema = objectRequestSchema.pipe(updateFieldsSchema);
 
-export type CreateDiningInput = z.infer<typeof createDiningSchema>;
-export type UpdateDiningInput = z.infer<typeof updateDiningSchema>;
+export type CreateDiningInput = z.input<typeof createFieldsSchema>;
+export type UpdateDiningInput = z.input<typeof updateFieldsSchema>;

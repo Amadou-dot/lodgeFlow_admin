@@ -136,3 +136,17 @@ it('disallows cancellation during active checkout while preserving the policy es
     },
   });
 });
+
+it.each([NaN, Infinity, -1, 1.005, Number.MAX_SAFE_INTEGER])(
+  'returns the safe failure envelope for invalid received money %s',
+  async amountPaid => {
+    jest.spyOn(logger, 'error').mockImplementation(() => {});
+    mockFindBooking.mockResolvedValue({ ...booking, amountPaid });
+    const response = await request();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Failed to calculate refund estimate',
+    });
+  }
+);

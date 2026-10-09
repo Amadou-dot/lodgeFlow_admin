@@ -1,3 +1,4 @@
+import { priceAmountSchema } from './money';
 import { z } from 'zod';
 
 const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -88,6 +89,7 @@ const settingsFieldsSchema = z.object({
   breakfastPrice: z
     .number()
     .min(0, 'Breakfast price must be positive')
+    .pipe(priceAmountSchema)
     .optional(),
   checkInTime: z
     .string()
@@ -105,19 +107,29 @@ const settingsFieldsSchema = z.object({
     .max(100, 'Deposit percentage cannot exceed 100')
     .optional(),
   allowPets: z.boolean().optional(),
-  petFee: z.number().min(0, 'Pet fee must be positive').optional(),
+  petFee: z
+    .number()
+    .min(0, 'Pet fee must be positive')
+    .pipe(priceAmountSchema)
+    .optional(),
   smokingAllowed: z.boolean().optional(),
   earlyCheckInFee: z
     .number()
     .min(0, 'Early check-in fee must be positive')
+    .pipe(priceAmountSchema)
     .optional(),
   lateCheckOutFee: z
     .number()
     .min(0, 'Late check-out fee must be positive')
+    .pipe(priceAmountSchema)
     .optional(),
   wifiIncluded: z.boolean().optional(),
   parkingIncluded: z.boolean().optional(),
-  parkingFee: z.number().min(0, 'Parking fee must be positive').optional(),
+  parkingFee: z
+    .number()
+    .min(0, 'Parking fee must be positive')
+    .pipe(priceAmountSchema)
+    .optional(),
   currency: z
     .string()
     .length(3, 'Currency code must be 3 characters')
@@ -146,7 +158,7 @@ export const updateSettingsSchema = settingsFieldsSchema
     }
   });
 
-export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
+export type UpdateSettingsInput = z.input<typeof updateSettingsSchema>;
 
 const MONGO_METADATA_KEYS = [
   '_id',

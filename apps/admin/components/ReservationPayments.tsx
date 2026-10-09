@@ -5,6 +5,13 @@ import type {
   ReservationReceiptJson,
   ReservationPaymentJson,
 } from '@lodgeflow/database/reservation-json';
+import {
+  cents,
+  formatCents,
+  majorAmount,
+  majorToCents,
+  MoneyError,
+} from '@lodgeflow/database/money';
 export interface PaymentSummary {
   totalCents: number;
   paidCents: number;
@@ -40,29 +47,38 @@ export function ReservationPayments({
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'error'; message: string }
   >({ kind: 'idle' });
   const request = useRef<{ body: string; id: string }>();
-  const format = (cents: number) =>
-    new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(
-      cents / 100
-    );
+  const format = (amount: number) =>
+    formatCents({ amount: cents(amount), currency });
   async function submit(retry = false) {
-    const transaction =
-      retry && stripeRefund
-        ? {
-            type: 'refund',
-            method: 'stripe',
-            amountCents: stripeRefund.amountCents,
-            reference: stripeRefund.reference,
-          }
-        : {
-            type,
-            method,
-            amountCents: Math.round(Number(amount) * 100),
-            reference,
-          };
-    if (
-      !retry &&
-      (!/^\d+(\.\d{1,2})?$/.test(amount) || transaction.amountCents <= 0)
-    ) {
+    let transaction;
+    try {
+      if (!retry && !/^\d+(\.\d{1,2})?$/.test(amount)) {
+        throw new MoneyError('Invalid amount');
+      }
+      transaction =
+        retry && stripeRefund
+          ? {
+              type: 'refund',
+              method: 'stripe',
+              amountCents: cents(stripeRefund.amountCents, {
+                sign: 'positive',
+              }),
+              reference: stripeRefund.reference,
+            }
+          : {
+              type,
+              method,
+              amountCents: majorToCents({
+                amount: majorAmount(Number(amount), {
+                  precision: 'exact',
+                  sign: 'positive',
+                }),
+                rounding: 'exact',
+              }),
+              reference,
+            };
+    } catch (error) {
+      if (!(error instanceof MoneyError)) throw error;
       setState({
         kind: 'error',
         message: 'Enter a positive amount with at most two decimal places',

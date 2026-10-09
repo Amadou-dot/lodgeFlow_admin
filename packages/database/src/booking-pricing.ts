@@ -1,4 +1,10 @@
 import { differenceInCalendarDays } from 'date-fns';
+import {
+  majorAmount,
+  MoneyError,
+  roundMajorAmount,
+  type MajorCurrencyAmount,
+} from './money';
 
 /**
  * Thrown when calculateBookingPricing() is given inputs that can't yield a
@@ -60,21 +66,34 @@ export interface BookingPricingInput {
 
 export interface BookingPricingResult {
   numNights: number;
-  cabinPrice: number;
-  extrasPrice: number;
-  totalPrice: number;
+  cabinPrice: MajorCurrencyAmount;
+  extrasPrice: MajorCurrencyAmount;
+  totalPrice: MajorCurrencyAmount;
   extras: {
     hasBreakfast: boolean;
-    breakfastPrice: number;
+    breakfastPrice: MajorCurrencyAmount;
     hasPets: boolean;
-    petFee: number;
+    petFee: MajorCurrencyAmount;
     hasParking: boolean;
-    parkingFee: number;
+    parkingFee: MajorCurrencyAmount;
     hasEarlyCheckIn: boolean;
-    earlyCheckInFee: number;
+    earlyCheckInFee: MajorCurrencyAmount;
     hasLateCheckOut: boolean;
-    lateCheckOutFee: number;
+    lateCheckOutFee: MajorCurrencyAmount;
   };
+}
+
+/** Adapts numeric catalog/settings/calculated prices without rounding storage. */
+function priceAmount(value: number): MajorCurrencyAmount {
+  try {
+    return majorAmount(value, { precision: 'preserve' });
+  } catch (error) {
+    if (error instanceof MoneyError)
+      throw new BookingPricingError(
+        'Prices must be finite, nonnegative and within the safe cents range'
+      );
+    throw error;
+  }
 }
 
 /**
@@ -89,14 +108,31 @@ export interface BookingPricingResult {
 export function calculateDepositAmount({
   settings,
   totalPrice,
-}: BookingDepositInput): number {
-  if (!settings.requireDeposit) return 0;
+}: BookingDepositInput): MajorCurrencyAmount {
+  const total = priceAmount(totalPrice);
+  if (!settings.requireDeposit) return priceAmount(0);
 
-  const deposit = Math.round(totalPrice * (settings.depositPercentage / 100));
+  if (!Number.isFinite(settings.depositPercentage))
+    throw new BookingPricingError('Deposit percentage must be finite');
+  let deposit: MajorCurrencyAmount;
+  try {
+    deposit = roundMajorAmount({
+      amount: majorAmount(total * (settings.depositPercentage / 100), {
+        precision: 'preserve',
+        sign: 'signed',
+      }),
+      rounding: 'whole',
+      maximum: total,
+    });
+  } catch (error) {
+    if (error instanceof MoneyError)
+      throw new BookingPricingError('Deposit exceeds the safe cents range');
+    throw error;
+  }
   // depositPercentage is schema-bound to 0-100, but clamp anyway so a legacy
   // or hand-edited settings document can never yield a deposit that exceeds
   // the total (which would drive remainingAmount negative).
-  return Math.min(Math.max(deposit, 0), totalPrice);
+  return priceAmount(Math.min(Math.max(deposit, 0), total));
 }
 
 /**
@@ -127,8 +163,11 @@ export function calculateBookingPricing({
     throw new BookingPricingError('numGuests must be at least 1');
   }
 
-  const cabinPrice =
-    cabin.discount > 0 ? cabin.price - cabin.discount : cabin.price;
+  const cabinPrice = priceAmount(
+    cabin.discount > 0
+      ? priceAmount(cabin.price) - priceAmount(cabin.discount)
+      : priceAmount(cabin.price)
+  );
 
   const hasBreakfast = extras?.hasBreakfast ?? false;
   const hasPets = extras?.hasPets ?? false;
@@ -136,34 +175,45 @@ export function calculateBookingPricing({
   const hasEarlyCheckIn = extras?.hasEarlyCheckIn ?? false;
   const hasLateCheckOut = extras?.hasLateCheckOut ?? false;
 
-  const breakfastPrice = hasBreakfast
-    ? settings.breakfastPrice * numGuests * numNights
-    : 0;
+  const breakfastPrice = priceAmount(
+    hasBreakfast
+      ? priceAmount(settings.breakfastPrice) * numGuests * numNights
+      : 0
+  );
 
-  const extraGuestFee =
+  const extraGuestFee = priceAmount(
     numGuests > 1 && (cabin.extraGuestFee ?? 0) > 0
-      ? (numGuests - 1) * (cabin.extraGuestFee ?? 0) * numNights
-      : 0;
+      ? (numGuests - 1) * priceAmount(cabin.extraGuestFee ?? 0) * numNights
+      : 0
+  );
 
-  const petFee = hasPets ? settings.petFee * numNights : 0;
+  const petFee = priceAmount(
+    hasPets ? priceAmount(settings.petFee) * numNights : 0
+  );
 
-  const parkingFee =
+  const parkingFee = priceAmount(
     hasParking && !settings.parkingIncluded
-      ? settings.parkingFee * numNights
-      : 0;
+      ? priceAmount(settings.parkingFee) * numNights
+      : 0
+  );
 
-  const earlyCheckInFee = hasEarlyCheckIn ? settings.earlyCheckInFee : 0;
-  const lateCheckOutFee = hasLateCheckOut ? settings.lateCheckOutFee : 0;
+  const earlyCheckInFee = priceAmount(
+    hasEarlyCheckIn ? settings.earlyCheckInFee : 0
+  );
+  const lateCheckOutFee = priceAmount(
+    hasLateCheckOut ? settings.lateCheckOutFee : 0
+  );
 
-  const extrasPrice =
+  const extrasPrice = priceAmount(
     breakfastPrice +
-    extraGuestFee +
-    petFee +
-    parkingFee +
-    earlyCheckInFee +
-    lateCheckOutFee;
+      extraGuestFee +
+      petFee +
+      parkingFee +
+      earlyCheckInFee +
+      lateCheckOutFee
+  );
 
-  const totalPrice = cabinPrice * numNights + extrasPrice;
+  const totalPrice = priceAmount(cabinPrice * numNights + extrasPrice);
 
   return {
     numNights,

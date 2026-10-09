@@ -88,6 +88,19 @@ describe('utilityFunctions', () => {
     it('formats negative amounts', () => {
       expect(formatCurrency(-50)).toBe('-$50.00');
     });
+
+    it('preserves currency fraction digits and legacy fractional prices', () => {
+      expect(formatCurrency(1234.5, 'JPY')).toBe('¥1,235');
+      expect(formatCurrency(1.005)).toBe('$1.01');
+      expect(formatCurrency(0.29)).toBe('$0.29');
+    });
+
+    it.each([NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER])(
+      'rejects an invalid major-unit value %s instead of displaying it',
+      amount => {
+        expect(() => formatCurrency(amount)).toThrow();
+      }
+    );
   });
 
   describe('validateEmail', () => {

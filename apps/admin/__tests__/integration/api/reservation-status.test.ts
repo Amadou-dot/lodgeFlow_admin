@@ -123,6 +123,31 @@ afterEach(() => {
 
 for (const resource of resources) {
   describe(`${resource.kind} staff status boundary`, () => {
+    it('maps invalid persisted receipt cents into a reservation error without writes', async () => {
+      const row = await resource.create({
+        receipts: [
+          {
+            id: 'unsafe-receipt',
+            type: 'payment',
+            amountCents: 1.5,
+            method: 'cash',
+            actor: 'staff',
+            reference: '',
+            recordedAt: date,
+          },
+        ],
+      });
+      const before = await snapshot();
+      const response = await resource.get(request({}), params(String(row._id)));
+      assert.ok(response);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Cents must be a safe integer',
+      });
+      expect(await snapshot()).toBe(before);
+    });
+
     it('authorizes before reading the body or validating IDs', async () => {
       const row = await resource.create();
       const before = await snapshot();

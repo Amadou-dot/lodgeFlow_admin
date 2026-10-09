@@ -1,3 +1,4 @@
+import { priceAmountSchema } from './money';
 import { objectRequestSchema } from './object-request';
 import { EXPERIENCE_DIFFICULTIES } from '@/lib/config';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ const createFieldsSchema = z.strictObject({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().min(1, 'Description is required').max(2000),
   duration: z.string().min(1, 'Duration is required').max(50),
-  price: z.number().min(0, 'Price cannot be negative'),
+  price: z.number().min(0, 'Price cannot be negative').pipe(priceAmountSchema),
   difficulty: difficultySchema,
   category: z.string().min(1, 'Category is required').max(50),
   image: z.string().min(1, 'Image is required').max(2048),
@@ -58,7 +59,7 @@ const updateFieldsSchema = z.strictObject({
   name: z.string().min(1).max(100).optional(),
   description: z.string().min(1).max(2000).optional(),
   duration: z.string().min(1).max(50).optional(),
-  price: z.number().min(0).optional(),
+  price: z.number().min(0).pipe(priceAmountSchema).optional(),
   difficulty: difficultySchema.optional(),
   category: z.string().min(1).max(50).optional(),
   image: z.string().min(1).max(2048).optional(),
@@ -86,5 +87,5 @@ export const createExperienceSchema =
 export const updateExperienceSchema =
   objectRequestSchema.pipe(updateFieldsSchema);
 
-export type CreateExperienceInput = z.infer<typeof createExperienceSchema>;
-export type UpdateExperienceInput = z.infer<typeof updateExperienceSchema>;
+export type CreateExperienceInput = z.input<typeof createFieldsSchema>;
+export type UpdateExperienceInput = z.input<typeof updateFieldsSchema>;

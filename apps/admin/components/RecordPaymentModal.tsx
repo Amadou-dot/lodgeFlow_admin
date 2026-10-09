@@ -11,6 +11,16 @@ import {
 } from '@heroui/modal';
 import { Select, SelectItem } from '@heroui/select';
 import { useState } from 'react';
+import {
+  cents,
+  centsToMajor,
+  majorAmount,
+  majorToCents,
+  majorToFixed,
+  MoneyError,
+  type Cents,
+  type MajorCurrencyAmount,
+} from '@lodgeflow/database/money';
 
 export interface PaymentData {
   paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'online';
@@ -28,6 +38,42 @@ interface RecordPaymentModalProps {
   guestName: string;
 }
 
+function parsePaymentAmount({
+  value,
+  remainingAmount,
+}: {
+  value: string;
+  remainingAmount: MajorCurrencyAmount;
+}): MajorCurrencyAmount | undefined {
+  try {
+    const amount = majorAmount(Number(value), {
+      precision: 'exact',
+      sign: 'positive',
+    });
+    return amount <= remainingAmount ? amount : undefined;
+  } catch (error) {
+    if (error instanceof MoneyError) return undefined;
+    throw error;
+  }
+}
+
+function halfPaymentAmount(
+  remaining: MajorCurrencyAmount
+): MajorCurrencyAmount {
+  let remainingCents: Cents;
+  try {
+    remainingCents = majorToCents({ amount: remaining, rounding: 'exact' });
+  } catch (error) {
+    if (!(error instanceof MoneyError)) throw error;
+    // Preserve display precision for historical balances, but choose a
+    // cent amount for the preset using ordinary nearest-cent rounding.
+    remainingCents = majorToCents({ amount: remaining, rounding: 'nearest' });
+  }
+  // Split cents and round a half cent up once for the label and submission.
+  // Major-unit division can otherwise turn half of 0.29 into 0.14.
+  return centsToMajor(cents(Math.round(remainingCents / 2)));
+}
+
 export default function RecordPaymentModal({
   isOpen,
   onClose,
@@ -41,6 +87,13 @@ export default function RecordPaymentModal({
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const total = majorAmount(totalAmount, { precision: 'preserve' });
+  const remaining = majorAmount(remainingAmount, { precision: 'preserve' });
+  const half = halfPaymentAmount(remaining);
+  const parsedAmount = parsePaymentAmount({
+    value: amountPaid,
+    remainingAmount: remaining,
+  });
 
   const paymentMethods = [
     { key: 'cash', label: 'Cash' },
@@ -50,16 +103,13 @@ export default function RecordPaymentModal({
   ];
 
   const handleSubmit = async () => {
-    if (!paymentMethod || !amountPaid) return;
-
-    const amount = parseFloat(amountPaid);
-    if (isNaN(amount) || amount <= 0) return;
+    if (!paymentMethod || parsedAmount === undefined) return;
 
     setIsLoading(true);
     try {
       await onRecordPayment({
         paymentMethod: paymentMethod as PaymentData['paymentMethod'],
-        amountPaid: amount,
+        amountPaid: parsedAmount,
         notes: notes.trim() || undefined,
       });
       handleClose();
@@ -77,11 +127,11 @@ export default function RecordPaymentModal({
     onClose();
   };
 
-  const handleAmountPreset = (amount: number) => {
-    setAmountPaid(amount.toString());
+  const handleAmountPreset = (amount: MajorCurrencyAmount) => {
+    setAmountPaid(majorToFixed({ amount }));
   };
 
-  const isValid = paymentMethod && amountPaid && parseFloat(amountPaid) > 0;
+  const isValid = paymentMethod && parsedAmount !== undefined;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size='md'>
@@ -98,12 +148,14 @@ export default function RecordPaymentModal({
             <div className='bg-default-50 p-4 rounded-lg'>
               <div className='flex justify-between items-center mb-2'>
                 <span className='text-sm text-default-600'>Total Amount:</span>
-                <span className='font-semibold'>${totalAmount.toFixed(2)}</span>
+                <span className='font-semibold'>
+                  ${majorToFixed({ amount: total })}
+                </span>
               </div>
               <div className='flex justify-between items-center'>
                 <span className='text-sm text-default-600'>Remaining:</span>
                 <span className='font-semibold text-warning'>
-                  ${remainingAmount.toFixed(2)}
+                  ${majorToFixed({ amount: remaining })}
                 </span>
               </div>
             </div>
@@ -115,16 +167,16 @@ export default function RecordPaymentModal({
                 <Button
                   variant='bordered'
                   size='sm'
-                  onPress={() => handleAmountPreset(remainingAmount)}
+                  onPress={() => handleAmountPreset(remaining)}
                 >
-                  Full Amount (${remainingAmount.toFixed(2)})
+                  Full Amount (${majorToFixed({ amount: remaining })})
                 </Button>
                 <Button
                   variant='bordered'
                   size='sm'
-                  onPress={() => handleAmountPreset(remainingAmount / 2)}
+                  onPress={() => handleAmountPreset(half)}
                 >
-                  Half (${(remainingAmount / 2).toFixed(2)})
+                  Half (${majorToFixed({ amount: half })})
                 </Button>
               </div>
             </div>

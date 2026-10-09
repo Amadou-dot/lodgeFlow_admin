@@ -3,7 +3,11 @@ import { useCabins } from '@/hooks/useCabins';
 import { useInfiniteCustomers } from '@/hooks/useInfiniteCustomers';
 import { useSettings } from '@/hooks/useSettings';
 import type { PopulatedBooking } from '@/types';
-import { calcNumNights } from '@/utils/utilityFunctions';
+import {
+  calcNumNights,
+  formatCurrency as formatCurrencyAmount,
+} from '@/utils/utilityFunctions';
+import { majorAmount, roundMajorAmount } from '@lodgeflow/database/money';
 import { useInfiniteScroll } from '@heroui/use-infinite-scroll';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
@@ -189,7 +193,14 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
       lateCheckOutFee;
     const totalPrice = cabinPrice + extrasPrice;
     const depositAmount = settings.requireDeposit
-      ? Math.round(totalPrice * (settings.depositPercentage / 100))
+      ? roundMajorAmount({
+          amount: majorAmount(totalPrice * (settings.depositPercentage / 100), {
+            precision: 'preserve',
+            // Draft guest input can be negative before form validation runs.
+            sign: 'signed',
+          }),
+          rounding: 'whole',
+        })
       : 0;
 
     setPriceBreakdown({
@@ -287,10 +298,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
   // Utility functions - memoized
   const formatCurrency = useCallback(
     (amount: number) => {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: settings?.currency || 'USD',
-      }).format(amount);
+      return formatCurrencyAmount(amount, settings?.currency || 'USD');
     },
     [settings?.currency]
   );

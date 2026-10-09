@@ -5,9 +5,11 @@ import DiningReservation, {
 } from './models/DiningReservation';
 import ExperienceBooking from './models/ExperienceBooking';
 import Settings from './models/Settings';
-import { ReservationRuleError } from './reservation-capacity';
+import { cents } from './money';
+import { ReservationRuleError, reservationMoney } from './reservation-errors';
 import {
   reservationPaymentSummary,
+  reservationTenderBalance,
   type ReservationReceipt,
 } from './reservation-payment-state';
 
@@ -94,6 +96,12 @@ export async function createReservationCheckout({
     row.stripeRefund?.status === 'pending'
   )
     throw new ReservationRuleError('Reservation is not payable');
+  const pendingQuote = row.checkout;
+  const quoteAmountCents = pendingQuote?.pending
+    ? reservationMoney(() =>
+        cents(pendingQuote.amountCents, { sign: 'positive' })
+      )
+    : summary.balanceCents;
   if (row.checkout?.pending && row.checkout.sessionId) {
     const session = await stripe.checkout.sessions.retrieve(
       row.checkout.sessionId
@@ -152,7 +160,7 @@ export async function createReservationCheckout({
         {
           price_data: {
             currency: quote.currency,
-            unit_amount: quote.amountCents,
+            unit_amount: quoteAmountCents,
             product_data: {
               name: `${kind === 'dining' ? 'Dining' : 'Experience'} reservation`,
             },
@@ -191,21 +199,22 @@ export async function settleReservationCheckout({
   currency: string;
   paymentIntentId: string;
 }) {
+  const receivedCents = reservationMoney(() =>
+    cents(amountCents, { sign: 'positive' })
+  );
   const Model = modelFor(kind);
   for (let attempt = 0; attempt < 5; attempt++) {
     const row = await Model.findById(id);
     if (!row) throw new ReservationRuleError('Reservation not found', 404);
-    if (
-      row.receipts.some(
-        (receipt: ReservationReceipt) => receipt.id === sessionId
-      )
-    )
-      return;
+    reservationPaymentSummary(row);
+    const existing = row.receipts.find(
+      (receipt: ReservationReceipt) => receipt.id === sessionId
+    );
     const quote = row.checkout;
     if (
       !quote ||
       quote.token !== token ||
-      quote.amountCents !== amountCents ||
+      quote.amountCents !== receivedCents ||
       quote.currency !== currency ||
       !paymentIntentId ||
       (quote.sessionId && quote.sessionId !== sessionId)
@@ -214,10 +223,24 @@ export async function settleReservationCheckout({
         'Checkout does not match reservation',
         409
       );
+    if (existing) {
+      if (
+        existing.type !== 'payment' ||
+        existing.amountCents !== receivedCents ||
+        existing.method !== 'stripe' ||
+        existing.reference !== paymentIntentId ||
+        existing.actor !== 'stripe'
+      )
+        throw new ReservationRuleError(
+          'Checkout does not match reservation',
+          409
+        );
+      return;
+    }
     row.receipts.push({
       id: sessionId,
       type: 'payment',
-      amountCents,
+      amountCents: receivedCents,
       method: 'stripe',
       reference: paymentIntentId,
       actor: 'stripe',
@@ -269,16 +292,19 @@ export async function refundReservationStripe({
 }) {
   if (!mongoose.isValidObjectId(id))
     throw new ReservationRuleError('Invalid reservation ID');
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0)
-    throw new ReservationRuleError('Invalid refund amount');
+  const refundCents = reservationMoney(
+    () => cents(amountCents, { sign: 'positive' }),
+    { message: 'Invalid refund amount' }
+  );
   const Model = modelFor(kind);
   let row = await Model.findById(id);
   if (!row) throw new ReservationRuleError('Reservation not found', 404);
+  const summary = reservationPaymentSummary(row);
   const existing = row.receipts.find((r: ReservationReceipt) => r.id === token);
   if (existing) {
     if (
       existing.type !== 'refund' ||
-      existing.amountCents !== amountCents ||
+      existing.amountCents !== refundCents ||
       existing.actor !== actor ||
       existing.reference !== reference
     )
@@ -289,33 +315,31 @@ export async function refundReservationStripe({
     throw new ReservationRuleError('Checkout is pending', 409);
   if (row.stripeRefund?.token === token) {
     if (
-      row.stripeRefund.amountCents !== amountCents ||
+      row.stripeRefund.amountCents !== refundCents ||
       row.stripeRefund.actor !== actor ||
       row.stripeRefund.reference !== reference
     )
       throw new ReservationRuleError('Request ID already used', 409);
-  } else {
-    if (row.stripeRefund?.status === 'pending')
-      throw new ReservationRuleError('Another refund is pending', 409);
-    const available = row.receipts.reduce(
-      (sum: number, r: ReservationReceipt) =>
-        sum +
-        (r.method === 'stripe'
-          ? r.type === 'payment'
-            ? r.amountCents
-            : -r.amountCents
-          : 0),
-      0
-    );
-    if (!row.stripePaymentIntentId || amountCents > available)
-      throw new ReservationRuleError('Refund exceeds online payments received');
+  } else if (row.stripeRefund?.status === 'pending')
+    throw new ReservationRuleError('Another refund is pending', 409);
+  const available = reservationTenderBalance({
+    receipts: row.receipts,
+    method: 'stripe',
+  });
+  if (
+    !row.stripePaymentIntentId ||
+    refundCents > available ||
+    refundCents > summary.refundableCents
+  )
+    throw new ReservationRuleError('Refund exceeds online payments received');
+  if (row.stripeRefund?.token !== token) {
     row = await Model.findOneAndUpdate(
       { _id: id, __v: row.get('__v') },
       {
         $set: {
           stripeRefund: {
             token,
-            amountCents,
+            amountCents: refundCents,
             actor,
             reference,
             createdAt: new Date(),
@@ -339,7 +363,7 @@ export async function refundReservationStripe({
     : await stripe.refunds.create(
         {
           payment_intent: row.stripePaymentIntentId!,
-          amount: operation.amountCents,
+          amount: refundCents,
           metadata: {
             reservationKind: kind,
             reservationId: id,
@@ -381,21 +405,37 @@ export async function settleReservationRefund({
       operation.status === 'succeeded'
     )
       return;
-    operation.refundId = refundId;
+    const summary = reservationPaymentSummary(row);
+    const reservedCents = reservationMoney(() =>
+      cents(operation.amountCents, { sign: 'positive' })
+    );
     if (status === 'succeeded') {
-      if (!row.receipts.some((r: ReservationReceipt) => r.id === token))
+      if (!row.receipts.some((r: ReservationReceipt) => r.id === token)) {
+        const available = reservationTenderBalance({
+          receipts: row.receipts,
+          method: 'stripe',
+        });
+        if (
+          reservedCents > available ||
+          reservedCents > summary.refundableCents
+        )
+          throw new ReservationRuleError(
+            'Refund exceeds online payments received'
+          );
         row.receipts.push({
           id: token,
           type: 'refund',
-          amountCents: operation.amountCents,
+          amountCents: reservedCents,
           method: 'stripe',
           actor: operation.actor,
           reference: operation.reference,
           recordedAt: new Date(),
         });
+      }
       operation.status = 'succeeded';
     } else if (['failed', 'canceled'].includes(status))
       operation.status = 'failed';
+    operation.refundId = refundId;
     try {
       await row.save();
       return;

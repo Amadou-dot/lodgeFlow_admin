@@ -14,18 +14,9 @@ import DiningReservation, {
 import ExperienceBooking, {
   type IExperienceBooking,
 } from './models/ExperienceBooking';
-import { roundMoney } from './booking-payments';
-
-export class ReservationRuleError extends Error {
-  constructor(
-    message: string,
-    public status = 400
-  ) {
-    super(message);
-    this.name = 'ReservationRuleError';
-    Object.setPrototypeOf(this, ReservationRuleError.prototype);
-  }
-}
+import { majorAmount, roundMajorAmount, MoneyError } from './money';
+import { ReservationRuleError } from './reservation-errors';
+export { ReservationRuleError } from './reservation-errors';
 function requireId(id: string) {
   if (!mongoose.isValidObjectId(id))
     throw new ReservationRuleError('Reservation or listing not found', 404);
@@ -91,6 +82,10 @@ async function withCatalog<T>(
       if (!catalog) throw new ReservationRuleError('Listing not found', 404);
       return work(catalog, session);
     }))!;
+  } catch (error: unknown) {
+    if (error instanceof MoneyError)
+      throw new ReservationRuleError(error.message);
+    throw error;
   } finally {
     await session.endSession();
   }
@@ -141,7 +136,24 @@ async function checkDining(
   if (occupied + reservation.numGuests > dining.maxPeople)
     throw new ReservationRuleError('Not enough dining seats available', 409);
   if (!reservation.isPaid && !reservation.receipts?.length)
-    reservation.totalPrice = roundMoney(dining.price * reservation.numGuests);
+    reservation.totalPrice = reservationTotal({
+      price: dining.price,
+      quantity: reservation.numGuests,
+    });
+}
+
+function reservationTotal({
+  price,
+  quantity,
+}: {
+  price: number;
+  quantity: number;
+}) {
+  const unitPrice = majorAmount(price, { precision: 'preserve' });
+  return roundMajorAmount({
+    amount: majorAmount(unitPrice * quantity, { precision: 'preserve' }),
+    rounding: 'epsilon',
+  });
 }
 type ReservationChange<Selection> =
   | { action: 'update'; updates: Partial<Selection> }
@@ -271,7 +283,10 @@ async function checkExperience(
       409
     );
   if (!booking.isPaid && !booking.receipts?.length)
-    booking.totalPrice = roundMoney(experience.price * booking.numParticipants);
+    booking.totalPrice = reservationTotal({
+      price: experience.price,
+      quantity: booking.numParticipants,
+    });
 }
 export interface CreateExperienceReservationInput {
   experienceId: string;
@@ -435,6 +450,8 @@ export async function updateCapacityCatalog({
   updates,
 }: UpdateCapacityCatalogInput) {
   return withCatalog({ kind, listingId: id }, async (catalog, session) => {
+    if (updates.price !== undefined)
+      majorAmount(updates.price, { precision: 'preserve' });
     Object.assign(catalog, updates);
     const start = new Date();
     start.setUTCHours(0, 0, 0, 0);
