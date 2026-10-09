@@ -10,6 +10,7 @@ import type {
   PaymentEmailBooking,
   PaymentEmailCabin,
 } from '@/types/payment-email';
+import { formatUsdAmount as formatPrice } from '@/lib/money-display';
 
 interface EmailTemplateProps {
   firstName: string;
@@ -192,13 +193,6 @@ export function BookingConfirmationEmail({
       weekday: 'long',
       year: 'numeric',
     });
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      currency: 'USD',
-      style: 'currency',
-    }).format(price);
   };
 
   const getAddons = () => {
@@ -432,13 +426,6 @@ export function PaymentConfirmationEmail({
     });
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      currency: 'USD',
-      style: 'currency',
-    }).format(price);
-  };
-
   return (
     <div style={emailStyles.container}>
       <div style={{ ...emailStyles.header, backgroundColor: '#059669' }}>
@@ -531,13 +518,6 @@ export function ExperienceBookingConfirmationEmail({
       weekday: 'long',
       year: 'numeric',
     });
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      currency: 'USD',
-      style: 'currency',
-    }).format(price);
   };
 
   return (
@@ -651,13 +631,6 @@ export function DiningReservationConfirmationEmail({
       weekday: 'long',
       year: 'numeric',
     });
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      currency: 'USD',
-      style: 'currency',
-    }).format(price);
   };
 
   const tablePreferenceLabels: Record<string, string> = {

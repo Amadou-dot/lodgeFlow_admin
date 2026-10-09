@@ -1,6 +1,11 @@
 import type { IBooking } from '@lodgeflow/database/models/Booking';
 import type { ISettings } from '@lodgeflow/database/models/Settings';
 import type { CancellationPolicy, RefundEstimate } from '@/types/cancellation';
+import {
+  majorAmount,
+  roundMajorAmount,
+  type MajorCurrencyAmount,
+} from '@lodgeflow/database/money';
 export type { CancellationPolicy, RefundEstimate } from '@/types/cancellation';
 
 export type RefundBooking = Pick<
@@ -8,6 +13,9 @@ export type RefundBooking = Pick<
   'checkInDate' | 'amountPaid' | 'refundAmount'
 >;
 export type RefundSettings = Pick<ISettings, 'cancellationPolicy'>;
+export type CalculatedRefund = Omit<RefundEstimate, 'refundAmount'> & {
+  refundAmount: MajorCurrencyAmount;
+};
 
 export interface CancellationDeadlines {
   fullRefundDeadline: Date | null;
@@ -37,7 +45,7 @@ export function calculateRefund(
   booking: RefundBooking,
   settings: RefundSettings,
   cancellationDate: Date = new Date()
-): RefundEstimate {
+): CalculatedRefund {
   const policy = settings.cancellationPolicy;
   const daysUntilCheckIn = getDaysUntilCheckIn(
     booking.checkInDate,
@@ -45,15 +53,18 @@ export function calculateRefund(
   );
 
   // Refund only received money; a required but unpaid deposit is not refundable.
-  const amountPaid = Math.max(
-    0,
-    (booking.amountPaid ?? 0) - (booking.refundAmount ?? 0)
-  );
+  const received = majorAmount(booking.amountPaid ?? 0, { precision: 'exact' });
+  const refunded = majorAmount(booking.refundAmount ?? 0, {
+    precision: 'exact',
+  });
+  const amountPaid = majorAmount(Math.max(0, received - refunded), {
+    precision: 'preserve',
+  });
 
   if (amountPaid === 0) {
     return {
       refundPercentage: 0,
-      refundAmount: 0,
+      refundAmount: majorAmount(0, { precision: 'exact' }),
       refundType: 'none',
       reason: 'No payment has been made for this booking',
       daysUntilCheckIn,
@@ -106,8 +117,12 @@ export function calculateRefund(
       reason = 'Unknown cancellation policy';
   }
 
-  const refundAmount =
-    Math.round(((amountPaid * refundPercentage) / 100) * 100) / 100;
+  const refundAmount = roundMajorAmount({
+    amount: majorAmount((amountPaid * refundPercentage) / 100, {
+      precision: 'preserve',
+    }),
+    rounding: 'nearest',
+  });
   const refundType =
     refundPercentage === 100
       ? 'full'

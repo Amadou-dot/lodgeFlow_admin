@@ -57,9 +57,6 @@ jest.mock('@lodgeflow/database', () => ({
     updateOne: (...args: unknown[]) => mockUpdate(...args),
   },
   Settings: { getSettings: () => mockSettings() },
-  roundMoney: jest.requireActual<
-    typeof import('@lodgeflow/database/booking-payments')
-  >('@lodgeflow/database/booking-payments').roundMoney,
 }));
 jest.mock('@/lib/stripe', () => ({
   getStripe: () => ({
@@ -134,6 +131,24 @@ afterEach(() => {
 });
 
 describe('checkout characterization', () => {
+  test('keeps epsilon rounding when reserving a fractional deposit quote', async () => {
+    mockFindPopulate.mockResolvedValue(
+      booking({ amountPaid: 0, depositAmount: 1.005 })
+    );
+    mockReservePopulate.mockResolvedValue(reserved({ checkoutAmount: 1.01 }));
+    expect((await POST(request())).status).toBe(200);
+    expect(mockReserve).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        $set: expect.objectContaining({ checkoutAmount: 1.01 }),
+      }),
+      expect.anything()
+    );
+    expect(
+      mockCreateSession.mock.calls[0][0].line_items?.[0].price_data?.unit_amount
+    ).toBe(101);
+  });
+
   test('reserves the server-calculated deposit and preserves the Stripe payload and response', async () => {
     const response = await POST(
       request({ bookingId, amount: 1, currency: 'eur', userId: 'foreign' })
@@ -572,6 +587,39 @@ describe('checkout input characterization', () => {
 });
 
 describe('checkout input regressions', () => {
+  test.each([
+    { remainingAmount: NaN },
+    { depositAmount: Infinity },
+    { amountPaid: -1 },
+    { totalPrice: Number.MAX_SAFE_INTEGER },
+  ])(
+    'rejects invalid booking money %j before reserving a quote or calling Stripe',
+    async fields => {
+      mockFindPopulate.mockResolvedValue(booking(fields));
+      const response = await POST(request());
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Failed to create checkout session',
+      });
+      expectNoWritesOrProviderCalls();
+    }
+  );
+
+  test.each([NaN, Infinity, -1, 1.005, Number.MAX_SAFE_INTEGER])(
+    'rejects invalid reserved checkout amount %s without creating a Stripe session',
+    async checkoutAmount => {
+      mockFindPopulate.mockResolvedValue(reserved({ checkoutAmount }));
+      const response = await POST(request());
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Failed to create checkout session',
+      });
+      expectNoWritesOrProviderCalls();
+    }
+  );
+
   test.each(['', '{', '{"bookingId":'])(
     'rejects malformed JSON %j before database or provider access',
     async body => {

@@ -1,3 +1,4 @@
+import { priceAmountSchema } from './money';
 import { objectRequestSchema } from './object-request';
 import { CABIN_STATUSES } from '@/lib/config';
 import { z } from 'zod';
@@ -25,8 +26,11 @@ const createFieldsSchema = z
     images: z.array(z.string().url('Invalid image URL')).optional().default([]),
     status: cabinStatusSchema.optional().default('active'),
     capacity: z.number().int().min(1, 'Capacity must be at least 1').max(20),
-    price: z.number().positive('Price must be positive'),
-    discount: z.number().min(0).optional().default(0),
+    price: z
+      .number()
+      .positive('Price must be positive')
+      .pipe(priceAmountSchema),
+    discount: z.number().min(0).default(0).pipe(priceAmountSchema),
     description: z
       .string()
       .min(CABIN_DESCRIPTION_MIN, 'Description must be at least 10 characters')
@@ -40,7 +44,7 @@ const createFieldsSchema = z
       .int()
       .min(1, 'Minimum nights must be at least 1')
       .optional(),
-    extraGuestFee: z.number().min(0).optional().default(0),
+    extraGuestFee: z.number().min(0).default(0).pipe(priceAmountSchema),
   })
   .refine(data => !data.discount || data.discount < data.price, {
     message: 'Discount cannot be greater than or equal to the price',
@@ -65,8 +69,8 @@ const updateFieldsSchema = z
     images: z.array(z.string().url('Invalid image URL')).optional(),
     status: cabinStatusSchema.optional(),
     capacity: z.number().int().min(1).max(20).optional(),
-    price: z.number().positive().optional(),
-    discount: z.number().min(0).optional(),
+    price: z.number().positive().pipe(priceAmountSchema).optional(),
+    discount: z.number().min(0).pipe(priceAmountSchema).optional(),
     description: z
       .string()
       .min(CABIN_DESCRIPTION_MIN)
@@ -77,7 +81,7 @@ const updateFieldsSchema = z
     bathrooms: z.number().min(1).optional(),
     size: z.number().min(1).optional(),
     minNights: z.number().int().min(1).optional(),
-    extraGuestFee: z.number().min(0).optional(),
+    extraGuestFee: z.number().min(0).pipe(priceAmountSchema).optional(),
   })
   .refine(
     data => {
@@ -110,5 +114,5 @@ export function isDiscountValid({
 export const createCabinSchema = objectRequestSchema.pipe(createFieldsSchema);
 export const updateCabinSchema = objectRequestSchema.pipe(updateFieldsSchema);
 
-export type CreateCabinInput = z.infer<typeof createCabinSchema>;
-export type UpdateCabinInput = z.infer<typeof updateCabinSchema>;
+export type CreateCabinInput = z.input<typeof createFieldsSchema>;
+export type UpdateCabinInput = z.input<typeof updateFieldsSchema>;

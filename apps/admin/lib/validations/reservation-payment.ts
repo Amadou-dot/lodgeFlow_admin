@@ -1,11 +1,17 @@
 import { objectRequestSchema } from './object-request';
 import { z } from 'zod';
+import { cents } from '@lodgeflow/database/money';
 
 const receiptFieldsSchema = z
   .object({
     id: z.uuid(),
     type: z.enum(['payment', 'refund']),
-    amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    amountCents: z
+      .number()
+      .int()
+      .positive()
+      .max(Number.MAX_SAFE_INTEGER)
+      .transform(value => cents(value, { sign: 'positive' })),
     method: z.enum(['cash', 'bank_transfer', 'card', 'stripe']),
     reference: z.string().trim().max(200),
   })

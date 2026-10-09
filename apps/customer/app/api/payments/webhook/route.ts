@@ -9,8 +9,13 @@ import {
   ProcessedStripeEvent,
   connectDB,
   settleCheckoutPayment,
-  roundMoney,
 } from '@lodgeflow/database';
+import {
+  cents,
+  centsToMajor,
+  majorAmount,
+  roundMajorAmount,
+} from '@lodgeflow/database/money';
 import { sendPaymentConfirmationEmail } from '@/lib/email';
 import type { PaymentEmailCabin } from '@/types/payment-email';
 import { serializePaymentEmailBooking } from '@/lib/serializers/payment-email';
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
           id: session.metadata.reservationId,
           token: session.metadata.quoteToken ?? '',
           sessionId: session.id,
-          amountCents: session.amount_total ?? 0,
+          amountCents: cents(session.amount_total ?? 0, { sign: 'positive' }),
           currency: session.currency ?? '',
           paymentIntentId:
             typeof session.payment_intent === 'string'
@@ -73,11 +78,14 @@ export async function POST(request: NextRequest) {
           id: session.metadata.reservationId,
         });
       if (session.payment_status === 'paid' && session.metadata?.bookingId) {
+        const amount = centsToMajor(
+          cents(session.amount_total ?? 0, { sign: 'positive' })
+        );
         const result = await settleCheckoutPayment({
           bookingId: session.metadata.bookingId,
           sessionId: session.id,
           quoteToken: session.metadata.quoteToken ?? '',
-          amount: (session.amount_total ?? 0) / 100,
+          amount,
           currency: session.currency ?? '',
           paymentIntentId:
             typeof session.payment_intent === 'string'
@@ -94,7 +102,7 @@ export async function POST(request: NextRequest) {
               const email = await sendPaymentConfirmationEmail({
                 booking: serializePaymentEmailBooking(booking),
                 cabin: { name: booking.cabin.name },
-                amountPaid: (session.amount_total ?? 0) / 100,
+                amountPaid: amount,
                 isDeposit: session.metadata.isDeposit === 'true',
               });
               if (email.success)
@@ -157,7 +165,8 @@ export async function POST(request: NextRequest) {
         typeof charge.payment_intent === 'string'
           ? charge.payment_intent
           : charge.payment_intent?.id;
-      if (intent)
+      if (intent) {
+        const providerRefund = centsToMajor(cents(charge.amount_refunded));
         for (let attempt = 0; attempt < 5; attempt++) {
           const booking = await Booking.findOne({
             'payments.paymentIntentId': intent,
@@ -166,18 +175,36 @@ export async function POST(request: NextRequest) {
           const payment = booking.payments.find(
             p => p.paymentIntentId === intent
           )!;
-          payment.refundedAmount = Math.max(
-            payment.refundedAmount ?? 0,
-            charge.amount_refunded / 100
+          const refundedAmount = majorAmount(
+            Math.max(
+              majorAmount(payment.refundedAmount ?? 0, { precision: 'exact' }),
+              providerRefund
+            ),
+            { precision: 'exact' }
           );
-          booking.refundAmount = roundMoney(
-            booking.payments.reduce(
-              (sum, p) => sum + (p.refundedAmount ?? 0),
-              0
-            )
-          );
+          const refundAmount = roundMajorAmount({
+            amount: booking.payments.reduce(
+              (sum, entry) =>
+                majorAmount(
+                  sum +
+                    (entry === payment
+                      ? refundedAmount
+                      : majorAmount(entry.refundedAmount ?? 0, {
+                          precision: 'exact',
+                        })),
+                  { precision: 'preserve' }
+                ),
+              majorAmount(0, { precision: 'exact' })
+            ),
+            rounding: 'epsilon',
+          });
+          const amountPaid = majorAmount(booking.amountPaid, {
+            precision: 'exact',
+          });
+          payment.refundedAmount = refundedAmount;
+          booking.refundAmount = refundAmount;
           booking.refundStatus =
-            booking.refundAmount >= booking.amountPaid ? 'full' : 'partial';
+            refundAmount >= amountPaid ? 'full' : 'partial';
           booking.refundedAt = new Date();
           try {
             await booking.save();
@@ -190,6 +217,7 @@ export async function POST(request: NextRequest) {
               throw error;
           }
         }
+      }
     }
     // Mark only after success. Receipt IDs make concurrent/retried processing safe;
     // a failed request leaves no premature claim that could swallow Stripe retries.

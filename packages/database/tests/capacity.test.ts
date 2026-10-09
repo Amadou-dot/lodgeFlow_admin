@@ -13,6 +13,7 @@ import {
   updateExperienceReservation,
   updateCapacityCatalog,
   deleteCapacityCatalog,
+  ReservationRuleError,
 } from '../src';
 let server: MongoMemoryReplSet;
 before(async () => {
@@ -270,4 +271,132 @@ test('simultaneous capacity reduction and reservation creation preserve the capa
   assert.ok(
     rows.reduce((sum, row) => sum + row.numGuests, 0) <= saved!.maxPeople
   );
+});
+
+test('catalog prices retain sub-cent precision until the party total is rounded', async () => {
+  for (const { price, quantity, totalPrice } of [
+    { price: 0.333, quantity: 3, totalPrice: 1 },
+    { price: 1.005, quantity: 1, totalPrice: 1.01 },
+    { price: 0, quantity: 1, totalPrice: 0 },
+  ]) {
+    const meal = await dining();
+    meal.price = price;
+    meal.maxPeople = 3;
+    await meal.save();
+    const dinner = await createDiningReservation({
+      diningId: String(meal._id),
+      customerId: 'guest',
+      selection: { ...diningSelection, numGuests: quantity },
+    });
+    assert.ok(dinner);
+    assert.equal(dinner.totalPrice, totalPrice);
+
+    const activity = await experience();
+    activity.price = price;
+    activity.maxParticipants = 3;
+    await activity.save();
+    const booking = await createExperienceReservation({
+      experienceId: String(activity._id),
+      customerId: 'guest',
+      selection: { date, numParticipants: quantity },
+    });
+    assert.ok(booking);
+    assert.equal(booking.totalPrice, totalPrice);
+  }
+});
+
+test('invalid catalog totals roll back reservation creation and the catalog version', async () => {
+  for (const price of [
+    Infinity,
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER / 150,
+  ]) {
+    const meal = await dining();
+    meal.price = price;
+    await meal.save();
+    const beforeMeal = await Dining.findById(meal._id)
+      .select('+reservationVersion')
+      .lean();
+    await assert.rejects(
+      createDiningReservation({
+        diningId: String(meal._id),
+        customerId: 'guest',
+        selection: diningSelection,
+      }),
+      ReservationRuleError
+    );
+    assert.deepEqual(
+      await Dining.findById(meal._id).select('+reservationVersion').lean(),
+      beforeMeal
+    );
+    assert.equal(
+      await DiningReservation.countDocuments({ dining: meal._id }),
+      0
+    );
+
+    const activity = await experience();
+    activity.price = price;
+    await activity.save();
+    const beforeActivity = await Experience.findById(activity._id)
+      .select('+reservationVersion')
+      .lean();
+    await assert.rejects(
+      createExperienceReservation({
+        experienceId: String(activity._id),
+        customerId: 'guest',
+        selection: { date, numParticipants: 2 },
+      }),
+      ReservationRuleError
+    );
+    assert.deepEqual(
+      await Experience.findById(activity._id)
+        .select('+reservationVersion')
+        .lean(),
+      beforeActivity
+    );
+    assert.equal(
+      await ExperienceBooking.countDocuments({ experience: activity._id }),
+      0
+    );
+  }
+});
+
+test('catalog edits reject unsafe prices without advancing the shared capacity version', async () => {
+  const meal = await dining();
+  const activity = await experience();
+  for (const price of [Infinity, Number.MAX_SAFE_INTEGER]) {
+    const beforeMeal = await Dining.findById(meal._id)
+      .select('+reservationVersion')
+      .lean();
+    await assert.rejects(
+      updateCapacityCatalog({
+        kind: 'dining',
+        listingId: String(meal._id),
+        updates: { price },
+      }),
+      ReservationRuleError
+    );
+    assert.deepEqual(
+      await Dining.findById(meal._id).select('+reservationVersion').lean(),
+      beforeMeal
+    );
+
+    const beforeActivity = await Experience.findById(activity._id)
+      .select('+reservationVersion')
+      .lean();
+    await assert.rejects(
+      updateCapacityCatalog({
+        kind: 'experience',
+        listingId: String(activity._id),
+        updates: { price },
+      }),
+      ReservationRuleError
+    );
+    assert.deepEqual(
+      await Experience.findById(activity._id)
+        .select('+reservationVersion')
+        .lean(),
+      beforeActivity
+    );
+  }
 });

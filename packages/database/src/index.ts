@@ -24,6 +24,7 @@ export * from './booking-pricing';
 export * from './cabin-booking-lock';
 
 export * from './booking-payments';
+export * from './money';
 export * from './customer-bookings';
 export * from './checkout-settlement';
 

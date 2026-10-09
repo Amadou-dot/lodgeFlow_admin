@@ -1,5 +1,12 @@
 import Stripe from 'stripe';
 import { logger } from '@lodgeflow/database/logger';
+import {
+  cents,
+  centsToMajor,
+  majorAmount,
+  majorToCents,
+  type MajorCurrencyAmount,
+} from '@lodgeflow/database/money';
 
 // Singleton Stripe instance
 let stripeInstance: Stripe | null = null;
@@ -29,6 +36,13 @@ export interface CreateCheckoutSessionParams {
 export async function createCheckoutSession(
   params: CreateCheckoutSessionParams
 ): Promise<Stripe.Checkout.Session> {
+  const amount = majorToCents({
+    amount: majorAmount(params.amount, {
+      precision: 'preserve',
+      sign: 'positive',
+    }),
+    rounding: 'nearest',
+  });
   const stripe = getStripe();
 
   const session = await stripe.checkout.sessions.create({
@@ -43,7 +57,7 @@ export async function createCheckoutSession(
             name: `${params.cabinName} - ${params.isDeposit ? 'Deposit' : 'Full Payment'}`,
             description: `Stay from ${params.checkInDate} to ${params.checkOutDate}`,
           },
-          unit_amount: Math.round(params.amount * 100),
+          unit_amount: amount,
         },
         quantity: 1,
       },
@@ -60,7 +74,7 @@ export async function createCheckoutSession(
 }
 
 export type RefundResult =
-  | { success: true; refundId: string; amount: number }
+  | { success: true; refundId: string; amount: MajorCurrencyAmount }
   | { success: false; error: string };
 
 export async function createRefund({
@@ -80,7 +94,10 @@ export async function createRefund({
     };
 
     if (amount !== undefined) {
-      refundParams.amount = Math.round(amount * 100);
+      refundParams.amount = majorToCents({
+        amount: majorAmount(amount, { precision: 'exact', sign: 'positive' }),
+        rounding: 'exact',
+      });
     }
 
     const refund = await stripe.refunds.create(
@@ -91,7 +108,7 @@ export async function createRefund({
     return {
       success: true,
       refundId: refund.id,
-      amount: refund.amount / 100,
+      amount: centsToMajor(cents(refund.amount)),
     };
   } catch (error) {
     logger.error('Stripe refund error', error);

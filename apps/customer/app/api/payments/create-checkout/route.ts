@@ -1,5 +1,10 @@
 import { randomUUID } from 'crypto';
-import { Booking, connectDB, Settings, roundMoney } from '@lodgeflow/database';
+import { Booking, connectDB, Settings } from '@lodgeflow/database';
+import {
+  majorAmount,
+  majorToCents,
+  roundMajorAmount,
+} from '@lodgeflow/database/money';
 import type { ICabin } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
 import { getStripe } from '@/lib/stripe';
@@ -58,14 +63,30 @@ export async function POST(request: NextRequest) {
       return errorResponse('Payment is being confirmed; refresh shortly', 409);
     }
     if (!booking.checkoutPending) {
-      const amount = roundMoney(
-        Math.min(
-          booking.remainingAmount,
-          booking.amountPaid < booking.depositAmount
-            ? booking.depositAmount - booking.amountPaid
-            : booking.remainingAmount
-        )
-      );
+      const remainingAmount = majorAmount(booking.remainingAmount, {
+        precision: 'preserve',
+      });
+      const amountPaid = majorAmount(booking.amountPaid, {
+        precision: 'exact',
+      });
+      const depositAmount = majorAmount(booking.depositAmount, {
+        precision: 'preserve',
+      });
+      const totalPrice = majorAmount(booking.totalPrice, {
+        precision: 'preserve',
+      });
+      const amount = roundMajorAmount({
+        amount: majorAmount(
+          Math.min(
+            remainingAmount,
+            amountPaid < depositAmount
+              ? depositAmount - amountPaid
+              : remainingAmount
+          ),
+          { precision: 'preserve' }
+        ),
+        rounding: 'epsilon',
+      });
       if (amount <= 0) return errorResponse('No payment is due', 400);
       const reserved = await Booking.findOneAndUpdate(
         { _id: bookingId, __v: booking.get('__v'), checkoutPending: false },
@@ -74,7 +95,7 @@ export async function POST(request: NextRequest) {
             checkoutPending: true,
             checkoutToken: randomUUID(),
             checkoutAmount: amount,
-            checkoutTotalPrice: booking.totalPrice,
+            checkoutTotalPrice: totalPrice,
             checkoutCurrency: settings.currency.toLowerCase(),
           },
           $unset: { stripeSessionId: 1 },
@@ -90,6 +111,13 @@ export async function POST(request: NextRequest) {
     // Retain the reserved quote, as with provider failure, without creating a session.
     const cabin = booking.cabin;
     if (!cabin) return errorResponse('Cabin not found', 404);
+    const checkoutAmount = majorToCents({
+      amount: majorAmount(booking.checkoutAmount!, {
+        precision: 'exact',
+        sign: 'positive',
+      }),
+      rounding: 'nearest',
+    });
     // Retain the quote token on failures: retrying the same Stripe idempotency key
     // recovers a session whose creation succeeded before a connection was lost.
     const baseUrl = normalizeBaseUrl(
@@ -104,7 +132,7 @@ export async function POST(request: NextRequest) {
           {
             price_data: {
               currency: booking.checkoutCurrency!,
-              unit_amount: Math.round(booking.checkoutAmount! * 100),
+              unit_amount: checkoutAmount,
               product_data: {
                 name: cabin.name,
                 description: isDeposit ? 'Booking deposit' : 'Booking balance',

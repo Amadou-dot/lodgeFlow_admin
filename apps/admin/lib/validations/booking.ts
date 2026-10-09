@@ -1,3 +1,4 @@
+import { receiptAmountSchema } from './money';
 import { objectRequestSchema } from './object-request';
 import {
   BOOKING_STATUSES,
@@ -75,7 +76,7 @@ const updateFieldsSchema = z
     cancelledAt: requestDateSchema.optional(),
     cancellationReason: z.string().max(500).optional(),
     refundStatus: refundStatusSchema.optional(),
-    refundAmount: z.number().min(0).optional(),
+    refundAmount: z.number().min(0).pipe(receiptAmountSchema).optional(),
     refundedAt: requestDateSchema.optional(),
     extras: bookingExtrasSchema.optional(),
     observations: z.string().max(1000).optional(),
@@ -100,7 +101,10 @@ const updateFieldsSchema = z
 const recordPaymentFields = z.strictObject({
   receiptId: z.string().uuid().optional(),
   paymentMethod: paymentMethodSchema,
-  amountPaid: z.number().positive('Payment amount must be positive'),
+  amountPaid: z
+    .number()
+    .positive('Payment amount must be positive')
+    .pipe(receiptAmountSchema),
   notes: z.string().max(500).optional(),
 });
 export const recordPaymentSchema =
@@ -115,7 +119,7 @@ const patchFieldsSchema = z
     cancellationReason: z.string().max(500).optional(),
     cancelledAt: requestDateSchema.optional(),
     refundStatus: refundStatusSchema.optional(),
-    refundAmount: z.number().min(0).optional(),
+    refundAmount: z.number().min(0).pipe(receiptAmountSchema).optional(),
     refundedAt: requestDateSchema.optional(),
     paidAt: requestDateSchema.optional(),
     stripePaymentIntentId: z.string().startsWith('pi_').max(255).optional(),

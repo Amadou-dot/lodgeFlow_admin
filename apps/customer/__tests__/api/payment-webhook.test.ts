@@ -10,7 +10,6 @@ jest.mock('@lodgeflow/database', () => ({
   settleReservationCheckout: jest.fn(),
   expireReservationCheckout: jest.fn(),
   settleReservationRefund: jest.fn(),
-  roundMoney: (amount: number) => Math.round(amount * 100) / 100,
 }));
 jest.mock('@/lib/stripe', () => ({ getStripe: jest.fn() }));
 jest.mock('@/lib/email', () => ({ sendPaymentConfirmationEmail: jest.fn() }));
@@ -28,7 +27,8 @@ import {
 } from '@lodgeflow/database';
 import { getStripe } from '@/lib/stripe';
 import { sendPaymentConfirmationEmail } from '@/lib/email';
-import { Types } from 'mongoose';
+import { Error as MongooseError, Types } from 'mongoose';
+import BookingModel from '@lodgeflow/database/models/Booking';
 const stripe = new Stripe('sk_test_webhook_unit_test');
 const secret = 'whsec_unit_test';
 const paidEvent = {
@@ -46,7 +46,9 @@ const paidEvent = {
   },
 };
 function signedRequest(event: unknown) {
-  const payload = JSON.stringify(event);
+  return signedPayload(JSON.stringify(event));
+}
+function signedPayload(payload: string) {
   return new NextRequest('http://localhost/api/payments/webhook', {
     method: 'POST',
     body: payload,
@@ -243,6 +245,182 @@ it('older refund events cannot reduce the amount already refunded', async () => 
   ).toBe(200);
   expect(booking.refundAmount).toBe(100);
   expect(booking.payments[0].refundedAmount).toBe(100);
+});
+
+it('converts signed checkout cents once before cabin settlement', async () => {
+  (settleCheckoutPayment as jest.Mock).mockResolvedValue({
+    changed: false,
+    booking: null,
+  });
+  const event = {
+    ...paidEvent,
+    data: { object: { ...paidEvent.data.object, amount_total: 29 } },
+  };
+  expect((await POST(signedRequest(event))).status).toBe(200);
+  expect(settleCheckoutPayment).toHaveBeenCalledWith(
+    expect.objectContaining({ amount: 0.29 })
+  );
+});
+
+it('rereads refund receipts after a version conflict and retains cumulative provider amounts', async () => {
+  const stale = {
+    payments: [{ paymentIntentId: 'pi_paid', amount: 1, refundedAmount: 0.01 }],
+    amountPaid: 2,
+    save: jest
+      .fn()
+      .mockRejectedValue(
+        new MongooseError.VersionError(new BookingModel(), 0, ['payments'])
+      ),
+  };
+  const refreshed = {
+    payments: [
+      { paymentIntentId: 'pi_paid', amount: 1, refundedAmount: 0.29 },
+      { paymentIntentId: 'pi_second', amount: 1, refundedAmount: 0.01 },
+    ],
+    amountPaid: 2,
+    refundAmount: 0,
+    refundStatus: 'none',
+    save: jest.fn().mockResolvedValue(undefined),
+  };
+  (Booking.findOne as jest.Mock)
+    .mockResolvedValueOnce(stale)
+    .mockResolvedValueOnce(refreshed);
+  const event = {
+    id: 'evt_refund_retry',
+    type: 'charge.refunded',
+    data: { object: { payment_intent: 'pi_paid', amount_refunded: 20 } },
+  };
+  expect((await POST(signedRequest(event))).status).toBe(200);
+  expect(Booking.findOne).toHaveBeenCalledTimes(2);
+  expect(refreshed.payments[0].refundedAmount).toBe(0.29);
+  expect(refreshed.refundAmount).toBe(0.3);
+  expect(refreshed.refundStatus).toBe('partial');
+  expect(ProcessedStripeEvent.updateOne).toHaveBeenCalledTimes(1);
+});
+
+describe.each([
+  { target: 'cabin', metadata: { bookingId: 'booking', quoteToken: 'quote' } },
+  {
+    target: 'dining',
+    metadata: {
+      reservationKind: 'dining',
+      reservationId: 'reservation',
+      quoteToken: 'quote',
+    },
+  },
+  {
+    target: 'experience',
+    metadata: {
+      reservationKind: 'experience',
+      reservationId: 'reservation',
+      quoteToken: 'quote',
+    },
+  },
+])('$target provider money validation', ({ metadata }) => {
+  it.each(['-1', '0', '1.5', '9007199254740992', '1e400', 'null'])(
+    'rejects signed invalid checkout cents %s before settlement or a processed marker',
+    async amount => {
+      (settleCheckoutPayment as jest.Mock).mockResolvedValue({
+        changed: false,
+        booking: null,
+      });
+      const event = {
+        ...paidEvent,
+        data: { object: { ...paidEvent.data.object, metadata } },
+      };
+      const payload = JSON.stringify(event).replace(
+        '"amount_total":15000',
+        '"amount_total":' + amount
+      );
+      const response = await POST(signedPayload(payload));
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        error: 'Webhook processing failed',
+      });
+      expect(settleCheckoutPayment).not.toHaveBeenCalled();
+      expect(settleReservationCheckout).not.toHaveBeenCalled();
+      expect(sendReservationConfirmation).not.toHaveBeenCalled();
+      expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+    }
+  );
+});
+
+it.each(['-1', '1.5', '9007199254740992', '1e400', 'null'])(
+  'rejects invalid cumulative refund cents %s before saving or marking processed',
+  async amount => {
+    const booking = {
+      payments: [
+        { paymentIntentId: 'pi_paid', amount: 150, refundedAmount: 0 },
+      ],
+      amountPaid: 150,
+      save: jest.fn(),
+    };
+    (Booking.findOne as jest.Mock).mockResolvedValue(booking);
+    const payload =
+      '{"id":"evt_invalid_refund","type":"charge.refunded","data":{"object":{"payment_intent":"pi_paid","amount_refunded":' +
+      amount +
+      '}}}';
+    const response = await POST(signedPayload(payload));
+    expect(response.status).toBe(500);
+    expect(booking.save).not.toHaveBeenCalled();
+    expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+  }
+);
+
+it('rejects aggregate refund overflow before changing receipts or marking the event processed', async () => {
+  const booking = {
+    payments: [
+      {
+        paymentIntentId: 'pi_paid',
+        amount: 50_000_000_000_000,
+        refundedAmount: 0,
+      },
+      {
+        paymentIntentId: 'pi_second',
+        amount: 50_000_000_000_000,
+        refundedAmount: 50_000_000_000_000,
+      },
+    ],
+    amountPaid: 50_000_000_000_000,
+    save: jest.fn(),
+  };
+  (Booking.findOne as jest.Mock).mockResolvedValue(booking);
+  const event = {
+    id: 'evt_refund_overflow',
+    type: 'charge.refunded',
+    data: {
+      object: {
+        payment_intent: 'pi_paid',
+        amount_refunded: 5_000_000_000_000_000,
+      },
+    },
+  };
+  expect((await POST(signedRequest(event))).status).toBe(500);
+  expect(booking.payments[0].refundedAmount).toBe(0);
+  expect(booking.save).not.toHaveBeenCalled();
+  expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+});
+
+it('leaves repeated version conflicts unprocessed after the fifth refund save attempt', async () => {
+  const source = {
+    payments: [{ paymentIntentId: 'pi_paid', amount: 1, refundedAmount: 0 }],
+    amountPaid: 1,
+    save: jest
+      .fn()
+      .mockRejectedValue(
+        new MongooseError.VersionError(new BookingModel(), 0, ['payments'])
+      ),
+  };
+  (Booking.findOne as jest.Mock).mockResolvedValue(source);
+  const event = {
+    id: 'evt_refund_conflict',
+    type: 'charge.refunded',
+    data: { object: { payment_intent: 'pi_paid', amount_refunded: 100 } },
+  };
+  expect((await POST(signedRequest(event))).status).toBe(500);
+  expect(source.save).toHaveBeenCalledTimes(5);
+  expect(Booking.findOne).toHaveBeenCalledTimes(5);
+  expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
 });
 
 for (const kind of ['dining', 'experience']) {

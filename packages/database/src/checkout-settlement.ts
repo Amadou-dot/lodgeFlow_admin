@@ -3,6 +3,7 @@ import Booking from './models/Booking';
 import {
   addBookingPayment,
   BookingPaymentError,
+  parseBookingPaymentAmount,
   type CheckoutReceipt,
 } from './booking-payments';
 
@@ -12,13 +13,14 @@ export async function settleCheckoutPayment(receipt: CheckoutReceipt) {
     throw new BookingPaymentError(
       'Payment is missing its provider reference or quote'
     );
+  const amount = parseBookingPaymentAmount(receipt.amount);
   for (let attempt = 0; attempt < 5; attempt++) {
     const booking = await Booking.findById(receipt.bookingId);
     if (!booking) return { booking: null, changed: false };
     const prior = booking.payments.find(p => p.id === receipt.sessionId);
     if (prior) {
       if (
-        prior.amount !== receipt.amount ||
+        prior.amount !== amount ||
         prior.paymentIntentId !== receipt.paymentIntentId
       )
         throw new BookingPaymentError(
@@ -30,7 +32,7 @@ export async function settleCheckoutPayment(receipt: CheckoutReceipt) {
       !booking.checkoutPending ||
       booking.checkoutToken !== receipt.quoteToken ||
       booking.checkoutTotalPrice !== booking.totalPrice ||
-      booking.checkoutAmount !== receipt.amount ||
+      booking.checkoutAmount !== amount ||
       booking.checkoutCurrency !== receipt.currency
     ) {
       throw new BookingPaymentError(
@@ -39,7 +41,7 @@ export async function settleCheckoutPayment(receipt: CheckoutReceipt) {
     }
     addBookingPayment(booking, {
       id: receipt.sessionId,
-      amount: receipt.amount,
+      amount,
       method: 'online',
       receivedAt: new Date(),
       paymentIntentId: receipt.paymentIntentId,

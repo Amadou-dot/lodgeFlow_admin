@@ -5,6 +5,11 @@ import {
 } from '@/lib/validations/booking';
 import { logger } from '@lodgeflow/database/logger';
 import {
+  majorAmount,
+  roundMajorAmount,
+  type MajorCurrencyAmount,
+} from '@lodgeflow/database/money';
+import {
   serializeBookingDetail,
   type DetailCabinSource,
 } from '@/lib/serializers/booking-read';
@@ -260,7 +265,9 @@ export async function DELETE(
     const refundEstimate =
       booking.status === 'cancelled'
         ? {
-            refundAmount: booking.refundRequestedAmount ?? 0,
+            refundAmount: majorAmount(booking.refundRequestedAmount ?? 0, {
+              precision: 'exact',
+            }),
             refundType: 'partial' as const,
             reason: 'Previously requested cancellation refund',
           }
@@ -270,23 +277,40 @@ export async function DELETE(
       // Persist the cancellation and its refund plan before contacting Stripe.
       // Concurrent cancellation/payment requests lose the version comparison.
       let remaining = refundEstimate.refundAmount;
-      booking.cancellationRefunds = [];
+      const cancellationRefunds: {
+        paymentIntentId: string;
+        amount: MajorCurrencyAmount;
+      }[] = [];
       for (const payment of booking.payments) {
         if (!payment.paymentIntentId || remaining <= 0) continue;
-        const amount =
-          Math.round(
-            Math.min(
-              remaining,
-              payment.amount - (payment.refundedAmount ?? 0)
-            ) * 100
-          ) / 100;
+        const received = majorAmount(payment.amount, {
+          precision: 'exact',
+          sign: 'positive',
+        });
+        const refunded = majorAmount(payment.refundedAmount ?? 0, {
+          precision: 'exact',
+        });
+        const amount = roundMajorAmount({
+          amount: majorAmount(Math.min(remaining, received - refunded), {
+            precision: 'preserve',
+            sign: 'signed',
+          }),
+          rounding: 'nearest',
+        });
         if (amount <= 0) continue;
-        booking.cancellationRefunds.push({
+        cancellationRefunds.push({
           paymentIntentId: payment.paymentIntentId,
           amount,
         });
-        remaining = Math.round((remaining - amount) * 100) / 100;
+        remaining = roundMajorAmount({
+          amount: majorAmount(remaining - amount, {
+            precision: 'preserve',
+            sign: 'signed',
+          }),
+          rounding: 'nearest',
+        });
       }
+      booking.cancellationRefunds = cancellationRefunds;
       booking.status = 'cancelled';
       booking.cancelledAt = new Date();
       booking.cancellationReason = cancellationReason;
@@ -307,7 +331,10 @@ export async function DELETE(
       }
       const result = await createRefund({
         paymentIntentId: refund.paymentIntentId,
-        amount: refund.amount,
+        amount: majorAmount(refund.amount, {
+          precision: 'exact',
+          sign: 'positive',
+        }),
         idempotencyKey: `cancel:${id}:${refund.paymentIntentId}`,
       });
       if (!result.success) {

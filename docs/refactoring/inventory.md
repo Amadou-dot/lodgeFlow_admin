@@ -5,7 +5,32 @@ This inventory assigns work; it does not authorize skipping the Phase 0B/0C gate
 All confirmed items below remain open unless their status explicitly says otherwise.
 The owning phase is an execution dependency, not an assigned person.
 
-## Current review checkpoint (2026-10-07)
+## Phase 3 review handoff (2026-10-09)
+
+M01–M03 are implemented on `refactor/phase3-money` from `2aa8756`. The complete
+[money boundary inventory](phase-3-money.md) maps catalog/settings prices, cabin
+and reservation accounting, checkout/webhook/refund conversions, input and display
+adapters across both apps. Validated major-unit and cents types retain numeric
+storage/JSON, existing price/deposit rounding, quote checks, locks, capacity
+transactions, version retries and legacy reconciliation safeguards.
+
+Focused corrections reject unsafe/sub-cent receipt or refund inputs before
+effects, validate provider cents and persisted monetary state, reject mismatched
+completed reservation checkout retries, and make the cabin Half preset display
+and submit the same exact cent amount. Invalid guest-count drafts remain editable;
+request validation still rejects them. No data migration, provider operation,
+Phase 4 workflow refactor or unrelated feature is included.
+
+Final local evidence: `pnpm ci:check` passes formatting, read-only lint and 2,387
+tests (admin 1,520; customer 771; database 93; email 3). Both app/shared production
+builds, frozen installation, strict compilation of all eight touched admin
+test files and the expanded isolated HTTP gate pass. Independent review has no
+remaining findings. The implementation is prepared for PR review; remote CI and
+preview status are recorded on the PR. Merge and production verification remain
+pending. Historical evidence below is retained. The existing syntax JSON
+remains the dated Phase 1–2 snapshot, not a fresh Phase 3 scan.
+
+## Historical review checkpoint (2026-10-07)
 
 Customer browser-review follow-up: cabin requests now submit all five controlled
 extra choices and complete nonblank special-request lines. The form receives
@@ -37,8 +62,9 @@ The remaining Phase 1–2 implementation is complete on the review branch
 `refactor/admin-cabin-availability`, based on `4d3590b`. Final local gates pass and
 the Phase 1–2 acceptance checklists are complete. The branch is ready for review;
 this checkpoint does not claim a merge or verified deployment. Historical PR evidence below
-continues to describe the earlier delivered slices only. Stop before Phase 3 for
-review; the overall refactoring milestone remains open.
+continues to describe the earlier delivered slices only. The requested Phase 3
+review boundary was subsequently lifted on 2026-10-08; the overall refactoring
+milestone remains open.
 
 The [current candidate review](inventory-current.json) supersedes the baseline
 candidate list for outstanding work. It covers 655 source/test/script files:
@@ -120,9 +146,9 @@ rather than treating counts as the completion gate.
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed available-only queries, explicit zero bounds and shared dining JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
 | V07 | Admin `app/api/cabins/bulk/route.ts` and `lib/validations/bulk-cabin.ts` | Raw payloads, raw exception messages and unawaited operations escape the request boundary. | 2 | Implemented in Phase 2 slice 22: validated tagged operations, preserved legacy denial precedence, safe logged failures and rejected contradictory/unknown fields. |
-| M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Characterize current arithmetic/rounding before introducing validated unit types; no silent storage or rounding migration.                                                          |
-| M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Inventory every reader/writer, introduce explicit constructors/conversions and retain duplicate/overpay/refund tests.                                                               |
-| M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Centralize boundary conversions after M01/M02; test precision/sign/range and display values.                                                                                        |
+| M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Completed locally in Phase 3: validated major-unit calculations with characterized rounding/clamping; see phase-3-money.md.                                                          |
+| M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Completed locally in Phase 3: boundary inventory, validated unit types, receipt/refund limits and retry/concurrency regressions; see phase-3-money.md.                                                               |
+| M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Completed locally in Phase 3: shared conversion/formatting helpers and precision/sign/range/display regressions; see phase-3-money.md.                                                                                        |
 | S01 | `apps/admin/hooks/useBookingForm.ts` and booking UI hooks/components                                             | Local derived price/form state and SWR/mutation invalidation require coordinated review.     | 4        | Identify redundant state and exclusive workflow states in one form; test error/retry/cache refresh. Independent extras booleans remain valid options.                               |
 | E01 | Both apps' existing send routes and customer email helpers                                                       | Ten sender sites migrated to validated `@lodgeflow/email` configuration.                     | 5 / #132 | Complete in PR #155 / merge `9a9c296`: tests, both production deployments, Resend delivery and user inbox confirmation verified. No #139 features.                                  |
 | O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Open for Phase 6: inventory-current.json lists remaining generic test mocks, schema-test fixtures and the test setup factories by path/line. All modified admin tests receive a separate strict type check; no compiler/lint settings are weakened. |

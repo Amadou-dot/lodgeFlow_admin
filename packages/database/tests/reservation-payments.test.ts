@@ -12,6 +12,8 @@ import {
   refundReservationStripe,
   type ReservationStripeGateway,
   type ReservationReceipt,
+  ReservationRuleError,
+  settleReservationRefund,
 } from '../src';
 let server: MongoMemoryServer;
 before(async () => {
@@ -170,6 +172,17 @@ for (const kind of ['dining', 'experience'] as const) {
         : await ExperienceBooking.findById(row.id).orFail();
     assert.equal(current.receipts.length, 1);
     assert.equal(current.isPaid, true);
+    for (const mismatch of [
+      { amountCents: 4999 },
+      { currency: 'eur' },
+      { token: 'different-quote' },
+      { paymentIntentId: 'different-intent' },
+    ]) {
+      await assert.rejects(
+        settleReservationCheckout({ ...settlement, ...mismatch }),
+        error => error instanceof ReservationRuleError && error.status === 409
+      );
+    }
     let calls = 0;
     const stripe: ReservationStripeGateway = {
       checkout: {
@@ -280,4 +293,273 @@ test('checkout enforces ownership, freezes the server balance, and recovers the 
   );
   assert.equal(keys.length, 2);
   assert.equal(keys[0], keys[1]);
+});
+
+test('unsafe saved quotes cannot create or retrieve a checkout or write a receipt', async () => {
+  let providerCalls = 0;
+  const stripe: ReservationStripeGateway = {
+    checkout: {
+      sessions: {
+        create: async () => {
+          providerCalls++;
+          return { id: 'cs_invalid', url: 'https://checkout.test' };
+        },
+        retrieve: async () => {
+          providerCalls++;
+          return { status: 'open', url: 'https://checkout.test' };
+        },
+      },
+    },
+    refunds: {
+      create: async () => {
+        throw new Error('Unexpected refund');
+      },
+      retrieve: async () => {
+        throw new Error('Unexpected refund');
+      },
+    },
+  };
+  for (const amountCents of [
+    0,
+    -1,
+    1.5,
+    Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    for (const sessionId of [undefined, 'cs_invalid']) {
+      const row = await fixture('dining');
+      row.checkout = {
+        token: 'quote',
+        amountCents,
+        currency: 'usd',
+        pending: true,
+        createdAt: new Date(),
+        sessionId,
+      };
+      await row.save();
+      const beforeRow = await DiningReservation.findById(row.id).lean();
+      await assert.rejects(
+        createReservationCheckout({
+          kind: 'dining',
+          id: row.id,
+          customer: 'guest',
+          returnUrl: 'https://customer.test',
+          stripe,
+        }),
+        ReservationRuleError
+      );
+      await assert.rejects(
+        settleReservationCheckout({
+          kind: 'dining',
+          id: row.id,
+          token: 'quote',
+          sessionId: 'cs_invalid',
+          amountCents,
+          currency: 'usd',
+          paymentIntentId: 'pi_invalid',
+        }),
+        ReservationRuleError
+      );
+      assert.deepEqual(
+        await DiningReservation.findById(row.id).lean(),
+        beforeRow
+      );
+    }
+  }
+  assert.equal(providerCalls, 0);
+});
+
+test('invalid provider cents and overflowing stored receipts never settle a payment', async () => {
+  const row = await fixture('dining');
+  row.checkout = {
+    token: 'quote',
+    amountCents: 5000,
+    currency: 'usd',
+    pending: true,
+    createdAt: new Date(),
+  };
+  await row.save();
+  const settlement = {
+    kind: 'dining' as const,
+    id: row.id,
+    token: 'quote',
+    sessionId: 'cs_invalid',
+    amountCents: 5000,
+    currency: 'usd',
+    paymentIntentId: 'pi_invalid',
+  };
+  for (const amountCents of [
+    NaN,
+    Infinity,
+    -1,
+    0,
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    await assert.rejects(
+      settleReservationCheckout({ ...settlement, amountCents }),
+      ReservationRuleError
+    );
+  }
+  row.receipts = [
+    {
+      ...payment,
+      amountCents: Number.MAX_SAFE_INTEGER,
+      recordedAt: new Date(),
+    },
+    { ...payment, id: 'another', amountCents: 1, recordedAt: new Date() },
+  ];
+  await row.save();
+  const beforeRow = await DiningReservation.findById(row.id).lean();
+  await assert.rejects(
+    settleReservationCheckout(settlement),
+    ReservationRuleError
+  );
+  assert.deepEqual(await DiningReservation.findById(row.id).lean(), beforeRow);
+});
+
+test('invalid refund reservations cannot call the provider or complete refund settlement', async () => {
+  let providerCalls = 0;
+  const stripe: ReservationStripeGateway = {
+    checkout: {
+      sessions: {
+        create: async () => {
+          throw new Error('Unexpected checkout');
+        },
+        retrieve: async () => {
+          throw new Error('Unexpected checkout');
+        },
+      },
+    },
+    refunds: {
+      create: async () => {
+        providerCalls++;
+        return { id: 're_invalid', status: 'succeeded' };
+      },
+      retrieve: async () => {
+        providerCalls++;
+        return { id: 're_invalid', status: 'succeeded' };
+      },
+    },
+  };
+  for (const amountCents of [
+    0,
+    -1,
+    1.5,
+    Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    const row = await fixture('dining');
+    row.receipts = [
+      {
+        ...payment,
+        method: 'stripe',
+        amountCents: 5000,
+        recordedAt: new Date(),
+      },
+    ];
+    row.stripePaymentIntentId = 'pi_paid';
+    row.stripeRefund = {
+      token: 'refund',
+      amountCents,
+      status: 'pending',
+      createdAt: new Date(),
+      actor: 'staff',
+      reference: 'Cancel',
+    };
+    await row.save();
+    const beforeRow = await DiningReservation.findById(row.id).lean();
+    await assert.rejects(
+      refundReservationStripe({
+        kind: 'dining',
+        id: row.id,
+        token: 'refund',
+        amountCents: 5000,
+        actor: 'staff',
+        reference: 'Cancel',
+        stripe,
+      }),
+      ReservationRuleError
+    );
+    await assert.rejects(
+      settleReservationRefund({
+        kind: 'dining',
+        id: row.id,
+        token: 'refund',
+        refundId: 're_invalid',
+        status: 'succeeded',
+      }),
+      ReservationRuleError
+    );
+    assert.deepEqual(
+      await DiningReservation.findById(row.id).lean(),
+      beforeRow
+    );
+  }
+  assert.equal(providerCalls, 0);
+});
+
+test('a saved refund that exceeds available receipts fails before contacting Stripe', async () => {
+  const row = await fixture('dining');
+  row.receipts = [
+    { ...payment, method: 'stripe', amountCents: 5000, recordedAt: new Date() },
+  ];
+  row.stripePaymentIntentId = 'pi_paid';
+  row.stripeRefund = {
+    token: 'refund',
+    amountCents: 5001,
+    status: 'pending',
+    createdAt: new Date(),
+    actor: 'staff',
+    reference: 'Cancel',
+  };
+  await row.save();
+  let providerCalls = 0;
+  const stripe: ReservationStripeGateway = {
+    checkout: {
+      sessions: {
+        create: async () => {
+          throw new Error('Unexpected checkout');
+        },
+        retrieve: async () => {
+          throw new Error('Unexpected checkout');
+        },
+      },
+    },
+    refunds: {
+      create: async () => {
+        providerCalls++;
+        return { id: 're_invalid', status: 'succeeded' };
+      },
+      retrieve: async () => {
+        providerCalls++;
+        return { id: 're_invalid', status: 'succeeded' };
+      },
+    },
+  };
+  const beforeRow = await DiningReservation.findById(row.id).lean();
+  await assert.rejects(
+    refundReservationStripe({
+      kind: 'dining',
+      id: row.id,
+      token: 'refund',
+      amountCents: 5001,
+      actor: 'staff',
+      reference: 'Cancel',
+      stripe,
+    }),
+    ReservationRuleError
+  );
+  await assert.rejects(
+    settleReservationRefund({
+      kind: 'dining',
+      id: row.id,
+      token: 'refund',
+      refundId: 're_invalid',
+      status: 'succeeded',
+    }),
+    ReservationRuleError
+  );
+  assert.equal(providerCalls, 0);
+  assert.deepEqual(await DiningReservation.findById(row.id).lean(), beforeRow);
 });

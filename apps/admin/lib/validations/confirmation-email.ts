@@ -1,10 +1,11 @@
+import { priceAmountSchema } from './money';
 import { z } from 'zod';
 import type { Cabin, PopulatedBooking } from '@/types';
 
 const dateString = z
   .string()
   .refine(value => Number.isFinite(Date.parse(value)), 'Invalid booking date');
-const amount = z.number().nonnegative();
+const amount = z.number().nonnegative().pipe(priceAmountSchema);
 const extras = z.object({
   hasBreakfast: z.boolean(),
   breakfastPrice: amount,

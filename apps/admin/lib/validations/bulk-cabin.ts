@@ -1,3 +1,4 @@
+import { priceAmountSchema } from './money';
 import { z } from 'zod';
 
 const REQUIRED_FIELDS = 'action and ids (non-empty array) are required';
@@ -28,7 +29,7 @@ export const bulkCabinSchema = z
         .object({
           action: z.literal('update-discount'),
           ids: idsSchema,
-          discount: z.number().nonnegative(),
+          discount: z.number().nonnegative().pipe(priceAmountSchema),
         })
         .strict(),
     ])

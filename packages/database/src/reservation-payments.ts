@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import DiningReservation from './models/DiningReservation';
 import ExperienceBooking from './models/ExperienceBooking';
-import { ReservationRuleError } from './reservation-capacity';
+import { cents } from './money';
+import { ReservationRuleError, reservationMoney } from './reservation-errors';
 import {
   reservationPaymentSummary,
+  reservationTenderBalance,
   type ReservationReceipt,
 } from './reservation-payment-state';
 
@@ -18,10 +20,10 @@ export async function recordReservationReceipt({
 }) {
   if (!mongoose.isValidObjectId(id))
     throw new ReservationRuleError('Invalid reservation ID');
-  if (!Number.isSafeInteger(receipt.amountCents) || receipt.amountCents <= 0)
-    throw new ReservationRuleError(
-      'Amount must be a positive whole number of cents'
-    );
+  const amountCents = reservationMoney(
+    () => cents(receipt.amountCents, { sign: 'positive' }),
+    { message: 'Amount must be a positive whole number of cents' }
+  );
   for (let attempt = 0; attempt < 5; attempt++) {
     const reservation =
       kind === 'dining'
@@ -35,7 +37,7 @@ export async function recordReservationReceipt({
     if (existing) {
       if (
         existing.type !== receipt.type ||
-        existing.amountCents !== receipt.amountCents ||
+        existing.amountCents !== amountCents ||
         existing.method !== receipt.method ||
         existing.reference !== receipt.reference ||
         existing.actor !== receipt.actor
@@ -62,31 +64,26 @@ export async function recordReservationReceipt({
         throw new ReservationRuleError(
           'This reservation cannot receive payments'
         );
-      if (receipt.amountCents > summary.balanceCents)
+      if (amountCents > summary.balanceCents)
         throw new ReservationRuleError(
           'Payment exceeds the outstanding balance'
         );
     } else {
       // Refund each tender only up to the amount actually collected on it.
-      const available = reservation.receipts.reduce(
-        (sum: number, row: ReservationReceipt) =>
-          sum +
-          (row.method === receipt.method
-            ? row.type === 'payment'
-              ? row.amountCents
-              : -row.amountCents
-            : 0),
-        0
-      );
-      if (
-        receipt.amountCents > summary.refundableCents ||
-        receipt.amountCents > available
-      )
+      const available = reservationTenderBalance({
+        receipts: reservation.receipts,
+        method: receipt.method,
+      });
+      if (amountCents > summary.refundableCents || amountCents > available)
         throw new ReservationRuleError(
           'Refund exceeds payments available for this method'
         );
     }
-    reservation.receipts.push({ ...receipt, recordedAt: new Date() });
+    reservation.receipts.push({
+      ...receipt,
+      amountCents,
+      recordedAt: new Date(),
+    });
     reservation.isPaid =
       reservationPaymentSummary(reservation).balanceCents === 0;
     try {

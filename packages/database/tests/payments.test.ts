@@ -12,6 +12,7 @@ import {
   updateCustomerBooking,
   BookingRuleError,
   buildDemoBookings,
+  BookingPaymentError,
 } from '../src';
 let server: MongoMemoryServer;
 before(async () => {
@@ -164,6 +165,23 @@ test('concurrent duplicate Stripe deliveries record one receipt and reject misma
   assert.equal(saved?.payments.length, 1);
   assert.equal(saved?.remainingAmount, 450);
   assert.equal(saved?.checkoutPending, false);
+});
+
+test('checkout rejects invalid receipt money even when its booking no longer exists', async () => {
+  for (const amount of [NaN, Infinity, -1, 0, 1.005, Number.MAX_SAFE_INTEGER]) {
+    await assert.rejects(
+      settleCheckoutPayment({
+        bookingId: new mongoose.Types.ObjectId().toString(),
+        quoteToken: 'quote',
+        sessionId: 'cs_invalid',
+        paymentIntentId: 'pi_invalid',
+        currency: 'usd',
+        amount,
+      }),
+      BookingPaymentError
+    );
+  }
+  assert.equal(await Booking.countDocuments(), 0);
 });
 test('optimistic saves prevent two concurrent offline payments from overwriting each other', async () => {
   const booking = await createCustomerBooking(await selection());
