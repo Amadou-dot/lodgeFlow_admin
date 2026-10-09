@@ -2,7 +2,7 @@ import type { PopulatedBooking } from '@/types';
 import { addToast } from '@heroui/toast';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 interface UsePrintBookingOptions {
   filename?: string;
@@ -24,8 +24,19 @@ interface UsePrintBookingReturn {
 export const usePrintBooking = (
   booking: PopulatedBooking
 ): UsePrintBookingReturn => {
-  const [isPrinting, setIsPrinting] = useState(false);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  type Operation = 'idle' | 'printing' | 'pdf';
+  const [operation, setOperation] = useState<Operation>('idle');
+  const activeOperation = useRef<Operation>('idle');
+  const begin = useCallback((next: Exclude<Operation, 'idle'>) => {
+    if (activeOperation.current !== 'idle')
+      throw new Error('Another print or PDF operation is already in progress');
+    activeOperation.current = next;
+    setOperation(next);
+  }, []);
+  const finish = useCallback(() => {
+    activeOperation.current = 'idle';
+    setOperation('idle');
+  }, []);
 
   // Generate PDF filename
   const generateFilename = useCallback(
@@ -47,15 +58,20 @@ export const usePrintBooking = (
 
   // Browser print functionality
   const handleBrowserPrint = useCallback(() => {
-    window.print();
-  }, []);
+    if (activeOperation.current !== 'idle') return;
+    begin('printing');
+    try {
+      window.print();
+    } finally {
+      finish();
+    }
+  }, [begin, finish]);
 
   // HTML element to canvas and then to PDF
   const handleDownloadPDF = useCallback(
     async (elementId: string, options: UsePrintBookingOptions = {}) => {
+      begin('pdf');
       try {
-        setIsGeneratingPDF(true);
-
         const element = document.getElementById(elementId);
         if (!element) {
           throw new Error(`Element with id "${elementId}" not found`);
@@ -111,24 +127,23 @@ export const usePrintBooking = (
         const filename = generateFilename(options.filename);
         pdf.save(filename);
       } catch (error) {
-        setIsGeneratingPDF(false);
         addToast({
           color: 'danger',
-          description: `Failed to generate PDF: ${(error as Error).message}`,
+          description: `Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
+        throw error;
       } finally {
-        setIsGeneratingPDF(false);
+        finish();
       }
     },
-    [generateFilename]
+    [generateFilename, begin, finish]
   );
 
   // Print function that opens a new window with just the booking details
   const handlePrint = useCallback(
     async (elementId: string) => {
+      begin('printing');
       try {
-        setIsPrinting(true);
-
         const element = document.getElementById(elementId);
         if (!element) {
           throw new Error(`Element with id "${elementId}" not found`);
@@ -190,27 +205,67 @@ export const usePrintBooking = (
         </html>
       `;
 
-        // Write content to print window
-        printWindow.document.write(printHTML);
-        printWindow.document.close();
-
-        // Wait for content to load, then print
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-          }, 500);
-        };
+        // Keep the operation busy until the popup has loaded and printed.
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          let printTimer: number | undefined;
+          const closeWatcher = window.setInterval(() => {
+            if (printWindow.closed) settle({ kind: 'complete' });
+          }, 100);
+          const onPageHide = () => {
+            if (printWindow.closed) settle({ kind: 'complete' });
+          };
+          const settle = (
+            outcome: { kind: 'complete' } | { kind: 'error'; error: unknown }
+          ) => {
+            if (settled) return;
+            settled = true;
+            window.clearInterval(closeWatcher);
+            if (printTimer !== undefined) window.clearTimeout(printTimer);
+            printWindow.onload = null;
+            printWindow.removeEventListener('pagehide', onPageHide);
+            if (outcome.kind === 'error') reject(outcome.error);
+            else resolve();
+          };
+          printWindow.addEventListener('pagehide', onPageHide);
+          printWindow.onload = () => {
+            printWindow.onload = null;
+            if (printWindow.closed) {
+              settle({ kind: 'complete' });
+              return;
+            }
+            printTimer = window.setTimeout(() => {
+              if (printWindow.closed) {
+                settle({ kind: 'complete' });
+                return;
+              }
+              try {
+                printWindow.print();
+                printWindow.close();
+                settle({ kind: 'complete' });
+              } catch (error) {
+                settle({ kind: 'error', error });
+              }
+            }, 500);
+          };
+          try {
+            printWindow.document.write(printHTML);
+            printWindow.document.close();
+            if (printWindow.closed) settle({ kind: 'complete' });
+          } catch (error) {
+            settle({ kind: 'error', error });
+          }
+        });
       } finally {
-        setIsPrinting(false);
+        finish();
       }
     },
-    [booking._id]
+    [booking._id, begin, finish]
   );
 
   return {
-    isPrinting,
-    isGeneratingPDF,
+    isPrinting: operation === 'printing',
+    isGeneratingPDF: operation === 'pdf',
     handlePrint,
     handleDownloadPDF,
     handleBrowserPrint,

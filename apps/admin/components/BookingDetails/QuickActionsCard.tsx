@@ -11,9 +11,9 @@ import {
   DropdownMenu,
   DropdownTrigger,
 } from '@heroui/dropdown';
-import { Modal, ModalBody, ModalContent, useDisclosure } from '@heroui/modal';
+import { Modal, ModalBody, ModalContent } from '@heroui/modal';
 import { addToast } from '@heroui/toast';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import RecordPaymentModal, { PaymentData } from '../RecordPaymentModal';
 import BookingPDFTemplate from './BookingPDFTemplate';
 
@@ -39,7 +39,10 @@ function extractCabinId(
   return String(cabin);
 }
 
-export default function QuickActionsCard({
+export default function QuickActionsCard(props: QuickActionsCardProps) {
+  return <QuickActionsContent key={props.booking._id} {...props} />;
+}
+function QuickActionsContent({
   booking,
   onCheckIn,
   onCheckOut,
@@ -48,17 +51,21 @@ export default function QuickActionsCard({
 }: QuickActionsCardProps) {
   const { sendConfirmationEmail } = useSendConfirmationEmail();
   const recordPaymentMutation = useRecordPayment();
-  const {
-    isOpen: isPaymentModalOpen,
-    onOpen: onPaymentModalOpen,
-    onClose: onPaymentModalClose,
-  } = useDisclosure();
-  const {
-    isOpen: isPrintModalOpen,
-    onOpen: onPrintModalOpen,
-    onClose: onPrintModalClose,
-  } = useDisclosure();
-  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [dialog, setDialog] = useState<{
+    kind: 'closed' | 'payment' | 'print';
+  }>({ kind: 'closed' });
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const closeDialog = () =>
+    setDialog(current => (current === dialog ? { kind: 'closed' } : current));
+  const onPaymentModalOpen = () => setDialog({ kind: 'payment' });
+  const onPrintModalOpen = () => setDialog({ kind: 'print' });
+  const paymentLoading = recordPaymentMutation.isPending;
 
   // Get data for email functionality - guard against null customer
   const { data: bookingData, isLoading: bookingLoading } = useBookingByEmail(
@@ -108,7 +115,6 @@ export default function QuickActionsCard({
   };
 
   const handleRecordPayment = async (paymentData: PaymentData) => {
-    setPaymentLoading(true);
     try {
       await recordPaymentMutation.mutateAsync({
         bookingId: booking._id.toString(),
@@ -121,15 +127,13 @@ export default function QuickActionsCard({
       });
 
       // Call the callback to refresh booking data
-      onPaymentRecorded?.();
+      if (active.current) onPaymentRecorded?.();
     } catch (error) {
       addToast({
         color: 'danger',
         description: `Failed to record payment: ${(error as Error).message}`,
       });
       throw error; // Re-throw to keep modal open
-    } finally {
-      setPaymentLoading(false);
     }
   };
 
@@ -137,7 +141,7 @@ export default function QuickActionsCard({
   const handlePrintBooking = async () => {
     try {
       await handlePrint('booking-pdf-template');
-      onPrintModalClose();
+      closeDialog();
     } catch (error) {
       addToast({
         color: 'danger',
@@ -149,12 +153,9 @@ export default function QuickActionsCard({
   const handleDownloadBookingPDF = async () => {
     try {
       await handleDownloadPDF('booking-pdf-template');
-      onPrintModalClose();
-    } catch (error) {
-      addToast({
-        color: 'danger',
-        description: `Failed to generate PDF: ${(error as Error).message}`,
-      });
+      closeDialog();
+    } catch {
+      // The print hook reports PDF failure; keep this dialog open for retry.
     }
   };
 
@@ -247,20 +248,23 @@ export default function QuickActionsCard({
       </Card>
 
       {/* Record Payment Modal */}
-      <RecordPaymentModal
-        isOpen={isPaymentModalOpen}
-        onClose={onPaymentModalClose}
-        onRecordPayment={handleRecordPayment}
-        totalAmount={booking.totalPrice}
-        remainingAmount={booking.remainingAmount}
-        bookingId={booking._id.toString()}
-        guestName={firstName}
-      />
+      {dialog.kind === 'payment' && (
+        <RecordPaymentModal
+          isLoading={paymentLoading}
+          isOpen
+          onClose={closeDialog}
+          onRecordPayment={handleRecordPayment}
+          totalAmount={booking.totalPrice}
+          remainingAmount={booking.remainingAmount}
+          bookingId={booking._id.toString()}
+          guestName={firstName}
+        />
+      )}
 
       {/* Print Preview Modal */}
       <Modal
-        isOpen={isPrintModalOpen}
-        onClose={onPrintModalClose}
+        isOpen={dialog.kind === 'print'}
+        onClose={closeDialog}
         size='5xl'
         scrollBehavior='inside'
       >

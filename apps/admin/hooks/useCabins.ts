@@ -103,9 +103,10 @@ export function useUpdateCabin() {
       const result = await response.json();
       return result.success ? result.data : result;
     },
-    onSuccess: () => {
+    onSuccess: (_data, cabin) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
       queryClient.invalidateQueries({ queryKey: ['cabin-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['cabin', cabin._id] });
       displayToast('Cabin updated successfully', 'success');
     },
   });
@@ -128,9 +129,10 @@ export function useDeleteCabin() {
       const result = await response.json();
       return result.success ? result : result;
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
       queryClient.invalidateQueries({ queryKey: ['cabin-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['cabin', id] });
     },
   });
 }
@@ -154,9 +156,12 @@ export function useBulkDeleteCabins() {
       const result = await response.json();
       return result.data;
     },
-    onSuccess: (data: { deletedCount: number }) => {
+    onSuccess: (data: { deletedCount: number }, ids) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
       queryClient.invalidateQueries({ queryKey: ['cabin-stats'] });
+      ids.forEach(id =>
+        queryClient.invalidateQueries({ queryKey: ['cabin', id] })
+      );
       displayToast(
         `${data.deletedCount} cabin${data.deletedCount === 1 ? '' : 's'} deleted`,
         'success'
@@ -190,9 +195,12 @@ export function useBulkUpdateDiscount() {
       const result = await response.json();
       return result.data;
     },
-    onSuccess: (data: { modifiedCount: number }) => {
+    onSuccess: (data: { modifiedCount: number }, { ids }) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
       queryClient.invalidateQueries({ queryKey: ['cabin-stats'] });
+      ids.forEach(id =>
+        queryClient.invalidateQueries({ queryKey: ['cabin', id] })
+      );
       displayToast(
         `Discount updated for ${data.modifiedCount} cabin${data.modifiedCount === 1 ? '' : 's'}`,
         'success'

@@ -162,9 +162,9 @@ function BookingsContent() {
                 : 'Failed to delete booking',
             color: 'danger',
           });
+          throw error;
         }
       },
-      isLoading: deleteBooking.isPending,
     });
   };
 

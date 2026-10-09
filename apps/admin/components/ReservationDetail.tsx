@@ -8,50 +8,91 @@ import type {
   ExperienceReservationDetail,
 } from '@lodgeflow/database/reservation-json';
 import Link from 'next/link';
+import { useResourceLoad } from '@/hooks/useResourceLoad';
 import { useCallback, useEffect, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import { utcDate } from '@/lib/reservation-options';
 type Reservation = DiningReservationDetail | ExperienceReservationDetail;
-export function ReservationDetail({
-  kind,
-  id,
-}: {
+interface ReservationDetailProps {
   kind: 'dining' | 'experience';
   id: string;
+}
+interface ReservationData {
+  reservation: Reservation;
+  customerName: string;
+  allowedStatuses: string[];
+  payment: PaymentSummary;
+  currency: string;
+}
+function isStatusAllowed({
+  data,
+  status,
+}: {
+  data: ReservationData;
+  status: string;
 }) {
+  return (
+    data.allowedStatuses.includes(status) &&
+    (status !== 'cancelled' ||
+      !(
+        data.payment.legacyPaid ||
+        data.payment.refundableCents > 0 ||
+        data.reservation.checkout?.pending ||
+        data.reservation.stripeRefund?.status === 'pending'
+      ))
+  );
+}
+export function ReservationDetail(props: ReservationDetailProps) {
+  return (
+    <ReservationDetailContent key={`${props.kind}:${props.id}`} {...props} />
+  );
+}
+function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
   const canManage = usePermission('bookings:manage');
   const endpoint = `/api/${kind === 'dining' ? 'dining-reservations' : 'experience-bookings'}/${id}`;
-  const [data, setData] = useState<{
-    reservation: Reservation;
-    customerName: string;
-    allowedStatuses: string[];
-    payment: PaymentSummary;
-    currency: string;
-  } | null>(null);
-  const [nextStatus, setNextStatus] = useState(''),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false);
-  const load = useCallback(async () => {
-    const response = await fetch(endpoint, { cache: 'no-store' });
-    const result = await response.json();
-    if (!response.ok)
-      throw new Error(result.error || 'Unable to load reservation');
-    setData(result.data);
-    setNextStatus('');
-  }, [endpoint]);
+  const [nextStatus, setNextStatus] = useState('');
+  const [action, setAction] = useState<
+    { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+  const request = useCallback(
+    async (signal: AbortSignal): Promise<ReservationData> => {
+      const response = await fetch(endpoint, { cache: 'no-store', signal });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || 'Unable to load reservation');
+      return result.data;
+    },
+    [endpoint]
+  );
+  const { state, reload: load } = useResourceLoad({
+    resourceKey: endpoint,
+    request,
+  });
+  const data = state.data;
+  const validDraft = !!data && isStatusAllowed({ data, status: nextStatus });
   useEffect(() => {
-    load().catch(e => setError(e.message));
-  }, [load]);
+    if (data)
+      setNextStatus(current =>
+        isStatusAllowed({ data, status: current }) ? current : ''
+      );
+  }, [data]);
+  const busy = action.kind === 'saving';
+  const error =
+    action.kind === 'error'
+      ? action.message
+      : state.kind === 'error'
+        ? state.message
+        : '';
   async function save() {
-    if (!data) return;
-    setBusy(true);
-    setError('');
+    if (!data || busy || !validDraft) return;
+    const submittedStatus = nextStatus;
+    setAction({ kind: 'saving' });
     try {
       const response = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: nextStatus,
+          status: submittedStatus,
           expectedStatus: data.reservation.status,
         }),
       });
@@ -59,10 +100,13 @@ export function ReservationDetail({
       if (!response.ok)
         throw new Error(result.error || 'Unable to update status');
       await load();
+      setNextStatus(current => (current === submittedStatus ? '' : current));
+      setAction({ kind: 'idle' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to update status');
-    } finally {
-      setBusy(false);
+      setAction({
+        kind: 'error',
+        message: e instanceof Error ? e.message : 'Unable to update status',
+      });
     }
   }
   const reservation = data?.reservation;
@@ -81,7 +125,17 @@ export function ReservationDetail({
           {error}
         </p>
       )}
-      {!reservation ? (
+      {state.kind === 'error' && (
+        <button
+          onClick={() => {
+            setAction({ kind: 'idle' });
+            void load().catch(() => {});
+          }}
+        >
+          Retry
+        </button>
+      )}
+      {!data || !reservation ? (
         !error && <p>Loading reservation…</p>
       ) : (
         <>
@@ -114,6 +168,7 @@ export function ReservationDetail({
           )}
           {experience?.observations && <p>Notes: {experience?.observations}</p>}
           <ReservationPayments
+            key={endpoint}
             endpoint={endpoint}
             payment={data.payment}
             currency={data.currency}
@@ -129,7 +184,7 @@ export function ReservationDetail({
                 Change status
                 <select
                   className='border rounded p-2 bg-background'
-                  value={nextStatus}
+                  value={validDraft ? nextStatus : ''}
                   disabled={busy}
                   onChange={e => setNextStatus(e.target.value)}
                 >
@@ -137,13 +192,7 @@ export function ReservationDetail({
                   {data.allowedStatuses.map(status => (
                     <option
                       key={status}
-                      disabled={
-                        status === 'cancelled' &&
-                        (data.payment.legacyPaid ||
-                          data.payment.refundableCents > 0 ||
-                          reservation.checkout?.pending ||
-                          reservation.stripeRefund?.status === 'pending')
-                      }
+                      disabled={!isStatusAllowed({ data, status })}
                     >
                       {status}
                     </option>
@@ -159,7 +208,7 @@ export function ReservationDetail({
                 )}
               <button
                 className='rounded bg-primary text-primary-foreground px-4 py-2 disabled:opacity-40'
-                disabled={busy || !nextStatus}
+                disabled={busy || !validDraft}
                 onClick={() => void save()}
               >
                 {busy ? 'Saving…' : 'Save status'}

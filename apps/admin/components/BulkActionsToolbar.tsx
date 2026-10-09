@@ -11,7 +11,7 @@ import {
 } from '@heroui/modal';
 import { UseMutationResult } from '@tanstack/react-query';
 import { Percent, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface BulkActionsToolbarProps {
   selectedCount: number;
@@ -40,17 +40,43 @@ export default function BulkActionsToolbar({
   bulkDelete,
   bulkUpdateDiscount,
 }: BulkActionsToolbarProps) {
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [dialog, setDialog] = useState<'closed' | 'delete' | 'discount'>(
+    'closed'
+  );
   const [discountAmount, setDiscountAmount] = useState('');
-
+  const session = useRef(0);
+  const selectionKey = JSON.stringify(selectedIds);
+  const selection = useMemo(() => ({ active: true }), [selectionKey]);
+  useEffect(() => {
+    selection.active = true;
+    setDialog('closed');
+    setDiscountAmount('');
+    return () => {
+      selection.active = false;
+    };
+  }, [selection]);
+  const openDialog = (kind: 'delete' | 'discount') => {
+    session.current += 1;
+    if (kind === 'delete' && !bulkDelete.isPending) bulkDelete.reset();
+    if (kind === 'discount' && !bulkUpdateDiscount.isPending)
+      bulkUpdateDiscount.reset();
+    setDiscountAmount('');
+    setDialog(kind);
+  };
+  const closeDialog = (kind: 'delete' | 'discount') => {
+    session.current += 1;
+    setDialog(current => (current === kind ? 'closed' : current));
+    if (kind === 'discount') setDiscountAmount('');
+  };
   const handleBulkDelete = async () => {
+    const startedSession = session.current;
     try {
       await bulkDelete.mutateAsync(selectedIds);
-      setIsDeleteModalOpen(false);
+      if (!selection.active || session.current !== startedSession) return;
+      closeDialog('delete');
       onClearSelection();
     } catch {
-      // Error is handled by the mutation's onError/toast
+      // Keep the dialog and draft; the mutation error is shown for retry.
     }
   };
 
@@ -58,13 +84,14 @@ export default function BulkActionsToolbar({
     const discount = parseFloat(discountAmount);
     if (isNaN(discount) || discount < 0) return;
 
+    const startedSession = session.current;
     try {
       await bulkUpdateDiscount.mutateAsync({ ids: selectedIds, discount });
-      setIsDiscountModalOpen(false);
-      setDiscountAmount('');
+      if (!selection.active || session.current !== startedSession) return;
+      closeDialog('discount');
       onClearSelection();
     } catch {
-      // Error is handled by the mutation's onError/toast
+      // Keep the dialog and draft; the mutation error is shown for retry.
     }
   };
 
@@ -81,7 +108,7 @@ export default function BulkActionsToolbar({
             variant='flat'
             color='primary'
             startContent={<Percent className='w-3.5 h-3.5' />}
-            onPress={() => setIsDiscountModalOpen(true)}
+            onPress={() => openDialog('discount')}
           >
             Set Discount
           </Button>
@@ -90,7 +117,7 @@ export default function BulkActionsToolbar({
             variant='flat'
             color='danger'
             startContent={<Trash2 className='w-3.5 h-3.5' />}
-            onPress={() => setIsDeleteModalOpen(true)}
+            onPress={() => openDialog('delete')}
           >
             Delete Selected
           </Button>
@@ -108,8 +135,10 @@ export default function BulkActionsToolbar({
 
       {/* Bulk Delete Confirmation Modal */}
       <Modal
-        isOpen={isDeleteModalOpen}
-        onOpenChange={setIsDeleteModalOpen}
+        isOpen={dialog === 'delete'}
+        onOpenChange={open => {
+          if (!open) closeDialog('delete');
+        }}
         size='md'
       >
         <ModalContent>
@@ -117,6 +146,9 @@ export default function BulkActionsToolbar({
             <>
               <ModalHeader>Delete {selectedCount} Cabins</ModalHeader>
               <ModalBody>
+                {bulkDelete.error && (
+                  <p role='alert'>{bulkDelete.error.message}</p>
+                )}
                 <p>
                   Are you sure you want to delete the following cabin
                   {selectedCount === 1 ? '' : 's'}?
@@ -152,10 +184,9 @@ export default function BulkActionsToolbar({
 
       {/* Bulk Discount Modal */}
       <Modal
-        isOpen={isDiscountModalOpen}
+        isOpen={dialog === 'discount'}
         onOpenChange={open => {
-          setIsDiscountModalOpen(open);
-          if (!open) setDiscountAmount('');
+          if (!open) closeDialog('discount');
         }}
         size='md'
       >
@@ -167,6 +198,9 @@ export default function BulkActionsToolbar({
                 {selectedCount === 1 ? '' : 's'}
               </ModalHeader>
               <ModalBody>
+                {bulkUpdateDiscount.error && (
+                  <p role='alert'>{bulkUpdateDiscount.error.message}</p>
+                )}
                 <p className='text-sm text-default-600'>
                   This will set the same discount amount for all selected
                   cabins:

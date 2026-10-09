@@ -23,6 +23,7 @@ import { getDifficultyColor } from './ExperienceCard';
 
 interface ExperienceModalProps {
   isOpen: boolean;
+  isCreating?: boolean;
   onClose: () => void;
   experience?: Experience;
   mode: 'view' | 'create' | 'edit';
@@ -32,6 +33,7 @@ interface ExperienceModalProps {
 
 export const ExperienceModal = ({
   isOpen,
+  isCreating = false,
   onClose,
   experience,
   mode,
@@ -40,10 +42,19 @@ export const ExperienceModal = ({
 }: ExperienceModalProps) => {
   const canWrite = usePermission('cabins:write');
   const updateExperience = useUpdateExperience();
-  const [formData, setFormData] = useState<FormData>({} as FormData);
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    title: '',
+    description: '',
+    category: '',
+    duration: '',
+    price: 0,
+    capacity: 0,
+    location: '',
+  });
 
   const isViewMode = mode === 'view';
-  const isLoading = updateExperience.isPending;
+  const isLoading = mode === 'create' ? isCreating : updateExperience.isPending;
 
   const handleEditSave = async (updatedExperience: Experience) => {
     if (!experience?._id) return;
@@ -63,10 +74,7 @@ export const ExperienceModal = ({
   };
 
   const handleCreateSubmit = () => {
-    if (onCreateSubmit) {
-      onCreateSubmit(formData);
-      setFormData({} as FormData);
-    }
+    if (onCreateSubmit && !isLoading) onCreateSubmit(formData);
   };
 
   return (

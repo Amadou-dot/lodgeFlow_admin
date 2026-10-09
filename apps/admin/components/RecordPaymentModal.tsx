@@ -30,6 +30,7 @@ export interface PaymentData {
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
+  isLoading: boolean;
   onClose: () => void;
   onRecordPayment: (paymentData: PaymentData) => Promise<void>;
   totalAmount: number;
@@ -76,6 +77,7 @@ function halfPaymentAmount(
 
 export default function RecordPaymentModal({
   isOpen,
+  isLoading,
   onClose,
   onRecordPayment,
   totalAmount,
@@ -86,7 +88,6 @@ export default function RecordPaymentModal({
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
   const total = majorAmount(totalAmount, { precision: 'preserve' });
   const remaining = majorAmount(remainingAmount, { precision: 'preserve' });
   const half = halfPaymentAmount(remaining);
@@ -103,9 +104,8 @@ export default function RecordPaymentModal({
   ];
 
   const handleSubmit = async () => {
-    if (!paymentMethod || parsedAmount === undefined) return;
+    if (isLoading || !paymentMethod || parsedAmount === undefined) return;
 
-    setIsLoading(true);
     try {
       await onRecordPayment({
         paymentMethod: paymentMethod as PaymentData['paymentMethod'],
@@ -115,8 +115,6 @@ export default function RecordPaymentModal({
       handleClose();
     } catch (error) {
       // Error handling is done in the parent component
-    } finally {
-      setIsLoading(false);
     }
   };
 

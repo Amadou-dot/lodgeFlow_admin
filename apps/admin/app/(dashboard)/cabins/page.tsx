@@ -1,5 +1,6 @@
 'use client';
 
+import type { CatalogDialog } from '@/types/catalog-dialog';
 import { usePermission } from '@/components/AuthGuard';
 
 import BulkActionsToolbar from '@/components/BulkActionsToolbar';
@@ -46,12 +47,9 @@ function CabinCardSkeleton() {
 export default function CabinsPage() {
   const canWrite = usePermission('cabins:write');
   const [filters, setFilters] = useState<CabinFiltersType>({});
-  const [selectedCabin, setSelectedCabin] = useState<Cabin | null>(null);
-  const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>(
-    'view'
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [cabinToDelete, setCabinToDelete] = useState<Cabin | null>(null);
+  const [dialog, setDialog] = useState<CatalogDialog<Cabin>>({
+    kind: 'closed',
+  });
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -119,30 +117,24 @@ export default function CabinsPage() {
   }, []);
 
   const handleViewCabin = (cabin: Cabin) => {
-    setSelectedCabin(cabin);
-    setModalMode('view');
-    setIsModalOpen(true);
+    setDialog({ kind: 'view', item: cabin });
   };
 
   const handleCreateCabin = () => {
-    setSelectedCabin(null);
-    setModalMode('create');
-    setIsModalOpen(true);
+    setDialog({ kind: 'create' });
   };
 
   const handleEditCabin = (cabin: Cabin) => {
-    setSelectedCabin(cabin);
-    setModalMode('edit');
-    setIsModalOpen(true);
+    setDialog({ kind: 'edit', item: cabin });
   };
 
   const handleDeleteCabin = (cabin: Cabin) => {
-    setCabinToDelete(cabin);
+    setDialog({ kind: 'delete', item: cabin });
   };
 
+  // A completed request may close only the dialog that started it.
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedCabin(null);
+    setDialog(current => (current === dialog ? { kind: 'closed' } : current));
   };
 
   const handleResetFilters = () => {
@@ -350,26 +342,36 @@ export default function CabinsPage() {
         </>
       )}
 
-      {/* Modal */}
-      <CabinModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        cabin={selectedCabin}
-        mode={modalMode}
-        onEdit={handleEditCabin}
-      />
+      {(dialog.kind === 'create' ||
+        dialog.kind === 'view' ||
+        dialog.kind === 'edit') && (
+        <CabinModal
+          key={
+            dialog.kind === 'create'
+              ? 'create'
+              : `${dialog.kind}:${dialog.item.id}`
+          }
+          isOpen
+          onClose={handleCloseModal}
+          cabin={dialog.kind === 'create' ? null : dialog.item}
+          mode={dialog.kind}
+          onEdit={handleEditCabin}
+        />
+      )}
 
-      {/* Delete Confirmation Modal */}
-      {cabinToDelete && (
+      {dialog.kind === 'delete' && (
         <DeletionModal
-          resourceId={cabinToDelete.id}
+          key={dialog.item.id}
+          resourceId={dialog.item.id}
           resourceName='Cabin'
-          itemName={cabinToDelete.name}
+          itemName={dialog.item.name}
           note='Cabins with active bookings cannot be deleted.'
           onDelete={deleteCabin}
-          onResourceDeleted={() => setCabinToDelete(null)}
-          isOpen={true}
-          onOpenChange={open => !open && setCabinToDelete(null)}
+          onResourceDeleted={handleCloseModal}
+          isOpen
+          onOpenChange={open => {
+            if (!open) handleCloseModal();
+          }}
         />
       )}
     </div>

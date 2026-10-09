@@ -7,6 +7,7 @@ async function show(remainingAmount = 10.01) {
   render(
     <RecordPaymentModal
       isOpen
+      isLoading={false}
       onClose={onClose}
       onRecordPayment={onRecordPayment}
       totalAmount={1234.5}

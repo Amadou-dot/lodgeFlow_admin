@@ -32,6 +32,13 @@ export default function BookingDetailsPage() {
   const checkOutMutation = useCheckOutBooking();
   const deleteMutation = useDeleteBooking();
 
+  const {
+    data: booking,
+    error,
+    isLoading,
+    mutate,
+  } = useBooking(bookingId ?? '');
+
   if (!bookingId) {
     return (
       <div className='flex items-center justify-center min-h-screen'>
@@ -50,8 +57,6 @@ export default function BookingDetailsPage() {
       </div>
     );
   }
-
-  const { data: booking, error, isLoading, mutate } = useBooking(bookingId);
 
   // Handle booking actions
   const handleCheckIn = async () => {

@@ -197,6 +197,7 @@ describe('cabin mutation contracts', () => {
     expect(invalidated.mock.calls).toEqual([
       [{ queryKey: ['cabins'] }],
       [{ queryKey: ['cabin-stats'] }],
+      [{ queryKey: ['cabin', cabin._id] }],
     ]);
     expect(addToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -236,6 +237,7 @@ describe('cabin mutation contracts', () => {
     expect(invalidated.mock.calls).toEqual([
       [{ queryKey: ['cabins'] }],
       [{ queryKey: ['cabin-stats'] }],
+      [{ queryKey: ['cabin', cabin._id] }],
     ]);
   });
   test('keeps deletion failure without invalidation', async () => {
@@ -272,6 +274,7 @@ describe('cabin mutation contracts', () => {
       expect(invalidated.mock.calls).toEqual([
         [{ queryKey: ['cabins'] }],
         [{ queryKey: ['cabin-stats'] }],
+        [{ queryKey: ['cabin', cabin._id] }],
       ]);
       expect(addToast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -303,6 +306,7 @@ describe('cabin mutation contracts', () => {
       expect(invalidated.mock.calls).toEqual([
         [{ queryKey: ['cabins'] }],
         [{ queryKey: ['cabin-stats'] }],
+        [{ queryKey: ['cabin', cabin._id] }],
       ]);
       expect(addToast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -313,3 +317,87 @@ describe('cabin mutation contracts', () => {
     }
   );
 });
+
+test('successful update refreshes the mounted detail reader; failed update leaves it untouched', async () => {
+  let savedName = cabin.name;
+  let fail = false;
+  fetchMock.mockImplementation((_url: string, input?: RequestInit) => {
+    if (input?.method === 'PUT') {
+      if (fail)
+        return Promise.resolve(
+          response({ ok: false, body: { error: 'Update denied' } })
+        );
+      savedName = 'Updated detail';
+    }
+    return Promise.resolve(
+      response({ body: { success: true, data: { ...cabin, name: savedName } } })
+    );
+  });
+  const { result } = renderHook(
+    () => ({ detail: useCabin(cabin._id), update: useUpdateCabin() }),
+    { wrapper }
+  );
+  await waitFor(() =>
+    expect(result.current.detail.data?.name).toBe(cabin.name)
+  );
+  await act(async () => {
+    await result.current.update.mutateAsync({
+      _id: cabin._id,
+      name: 'Updated detail',
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.detail.data?.name).toBe('Updated detail')
+  );
+  const fetchCount = fetchMock.mock.calls.length;
+  fail = true;
+  await act(async () => {
+    await expect(
+      result.current.update.mutateAsync({ _id: cabin._id, name: 'Denied' })
+    ).rejects.toThrow('Update denied');
+  });
+  expect(result.current.detail.data?.name).toBe('Updated detail');
+  expect(fetchMock).toHaveBeenCalledTimes(fetchCount + 1);
+});
+test.each(['delete', 'discount'] as const)(
+  'bulk %s failure does not refresh and successful retry invalidates each affected detail',
+  async action => {
+    fetchMock
+      .mockResolvedValueOnce(
+        response({ ok: false, body: { error: 'Try again' } })
+      )
+      .mockResolvedValueOnce(
+        response({
+          body: { success: true, data: { deletedCount: 2, modifiedCount: 2 } },
+        })
+      );
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(
+      () => ({
+        remove: useBulkDeleteCabins(),
+        discount: useBulkUpdateDiscount(),
+      }),
+      { wrapper }
+    );
+    const run = () =>
+      action === 'delete'
+        ? result.current.remove.mutateAsync(['one', 'two'])
+        : result.current.discount.mutateAsync({
+            ids: ['one', 'two'],
+            discount: 15,
+          });
+    await act(async () => {
+      await expect(run()).rejects.toThrow('Try again');
+    });
+    expect(invalidated).not.toHaveBeenCalled();
+    await act(async () => {
+      await run();
+    });
+    expect(invalidated.mock.calls).toEqual([
+      [{ queryKey: ['cabins'] }],
+      [{ queryKey: ['cabin-stats'] }],
+      [{ queryKey: ['cabin', 'one'] }],
+      [{ queryKey: ['cabin', 'two'] }],
+    ]);
+  }
+);

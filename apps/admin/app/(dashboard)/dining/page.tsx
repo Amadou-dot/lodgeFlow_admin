@@ -1,5 +1,6 @@
 'use client';
 
+import type { CatalogDialog } from '@/types/catalog-dialog';
 import { usePermission } from '@/components/AuthGuard';
 
 import DiningFilters from '@/components/DiningFilters';
@@ -38,12 +39,9 @@ function DiningCardSkeleton() {
 export default function DiningPage() {
   const canWrite = usePermission('cabins:write');
   const [filters, setFilters] = useState<DiningFiltersType>({});
-  const [selectedDining, setSelectedDining] = useState<Dining | null>(null);
-  const [modalMode, setModalMode] = useState<'view' | 'create' | 'edit'>(
-    'view'
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [diningToDelete, setDiningToDelete] = useState<Dining | null>(null);
+  const [dialog, setDialog] = useState<CatalogDialog<Dining>>({
+    kind: 'closed',
+  });
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   useEffect(() => {
@@ -62,30 +60,24 @@ export default function DiningPage() {
   const deleteDining = useDeleteDining();
 
   const handleViewDining = (item: Dining) => {
-    setSelectedDining(item);
-    setModalMode('view');
-    setIsModalOpen(true);
+    setDialog({ kind: 'view', item: item });
   };
 
   const handleCreateDining = () => {
-    setSelectedDining(null);
-    setModalMode('create');
-    setIsModalOpen(true);
+    setDialog({ kind: 'create' });
   };
 
   const handleEditDining = (item: Dining) => {
-    setSelectedDining(item);
-    setModalMode('edit');
-    setIsModalOpen(true);
+    setDialog({ kind: 'edit', item: item });
   };
 
   const handleDeleteDining = (item: Dining) => {
-    setDiningToDelete(item);
+    setDialog({ kind: 'delete', item: item });
   };
 
+  // A completed request may close only the dialog that started it.
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedDining(null);
+    setDialog(current => (current === dialog ? { kind: 'closed' } : current));
   };
 
   const handleResetFilters = () => {
@@ -252,25 +244,35 @@ export default function DiningPage() {
         </>
       )}
 
-      {/* Modal */}
-      <DiningModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        dining={selectedDining ?? undefined}
-        mode={modalMode}
-        onEdit={handleEditDining}
-      />
+      {(dialog.kind === 'create' ||
+        dialog.kind === 'view' ||
+        dialog.kind === 'edit') && (
+        <DiningModal
+          key={
+            dialog.kind === 'create'
+              ? 'create'
+              : `${dialog.kind}:${dialog.item._id}`
+          }
+          isOpen
+          onClose={handleCloseModal}
+          dining={dialog.kind === 'create' ? undefined : dialog.item}
+          mode={dialog.kind}
+          onEdit={handleEditDining}
+        />
+      )}
 
-      {/* Delete Confirmation Modal */}
-      {diningToDelete && diningToDelete._id && (
+      {dialog.kind === 'delete' && (
         <DeletionModal
-          resourceId={diningToDelete._id}
+          key={dialog.item._id}
+          resourceId={dialog.item._id}
           resourceName='Dining Item'
-          itemName={diningToDelete.name}
+          itemName={dialog.item.name}
           onDelete={deleteDining}
-          onResourceDeleted={() => setDiningToDelete(null)}
-          isOpen={true}
-          onOpenChange={open => !open && setDiningToDelete(null)}
+          onResourceDeleted={handleCloseModal}
+          isOpen
+          onOpenChange={open => {
+            if (!open) handleCloseModal();
+          }}
         />
       )}
     </div>

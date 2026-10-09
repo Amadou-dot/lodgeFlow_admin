@@ -56,7 +56,12 @@ export default function CabinModal({
 
   const [newAmenity, setNewAmenity] = useState('');
   const [newGalleryImage, setNewGalleryImage] = useState('');
-  const [isValidImage, setIsValidImage] = useState(false);
+  const [imageValidation, setImageValidation] = useState({
+    url: '',
+    valid: false,
+  });
+  const isValidImage =
+    imageValidation.url === formData.image && imageValidation.valid;
   const createCabin = useCreateCabin();
   const updateCabin = useUpdateCabin();
 
@@ -100,21 +105,27 @@ export default function CabinModal({
 
   // Validate image URL whenever it changes
   useEffect(() => {
+    let active = true;
+    setImageValidation({ url: formData.image, valid: false });
     const validateImage = async () => {
       if (formData.image.trim()) {
         try {
           const isValid = await isImageUrl(formData.image);
-          setIsValidImage(isValid);
+          if (active)
+            setImageValidation({ url: formData.image, valid: isValid });
         } catch {
-          setIsValidImage(false);
+          if (active) setImageValidation({ url: formData.image, valid: false });
         }
       } else {
-        setIsValidImage(false);
+        setImageValidation({ url: formData.image, valid: false });
       }
     };
 
-    validateImage();
-  }, [formData.image]);
+    void validateImage();
+    return () => {
+      active = false;
+    };
+  }, [formData.image, isOpen]);
 
   const handleSubmit = async () => {
     try {

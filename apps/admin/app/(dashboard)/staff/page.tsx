@@ -4,8 +4,10 @@ import {
   OperationsSelect,
   OperationsError,
 } from '@/components/OperationsPage';
+import { useResourceLoad } from '@/hooks/useResourceLoad';
+import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useStaffAccess } from '@/components/AuthGuard';
 import {
   Table,
@@ -20,26 +22,44 @@ import type { StaffMemberJson as Member } from '@/types/staff-audit';
 import type { ApiResponse } from '@/lib/api-utils';
 export default function StaffPage() {
   const access = useStaffAccess();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  async function load() {
-    const response = await fetch('/api/staff', { cache: 'no-store' });
-    const result: ApiResponse<Member[]> = await response.json();
-    if (!response.ok || !result.success)
-      throw new Error(!result.success ? result.error : 'Unable to load staff');
-    setMembers(result.data);
-  }
-  useEffect(() => {
-    load()
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+  return <StaffContent key={access?.userId ?? ''} access={access} />;
+}
+function StaffContent({
+  access,
+}: {
+  access: ReturnType<typeof useStaffAccess>;
+}) {
+  const [action, setAction] = useState<
+    { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+  const request = useCallback(
+    async (signal: AbortSignal): Promise<Member[]> => {
+      const response = await fetch('/api/staff', { cache: 'no-store', signal });
+      const result: ApiResponse<Member[]> = await response.json();
+      if (!response.ok || !result.success)
+        throw new Error(
+          !result.success ? result.error : 'Unable to load staff'
+        );
+      return result.data;
+    },
+    []
+  );
+  const { state, reload: load } = useResourceLoad({
+    resourceKey: access?.userId ?? '',
+    request,
+  });
+  const members = state.data ?? [];
+  const loading = state.kind === 'loading';
+  const busy = action.kind === 'saving';
+  const error =
+    action.kind === 'error'
+      ? action.message
+      : state.kind === 'error'
+        ? state.message
+        : '';
   async function change(member: Member, role: string) {
-    if (!member.userId) return;
-    setBusy(true);
-    setError('');
+    if (!member.userId || busy) return;
+    setAction({ kind: 'saving' });
     try {
       const response = await fetch('/api/staff', {
         method: 'PUT',
@@ -50,10 +70,12 @@ export default function StaffPage() {
       if (!response.ok)
         throw new Error(result.error || 'Unable to update access');
       await load();
+      setAction({ kind: 'idle' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to update access');
-    } finally {
-      setBusy(false);
+      setAction({
+        kind: 'error',
+        message: e instanceof Error ? e.message : 'Unable to update access',
+      });
     }
   }
   return (
@@ -75,6 +97,16 @@ export default function StaffPage() {
         </CardBody>
       </Card>
       <OperationsError message={error} />
+      {state.kind === 'error' && (
+        <Button
+          onPress={() => {
+            setAction({ kind: 'idle' });
+            void load().catch(() => {});
+          }}
+        >
+          Retry
+        </Button>
+      )}
       <Table
         aria-label='Staff access'
         classNames={{

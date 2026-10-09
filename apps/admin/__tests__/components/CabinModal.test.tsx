@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { isImageUrl } from '@/utils/utilityFunctions';
 import CabinModal from '@/components/CabinModal';
 import type { Cabin, CreateCabinData, UpdateCabinData } from '@/types';
 
@@ -42,6 +49,7 @@ const cabin: Cabin = {
 };
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(isImageUrl).mockResolvedValue(true);
   mockCreate.mockResolvedValue(undefined);
   mockUpdate.mockResolvedValue(undefined);
 });
@@ -93,4 +101,32 @@ test('create mode accepts explicit absent cabin data', async () => {
     await screen.findByRole('button', { name: 'Create Cabin' })
   ).toBeDisabled();
   expect(mockCreate).not.toHaveBeenCalled();
+});
+
+test('ignores a late image validation from the previous URL', async () => {
+  let finishOld: (valid: boolean) => void = () => {
+    throw new Error('not started');
+  };
+  jest.mocked(isImageUrl).mockImplementation(url =>
+    url === cabin.image
+      ? new Promise<boolean>(resolve => {
+          finishOld = resolve;
+        })
+      : Promise.resolve(false)
+  );
+  render(<CabinModal isOpen onClose={jest.fn()} cabin={cabin} mode='edit' />);
+  fireEvent.change(await screen.findByDisplayValue(cabin.image), {
+    target: { value: 'https://example.invalid/broken.jpg' },
+  });
+  await waitFor(() =>
+    expect(isImageUrl).toHaveBeenCalledWith(
+      'https://example.invalid/broken.jpg'
+    )
+  );
+  await act(async () => {
+    finishOld(true);
+  });
+  expect(
+    screen.queryByRole('img', { name: /preview/i })
+  ).not.toBeInTheDocument();
 });
