@@ -9,6 +9,7 @@ import {
   DiningReservation,
   ExperienceBooking,
   buildDemoBookings,
+  StaffAccess,
 } from '@lodgeflow/database';
 import {
   cabinData,
@@ -28,10 +29,24 @@ export async function seedDatabase() {
     customers.push(...response.data.map(user => user.id));
     if (response.data.length < 100) break;
   }
-  return replaceDemoData(customers);
+  // Staff accounts are not guests. Keep demo reservations attached only to
+  // real, resolvable Clerk identities that are not assigned staff access.
+  await connectDB();
+  const staff = await StaffAccess.distinct('userId');
+  const staffIds = new Set(staff);
+  const guestIds = Array.from(new Set(customers)).filter(
+    id => !staffIds.has(id)
+  );
+  if (!guestIds.length) {
+    throw new Error('No non-staff Clerk guests available for demo seeding');
+  }
+  return replaceDemoData(guestIds);
 }
 
 export async function replaceDemoData(customers: string[]) {
+  if (!customers.length) {
+    throw new Error('Demo seeding requires at least one Clerk guest');
+  }
   await connectDB();
   const settings = new Settings(settingsData);
   const cabins = cabinData.map(input => new Cabin(input));

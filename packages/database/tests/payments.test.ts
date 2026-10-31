@@ -222,6 +222,44 @@ test('500 demo reservations have consistent prices, receipts, dates, and no over
   }
 });
 
+test('demo reservations spread recent booking activity across days without future timestamps', async () => {
+  await selection();
+  const cabins = await Cabin.find();
+  const settings = await Settings.getSettings();
+  const today = new Date('2026-10-31T12:00:00.000Z');
+  const bookings = buildDemoBookings(
+    cabins,
+    settings,
+    ['guest-one', 'guest-two', 'guest-three'],
+    today
+  );
+  const recent = bookings.filter(
+    booking => booking.createdAt >= new Date('2026-10-01T00:00:00.000Z')
+  );
+  const recentDays = new Set(
+    recent.map(booking => booking.createdAt.toISOString().slice(0, 10))
+  );
+  assert.ok(recent.length > 20);
+  assert.ok(recentDays.size > 10);
+  assert.ok(bookings.every(booking => booking.createdAt <= today));
+  assert.ok(
+    bookings.every(
+      booking =>
+        booking.createdAt <= booking.checkInDate &&
+        booking.payments.every(payment => payment.receivedAt <= today)
+    )
+  );
+  assert.deepEqual(
+    bookings.map(booking => booking.createdAt),
+    buildDemoBookings(
+      cabins,
+      settings,
+      ['guest-one', 'guest-two', 'guest-three'],
+      today
+    ).map(booking => booking.createdAt)
+  );
+});
+
 test('customer update conceals invalid, missing and foreign identities without writes', async () => {
   const booking = await createCustomerBooking(await selection());
   const bookingId = String(booking._id);
