@@ -6,7 +6,8 @@ import {
   ReservationRuleError,
 } from '@lodgeflow/database';
 import { getStripe } from './stripe';
-import { normalizeBaseUrl } from './url';
+import { logger } from '@lodgeflow/database/logger';
+import { getCustomerOrigin } from './url';
 export async function reservationCheckout(
   request: NextRequest,
   { kind, id }: { kind: 'dining' | 'experience'; id: string }
@@ -19,18 +20,23 @@ export async function reservationCheckout(
     );
   try {
     await connectDB();
-    const base = normalizeBaseUrl(
-      process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
-    );
     const url = await createReservationCheckout({
       kind,
       id,
       customer: userId,
       stripe: getStripe(),
-      returnUrl: `${base}/${kind === 'dining' ? 'dining' : 'experiences'}/confirmation/${id}`,
+      getReturnUrl: () => {
+        const base = getCustomerOrigin({
+          requestOrigin: request.nextUrl.origin,
+        });
+        return `${base}/${kind === 'dining' ? 'dining' : 'experiences'}/confirmation/${id}`;
+      },
     });
     return NextResponse.json({ success: true, data: { url } });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (!(error instanceof ReservationRuleError)) {
+      logger.error('Error creating reservation checkout', error);
+    }
     return NextResponse.json(
       {
         error:

@@ -63,6 +63,15 @@ plan and existing-issue triage; issues #136 and #139 are outside that effort.
 - Keep database and provider runtime code on the server. Use `import type` for
   type-only dependencies. Client components should consume explicit serializable
   data shapes, not Mongoose documents.
+- Customer absolute URLs use `apps/customer/lib/url.ts:getCustomerOrigin`:
+  explicit `NEXT_PUBLIC_APP_URL`, then an optional checkout request origin, then
+  `https://lodgeflow.app`. Bare hosts and local/preview HTTP(S) overrides are
+  supported. Empty values, credentials, paths, queries, fragments and the staff
+  host are invalid. Validate a new origin before reserving its quote; shared
+  reservation checkout accepts a lazy `getReturnUrl` so ownership/payability
+  checks and reuse of existing open sessions precede URL resolution. Staff
+  navigation stays relative to the admin app; its customer-site shortcut targets
+  `lodgeflow.app`.
 - Both Next configs transpile `@lodgeflow/database` and `@lodgeflow/email` and trace from the workspace
   root. Preserve this configuration when moving shared code.
 

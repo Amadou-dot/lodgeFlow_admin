@@ -3797,6 +3797,109 @@ try {
     'PASS staff reservation detail/status: permissions, strict payloads, stale-state rollback, no-op retries and exact audit attribution'
   );
 
+  for (const resource of [
+    {
+      kind: 'dining',
+      route: '/api/dining-reservations',
+      confirmation: 'dining',
+      model: DiningReservation,
+      selection: { dining: guestDining._id, time: '18:00', numGuests: 2 },
+    },
+    {
+      kind: 'experience',
+      route: '/api/experience-bookings',
+      confirmation: 'experiences',
+      model: ExperienceBooking,
+      selection: {
+        experience: guestExperience._id,
+        timeSlot: '18:00',
+        numParticipants: 2,
+      },
+    },
+  ]) {
+    const row = await resource.model.create({
+      ...resource.selection,
+      customer: 'smoke_customer',
+      date: new Date('2030-07-02T18:00:00.000Z'),
+      status: 'confirmed',
+      totalPrice: 25,
+    });
+    const id = String(row._id);
+    const route = `${resource.route}/${id}/checkout`;
+    const snapshot = () =>
+      resource.model
+        .findById(id)
+        .lean()
+        .then(value => JSON.stringify(value));
+    const before = await snapshot();
+    const callsBefore = calls.length;
+    await expectAuthenticationDenied({
+      origin: customer,
+      route,
+      method: 'POST',
+    });
+    for (const deniedId of [id, new mongoose.Types.ObjectId().toString()]) {
+      assert.deepEqual(
+        await request({
+          origin: customer,
+          route: `${resource.route}/${deniedId}/checkout`,
+          identity: 'foreign',
+          method: 'POST',
+          status: 404,
+        }),
+        { error: 'Reservation not found' }
+      );
+    }
+    assert.equal(await snapshot(), before);
+    assert.equal(calls.length, callsBefore);
+
+    const response = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'POST',
+      status: 200,
+    });
+    assert.deepEqual(response, {
+      success: true,
+      data: { url: 'https://checkout.stripe.invalid/smoke' },
+    });
+    const creation = calls
+      .slice(callsBefore)
+      .filter(call => call.route === '/stripe/create');
+    assert.equal(creation.length, 1);
+    const returnUrl = `https://lodgeflow.app/${resource.confirmation}/confirmation/${id}`;
+    assert.equal(creation[0].input.success_url, returnUrl);
+    assert.equal(creation[0].input.cancel_url, returnUrl);
+    assert.equal(creation[0].input.metadata.reservationId, id);
+    assert.equal(creation[0].input.metadata.reservationKind, resource.kind);
+    assert.equal(creation[0].input.line_items[0].price_data.unit_amount, 2500);
+    const saved = await resource.model.findById(id).lean();
+    assert.equal(saved.checkout.pending, true);
+    assert.equal(saved.checkout.amountCents, 2500);
+    assert.equal(saved.isPaid, false);
+    assert.deepEqual(saved.receipts, []);
+
+    const beforeRetry = await snapshot();
+    const retry = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'POST',
+      status: 200,
+    });
+    assert.deepEqual(retry, response);
+    assert.equal(await snapshot(), beforeRetry);
+    assert.equal(
+      calls.slice(callsBefore).filter(call => call.route === '/stripe/create')
+        .length,
+      1
+    );
+  }
+  console.log(
+    'PASS dining/experience checkout owner denial, customer return origins, unpaid receipts and open-session reuse'
+  );
+
   const experienceFields = {
     name: 'Smoke Kayak',
     price: 37.5,

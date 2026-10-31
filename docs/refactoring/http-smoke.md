@@ -47,6 +47,9 @@ Memory Server binary download. No application credentials are required.
   reuse the idempotency key on retry. Signed completion events update receipts;
   duplicate or older events cannot increase completed refunds.
 - The real Stripe webhook signature verifier, with locally signed payloads.
+- Cabin, dining and experience checkout return URLs use the configured customer
+  origin. Reservation checkout also checks foreign/missing owner denial without
+  writes, unchanged receipts while unpaid and reuse of an open provider session.
 - The installed Resend SDK and `@react-email/render` template rendering, with
   transport intercepted before live delivery.
 

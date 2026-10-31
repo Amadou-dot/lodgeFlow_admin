@@ -8,7 +8,7 @@ import {
 import type { ICabin } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
 import { getStripe } from '@/lib/stripe';
-import { normalizeBaseUrl } from '@/lib/url';
+import { getCustomerOrigin } from '@/lib/url';
 import { createCheckoutSchema } from '@/lib/validations/checkout';
 import { readJsonRequestBody } from '@/lib/validations/request-body';
 import { auth } from '@clerk/nextjs/server';
@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
       }
       return errorResponse('Payment is being confirmed; refresh shortly', 409);
     }
+    // Invalid configuration must not leave a new quote pending. Existing open
+    // sessions above remain reusable without constructing another return URL.
+    const baseUrl = getCustomerOrigin({
+      requestOrigin: request.nextUrl.origin,
+    });
     if (!booking.checkoutPending) {
       const remainingAmount = majorAmount(booking.remainingAmount, {
         precision: 'preserve',
@@ -120,9 +125,6 @@ export async function POST(request: NextRequest) {
     });
     // Retain the quote token on failures: retrying the same Stripe idempotency key
     // recovers a session whose creation succeeded before a connection was lost.
-    const baseUrl = normalizeBaseUrl(
-      process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
-    );
     const isDeposit = booking.amountPaid < booking.depositAmount;
     const session = await stripe.checkout.sessions.create(
       {

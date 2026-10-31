@@ -283,6 +283,73 @@ describe('checkout characterization', () => {
     );
   });
 
+  test.each([
+    ['', 'empty'],
+    ['https://guest:private-token@example.com', 'credentials'],
+    ['https://example.com/payments', 'path'],
+    ['https://example.com?private-token=1', 'query'],
+    ['https://example.com#private-token', 'fragment'],
+    ['https://admin.lodgeflow.app', 'staff origin'],
+  ])(
+    'rejects %s configuration before reserving a new quote (%s)',
+    async origin => {
+      process.env.NEXT_PUBLIC_APP_URL = origin;
+      const response = await POST(request());
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        success: false,
+        error: 'Failed to create checkout session',
+      });
+      expectNoWritesOrProviderCalls();
+    }
+  );
+
+  test.each([
+    ['localhost:3002/', 'http://localhost:3002'],
+    ['preview.example.com/', 'https://preview.example.com'],
+  ])(
+    'uses explicit local/preview configuration %s',
+    async (origin, expected) => {
+      process.env.NEXT_PUBLIC_APP_URL = origin;
+      expect((await POST(request())).status).toBe(200);
+      expect(mockCreateSession.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          success_url: `${expected}/payments/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
+          cancel_url: `${expected}/payments/cancel?booking_id=${bookingId}`,
+        })
+      );
+    }
+  );
+
+  test('reuses an open session even when new-checkout origin configuration is invalid', async () => {
+    process.env.NEXT_PUBLIC_APP_URL = 'https://example.com/path';
+    mockFindPopulate.mockResolvedValue(
+      reserved({ stripeSessionId: session.id })
+    );
+    mockRetrieveSession.mockResolvedValue(session);
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      data: { url: session.url },
+    });
+    expect(mockReserve).not.toHaveBeenCalled();
+    expect(mockCreateSession).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  test('preserves owner denial before inspecting invalid origin configuration', async () => {
+    process.env.NEXT_PUBLIC_APP_URL = 'https://example.com/path';
+    mockFindPopulate.mockResolvedValue(null);
+    const response = await POST(request());
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Booking not found',
+    });
+    expectNoWritesOrProviderCalls();
+  });
+
   test('rejects unauthenticated requests before database access', async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const response = await POST(request());
