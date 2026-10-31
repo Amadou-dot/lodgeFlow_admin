@@ -34,7 +34,9 @@ export async function seedDatabase() {
   await connectDB();
   const staff = await StaffAccess.distinct('userId');
   const staffIds = new Set(staff);
-  const guestIds = [...new Set(customers)].filter(id => !staffIds.has(id));
+  const guestIds = Array.from(new Set(customers)).filter(
+    id => !staffIds.has(id)
+  );
   if (!guestIds.length) {
     throw new Error('No non-staff Clerk guests available for demo seeding');
   }

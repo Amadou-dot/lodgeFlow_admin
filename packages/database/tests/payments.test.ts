@@ -234,8 +234,7 @@ test('demo reservations spread recent booking activity across days without futur
     today
   );
   const recent = bookings.filter(
-    booking =>
-      booking.createdAt >= new Date('2026-10-01T00:00:00.000Z')
+    booking => booking.createdAt >= new Date('2026-10-01T00:00:00.000Z')
   );
   const recentDays = new Set(
     recent.map(booking => booking.createdAt.toISOString().slice(0, 10))
