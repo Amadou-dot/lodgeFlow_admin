@@ -6,7 +6,14 @@
 
 ## Header
 
-Open with a single line referencing the issue this PR resolves. Use one of these forms:
+Open with a single line referencing the related issue. For a slice of an ongoing
+tracker, use:
+
+```
+Part of #150 · Phase 5.
+```
+
+When the PR completes the referenced issue, use one of these forms:
 
 ```
 Closes #123.
@@ -20,7 +27,10 @@ Closes #178 · Parent: #173 · PR 5 of 5 in the reviews feature.
 Closes #175 · Parent #173 · Depends on: #174 (merged) · Blocks: #176
 ```
 
-- Use `Closes #N` so the issue auto-closes on merge.
+- Use `Closes #N` only when the issue should automatically close on merge.
+- For ongoing trackers, use `Part of #N` and say that the tracker remains open.
+  Avoid pairing a closing keyword with its issue reference anywhere in the PR
+  description, even in a negated sentence; GitHub still recognizes that pairing.
 - For multi-PR features, include `Parent: #N`, `Depends on: #N`, `Blocks: #N` chains so the dependency graph is readable from any single PR.
 
 ---
@@ -84,6 +94,7 @@ Always present. Use checkboxes — checked for things you actually ran, unchecke
 
 ```markdown
 ## Test plan
+
 - [x] `pnpm test __tests__/integration/actions/admin/users.test.ts` — 8/8 pass (promote, demote, self-demote-guard, last-admin-guard, idempotent no-op, NOT_FOUND, invalid UUID, PII-clean audit)
 - [x] `pnpm lint` — 0 errors (3 warnings on `lib/db/audit.ts` are pre-existing)
 - [x] `pnpm exec tsc --noEmit` — clean
@@ -103,6 +114,7 @@ The minimum acceptable test plan is:
 
 ```markdown
 ## Test plan
+
 - [x] `pnpm exec tsc --noEmit` clean
 - [x] `pnpm test` — N passing, M skipped
 - [x] `pnpm lint` — no new errors
@@ -128,6 +140,7 @@ If the deferred work has a tracking issue, link it.
 Use only for actions the reviewer or the deployer needs to take **after** merging — env vars to configure, migrations to apply, DNS records to publish, etc.
 
 > Example:
+>
 > - _"apply the new Prisma migration before deploy"_
 > - _"configure `RESEND_API_KEY` and publish the SPF/DKIM/DMARC records documented in `docs/notes/transactional-email.md`"_
 
@@ -152,11 +165,13 @@ Not the same as `## Out of scope` — these are blocking actions tied to this PR
 Closes #___.
 
 ## Summary
+
 - _what changed, bullet per discrete change_
 - _inline code spans for paths and identifiers_
 - _surface non-obvious invariants here_
 
 ## Test plan
+
 - [x] `pnpm exec tsc --noEmit` — clean
 - [x] `pnpm test` — N passing, M skipped
 - [x] `pnpm lint` — no new errors

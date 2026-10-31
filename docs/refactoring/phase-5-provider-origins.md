@@ -1,7 +1,7 @@
 # Phase 5 provider origins and existing email contracts
 
-Status: implemented and locally verified on `refactor/phase5-provider-origins`,
-based on `bfe819b`; ready for PR review.
+Status: open for review in [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198)
+on `refactor/phase5-provider-origins`, based on `bfe819b`.
 Part of [#150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150).
 See the [implementation plan](phase-5-provider-origins-plan.md).
 
@@ -28,7 +28,12 @@ preview behavior and is not a new host allowlist.
 
 Bare hostnames use HTTPS; bare `localhost`, `127.0.0.1` and `[::1]` use HTTP.
 Explicit HTTP/HTTPS overrides remain supported. Leading/trailing whitespace and
-trailing slashes are normalized; URL parsing canonicalizes the resulting origin.
+trailing slashes are normalized. URL parsing validates the result, while the
+returned text preserves legacy spelling, including explicit default ports, host
+case and encoding. Canonical host parsing still rejects the known staff host.
+This distinction protects Stripe retries: a retained quote whose original
+session response was lost must send the same redirect strings with its existing
+idempotency key, including when the quote predates deployment.
 
 Explicit empty values, malformed URLs, embedded whitespace/backslashes,
 credentials, paths, queries and fragments now throw
@@ -48,6 +53,8 @@ invalid. Unexpected failures now use the existing server logger. HTTP envelopes
 and safe error messages are unchanged.
 
 ## Evidence and limits
+
+Initial PR checkpoint at `252ad61`:
 
 - Before production edits: six customer characterization suites passed 85 tests;
   all three shared sender tests passed.
@@ -87,6 +94,29 @@ and safe error messages are unchanged.
   after tests above. `git diff --check`, root formatting, explicit new-document
   formatting and all 24 local Markdown links pass. Remote CI/previews belong to
   the PR; these local results do not claim merge or deployment.
+
+Review correction for [the retained-quote finding](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198#issuecomment-6548916210):
+
+- Seven new URL regressions failed before the fix because parsing rewrote ports,
+  host case/encoding or IPv6 spelling. The HTTP gate independently reproduced a
+  500 when a retained cabin quote retried a pre-deployment accepted payload with
+  different redirect strings under the same idempotency key.
+- Validation now preserves legacy URL text. The parsed hostname still rejects
+  encoded, mixed-case and trailing-dot variants of the staff host. All 134
+  focused URL/metadata/checkout tests pass after the correction.
+- The expanded HTTP gate passes for cabin, dining and experience recovery of
+  pre-deployment sessions with lost responses. Its controlled provider rejects
+  changed parameters under the same key; fixtures use the literal legacy
+  `https://lodgeflow.app:443` origin. Receipts remain unpaid and quote tokens and
+  amounts remain intact.
+- Fresh `pnpm ci:check` passes formatting, read-only lint and 2,610 tests: admin
+  1,590, customer 921, database 96, email 3. Customer TypeScript and all clean-copy
+  builds pass. No dependency changes required another install. These local
+  results supplement the initial PR evidence above; current CI/preview evidence
+  is recorded on the PR.
+- The PR description uses an ongoing-tracker reference. GitHub reports no
+  automatic issue closures. The PR template now warns that negating a closing
+  keyword does not prevent GitHub from recognizing it.
 
 The sender repair and separately authorized delivery/inbox evidence in #155/#132
 remain historical evidence; this slice sends no live email and performs no live

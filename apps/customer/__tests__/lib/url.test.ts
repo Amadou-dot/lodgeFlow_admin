@@ -91,6 +91,21 @@ describe('normalizeBaseUrl', () => {
   });
 
   test.each([
+    ['https://lodgeflow.app:443/', 'https://lodgeflow.app:443'],
+    ['http://localhost:80', 'http://localhost:80'],
+    ['HTTPS://LODGEFLOW.APP:443', 'HTTPS://LODGEFLOW.APP:443'],
+    ['LODGEFLOW.APP:443', 'https://LODGEFLOW.APP:443'],
+    ['https://bücher.example', 'https://bücher.example'],
+    ['https://%6codgeflow.app', 'https://%6codgeflow.app'],
+    ['http://[0:0:0:0:0:0:0:1]:80', 'http://[0:0:0:0:0:0:0:1]:80'],
+  ])(
+    'preserves legacy redirect text for retained quote retries: %s',
+    (input, expected) => {
+      expect(normalizeBaseUrl(input)).toBe(expected);
+    }
+  );
+
+  test.each([
     '',
     '   ',
     '//preview.example.com',

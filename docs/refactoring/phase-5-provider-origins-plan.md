@@ -24,6 +24,8 @@ isolated HTTP gate.
   is `https://admin.lodgeflow.app`.
 - Preserve bare hostnames, HTTP loopback, explicit HTTP/HTTPS, preview overrides,
   and checkout request-origin fallback when configuration is absent.
+- Preserve validated legacy redirect text, including explicit default ports and
+  host spelling, so retries of retained quotes keep their Stripe parameters.
 - Reject explicit empty or malformed configuration with a typed, redacted error.
   Do not reinterpret paths, credentials, query strings or fragments as origins.
 - Resolve new checkout origins before reserving a quote. Preserve reuse of an

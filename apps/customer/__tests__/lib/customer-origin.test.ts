@@ -35,10 +35,14 @@ test.each([
   }
 );
 
-test.each(['', 'https://example.com/path', 'https://admin.lodgeflow.app'])(
-  'metadata rejects an unusable customer origin: %s',
-  configured => {
-    process.env.NEXT_PUBLIC_APP_URL = configured;
-    expect(configuredSiteUrl).toThrow();
-  }
-);
+test.each([
+  '',
+  'https://example.com/path',
+  'https://admin.lodgeflow.app',
+  'https://ADMIN.LODGEFLOW.APP:443',
+  'https://%61dmin.lodgeflow.app:443',
+  'https://admin.lodgeflow.app.',
+])('metadata rejects an unusable customer origin: %s', configured => {
+  process.env.NEXT_PUBLIC_APP_URL = configured;
+  expect(configuredSiteUrl).toThrow();
+});

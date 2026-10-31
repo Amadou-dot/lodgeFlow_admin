@@ -67,7 +67,9 @@ plan and existing-issue triage; issues #136 and #139 are outside that effort.
   explicit `NEXT_PUBLIC_APP_URL`, then an optional checkout request origin, then
   `https://lodgeflow.app`. Bare hosts and local/preview HTTP(S) overrides are
   supported. Empty values, credentials, paths, queries, fragments and the staff
-  host are invalid. Validate a new origin before reserving its quote; shared
+  host are invalid. Preserve validated legacy redirect text, including default
+  ports and host spelling, so retained Stripe quote keys reuse identical URLs.
+  Validate a new origin before reserving its quote; shared
   reservation checkout accepts a lazy `getReturnUrl` so ownership/payability
   checks and reuse of existing open sessions precede URL resolution. Staff
   navigation stays relative to the admin app; its customer-site shortcut targets

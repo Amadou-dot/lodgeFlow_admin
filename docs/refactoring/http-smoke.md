@@ -50,6 +50,9 @@ Memory Server binary download. No application credentials are required.
 - Cabin, dining and experience checkout return URLs use the configured customer
   origin. Reservation checkout also checks foreign/missing owner denial without
   writes, unchanged receipts while unpaid and reuse of an open provider session.
+  All three families recover pre-deployment retained quotes whose session
+  response was lost. The controlled provider rejects changed parameters under
+  the same idempotency key; accepted fixtures retain an explicit default port.
 - The installed Resend SDK and `@react-email/render` template rendering, with
   transport intercepted before live delivery.
 
@@ -74,7 +77,7 @@ failure cannot be hidden by a no-op send double. Email payloads are recorded and
 return controlled success/failure through the loopback server. Unsupported
 operations fail. These email/payment paths cannot make live sends or charges.
 
-Production link assertions use `https://lodgeflow.app`; admin configuration uses
+Customer link assertions use `https://lodgeflow.app:443`; admin configuration uses
 `https://admin.lodgeflow.app`. HTTP requests themselves use local origins. Resend's
 already-configured production domain needs no setup for this test. Sender selection
 uses `@lodgeflow/email` and the approved payment/notification defaults. Live provider

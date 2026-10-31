@@ -29,7 +29,10 @@ export function normalizeBaseUrl(url: string): string {
   }
 
   try {
-    return new URL(absolute).origin;
+    // Validate without serializing: canonicalization changes default ports,
+    // host case and encoding, breaking Stripe retries of retained quote keys.
+    new URL(absolute);
+    return absolute;
   } catch {
     throw new ApplicationOriginConfigurationError();
   }
