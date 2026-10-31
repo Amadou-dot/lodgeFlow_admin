@@ -72,11 +72,11 @@ test('missing cabin and timestamps render explicit fallback text', () => {
 test('minimal list customer fallback renders without document or Date fields', () => {
   render(
     <GuestInformationCard
-      customer={{ id: 'user_deleted', name: 'Unknown User', email: 'N/A' }}
+      customer={{ id: 'user_deleted', name: 'Unavailable guest', email: 'N/A' }}
       numGuests={2}
       numNights={2}
     />
   );
-  expect(screen.getByText('Unknown User')).toBeInTheDocument();
+  expect(screen.getByText('Unavailable guest')).toBeInTheDocument();
   expect(screen.getByText('N/A')).toBeInTheDocument();
 });

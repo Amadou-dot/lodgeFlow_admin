@@ -1,12 +1,7 @@
-import { config } from 'dotenv';
-import { resolve } from 'path';
-import mongoose from 'mongoose';
-import { seedDatabase } from '../lib/seed-database';
-config({ path: resolve(process.cwd(), '.env.local') });
-seedDatabase()
-  .then(results => console.log(JSON.stringify(results)))
-  .catch(error => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => mongoose.disconnect());
+// Keep the local entry point inert until development has its own database.
+// The shared server seed operation remains available for live seeding.
+console.warn(
+  'Local seeding is disabled until a separate testing database is configured. Live seeding is managed by n8n.'
+);
+
+export {};

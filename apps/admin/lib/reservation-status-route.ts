@@ -26,6 +26,7 @@ import {
 } from './api-utils';
 import { recordAudit } from './audit';
 import { getClerkUser } from './clerk-users';
+import { UNAVAILABLE_GUEST_NAME } from './guest-display';
 import { logger } from './logger';
 import connectDB from './mongodb';
 import { reservationStatusSchema } from './validations/reservation-status';
@@ -65,7 +66,7 @@ export async function reservationDetails({
           : serializeExperienceReservationDetail(reservation.toObject()),
       payment: reservationPaymentSummary(reservation),
       currency: (await Settings.getSettings()).currency,
-      customerName: customer?.name || 'Unavailable guest',
+      customerName: customer?.name || UNAVAILABLE_GUEST_NAME,
       allowedStatuses: transitions[reservation.status] ?? [],
     });
   } catch (error: unknown) {

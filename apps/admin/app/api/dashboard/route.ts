@@ -2,6 +2,7 @@ import type { DashboardData } from '@/types/reporting';
 import { logger } from '@/lib/logger';
 import { requireApiAuth } from '@/lib/api-utils';
 import { getClerkUsersBatch } from '@/lib/clerk-users';
+import { UNAVAILABLE_GUEST_NAME } from '@/lib/guest-display';
 import connectDB from '@/lib/mongodb';
 import type {
   DurationDataItem,
@@ -281,7 +282,7 @@ export async function GET() {
         const { users: customerMap } = await getClerkUsersBatch(customerIds);
 
         return bookingsList.map(booking => {
-          let customerName = 'Customer';
+          let customerName = UNAVAILABLE_GUEST_NAME;
 
           if (booking.customer) {
             const clerkUser = customerMap.get(booking.customer);
@@ -289,7 +290,7 @@ export async function GET() {
               customerName =
                 clerkUser.name ||
                 `${clerkUser.first_name || ''} ${clerkUser.last_name || ''}`.trim() ||
-                'Customer';
+                UNAVAILABLE_GUEST_NAME;
             }
           }
 
