@@ -35,6 +35,7 @@ import {
   type LockedWriteResult,
 } from '@/lib/cabin-booking-lock';
 import { getClerkUsersBatch, searchClerkUsers } from '@/lib/clerk-users';
+import { UNAVAILABLE_GUEST_NAME } from '@/lib/guest-display';
 import { VALID_TRANSITIONS } from '@/lib/config';
 import { logger } from '@/lib/logger';
 import connectDB from '@/lib/mongodb';
@@ -65,7 +66,7 @@ async function populateBookingsWithClerkCustomers(
     // Provide fallback for missing customers
     const customerData = customer || {
       id: booking.customer,
-      name: 'Unknown User',
+      name: UNAVAILABLE_GUEST_NAME,
       email: 'N/A',
     };
 

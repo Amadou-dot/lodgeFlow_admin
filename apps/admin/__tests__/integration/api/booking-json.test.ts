@@ -127,7 +127,7 @@ test('detail preserves full cabin and customer JSON', async () => {
   });
 });
 
-test('list keeps its unknown-customer fallback and warning while detail keeps null', async () => {
+test('list keeps its unavailable-guest fallback and warning while detail keeps null', async () => {
   const { booking, cabin } = await fixture();
   jest
     .mocked(getClerkUsersBatch)
@@ -137,7 +137,7 @@ test('list keeps its unknown-customer fallback and warning while detail keeps nu
   const body = await list.json();
   expect(body.data[0].customer).toEqual({
     id: customer.id,
-    name: 'Unknown User',
+    name: 'Unavailable guest',
     email: 'N/A',
   });
   expect(body.data[0].guest).toEqual(body.data[0].customer);

@@ -12,6 +12,7 @@ import {
   requireApiAuth,
 } from '@/lib/api-utils';
 import { getClerkUsersBatch } from '@/lib/clerk-users';
+import { UNAVAILABLE_GUEST_NAME } from '@/lib/guest-display';
 import connectDB from '@/lib/mongodb';
 import { reservationPipeline } from '@/lib/reservation-reads';
 export async function GET(request: Request) {
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       serializeReservationRow({
         row,
         customerName:
-          customers.users.get(row.customer)?.name || 'Unavailable guest',
+          customers.users.get(row.customer)?.name || UNAVAILABLE_GUEST_NAME,
       })
     );
     return createSuccessResponse<ReservationInboxJson>({

@@ -129,7 +129,7 @@ test('dashboard preserves paid-only revenue, cancellation scope, occupancy and s
   expect(body.data.recentActivity).toHaveLength(3);
   expect(body.data.recentActivity).toContainEqual({
     id: String(booking._id),
-    customerName: 'Customer',
+    customerName: 'Unavailable guest',
     cabinName: cabin.name,
     checkInDate: booking.checkInDate.toISOString(),
     checkOutDate: booking.checkOutDate.toISOString(),
@@ -155,7 +155,7 @@ test('dashboard retains missing-cabin and missing-customer fallbacks', async () 
   expect(
     body.data.recentActivity.every(
       (row: { cabinName: string; customerName: string }) =>
-        row.cabinName === 'Unknown' && row.customerName === 'Customer'
+        row.cabinName === 'Unknown' && row.customerName === 'Unavailable guest'
     )
   ).toBe(true);
   expect(body.data.charts.occupancy).toEqual([]);

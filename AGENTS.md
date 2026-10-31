@@ -294,8 +294,13 @@ incompatible duplicate date-picker types.
 - Configure app-local `.env.local`; inspect variable names in code and the customer
   `.env.example`. Admin staff access requires `LODGEFLOW_STAFF_ORG_ID` in addition
   to Clerk keys and `MONGODB_URI`. Never print or commit secret values.
-- `pnpm seed` and `/api/cron/seed` reset demo data; they are not ordinary validation
-  commands. The cron endpoint requires `SEED_SECRET` bearer authentication even
+- The local admin seed command (`pnpm --filter @lodgeflow/admin seed`) is disabled
+  until a separate testing database is configured. `apps/admin/scripts/seed.ts`
+  prints a notice and exits without loading credentials or invoking seeding.
+  Live demo seeding is managed by n8n; the shared server seed operation and
+  authenticated `/api/cron/seed` endpoint remain available.
+- `/api/cron/seed` resets demo data; it is not an ordinary validation command.
+  The cron endpoint requires `SEED_SECRET` bearer authentication even
   though it is exempt from Clerk. Do not run seeding, bootstrap, backfills, live
   Settings edits, or provider mutations without explicit scope and a known target.
 - Existing sends resolve `getEmailSender({ kind })` from `@lodgeflow/email` at the
