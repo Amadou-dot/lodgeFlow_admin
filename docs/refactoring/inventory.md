@@ -17,9 +17,11 @@ merged in #198 as `79ecabc`. The reviewed head passed 2,610 package tests, type
 checks, isolated HTTP and clean builds. All five main CI jobs and both exact-SHA
 production deployments passed, along with read-only customer/admin smoke checks.
 
-The first [Phase 6 V03 slice](phase-6-admin-responses-plan.md) consolidates static
-admin envelopes and customer route/hook contracts. Runtime response validation,
-customer-app/webhook contracts, O01 and final browser acceptance remain open.
+The first [Phase 6 V03 slice](phase-6-admin-responses-plan.md) merged in #199 as
+`f735bc5`; main CI, exact-SHA production deployments and read-only smoke checks
+passed. The second [customer list slice](phase-6-customer-list-plan.md) validates
+JSON before both client caches, reusing the existing read schema. Detail/mutation
+and other response validation, O01 and final browser acceptance remain open.
 
 ## Historical Phase 4 review handoff (2026-10-09)
 
@@ -180,7 +182,7 @@ rather than treating counts as the completion gate.
 | F09 | Admin `lib/validations/cabin.ts`: `isDiscountValid` | Discount and price numbers can be swapped. | 2 | Completed alongside Phase 1 slice 12: named inputs at both routes and all three test calls, with unchanged comparison and stored-price validation. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Complete locally in slice 24: payload-only date/refund/payment rules live in schemas; IDs/JSON/unknown fields validate before writes. Existing lock, Settings, receipts, refund authorization and stored-state rules remain server-side. |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. Phase 6 now consolidates static admin envelopes/customer responses. Runtime parsing and remaining customer-app/resource/webhook contracts stay open. |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. Phase 6 delivers static admin envelopes in #199 and validates customer lists in slice 2. Remaining detail/mutation, customer-app/resource/webhook runtime contracts stay open. |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed filters, explicit zero bounds and shared experience JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed available-only queries, explicit zero bounds and shared dining JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
@@ -1860,9 +1862,63 @@ login, full browser workflows or live provider operations were exercised.
 A fresh whole-branch review of `79ecabc..12d188b` found no actionable introduced
 defects; the following response/runtime and acceptance gaps remain explicit.
 
-Remaining concrete V03 debt includes runtime response parsing in admin
+After slice 1, remaining V03 debt included runtime response parsing in admin
 `hooks/useCustomers.ts`, `hooks/useInfiniteCustomers.ts`, `hooks/useData.ts` and
-`hooks/useBookingAnalytics.ts`; customer `types/index.ts`, resource consumers and
+`hooks/useBookingAnalytics.ts`; slice 2 below handles the two list readers only; customer `types/index.ts`, resource consumers and
 `app/api/payments/webhook/route.ts` need their own compatibility review. Raw
 reporting payloads and signed webhook acknowledgements must retain their distinct
 contracts. O01 remains assigned to the paths in `inventory-current.json`.
+
+
+## Phase 6 slice 1 delivery — PR #199
+
+User-accepted head `dbb4d004f84e0f8356f423db6689038ba891842a` merged as
+`f735bc57dca3137e7fcac2bd23d40e5810003106`. All five
+[main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/41344655948)
+pass. Exact-SHA production deployments are Ready: customer
+`dpl_4322bJTiQGUPA7KC4bjezMQXzPcD`, admin `dpl_3NpugWWHknNNUdWQghXVqFtqTJqz`.
+App roots, shared sources and aliases are verified. Read-only customer home/catalog
+and admin sign-in returned 200; the protected API redirected to Clerk. No hosted
+login, browser acceptance or live provider mutations were exercised.
+
+## Phase 6 slice 2: customer list runtime validation (V03)
+
+The existing cache read schema now supplies `lib/validations/customer-json.ts`;
+`CustomerJson` and list success types are inferred from schemas. Only
+`customer-cache.ts` revives the five server Date fields. The list route's full,
+filtered and empty replies are checked against the client schema in integration
+tests; server JSON and permissions remain unchanged.
+
+`lib/customer-list.ts` reads JSON as unknown and validates before SWR or TanStack
+accepts a page. The validation guard retains the original value, so additive
+fields survive at the envelope, pagination, customer and nested metadata/booking
+levels. Partial legacy metadata, null identity fields, empty strings and finite
+legacy money precision remain supported; creation constraints are not read rules.
+
+Intentional correction: malformed success envelopes/customer rows/pagination and
+invalid JSON now produce `Failed to fetch customers` before caching. Previously
+invalid values could replace good data or reach rendering, and parser details
+could become the displayed error. A bad row rejects the page; no partial-page
+filtering changes totals. Previously valid pages survive failed revalidation or
+pagination, and the same page/search can retry under the existing cache policy.
+
+Baseline: 128 existing focused tests and six new valid-response/provider/cache
+characterizations passed before production edits. Sixteen regressions then failed
+for malformed response acceptance, parser details and replacement of valid cache
+data. After the change, all 165 focused tests pass. Strict admin types and all
+five changed TypeScript/JavaScript tests/helpers pass without suppressions. The
+new test-local jsdom environment supplies real Node Response JSON parsing; it
+does not change ordinary test projects or production dependencies.
+
+Final local validation: `pnpm ci:check` passes formatting, read-only lint and
+2,676 package tests (admin 1,656; customer 921; database 96; email 3). Both app
+TypeScript checks, strict checking of all five changed test/helper files including
+JavaScript, and the isolated HTTP gate pass. Frozen installation and all builds
+pass in a clean source copy with CI's throwaway Clerk public key and no app/provider
+credentials. All 766 non-Markdown source/test/config/asset inputs match that copy;
+25 local documentation links and whitespace checks pass. Existing build diagnostics
+remain non-blocking. Hosted login and full browser acceptance were not exercised.
+
+Remaining V03 work includes customer detail/create/update/lock acknowledgements in
+`hooks/useCustomers.ts`, dashboard/analytics readers, customer-app consumers and
+webhook-specific contracts. O01 and browser acceptance remain separate gates.

@@ -157,8 +157,12 @@ already complies.
   Admin `types/api-response.ts` owns the browser-safe discriminated `ApiResponse<T>`
   and data-less `ApiAcknowledgement`; server builders import those same types.
   Customer resource contracts in admin `types/customer-responses.ts` retain list
-  pagination and distinct lock/unlock timestamps. These are static types, not
-  runtime JSON validators. Remaining response boundaries need deliberate migration.
+  pagination and distinct lock/unlock timestamps. Customer lists use
+  `lib/customer-list.ts` to validate HTTP JSON before SWR/TanStack caches accept
+  it. Their JSON schema is shared with the server cache adapter, which alone
+  revives Dates; client DTOs retain strings, legacy values and additive fields.
+  Other response type annotations are not runtime validators and still need
+  deliberate migration.
 
 ### Money: preserve units and accounting
 

@@ -6,6 +6,7 @@ import type {
 } from '@/lib/validations/customer';
 
 import { SWR_CONFIG } from '@/lib/config';
+import { fetchCustomersList } from '@/lib/customer-list';
 import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type {
   Customer,
@@ -15,7 +16,6 @@ import type {
 } from '@/types';
 import type { ApiAcknowledgement } from '@/types/api-response';
 import type {
-  CustomersResponse,
   CustomerResponse,
   CustomerMutationResponse,
   CustomerLockResponse,
@@ -58,30 +58,17 @@ interface CustomersListResponse {
 
 // Fetcher function for SWR
 const fetcher = (url: string): Promise<CustomersListResponse> =>
-  fetch(url)
-    .then(res => {
-      if (!res.ok) {
-        throw new Error('Failed to fetch customers');
-      }
-      return res.json();
-    })
-    .then((result: CustomersResponse) => {
-      // Handle new API response format
-      if (result.success) {
-        return {
-          customers: result.data,
-          pagination: {
-            currentPage: result.pagination.currentPage,
-            totalPages: result.pagination.totalPages,
-            totalItems: result.pagination.totalCustomers, // Map to consistent naming
-            itemsPerPage: result.pagination.limit, // Map to consistent naming
-            hasNextPage: result.pagination.hasNextPage,
-            hasPreviousPage: result.pagination.hasPrevPage, // Map to consistent naming
-          },
-        };
-      }
-      throw new Error('Failed to fetch customers');
-    });
+  fetchCustomersList(url).then(result => ({
+    customers: result.data,
+    pagination: {
+      currentPage: result.pagination.currentPage,
+      totalPages: result.pagination.totalPages,
+      totalItems: result.pagination.totalCustomers,
+      itemsPerPage: result.pagination.limit,
+      hasNextPage: result.pagination.hasNextPage,
+      hasPreviousPage: result.pagination.hasPrevPage,
+    },
+  }));
 
 // Fetch customers with filters and pagination using SWR
 export const useCustomers = (filters: CustomersFilters = {}) => {

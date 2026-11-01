@@ -1,23 +1,12 @@
-import type {
-  ApiErrorResponse,
-  ApiResponse,
-  ApiSuccessResponse,
-} from './api-response';
+import type { z } from 'zod';
+import type { customersSuccessResponseSchema } from '@/lib/validations/customer-list';
+import type { ApiErrorResponse, ApiResponse } from './api-response';
 import type { CustomerJson } from './customer-json';
 import type { CustomerWithStats } from './index';
 
-export interface CustomersSuccessResponse extends ApiSuccessResponse<
-  CustomerJson[]
-> {
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCustomers: number;
-    limit: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
+export type CustomersSuccessResponse = z.output<
+  typeof customersSuccessResponseSchema
+>;
 
 export type CustomersResponse = CustomersSuccessResponse | ApiErrorResponse;
 export type CustomerResponse = ApiResponse<CustomerWithStats>;
