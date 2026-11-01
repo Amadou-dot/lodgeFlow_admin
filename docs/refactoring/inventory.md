@@ -1969,7 +1969,15 @@ source/test/config/asset inputs match the build copy; the sole post-build change
 was a test notification wait, validated by the final suite and strict test types.
 Thirty local documentation links and whitespace checks pass. Existing no-secret
 prerender/module diagnostics remain non-blocking; full browser/hosted login was
-not exercised. Independent whole-branch review is the next checkpoint.
+not exercised. Fresh whole-branch review of `5bd96fa..0c38dc1` found no actionable
+introduced defects and independently passed 71 unit/jsdom tests. Its additional
+integration run was blocked by sandbox listener permission; primary-agent HTTP,
+integration and full-suite validation above passed with disposable local services.
+
+Existing cache limitations remain explicit: in-flight reads can repopulate a
+stale profile after eviction, and a failed Redis eviction can retain stale data
+until TTL expiry. The guest page's extra refresh is unchanged. These are existing
+policies/design debt, not new synchronization guarantees from this slice.
 
 Remaining V03: customer detail/create/update/delete in `hooks/useCustomers.ts`,
 dashboard/analytics/resource reads, customer-app consumers and webhook contracts.

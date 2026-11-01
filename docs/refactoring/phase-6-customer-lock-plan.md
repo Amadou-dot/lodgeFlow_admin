@@ -85,9 +85,9 @@ and await `invalidateCache(userId)` only after provider success.
 - [x] Run focused suites, strict changed-test types, both app types, full
       `pnpm ci:check`, `pnpm test:http`, frozen install and clean builds. Expect
       all pass; compare build inputs and verify document links/whitespace.
-- [ ] Commit the verified slice and obtain a fresh whole-branch review. Resolve
-      actionable findings with regressions, then push and open a review PR.
+- [x] Commit the verified slice and obtain a fresh whole-branch review. Resolve
+      actionable findings with regressions; none were identified.
 
 **Delivery:** Use `Part of #150`. Keep tracker/milestone open. The current approval
 authorizes #200 delivery and continuation to this next review checkpoint; the new
-PR awaits user acceptance before merge.
+PR is pushed/opened after local review and awaits user acceptance before merge.
