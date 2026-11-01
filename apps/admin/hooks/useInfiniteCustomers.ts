@@ -1,8 +1,6 @@
 import type { Customer } from '@/types';
-import type {
-  CustomersResponse,
-  CustomersSuccessResponse,
-} from '@/types/customer-responses';
+import type { CustomersSuccessResponse } from '@/types/customer-responses';
+import { fetchCustomersList } from '@/lib/customer-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -16,13 +14,9 @@ async function fetchCustomersPage({
   search: string;
 }): Promise<CustomersSuccessResponse> {
   const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-  const response = await fetch(
+  return fetchCustomersList(
     `/api/customers?page=${page}&limit=${PAGE_SIZE}${searchParam}`
   );
-  if (!response.ok) throw new Error('Failed to fetch customers');
-  const result: CustomersResponse = await response.json();
-  if (!result.success) throw new Error('Failed to fetch customers');
-  return result;
 }
 
 // Search and pagination are one query per search term, so late responses cannot

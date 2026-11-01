@@ -97,11 +97,14 @@ HTTP, frozen installation and clean builds. Main CI and both exact-SHA productio
 deployments passed; read-only customer/admin smoke checks passed on 2026-11-01.
 Retained Stripe quote retries preserve their original redirect text.
 
-The first [Phase 6 admin response slice](phase-6-admin-responses-plan.md) is ready
-for review after 2,639 package tests, types, isolated HTTP, clean builds and a
-fresh review found no actionable introduced defects. V03 runtime response boundaries, O01 test infrastructure and full
-browser acceptance remain open. PRs #196/#197 are separate demo-data/guest-identity
-fixes and do not complete later phases.
+The first [Phase 6 admin response slice](phase-6-admin-responses-plan.md) merged
+in [PR #199](https://github.com/Amadou-dot/lodgeFlow_admin/pull/199) as `f735bc5`.
+All five main CI jobs and both exact-SHA production deployments passed; read-only
+customer/admin smoke checks passed. The next bounded slice validates customer
+list responses before the two client caches accept them; see its
+[implementation plan](phase-6-customer-list-plan.md). Remaining V03 response
+boundaries, O01 test infrastructure and full browser acceptance stay open.
+PRs #196/#197 remain separate demo-data/guest-identity fixes.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151). The historical
@@ -380,8 +383,10 @@ Dependencies: Phases 0A–0C and 1–5.
 The first bounded V03 slice is [admin response contracts](phase-6-admin-responses-plan.md):
 one pure discriminated envelope shared by server builders and browser consumers,
 plus accurate customer pagination, acknowledgement and lock/unlock types. It
-preserves the existing wire behavior. Runtime response parsing, customer-app and
-webhook contracts, O01 test infrastructure and final browser acceptance remain.
+preserves the existing wire behavior and is delivered in #199. The second slice
+validates customer list JSON through a shared read schema, preserving Date revival
+only in the server cache adapter. Detail/mutation and other response parsing,
+customer-app/webhook contracts, O01 and final browser acceptance remain.
 
 - Resolve the remaining inventory across routes, components, hooks, utilities,
   scripts, tests and shared models. Do not define completion as finishing only the

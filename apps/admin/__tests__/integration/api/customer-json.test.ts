@@ -16,6 +16,7 @@ import {
 } from '@/lib/clerk-users';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
+import { isCustomersSuccessResponse } from '@/lib/validations/customer-list';
 import type { Customer } from '@/types/clerk';
 
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
@@ -117,7 +118,9 @@ test.each(['', '?search=Test&sortBy=name&sortOrder=asc'])(
     await fixture();
     const response = await GET(request(query));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    const body: unknown = await response.json();
+    expect(isCustomersSuccessResponse(body)).toBe(true);
+    expect(body).toEqual({
       success: true,
       data: [json({ ...customer, totalBookings: 1, totalSpent: 200 })],
       pagination: {
@@ -137,7 +140,9 @@ test('empty customer lists retain pagination outside their data', async () => {
   jest.mocked(getClerkUsers).mockResolvedValueOnce({ data: [], totalCount: 0 });
   const response = await GET(request());
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const body: unknown = await response.json();
+  expect(isCustomersSuccessResponse(body)).toBe(true);
+  expect(body).toEqual({
     success: true,
     data: [],
     pagination: {
