@@ -11,7 +11,7 @@ import { Input } from '@heroui/input';
 import { Chip } from '@heroui/chip';
 import { useEffect, useState } from 'react';
 import type { AuditHistoryJson } from '@/types/staff-audit';
-import type { ApiResponse } from '@/lib/api-utils';
+import type { ApiResponse } from '@/types/api-response';
 export default function AuditPage() {
   const [filters, setFilters] = useState({
     actor: '',

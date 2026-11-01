@@ -1,4 +1,8 @@
-import type { Customer, CustomersResponse } from '@/types';
+import type { Customer } from '@/types';
+import type {
+  CustomersResponse,
+  CustomersSuccessResponse,
+} from '@/types/customer-responses';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -10,7 +14,7 @@ async function fetchCustomersPage({
 }: {
   page: number;
   search: string;
-}): Promise<CustomersResponse> {
+}): Promise<CustomersSuccessResponse> {
   const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
   const response = await fetch(
     `/api/customers?page=${page}&limit=${PAGE_SIZE}${searchParam}`

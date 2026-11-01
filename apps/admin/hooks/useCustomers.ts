@@ -10,12 +10,17 @@ import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type {
   Customer,
   CustomersFilters,
-  CustomersResponse,
-  CustomerResponse,
   CustomerWithStats,
   CustomerPaginationMeta,
-  ApiResponse,
 } from '@/types';
+import type { ApiAcknowledgement } from '@/types/api-response';
+import type {
+  CustomersResponse,
+  CustomerResponse,
+  CustomerMutationResponse,
+  CustomerLockResponse,
+  CustomerUnlockResponse,
+} from '@/types/customer-responses';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import useSWR, { useSWRConfig } from 'swr';
 
@@ -158,11 +163,17 @@ export const useCreateCustomer = () => {
         throw new Error(error.error || 'Failed to create customer');
       }
 
-      const result: ApiResponse<Customer> = await response.json();
+      const result: CustomerMutationResponse = await response.json();
       if (result.success && result.data) {
         return result.data;
       }
-      throw new Error(result.error || 'Failed to create customer');
+      throw new Error(
+        (typeof result === 'object' &&
+          result !== null &&
+          'error' in result &&
+          result.error) ||
+          'Failed to create customer'
+      );
     },
     onSuccess: () => refreshCustomerCaches({ dashboard: 'overview' }),
   });
@@ -188,11 +199,17 @@ export const useUpdateCustomer = () => {
         throw new Error(error.error || 'Failed to update customer');
       }
 
-      const result: ApiResponse<Customer> = await response.json();
+      const result: CustomerMutationResponse = await response.json();
       if (result.success && result.data) {
         return result.data;
       }
-      throw new Error(result.error || 'Failed to update customer');
+      throw new Error(
+        (typeof result === 'object' &&
+          result !== null &&
+          'error' in result &&
+          result.error) ||
+          'Failed to update customer'
+      );
     },
     onSuccess: () =>
       refreshCustomerCaches({
@@ -216,7 +233,7 @@ export const useDeleteCustomer = () => {
         throw new Error(error.error || 'Failed to delete customer');
       }
 
-      const result: ApiResponse<null> = await response.json();
+      const result: ApiAcknowledgement = await response.json();
       if (result.success) {
         return { success: true };
       }
@@ -240,7 +257,7 @@ export const useLockCustomer = () => {
         throw new Error(error.error || 'Failed to lock customer');
       }
 
-      const result: ApiResponse<null> = await response.json();
+      const result: CustomerLockResponse = await response.json();
       if (result.success) {
         return { success: true };
       }
@@ -264,7 +281,7 @@ export const useUnlockCustomer = () => {
         throw new Error(error.error || 'Failed to unlock customer');
       }
 
-      const result: ApiResponse<null> = await response.json();
+      const result: CustomerUnlockResponse = await response.json();
       if (result.success) {
         return { success: true };
       }

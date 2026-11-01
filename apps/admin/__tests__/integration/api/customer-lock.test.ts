@@ -25,6 +25,25 @@ describe.each(['lock', 'unlock'])('%s customer', operation => {
       new NextRequest('https://admin.test/api/customers/user_guest/lock'),
       { params: Promise.resolve({ id: 'user_guest' }) }
     );
+  test('preserves the success message, lock flag and timestamp key', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    jest.setSystemTime(new Date('2030-01-02T03:04:05.000Z'));
+    try {
+      const response = await request();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        success: true,
+        message: `User ${operation === 'lock' ? 'locked' : 'unlocked'} successfully`,
+        data:
+          operation === 'lock'
+            ? { locked: true, lockedAt: '2030-01-02T03:04:05.000Z' }
+            : { locked: false, unlockedAt: '2030-01-02T03:04:05.000Z' },
+      });
+      expect(dependency).toHaveBeenCalledWith('user_guest');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
   test('requires administrator access before the provider call', async () => {
     const error = createErrorResponse('Denied', 403);
     jest

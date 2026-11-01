@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/lib/api-utils';
+import type { ApiResponse } from '@/types/api-response';
 import { useQuery } from '@tanstack/react-query';
 
 import type { AnalyticsPeriod, BookingAnalyticsData } from '@/types/reporting';

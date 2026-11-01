@@ -1,7 +1,8 @@
 # Phase 5 provider origins and existing email contracts
 
-Status: open for review in [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198)
-on `refactor/phase5-provider-origins`, based on `bfe819b`.
+Status: [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198) merged on
+2026-11-01 as `79ecabc9ab7bfe9ba2370d98936d45179f4f920f`, from reviewed head
+`4275012956e80d06fe6e070acb9353a7ae51aed2`.
 Part of [#150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150).
 See the [implementation plan](phase-5-provider-origins-plan.md).
 
@@ -117,6 +118,18 @@ Review correction for [the retained-quote finding](https://github.com/Amadou-dot
 - The PR description uses an ongoing-tracker reference. GitHub reports no
   automatic issue closures. The PR template now warns that negating a closing
   keyword does not prevent GitHub from recognizing it.
+
+## Delivery
+
+All five [main CI jobs](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/41325115321)
+passed at the merge SHA. Both exact-SHA production deployments are Ready:
+customer `dpl_GmaB2dkZxz9cq2eD4FeHrp8KfKj6` and admin
+`dpl_HHCA5gcNysq24QYfjdHBKbQs7v5R`. Project roots remain `apps/customer` and
+`apps/admin`, with shared workspace sources enabled. Production aliases point to
+these deployments: `lodgeflow.app` / `www.lodgeflow.app` and `admin.lodgeflow.app`.
+Read-only smoke checks returned 200 for the customer home/catalog and admin
+sign-in; the unauthenticated admin cabin API redirected to Clerk as expected.
+Issue #150 and milestone #2 remain open.
 
 The sender repair and separately authorized delivery/inbox evidence in #155/#132
 remain historical evidence; this slice sends no live email and performs no live
