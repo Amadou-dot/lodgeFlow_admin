@@ -78,7 +78,7 @@ success object; malformed JSON/envelopes use `Failed to fetch customers`.
       compilation of all touched admin tests to pass without suppressions.
 - [x] Run full `pnpm ci:check`, both app types, `pnpm test:http`, frozen install and
       clean builds; compare build inputs and check documentation links/whitespace.
-- [ ] Obtain one fresh whole-branch review and resolve actionable findings with
+- [x] Obtain one fresh whole-branch review and resolve actionable findings with
       failing-before/passing-after regressions. Commit, push and open the next PR.
 
 **Delivery:** Link with `Part of #150`. Update tracker and milestone; keep both
