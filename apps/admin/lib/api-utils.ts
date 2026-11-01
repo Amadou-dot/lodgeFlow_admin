@@ -1,27 +1,14 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import type {
+  ApiErrorResponse,
+  ApiSuccessResponse,
+} from '@/types/api-response';
 
 import { isAuthBypassEnabled } from './auth-helpers';
 import { resolveStaffRole } from './staff-access';
 import { hasPermission, type Permission, type StaffRole } from './permissions';
 import { logger } from './logger';
-
-/**
- * Standard API response interfaces
- */
-export interface ApiSuccessResponse<T = unknown> {
-  success: true;
-  data: T;
-  message?: string;
-}
-
-export interface ApiErrorResponse {
-  success: false;
-  error: string;
-  details?: unknown;
-}
-
-export type ApiResponse<T = unknown> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 /**
  * Common error status codes

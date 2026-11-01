@@ -5,7 +5,7 @@ This inventory assigns work; it does not authorize skipping the Phase 0B/0C gate
 All confirmed items below remain open unless their status explicitly says otherwise.
 The owning phase is an execution dependency, not an assigned person.
 
-## Current execution status (2026-10-31)
+## Current execution status (2026-11-01)
 
 Phase 1–2 completion merged in #190 (`b8eea6b`); Phase 3 merged in #194
 (`9f8b1a8`); Phase 4 merged in #195 (`d0870e1`). Phase 4's final corrections have
@@ -13,12 +13,13 @@ Phase 1–2 completion merged in #190 (`b8eea6b`); Phase 3 merged in #194
 conflicts with its notes, so full-browser acceptance remains unresolved.
 
 The remaining [Phase 5 origins and provider contracts](phase-5-provider-origins.md)
-are implemented and locally verified on `refactor/phase5-provider-origins`. The
-full gate passes 2,600 tests, type checks, isolated HTTP and clean builds. New tests reproduced
-unvalidated URL configuration and check that invalid origins cannot reserve a
-new quote or create a provider session. Existing-session reuse and owner denials
-precede deferred URL validation in all checkout families. Phase 6 remains open, including
-O01 and general response-contract consolidation under V03.
+merged in #198 as `79ecabc`. The reviewed head passed 2,610 package tests, type
+checks, isolated HTTP and clean builds. All five main CI jobs and both exact-SHA
+production deployments passed, along with read-only customer/admin smoke checks.
+
+The first [Phase 6 V03 slice](phase-6-admin-responses-plan.md) consolidates static
+admin envelopes and customer route/hook contracts. Runtime response validation,
+customer-app/webhook contracts, O01 and final browser acceptance remain open.
 
 ## Historical Phase 4 review handoff (2026-10-09)
 
@@ -179,7 +180,7 @@ rather than treating counts as the completion gate.
 | F09 | Admin `lib/validations/cabin.ts`: `isDiscountValid` | Discount and price numbers can be swapped. | 2 | Completed alongside Phase 1 slice 12: named inputs at both routes and all three test calls, with unchanged comparison and stored-price validation. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Complete locally in slice 24: payload-only date/refund/payment rules live in schemas; IDs/JSON/unknown fields validate before writes. Existing lock, Settings, receipts, refund authorization and stored-state rules remain server-side. |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. General response consolidation remains Phase 6. |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. Phase 6 now consolidates static admin envelopes/customer responses. Runtime parsing and remaining customer-app/resource/webhook contracts stay open. |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed filters, explicit zero bounds and shared experience JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed available-only queries, explicit zero bounds and shared dining JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
@@ -1823,3 +1824,45 @@ production deployment is inferred from these local gates.
   logs are cleaned up. The final source scan is captured in inventory-current.json.
 - No browser/hosted-login E2E, live provider delivery, remote CI or production
   deployment is claimed. Phase 3 is unstarted; wait for the requested review.
+
+
+## Phase 6 slice 1: admin response contracts (V03)
+
+`apps/admin/types/api-response.ts` now owns the data-success/error discriminated
+union and the existing data-less acknowledgement. Server builders and six
+browser consumers import this pure module. The duplicate broad interface in
+`types/index.ts` is removed. `types/customer-responses.ts` describes list pagination,
+customer detail/mutations and the distinct lock/unlock payloads; the customer
+routes and both hooks share those contracts.
+
+Wire behavior is unchanged: deletion omits `data`, lock/unlock include their own
+timestamp key, empty lists retain pagination, and errors retain their status,
+message and details. Customer create/update fallbacks, permissions and SWR/TanStack
+cache refreshes are preserved. These annotations do not validate runtime JSON.
+
+Baseline: 106 focused tests passed before edits. Additional wire/fallback tests
+passed against the old implementation; two compiler assertions failed as intended
+because the old broad response type accepted incomplete/contradictory objects and
+could not narrow required data/errors. After migration and fallback edge checks, all 135 focused tests pass,
+as do admin TypeScript and strict compilation of all five changed test files.
+Four primitive-JSON hook cases additionally reproduced a TypeError in the initial
+narrowing guard; the object guard restores the existing error fallback.
+
+Final local gate: `pnpm ci:check` passes formatting, read-only lint and 2,639 tests
+(admin 1,619; customer 921; database 96; email 3). Both app type checks and strict
+compilation of the five changed tests pass. `pnpm test:http` passes with disposable
+MongoDB, real local Clerk signature verification and controlled provider transport.
+Frozen installation and all package builds pass in a clean source copy without
+app credentials, using CI's throwaway Clerk public key. After the hook correction,
+the admin build passes again from fresh output. Existing optional Sharp/module-type
+and absent-database/static-generation diagnostics remain non-blocking. No hosted
+login, full browser workflows or live provider operations were exercised.
+A fresh whole-branch review of `79ecabc..12d188b` found no actionable introduced
+defects; the following response/runtime and acceptance gaps remain explicit.
+
+Remaining concrete V03 debt includes runtime response parsing in admin
+`hooks/useCustomers.ts`, `hooks/useInfiniteCustomers.ts`, `hooks/useData.ts` and
+`hooks/useBookingAnalytics.ts`; customer `types/index.ts`, resource consumers and
+`app/api/payments/webhook/route.ts` need their own compatibility review. Raw
+reporting payloads and signed webhook acknowledgements must retain their distinct
+contracts. O01 remains assigned to the paths in `inventory-current.json`.

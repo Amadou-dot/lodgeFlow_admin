@@ -154,8 +154,11 @@ already complies.
   semantics in their transport adapters. Internal editor/modal inputs normalize
   absence; do not apply that normalization to stored data or response JSON.
 - Preserve response envelopes, pagination and status codes during a type cleanup.
-  Admin `lib/api-utils.ts` already has a discriminated `ApiResponse<T>`; other
-  response declarations and routes are inconsistent and need deliberate migration.
+  Admin `types/api-response.ts` owns the browser-safe discriminated `ApiResponse<T>`
+  and data-less `ApiAcknowledgement`; server builders import those same types.
+  Customer resource contracts in admin `types/customer-responses.ts` retain list
+  pagination and distinct lock/unlock timestamps. These are static types, not
+  runtime JSON validators. Remaining response boundaries need deliberate migration.
 
 ### Money: preserve units and accounting
 

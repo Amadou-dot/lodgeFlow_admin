@@ -78,7 +78,7 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-10-31): Phase 0 is complete. Remaining Phase 1–2
+Current execution status (2026-11-01): Phase 0 is complete. Remaining Phase 1–2
 boundaries merged in [PR #190](https://github.com/Amadou-dot/lodgeFlow_admin/pull/190)
 at `b8eea6b`; review fixes followed in #191/#192. Phase 3 merged in
 [PR #194](https://github.com/Amadou-dot/lodgeFlow_admin/pull/194) at `9f8b1a8`.
@@ -91,13 +91,17 @@ say full application browser checks were unrun. Keep that acceptance item open
 until the evidence is reconciled.
 
 The remaining [Phase 5 origin/configuration slice](phase-5-provider-origins.md)
-is implemented and locally verified on `refactor/phase5-provider-origins`. It validates customer
-origins before new checkout quote writes, preserves explicit local/preview
-configuration and existing sender/settlement behavior, and adds provider/HTTP
-contract checks. The full gate passes 2,600 tests, type checks, isolated HTTP,
-frozen installation and clean builds; it is ready for PR review. Phase 6 and the
-milestone remain open. PRs #196/#197 are
-separate demo-data/guest-identity fixes and do not complete later phases.
+merged in [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198) as
+`79ecabc`. Its reviewed head passed 2,610 package tests, type checks, isolated
+HTTP, frozen installation and clean builds. Main CI and both exact-SHA production
+deployments passed; read-only customer/admin smoke checks passed on 2026-11-01.
+Retained Stripe quote retries preserve their original redirect text.
+
+The first [Phase 6 admin response slice](phase-6-admin-responses-plan.md) is ready
+for review after 2,639 package tests, types, isolated HTTP, clean builds and a
+fresh review found no actionable introduced defects. V03 runtime response boundaries, O01 test infrastructure and full
+browser acceptance remain open. PRs #196/#197 are separate demo-data/guest-identity
+fixes and do not complete later phases.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151). The historical
@@ -351,6 +355,11 @@ routes share validated origin selection. Its new validation deliberately rejects
 empty values, credentials, paths, query strings, fragments and the staff hostname.
 This slice does not add links or new emails.
 
+Delivered in [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198) on
+2026-11-01 as `79ecabc`. All five main CI jobs and both exact-SHA production
+deployments passed; read-only customer home/catalog and admin sign-in/auth
+redirect checks passed. See the slice notes for deployment evidence and limits.
+
 Local verification on 2026-09-20: `pnpm ci:check` passed 1,207 tests (admin 1,014,
 customer 165, database 25, email 3), formatting and lint. `pnpm test:http` passed
 with actual email rendering and controlled transport. These checks do not establish
@@ -367,6 +376,12 @@ Acceptance:
 ### Phase 6 — Remaining debt and milestone verification
 
 Dependencies: Phases 0A–0C and 1–5.
+
+The first bounded V03 slice is [admin response contracts](phase-6-admin-responses-plan.md):
+one pure discriminated envelope shared by server builders and browser consumers,
+plus accurate customer pagination, acknowledgement and lock/unlock types. It
+preserves the existing wire behavior. Runtime response parsing, customer-app and
+webhook contracts, O01 test infrastructure and final browser acceptance remain.
 
 - Resolve the remaining inventory across routes, components, hooks, utilities,
   scripts, tests and shared models. Do not define completion as finishing only the

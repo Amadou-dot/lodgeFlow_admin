@@ -120,9 +120,40 @@ describe('useCreateCustomer', () => {
 
     await expect(mutation().mutationFn(customer)).rejects.toThrow('Rejected');
   });
+
+  it.each([
+    { body: false, error: 'Failed to create customer' },
+    { body: 'unexpected', error: 'Failed to create customer' },
+    { body: { success: true }, error: 'Failed to create customer' },
+    { body: { success: true, data: null }, error: 'Failed to create customer' },
+    {
+      body: { success: true, error: 'Legacy rejection' },
+      error: 'Legacy rejection',
+    },
+  ])('preserves the missing-data fallback: $error', async ({ body, error }) => {
+    mockFetch.mockResolvedValue(Response.json(body));
+    useCreateCustomer();
+    await expect(mutation().mutationFn(customer)).rejects.toThrow(error);
+  });
 });
 
 describe('useUpdateCustomer', () => {
+  it.each([
+    { body: false, error: 'Failed to update customer' },
+    { body: 'unexpected', error: 'Failed to update customer' },
+    { body: { success: true }, error: 'Failed to update customer' },
+    { body: { success: true, data: null }, error: 'Failed to update customer' },
+    {
+      body: { success: true, error: 'Legacy rejection' },
+      error: 'Legacy rejection',
+    },
+  ])('preserves the missing-data fallback: $error', async ({ body, error }) => {
+    mockFetch.mockResolvedValue(Response.json(body));
+    useUpdateCustomer();
+    await expect(mutation().mutationFn({ id: 'user_1' })).rejects.toThrow(
+      error
+    );
+  });
   it('PUTs to the customer-specific endpoint', async () => {
     const update = {
       id: 'user_1',

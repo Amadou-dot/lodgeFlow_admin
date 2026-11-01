@@ -1,3 +1,8 @@
+import type { ApiAcknowledgement } from '@/types/api-response';
+import type {
+  CustomerResponse,
+  CustomerMutationResponse,
+} from '@/types/customer-responses';
 import { logger } from '@/lib/logger';
 import { readJsonRequestBody } from '@/lib/validations/request-body';
 import { updateCustomerSchema } from '@/lib/validations/customer';
@@ -36,7 +41,7 @@ export async function GET(
     const customer = await getClerkUser(id);
 
     if (!customer) {
-      return NextResponse.json(
+      return NextResponse.json<CustomerResponse>(
         {
           success: false,
           error: 'Customer not found',
@@ -121,13 +126,13 @@ export async function GET(
       recentBookings: recentBookings.map(serializeRecentCustomerBooking),
     };
 
-    return NextResponse.json({
+    return NextResponse.json<CustomerResponse>({
       success: true,
       data: customerData,
     });
   } catch (error) {
     logger.error('Failed to fetch customer', error);
-    return NextResponse.json(
+    return NextResponse.json<CustomerResponse>(
       { success: false, error: 'Failed to fetch customer' },
       { status: 500 }
     );
@@ -151,14 +156,14 @@ export async function PUT(
     if (!parsed.success) return createValidationErrorResponse(parsed.error);
     const customer = await updateCompleteCustomer(id, parsed.data);
 
-    return NextResponse.json({
+    return NextResponse.json<CustomerMutationResponse>({
       success: true,
       data: serializeCustomer(customer),
     });
   } catch (error: unknown) {
     logger.error('Failed to update customer', error);
 
-    return NextResponse.json(
+    return NextResponse.json<CustomerMutationResponse>(
       {
         success: false,
         error: 'Failed to update customer',
@@ -184,7 +189,7 @@ export async function DELETE(
     const bookingCount = await Booking.countDocuments({ customer: id });
 
     if (bookingCount > 0) {
-      return NextResponse.json(
+      return NextResponse.json<ApiAcknowledgement>(
         {
           success: false,
           error: 'Cannot delete customer with existing bookings',
@@ -196,13 +201,13 @@ export async function DELETE(
     // Delete customer from Clerk (no more MongoDB cleanup needed)
     await deleteCompleteCustomer(id);
 
-    return NextResponse.json({
+    return NextResponse.json<ApiAcknowledgement>({
       success: true,
       message: 'Customer deleted successfully',
     });
   } catch (error) {
     logger.error('Failed to delete customer', error);
-    return NextResponse.json(
+    return NextResponse.json<ApiAcknowledgement>(
       {
         success: false,
         error: 'Failed to delete customer',

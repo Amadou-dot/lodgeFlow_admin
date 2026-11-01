@@ -62,13 +62,6 @@ export interface UpdateCabinData extends Partial<CreateCabinData> {
   _id: string;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
 // Base type for URL-storable filter values
 type FilterValue = string | number | boolean | undefined;
 
@@ -111,25 +104,6 @@ export interface CustomersFilters {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-}
-
-// API Response types for better type safety
-export interface CustomersResponse {
-  success: boolean;
-  data: Customer[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCustomers: number; // Keep original field name from API
-    limit: number; // Keep original field name from API
-    hasNextPage: boolean;
-    hasPrevPage: boolean; // Keep original field name from API
-  };
-}
-
-export interface CustomerResponse {
-  success: boolean;
-  data: CustomerWithStats;
 }
 
 export interface CustomerWithStats extends Omit<Customer, 'recentBookings'> {

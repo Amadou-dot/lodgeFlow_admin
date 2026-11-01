@@ -1,3 +1,7 @@
+import type {
+  CustomerLockResponse,
+  CustomerUnlockResponse,
+} from '@/types/customer-responses';
 import { requireApiAuth } from '@/lib/api-utils';
 import { lockClerkUser, unlockClerkUser } from '@/lib/clerk-users';
 import { CustomerProviderError } from '@/lib/customer-errors';
@@ -18,7 +22,7 @@ export async function POST(
     // Lock the user in Clerk
     await lockClerkUser(id);
 
-    return NextResponse.json({
+    return NextResponse.json<CustomerLockResponse>({
       success: true,
       message: 'User locked successfully',
       data: {
@@ -30,7 +34,7 @@ export async function POST(
     logger.error('Failed to lock user', error);
 
     if (error instanceof CustomerProviderError && error.kind === 'not-found') {
-      return NextResponse.json(
+      return NextResponse.json<CustomerLockResponse>(
         {
           success: false,
           error: 'User not found',
@@ -39,7 +43,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json(
+    return NextResponse.json<CustomerLockResponse>(
       {
         success: false,
         error: 'Failed to lock user',
@@ -63,7 +67,7 @@ export async function DELETE(
     // Unlock the user in Clerk
     await unlockClerkUser(id);
 
-    return NextResponse.json({
+    return NextResponse.json<CustomerUnlockResponse>({
       success: true,
       message: 'User unlocked successfully',
       data: {
@@ -75,7 +79,7 @@ export async function DELETE(
     logger.error('Failed to unlock user', error);
 
     if (error instanceof CustomerProviderError && error.kind === 'not-found') {
-      return NextResponse.json(
+      return NextResponse.json<CustomerUnlockResponse>(
         {
           success: false,
           error: 'User not found',
@@ -84,7 +88,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json(
+    return NextResponse.json<CustomerUnlockResponse>(
       {
         success: false,
         error: 'Failed to unlock user',

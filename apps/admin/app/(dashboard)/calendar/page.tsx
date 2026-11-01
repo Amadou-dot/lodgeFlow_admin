@@ -14,7 +14,7 @@ import type {
   CalendarJson as CalendarData,
   CalendarResource as Resource,
 } from '@/types/reservation-calendar';
-import type { ApiResponse } from '@/lib/api-utils';
+import type { ApiResponse } from '@/types/api-response';
 const DAY = 86_400_000;
 const colors: Record<string, string> = {
   unconfirmed: 'bg-warning-100',

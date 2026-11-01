@@ -32,7 +32,7 @@ import {
   utcDate,
 } from '@/lib/reservation-options';
 import type { ReservationInboxJson } from '@/types/reservation-calendar';
-import type { ApiResponse } from '@/lib/api-utils';
+import type { ApiResponse } from '@/types/api-response';
 export default function ReservationsPage() {
   const search = useSearchParams();
   const [filters, setFilters] = useState({

@@ -1,13 +1,18 @@
 import { NextRequest } from 'next/server';
 import { Booking, Cabin } from '@lodgeflow/database';
 import { GET, POST } from '@/app/api/customers/route';
-import { GET as getById, PUT } from '@/app/api/customers/[id]/route';
+import {
+  DELETE as deleteById,
+  GET as getById,
+  PUT,
+} from '@/app/api/customers/[id]/route';
 import {
   getClerkUser,
   getClerkUsers,
   searchClerkUsers,
   createCompleteCustomer,
   updateCompleteCustomer,
+  deleteCompleteCustomer,
 } from '@/lib/clerk-users';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
@@ -25,6 +30,7 @@ jest.mock('@/lib/clerk-users', () => ({
   searchClerkUsers: jest.fn(),
   createCompleteCustomer: jest.fn(),
   updateCompleteCustomer: jest.fn(),
+  deleteCompleteCustomer: jest.fn(),
 }));
 
 const customer: Customer = {
@@ -72,6 +78,7 @@ beforeEach(() => {
     .mockResolvedValue({ data: [customer], totalCount: 1 });
   jest.mocked(createCompleteCustomer).mockResolvedValue(customer);
   jest.mocked(updateCompleteCustomer).mockResolvedValue(customer);
+  jest.mocked(deleteCompleteCustomer).mockResolvedValue(undefined);
 });
 async function fixture() {
   const cabin = await Cabin.create({
@@ -125,6 +132,24 @@ test.each(['', '?search=Test&sortBy=name&sortOrder=asc'])(
     expect(query ? searchClerkUsers : getClerkUsers).toHaveBeenCalled();
   }
 );
+
+test('empty customer lists retain pagination outside their data', async () => {
+  jest.mocked(getClerkUsers).mockResolvedValueOnce({ data: [], totalCount: 0 });
+  const response = await GET(request());
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    success: true,
+    data: [],
+    pagination: {
+      currentPage: 1,
+      totalPages: 0,
+      totalCustomers: 0,
+      limit: 10,
+      hasNextPage: false,
+      hasPrevPage: false,
+    },
+  });
+});
 
 test.each([false, true])(
   'customer detail preserves recent booking JSON and null cabin %s',
@@ -202,7 +227,41 @@ test.each(['POST', 'PUT'])(
   }
 );
 
-test.each(['list', 'detail', 'create', 'update'])(
+test('customer deletion returns a message acknowledgement without data', async () => {
+  const response = await deleteById(request(), params());
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    success: true,
+    message: 'Customer deleted successfully',
+  });
+  expect(requireApiAuth).toHaveBeenCalledWith();
+  expect(deleteCompleteCustomer).toHaveBeenCalledWith(customer.id);
+});
+
+test('customer deletion rejects existing bookings before the provider mutation', async () => {
+  await fixture();
+  const response = await deleteById(request(), params());
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    success: false,
+    error: 'Cannot delete customer with existing bookings',
+  });
+  expect(deleteCompleteCustomer).not.toHaveBeenCalled();
+});
+
+test('customer deletion keeps unexpected provider failures private', async () => {
+  jest
+    .mocked(deleteCompleteCustomer)
+    .mockRejectedValueOnce(new Error('private provider detail'));
+  const response = await deleteById(request(), params());
+  expect(response.status).toBe(500);
+  expect(await response.json()).toEqual({
+    success: false,
+    error: 'Failed to delete customer',
+  });
+});
+
+test.each(['list', 'detail', 'create', 'update', 'delete'])(
   '%s denies before Clerk or database access',
   async operation => {
     const error = createErrorResponse('Denied', 403);
@@ -216,13 +275,16 @@ test.each(['list', 'detail', 'create', 'update'])(
           ? await getById(request(), params())
           : operation === 'create'
             ? await POST(request())
-            : await PUT(request(), params());
+            : operation === 'update'
+              ? await PUT(request(), params())
+              : await deleteById(request(), params());
     expect(response).toBe(error);
     for (const dependency of [
       getClerkUser,
       getClerkUsers,
       createCompleteCustomer,
       updateCompleteCustomer,
+      deleteCompleteCustomer,
       connectDB,
     ])
       expect(dependency).not.toHaveBeenCalled();

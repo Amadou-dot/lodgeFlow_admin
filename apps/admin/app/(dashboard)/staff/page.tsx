@@ -19,7 +19,7 @@ import {
 } from '@heroui/table';
 import { Spinner } from '@heroui/spinner';
 import type { StaffMemberJson as Member } from '@/types/staff-audit';
-import type { ApiResponse } from '@/lib/api-utils';
+import type { ApiResponse } from '@/types/api-response';
 export default function StaffPage() {
   const access = useStaffAccess();
   return <StaffContent key={access?.userId ?? ''} access={access} />;

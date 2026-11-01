@@ -1,3 +1,7 @@
+import type {
+  CustomersResponse,
+  CustomerMutationResponse,
+} from '@/types/customer-responses';
 import { logger } from '@/lib/logger';
 import { readJsonRequestBody } from '@/lib/validations/request-body';
 import { CustomerProviderError } from '@/lib/customer-errors';
@@ -120,7 +124,7 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({
+    return NextResponse.json<CustomersResponse>({
       success: true,
       data: enrichedData,
       pagination: {
@@ -134,7 +138,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     logger.error('Failed to fetch customers', error);
-    return NextResponse.json(
+    return NextResponse.json<CustomersResponse>(
       {
         success: false,
         error: 'Failed to fetch customers',
@@ -199,7 +203,7 @@ export async function POST(request: NextRequest) {
       preferences,
     });
 
-    return NextResponse.json({
+    return NextResponse.json<CustomerMutationResponse>({
       success: true,
       data: serializeCustomer(customer),
       message: 'Customer created successfully',
