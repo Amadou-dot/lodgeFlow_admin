@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { expectJson, assertAuthenticationDenied } from './assert-http.mjs';
 import { createClerkFixture } from './clerk-fixture.mjs';
 
@@ -79,6 +80,7 @@ const children = [];
 const logs = new Map();
 const calls = [];
 const sessions = new Map();
+const sessionInputs = new Map();
 const refunds = new Map();
 let refundFailure = false;
 let stripeFailure = false;
@@ -183,7 +185,7 @@ async function startApp({ app, mongoUri, providerUrl }) {
         RESEND_API_KEY: 're_smoke_only',
         NEXT_PUBLIC_APP_URL:
           app === 'customer'
-            ? 'https://lodgeflow.app'
+            ? 'https://lodgeflow.app:443'
             : 'https://admin.lodgeflow.app',
         SMOKE_SECRET: secret,
         SMOKE_PROVIDER_URL: providerUrl,
@@ -407,12 +409,22 @@ try {
         return;
       }
       const key = payload.options.idempotencyKey;
-      if (!sessions.has(key))
+      if (
+        sessionInputs.has(key) &&
+        !isDeepStrictEqual(sessionInputs.get(key), payload.input)
+      ) {
+        outgoing.writeHead(400);
+        outgoing.end('{"error":"idempotency parameters changed"}');
+        return;
+      }
+      if (!sessions.has(key)) {
+        sessionInputs.set(key, payload.input);
         sessions.set(key, {
           id: `cs_smoke_${sessions.size + 1}`,
           status: 'open',
           url: 'https://checkout.stripe.invalid/smoke',
         });
+      }
       outgoing.end(JSON.stringify(sessions.get(key)));
       return;
     }
@@ -1786,6 +1798,40 @@ try {
   assert.equal(persisted.payments.length, 0);
   const quoteToken = persisted.checkoutToken;
   assert.equal(typeof quoteToken, 'string');
+  // A pre-deployment provider request succeeded, but its response was lost.
+  // Seed its literal payload independently of the origin helper under test.
+  const legacyCheckoutInput = {
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          unit_amount: 7500,
+          product_data: { name: 'Smoke Cabin', description: 'Booking deposit' },
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      bookingId,
+      userId: 'smoke_customer',
+      isDeposit: 'true',
+      quoteToken,
+    },
+    payment_intent_data: {
+      metadata: { bookingId, userId: 'smoke_customer', quoteToken },
+    },
+    success_url: `https://lodgeflow.app:443/payments/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
+    cancel_url: `https://lodgeflow.app:443/payments/cancel?booking_id=${bookingId}`,
+  };
+  const legacyCheckoutKey = `booking:${bookingId}:${quoteToken}`;
+  sessionInputs.set(legacyCheckoutKey, legacyCheckoutInput);
+  sessions.set(legacyCheckoutKey, {
+    id: 'cs_smoke_1',
+    status: 'open',
+    url: 'https://checkout.stripe.invalid/smoke',
+  });
   stripeFailure = false;
   const checkout = await request({
     origin: customer,
@@ -1840,33 +1886,9 @@ try {
     creations[0].options.idempotencyKey,
     creations[1].options.idempotencyKey
   );
-  assert.deepEqual(creations[1].input, {
-    mode: 'payment',
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          unit_amount: 7500,
-          product_data: { name: 'Smoke Cabin', description: 'Booking deposit' },
-        },
-        quantity: 1,
-      },
-    ],
-    metadata: {
-      bookingId,
-      userId: 'smoke_customer',
-      isDeposit: 'true',
-      quoteToken,
-    },
-    payment_intent_data: {
-      metadata: { bookingId, userId: 'smoke_customer', quoteToken },
-    },
-    success_url: `https://lodgeflow.app/payments/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
-    cancel_url: `https://lodgeflow.app/payments/cancel?booking_id=${bookingId}`,
-  });
+  assert.deepEqual(creations[1].input, legacyCheckoutInput);
   console.log(
-    'PASS checkout provider failure, retained quote, retry/idempotency, customer return origin'
+    'PASS checkout provider failure, pre-deployment retained quote recovery, retry/idempotency, customer return origin'
   );
 
   const beforeEmail = JSON.stringify(await Booking.findById(bookingId).lean());
@@ -3795,6 +3817,182 @@ try {
   );
   console.log(
     'PASS staff reservation detail/status: permissions, strict payloads, stale-state rollback, no-op retries and exact audit attribution'
+  );
+
+  for (const resource of [
+    {
+      kind: 'dining',
+      route: '/api/dining-reservations',
+      confirmation: 'dining',
+      model: DiningReservation,
+      selection: { dining: guestDining._id, time: '18:00', numGuests: 2 },
+    },
+    {
+      kind: 'experience',
+      route: '/api/experience-bookings',
+      confirmation: 'experiences',
+      model: ExperienceBooking,
+      selection: {
+        experience: guestExperience._id,
+        timeSlot: '18:00',
+        numParticipants: 2,
+      },
+    },
+  ]) {
+    const row = await resource.model.create({
+      ...resource.selection,
+      customer: 'smoke_customer',
+      date: new Date('2030-07-02T18:00:00.000Z'),
+      status: 'confirmed',
+      totalPrice: 25,
+    });
+    const id = String(row._id);
+    const route = `${resource.route}/${id}/checkout`;
+    const snapshot = () =>
+      resource.model
+        .findById(id)
+        .lean()
+        .then(value => JSON.stringify(value));
+    const before = await snapshot();
+    const callsBefore = calls.length;
+    await expectAuthenticationDenied({
+      origin: customer,
+      route,
+      method: 'POST',
+    });
+    for (const deniedId of [id, new mongoose.Types.ObjectId().toString()]) {
+      assert.deepEqual(
+        await request({
+          origin: customer,
+          route: `${resource.route}/${deniedId}/checkout`,
+          identity: 'foreign',
+          method: 'POST',
+          status: 404,
+        }),
+        { error: 'Reservation not found' }
+      );
+    }
+    assert.equal(await snapshot(), before);
+    assert.equal(calls.length, callsBefore);
+
+    const response = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'POST',
+      status: 200,
+    });
+    assert.deepEqual(response, {
+      success: true,
+      data: { url: 'https://checkout.stripe.invalid/smoke' },
+    });
+    const creation = calls
+      .slice(callsBefore)
+      .filter(call => call.route === '/stripe/create');
+    assert.equal(creation.length, 1);
+    const returnUrl = `https://lodgeflow.app:443/${resource.confirmation}/confirmation/${id}`;
+    assert.equal(creation[0].input.success_url, returnUrl);
+    assert.equal(creation[0].input.cancel_url, returnUrl);
+    assert.equal(creation[0].input.metadata.reservationId, id);
+    assert.equal(creation[0].input.metadata.reservationKind, resource.kind);
+    assert.equal(creation[0].input.line_items[0].price_data.unit_amount, 2500);
+    const saved = await resource.model.findById(id).lean();
+    assert.equal(saved.checkout.pending, true);
+    assert.equal(saved.checkout.amountCents, 2500);
+    assert.equal(saved.isPaid, false);
+    assert.deepEqual(saved.receipts, []);
+
+    const beforeRetry = await snapshot();
+    const retry = await request({
+      origin: customer,
+      route,
+      identity: 'customer',
+      method: 'POST',
+      status: 200,
+    });
+    assert.deepEqual(retry, response);
+    assert.equal(await snapshot(), beforeRetry);
+    assert.equal(
+      calls.slice(callsBefore).filter(call => call.route === '/stripe/create')
+        .length,
+      1
+    );
+
+    // Recover a pre-deployment session accepted with the explicit default port,
+    // whose response never reached the application. The provider rejects any
+    // parameter change under its retained idempotency key.
+    const retainedToken = randomUUID();
+    const retained = await resource.model.create({
+      ...resource.selection,
+      customer: 'smoke_customer',
+      date: new Date('2030-07-03T18:00:00.000Z'),
+      status: 'confirmed',
+      totalPrice: 25,
+      checkout: {
+        token: retainedToken,
+        amountCents: 2500,
+        currency: 'usd',
+        createdAt: new Date(),
+        pending: true,
+      },
+    });
+    const retainedId = String(retained._id);
+    const retainedKey = `reservation:${resource.kind}:${retainedId}:${retainedToken}`;
+    const retainedUrl = `https://lodgeflow.app:443/${resource.confirmation}/confirmation/${retainedId}`;
+    const retainedMetadata = {
+      reservationId: retainedId,
+      reservationKind: resource.kind,
+      quoteToken: retainedToken,
+    };
+    sessionInputs.set(retainedKey, {
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            unit_amount: 2500,
+            product_data: {
+              name: `${resource.kind === 'dining' ? 'Dining' : 'Experience'} reservation`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: retainedMetadata,
+      payment_intent_data: { metadata: retainedMetadata },
+      success_url: retainedUrl,
+      cancel_url: retainedUrl,
+    });
+    const retainedSession = {
+      id: `cs_smoke_${sessions.size + 1}`,
+      status: 'open',
+      url: `https://checkout.stripe.invalid/retained-${resource.kind}`,
+    };
+    sessions.set(retainedKey, retainedSession);
+    const sessionCount = sessions.size;
+    const recovered = await request({
+      origin: customer,
+      route: `${resource.route}/${retainedId}/checkout`,
+      identity: 'customer',
+      method: 'POST',
+      status: 200,
+    });
+    assert.deepEqual(recovered, {
+      success: true,
+      data: { url: retainedSession.url },
+    });
+    assert.equal(sessions.size, sessionCount);
+    const recoveredRow = await resource.model.findById(retainedId).lean();
+    assert.equal(recoveredRow.checkout.token, retainedToken);
+    assert.equal(recoveredRow.checkout.sessionId, retainedSession.id);
+    assert.equal(recoveredRow.checkout.amountCents, 2500);
+    assert.equal(recoveredRow.checkout.pending, true);
+    assert.equal(recoveredRow.isPaid, false);
+    assert.deepEqual(recoveredRow.receipts, []);
+  }
+  console.log(
+    'PASS dining/experience checkout owner denial, customer return origins, unpaid receipts, open-session reuse and pre-deployment retained quote recovery'
   );
 
   const experienceFields = {

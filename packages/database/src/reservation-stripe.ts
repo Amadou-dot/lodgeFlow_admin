@@ -75,13 +75,13 @@ export async function createReservationCheckout({
   kind,
   id,
   customer,
-  returnUrl,
+  getReturnUrl,
   stripe,
 }: {
   kind: Kind;
   id: string;
   customer: string;
-  returnUrl: string;
+  getReturnUrl: () => string;
   stripe: ReservationStripeGateway;
 }) {
   if (!mongoose.isValidObjectId(id))
@@ -122,6 +122,9 @@ export async function createReservationCheckout({
       409
     );
   }
+  // Resolve only for a new provider session, after owner/payability/reuse checks
+  // and before freezing a quote. Configuration failures must not strand quotes.
+  const returnUrl = getReturnUrl();
   if (!row.checkout?.pending) {
     const settings = await Settings.getSettings();
     row = await Model.findOneAndUpdate(

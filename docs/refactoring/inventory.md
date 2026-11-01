@@ -5,7 +5,25 @@ This inventory assigns work; it does not authorize skipping the Phase 0B/0C gate
 All confirmed items below remain open unless their status explicitly says otherwise.
 The owning phase is an execution dependency, not an assigned person.
 
-## Phase 4 review handoff (2026-10-09)
+## Current execution status (2026-10-31)
+
+Phase 1–2 completion merged in #190 (`b8eea6b`); Phase 3 merged in #194
+(`9f8b1a8`); Phase 4 merged in #195 (`d0870e1`). Phase 4's final corrections have
+2,524 passing package tests and successful post-merge CI. Its browser checklist
+conflicts with its notes, so full-browser acceptance remains unresolved.
+
+The remaining [Phase 5 origins and provider contracts](phase-5-provider-origins.md)
+are implemented and locally verified on `refactor/phase5-provider-origins`. The
+full gate passes 2,600 tests, type checks, isolated HTTP and clean builds. New tests reproduced
+unvalidated URL configuration and check that invalid origins cannot reserve a
+new quote or create a provider session. Existing-session reuse and owner denials
+precede deferred URL validation in all checkout families. Phase 6 remains open, including
+O01 and general response-contract consolidation under V03.
+
+## Historical Phase 4 review handoff (2026-10-09)
+
+The following records the original pre-merge handoff. It is superseded by the
+delivery status above and the corrections in [phase-4-ui-state.md](phase-4-ui-state.md).
 
 S01 is implemented on `refactor/phase4-ui-state` from Phase 3 merge `9f8b1a8`.
 The [UI state/cache inventory](phase-4-ui-state.md) covers admin forms and caches,
@@ -169,8 +187,9 @@ rather than treating counts as the completion gate.
 | M01 | `packages/database/src/booking-pricing.ts`: price/deposit calculation                                            | Prices are raw major-unit numbers; deposit rounding has business meaning.                    | 3        | Completed locally in Phase 3: validated major-unit calculations with characterized rounding/clamping; see phase-3-money.md.                                                          |
 | M02 | `booking-payments.ts` vs `reservation-payment-state.ts`/`reservation-payments.ts`                                | Cabin receipt `amount` is major units while reservation `amountCents` is cents.              | 3        | Completed locally in Phase 3: boundary inventory, validated unit types, receipt/refund limits and retry/concurrency regressions; see phase-3-money.md.                                                               |
 | M03 | Customer checkout/webhook routes and admin `utils/utilityFunctions.ts`: Stripe conversion/formatting             | Raw `* 100`, `/ 100` and display formatting encode units implicitly.                         | 3        | Completed locally in Phase 3: shared conversion/formatting helpers and precision/sign/range/display regressions; see phase-3-money.md.                                                                                        |
-| S01 | Admin/customer page, form and mutation hooks; see `phase-4-ui-state.md` | Derived form/query state, exclusive workflows and actual SWR/TanStack reader refresh | 4 | Implemented and independently reviewed with success/failure/retry/cache regressions. Independent extras remain valid options. Browser acceptance remains blocked and unchecked. |
+| S01 | Admin/customer page, form and mutation hooks; see `phase-4-ui-state.md` | Derived form/query state, exclusive workflows and actual SWR/TanStack reader refresh | 4 | Merged in #195 with review corrections and passing post-merge CI. Full-browser acceptance remains unresolved: the PR checkbox conflicts with its notes and lacks supporting full-flow evidence. |
 | E01 | Both apps' existing send routes and customer email helpers                                                       | Ten sender sites migrated to validated `@lodgeflow/email` configuration.                     | 5 / #132 | Complete in PR #155 / merge `9a9c296`: tests, both production deployments, Resend delivery and user inbox confirmation verified. No #139 features.                                  |
+| E02 | Customer `lib/url.ts`, metadata configuration and cabin/dining/experience checkout routes | Unvalidated origin text can corrupt appended checkout URLs; cabin quote reservation previously preceded origin construction. | 5 | Implemented and locally verified: shared customer resolver, typed redacted configuration errors, deferred validation before new quote writes, preserved open-session reuse, real-Mongo and route/provider tests, and expanded HTTP checks. Ready for PR review; see phase-5-provider-origins.md. |
 | O01 | Scripts, test helpers and unmatched remaining candidates                                                         | Admin compiler excludes scripts/tests; passing Jest does not prove their type safety.        | 6        | Open for Phase 6: inventory-current.json lists remaining generic test mocks, schema-test fixtures and the test setup factories by path/line. All modified admin tests receive a separate strict type check; no compiler/lint settings are weakened. |
 | D01 | Both `CLAUDE.md` files                                                                                           | Stale model paths, deposit accounting, fixture cast advice, domains and CI description.      | 0A       | Corrected in this Phase 0 tree against source; final format/read-through verification required before review completion.                                                            |
 

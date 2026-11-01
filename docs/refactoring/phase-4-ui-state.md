@@ -5,6 +5,20 @@ of [tracking issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/15
 starting from `9f8b1a8` with Phases 0–3 merged. The user authorized this phase
 and a draft PR; Phase 5 provider-origin work and Phase 6 remain separate.
 
+## Delivery status (reconciled 2026-10-31)
+
+[PR #195](https://github.com/Amadou-dot/lodgeFlow_admin/pull/195) merged on
+2026-10-09 as `d0870e124b866ed9ce10c5c66399707c75532665` after the final review
+corrections below. [Post-merge CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/37979772079)
+passed at that SHA. The earlier references to a draft/local-only checkpoint in
+this document are historical, not the current delivery state.
+
+The PR's full-browser checkbox is checked, while its own notes say full
+application browser checks were unrun. The supported Chromium evidence covers
+the isolated print-popup lifecycle. Keep representative customer/staff browser
+acceptance unchecked until full-flow evidence or an explicit user sign-off is
+recorded; neither merge nor HTTP smoke silently satisfies that gate.
+
 ## Preserved contracts
 
 - Keep request/response shapes, ownership and staff permissions, payment and
@@ -197,5 +211,6 @@ jsdom and the HTTP harness cover their stated local boundaries only.
 The unchanged `apps/customer/app/payments/success/page.tsx` displays static payment
 success wording without checking settlement; correcting that page is separate
 work. This phase introduces no settlement inference. No live payment/email
-operation, merge or production deployment was performed. Phases 5–6 and the
-overall milestone remain open; issues #136 and #139 remain excluded.
+operation was performed. The original local checkpoint preceded the subsequent
+#195 merge and its post-merge checks recorded above. Phases 5–6 and the overall
+milestone remain open; issues #136 and #139 remain excluded.

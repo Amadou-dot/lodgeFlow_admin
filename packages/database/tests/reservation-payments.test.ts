@@ -267,7 +267,7 @@ test('checkout enforces ownership, freezes the server balance, and recovers the 
     kind: 'dining' as const,
     id: row.id,
     customer: 'guest',
-    returnUrl: 'https://customer.test/dining/confirmation/test',
+    getReturnUrl: () => 'https://customer.test/dining/confirmation/test',
     stripe,
   };
   await assert.rejects(
@@ -294,6 +294,97 @@ test('checkout enforces ownership, freezes the server balance, and recovers the 
   assert.equal(keys.length, 2);
   assert.equal(keys[0], keys[1]);
 });
+
+for (const kind of ['dining', 'experience'] as const) {
+  test(`${kind}: resolves new return URLs before quote writes and preserves existing-session/owner checks`, async () => {
+    let providerCalls = 0;
+    let originCalls = 0;
+    const stripe: ReservationStripeGateway = {
+      checkout: {
+        sessions: {
+          create: async () => {
+            providerCalls++;
+            return { id: 'cs_unexpected', url: 'https://checkout.test/new' };
+          },
+          retrieve: async id => {
+            providerCalls++;
+            assert.equal(id, 'cs_open');
+            return { status: 'open', url: 'https://checkout.test/existing' };
+          },
+        },
+      },
+      refunds: {
+        create: async () => {
+          throw new Error('Unexpected refund');
+        },
+        retrieve: async () => {
+          throw new Error('Unexpected refund');
+        },
+      },
+    };
+    const row = await fixture(kind);
+    const snapshot = async () =>
+      JSON.stringify(
+        kind === 'dining'
+          ? await DiningReservation.findById(row.id).lean()
+          : await ExperienceBooking.findById(row.id).lean()
+      );
+    const failure = new Error('Invalid return origin');
+    const input = {
+      kind,
+      id: row.id,
+      customer: 'guest',
+      stripe,
+      getReturnUrl: () => {
+        originCalls++;
+        throw failure;
+      },
+    };
+    const before = await snapshot();
+    await assert.rejects(
+      createReservationCheckout(input),
+      error => error === failure
+    );
+    assert.equal(originCalls, 1);
+    assert.equal(providerCalls, 0);
+    assert.equal(await snapshot(), before);
+
+    await assert.rejects(
+      createReservationCheckout({ ...input, customer: 'foreign' }),
+      /not found/
+    );
+    assert.equal(originCalls, 1);
+    assert.equal(providerCalls, 0);
+
+    row.checkout = {
+      token: 'quote',
+      amountCents: 5000,
+      currency: 'usd',
+      pending: true,
+      createdAt: new Date(),
+    };
+    await row.save();
+    const quoted = await snapshot();
+    await assert.rejects(
+      createReservationCheckout(input),
+      error => error === failure
+    );
+    assert.equal(originCalls, 2);
+    assert.equal(providerCalls, 0);
+    assert.equal(await snapshot(), quoted);
+
+    row.checkout.sessionId = 'cs_open';
+    await row.save();
+    const open = await snapshot();
+    assert.equal(
+      await createReservationCheckout(input),
+      'https://checkout.test/existing'
+    );
+    assert.equal(originCalls, 2);
+    assert.equal(providerCalls, 1);
+    assert.equal(await snapshot(), open);
+  });
+}
 
 test('unsafe saved quotes cannot create or retrieve a checkout or write a receipt', async () => {
   let providerCalls = 0;
@@ -343,7 +434,7 @@ test('unsafe saved quotes cannot create or retrieve a checkout or write a receip
           kind: 'dining',
           id: row.id,
           customer: 'guest',
-          returnUrl: 'https://customer.test',
+          getReturnUrl: () => 'https://customer.test',
           stripe,
         }),
         ReservationRuleError

@@ -78,16 +78,26 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-10-09): Phase 3 merged in
+Current execution status (2026-10-31): Phase 0 is complete. Remaining Phase 1–2
+boundaries merged in [PR #190](https://github.com/Amadou-dot/lodgeFlow_admin/pull/190)
+at `b8eea6b`; review fixes followed in #191/#192. Phase 3 merged in
 [PR #194](https://github.com/Amadou-dot/lodgeFlow_admin/pull/194) at `9f8b1a8`.
-Phase 4 is implemented on `refactor/phase4-ui-state` from that base. The
-[UI state/cache inventory and evidence](phase-4-ui-state.md) separates migrated
-families, intentional fixes and verification boundaries. Final local gates pass
-formatting/read-only lint, 2,497 tests, both app type checks, strict compilation of
-20 changed admin test files, isolated HTTP checks, frozen installation and all
-credential-free production builds. Representative browser checks remain unrun:
-CUA is unavailable and this checkout has no existing Playwright runner. Remote CI and review status are recorded on
-the draft PR; merge and production verification remain separate.
+Phase 4 merged in [PR #195](https://github.com/Amadou-dot/lodgeFlow_admin/pull/195)
+at `d0870e1`; its final review corrections brought the package total to 2,524
+passing tests. [Post-merge CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/37979772079)
+passed at that commit. The [UI state/cache evidence](phase-4-ui-state.md) records
+the remaining browser boundary: the PR checkbox is checked but its notes still
+say full application browser checks were unrun. Keep that acceptance item open
+until the evidence is reconciled.
+
+The remaining [Phase 5 origin/configuration slice](phase-5-provider-origins.md)
+is implemented and locally verified on `refactor/phase5-provider-origins`. It validates customer
+origins before new checkout quote writes, preserves explicit local/preview
+configuration and existing sender/settlement behavior, and adds provider/HTTP
+contract checks. The full gate passes 2,600 tests, type checks, isolated HTTP,
+frozen installation and clean builds; it is ready for PR review. Phase 6 and the
+milestone remain open. PRs #196/#197 are
+separate demo-data/guest-identity fixes and do not complete later phases.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
 [PR #151](https://github.com/Amadou-dot/lodgeFlow_admin/pull/151). The historical
@@ -101,7 +111,7 @@ request lines and missing-cabin confirmation crashes. The inventory records the
 intentional fixes, regression coverage and verification boundaries. This follow-up
 does not begin Phase 3 or change persistence, server pricing or payment operations.
 
-All remaining Phase 1–2 implementation is now present on the review branch
+At the historical Phase 1–2 local review checkpoint, implementation was on
 `refactor/admin-cabin-availability`. The remaining resource DTOs, request and
 provider/cache validation, named operations, safe errors, affected UI callers and
 checked fixtures are complete. Intentional behavior fixes and preserved contracts
@@ -114,11 +124,12 @@ this review checkpoint.
 
 The earlier Phase 1–2 review checkpoint preceded the user's 2026-10-08
 authorization to implement Phase 3, now merged at `9f8b1a8`. The user authorized
-Phase 4 implementation and a draft PR on 2026-10-09. Its scope and verification
-are recorded in [phase-4-ui-state.md](phase-4-ui-state.md). Phase 4's implementation
-and automated validation are complete; browser verification remains unchecked.
-Remaining provider-origin review and Phase 6 verification stay separate, and the
-milestone remains open.
+Phase 4 implementation and a draft PR on 2026-10-09, followed by approval to merge
+#195 after review corrections and checks. Its scope and verification are recorded
+in [phase-4-ui-state.md](phase-4-ui-state.md). Implementation and automated
+validation are delivered; full-browser acceptance remains unresolved. The user
+authorized continuing the milestone on 2026-10-31, starting with the remaining
+Phase 5 work. Phase 6 and milestone closure require their own evidence.
 The [Phase 1–2 syntax review](inventory-current.json) accounts for
 remaining boundary exceptions and concrete later-phase debt; it does not claim
 that the whole repository meets every final milestone criterion.
@@ -294,8 +305,8 @@ Acceptance:
 - [ ] Representative customer/staff interactions are checked in-browser where credentials permit; blockers remain explicit.
 
 Implementation, regression evidence and the browser verification limits are
-recorded in [phase-4-ui-state.md](phase-4-ui-state.md). The draft PR retains this
-manual gate for review; automated checks do not substitute for browser sign-off.
+recorded in [phase-4-ui-state.md](phase-4-ui-state.md). PR #195 is merged; its
+conflicting full-browser checklist and notes do not establish browser sign-off.
 
 ### Phase 5 — Provider configuration and existing email repair
 
@@ -333,6 +344,13 @@ This phase can proceed independently of unrelated UI refactors.
   origin/contract review. The approved private test recipient is not recorded here.
 - Preserve existing templates, recipients, send triggers, and retry semantics.
 
+The 2026-10-31 [origin/configuration slice](phase-5-provider-origins.md) audits all
+existing link and sender sites. Email templates contain no application links;
+staff links are relative to the admin app. Customer metadata and all checkout
+routes share validated origin selection. Its new validation deliberately rejects
+empty values, credentials, paths, query strings, fragments and the staff hostname.
+This slice does not add links or new emails.
+
 Local verification on 2026-09-20: `pnpm ci:check` passed 1,207 tests (admin 1,014,
 customer 165, database 25, email 3), formatting and lint. `pnpm test:http` passed
 with actual email rendering and controlled transport. These checks do not establish
@@ -342,7 +360,7 @@ isolated production app builds and shared package builds also passed.
 Acceptance:
 
 - [x] Existing production send paths use centralized validated configuration, not hardcoded sandbox senders.
-- [ ] Tests cover missing/invalid configuration, sender reuse, provider failure and correct customer/staff link origins.
+- [x] Tests cover missing/invalid configuration, sender reuse, provider failure and correct customer/staff link origins.
 - [x] Builds still work without Stripe/Resend secrets (clean isolated app builds and shared package builds passed on 2026-09-20).
 - [x] #132 closes after existing send paths use the configured `lodgeflow.app` sender and delivery is validated; no #139 features are added.
 

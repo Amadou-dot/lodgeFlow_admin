@@ -1,4 +1,4 @@
-import { normalizeBaseUrl } from '@/lib/url';
+import { getCustomerOrigin } from '@/lib/url';
 
 export type SiteConfig = typeof siteConfig;
 
@@ -7,9 +7,7 @@ export const siteConfig = {
   description:
     'Welcome to paradise. Escape to luxury in the heart of nature at LodgeFlow.',
   // SEO / social fields
-  url: normalizeBaseUrl(
-    process.env.NEXT_PUBLIC_APP_URL ?? 'https://lodgeflow.app'
-  ),
+  url: getCustomerOrigin(),
   twitterHandle: '@lodgeflow',
   defaultOgImageAlt: 'LodgeFlow — luxury cabins in nature',
   navItems: [

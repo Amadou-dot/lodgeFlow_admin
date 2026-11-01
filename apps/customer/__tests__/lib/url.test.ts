@@ -1,4 +1,7 @@
-import { normalizeBaseUrl } from '@/lib/url';
+import {
+  ApplicationOriginConfigurationError,
+  normalizeBaseUrl,
+} from '@/lib/url';
 
 describe('normalizeBaseUrl', () => {
   describe('adds a missing scheme', () => {
@@ -75,5 +78,57 @@ describe('normalizeBaseUrl', () => {
         expect(() => new URL(normalizeBaseUrl(raw))).not.toThrow();
       }
     });
+  });
+
+  test.each([
+    ['  lodgeflow.app/  ', 'https://lodgeflow.app'],
+    ['localhost:3002/', 'http://localhost:3002'],
+    ['[::1]:3002', 'http://[::1]:3002'],
+    ['https://preview.example.com/', 'https://preview.example.com'],
+    ['http://preview.example.com', 'http://preview.example.com'],
+  ])('preserves supported configured origin %s', (input, expected) => {
+    expect(normalizeBaseUrl(input)).toBe(expected);
+  });
+
+  test.each([
+    ['https://lodgeflow.app:443/', 'https://lodgeflow.app:443'],
+    ['http://localhost:80', 'http://localhost:80'],
+    ['HTTPS://LODGEFLOW.APP:443', 'HTTPS://LODGEFLOW.APP:443'],
+    ['LODGEFLOW.APP:443', 'https://LODGEFLOW.APP:443'],
+    ['https://bücher.example', 'https://bücher.example'],
+    ['https://%6codgeflow.app', 'https://%6codgeflow.app'],
+    ['http://[0:0:0:0:0:0:0:1]:80', 'http://[0:0:0:0:0:0:0:1]:80'],
+  ])(
+    'preserves legacy redirect text for retained quote retries: %s',
+    (input, expected) => {
+      expect(normalizeBaseUrl(input)).toBe(expected);
+    }
+  );
+
+  test.each([
+    '',
+    '   ',
+    '//preview.example.com',
+    'ftp://preview.example.com',
+    'javascript:alert(1)',
+    'https://guest:private-token@example.com',
+    'https://example.com/bookings',
+    'https://example.com/path/../',
+    'https://example.com?token=private-token',
+    'https://example.com#private-token',
+    'https://example.com?',
+    'https://example.com#',
+    'https://example.com\\bookings',
+    'https://exam ple.com',
+    'https://example.com\n.other.com',
+    'https://',
+    'https://example.com:99999',
+  ])('rejects malformed origin without exposing it: %s', input => {
+    expect(() => normalizeBaseUrl(input)).toThrow(
+      ApplicationOriginConfigurationError
+    );
+    expect(() => normalizeBaseUrl(input)).toThrow(
+      'Application origin must be an HTTP(S) origin without credentials, path, query or fragment'
+    );
   });
 });
