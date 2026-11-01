@@ -696,6 +696,7 @@ export async function lockClerkUser(userId: string): Promise<User> {
   try {
     const client = await clerkClient();
     const lockedUser = await client.users.lockUser(userId);
+    await invalidateCache(userId);
     return lockedUser;
   } catch (error: unknown) {
     logger.error('Failed to lock user in Clerk', error);
@@ -713,6 +714,7 @@ export async function unlockClerkUser(userId: string): Promise<User> {
   try {
     const client = await clerkClient();
     const unlockedUser = await client.users.unlockUser(userId);
+    await invalidateCache(userId);
     return unlockedUser;
   } catch (error: unknown) {
     logger.error('Failed to unlock user in Clerk', error);

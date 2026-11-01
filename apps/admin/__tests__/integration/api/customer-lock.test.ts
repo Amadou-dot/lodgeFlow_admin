@@ -4,6 +4,10 @@ import { lockClerkUser, unlockClerkUser } from '@/lib/clerk-users';
 import { CustomerProviderError } from '@/lib/customer-errors';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import { logger } from '@/lib/logger';
+import {
+  customerLockSuccessResponseSchema,
+  customerUnlockSuccessResponseSchema,
+} from '@/lib/validations/customer-lock';
 
 jest.mock('@/lib/clerk-users', () => ({
   lockClerkUser: jest.fn(),
@@ -31,7 +35,13 @@ describe.each(['lock', 'unlock'])('%s customer', operation => {
     try {
       const response = await request();
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      const body: unknown = await response.json();
+      const schema =
+        operation === 'lock'
+          ? customerLockSuccessResponseSchema
+          : customerUnlockSuccessResponseSchema;
+      expect(schema.safeParse(body).success).toBe(true);
+      expect(body).toEqual({
         success: true,
         message: `User ${operation === 'lock' ? 'locked' : 'unlocked'} successfully`,
         data:

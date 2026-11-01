@@ -100,10 +100,13 @@ Retained Stripe quote retries preserve their original redirect text.
 The first [Phase 6 admin response slice](phase-6-admin-responses-plan.md) merged
 in [PR #199](https://github.com/Amadou-dot/lodgeFlow_admin/pull/199) as `f735bc5`.
 All five main CI jobs and both exact-SHA production deployments passed; read-only
-customer/admin smoke checks passed. The next bounded slice validates customer
-list responses before the two client caches accept them; see its
-[implementation plan](phase-6-customer-list-plan.md). Remaining V03 response
-boundaries, O01 test infrastructure and full browser acceptance stay open.
+customer/admin smoke checks passed. The [customer list slice](phase-6-customer-list-plan.md)
+merged in [PR #200](https://github.com/Amadou-dot/lodgeFlow_admin/pull/200) as
+`5bd96fa`; all five main CI jobs, both exact-SHA production deployments and
+read-only smoke checks passed. The next [customer lock slice](phase-6-customer-lock-plan.md)
+validates lock acknowledgements and corrects stale server-cached lock status.
+Remaining V03 response boundaries, O01 test infrastructure and full browser
+acceptance stay open.
 PRs #196/#197 remain separate demo-data/guest-identity fixes.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
@@ -385,7 +388,9 @@ one pure discriminated envelope shared by server builders and browser consumers,
 plus accurate customer pagination, acknowledgement and lock/unlock types. It
 preserves the existing wire behavior and is delivered in #199. The second slice
 validates customer list JSON through a shared read schema, preserving Date revival
-only in the server cache adapter. Detail/mutation and other response parsing,
+only in the server cache adapter, and is delivered in #200. The third bounded
+slice validates lock/unlock acknowledgements and invalidates stale server profiles
+after provider success. Detail/create/update/delete and other response parsing,
 customer-app/webhook contracts, O01 and final browser acceptance remain.
 
 - Resolve the remaining inventory across routes, components, hooks, utilities,

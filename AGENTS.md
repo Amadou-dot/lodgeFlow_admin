@@ -161,6 +161,11 @@ already complies.
   `lib/customer-list.ts` to validate HTTP JSON before SWR/TanStack caches accept
   it. Their JSON schema is shared with the server cache adapter, which alone
   revives Dates; client DTOs retain strings, legacy values and additive fields.
+  Lock/unlock hooks use `lib/customer-lock.ts` to validate the action's literal
+  flag and timestamp before success callbacks; their route types derive from
+  those schemas. Successful Clerk lock/unlock operations invalidate the affected
+  server-cached profile before returning, using the existing best-effort cache
+  policy; failed provider operations leave cached profiles intact.
   Other response type annotations are not runtime validators and still need
   deliberate migration.
 

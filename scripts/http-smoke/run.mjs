@@ -2473,6 +2473,85 @@ try {
     'PASS customer JSON dates, computed stats and full recent-booking projections without writes'
   );
 
+  const beforeCustomerLockProviders = calls.length;
+  const beforeCustomerLockAttempts = clerkMutationAttempts;
+  const lockRoute = '/api/customers/smoke_customer/lock';
+  for (const method of ['POST', 'DELETE']) {
+    await expectAuthenticationDenied({
+      origin: admin,
+      route: lockRoute,
+      method,
+    });
+    for (const identity of ['front_desk', 'manager']) {
+      const denied = await request({
+        origin: admin,
+        route: lockRoute,
+        identity,
+        method,
+        status: 403,
+      });
+      assert.equal(denied.success, false);
+    }
+  }
+  assert.equal(clerkMutationAttempts, beforeCustomerLockAttempts);
+  for (const operation of [
+    {
+      method: 'POST',
+      locked: true,
+      timeKey: 'lockedAt',
+      message: 'User locked successfully',
+    },
+    {
+      method: 'DELETE',
+      locked: false,
+      timeKey: 'unlockedAt',
+      message: 'User unlocked successfully',
+    },
+  ]) {
+    const acknowledgement = await request({
+      origin: admin,
+      route: lockRoute,
+      identity: 'admin',
+      method: operation.method,
+      status: 200,
+    });
+    const timestamp = acknowledgement.data[operation.timeKey];
+    assert.equal(new Date(timestamp).toISOString(), timestamp);
+    assert.deepEqual(acknowledgement, {
+      success: true,
+      message: operation.message,
+      data: { locked: operation.locked, [operation.timeKey]: timestamp },
+    });
+    const refreshed = await request({
+      origin: admin,
+      route: '/api/customers/smoke_customer',
+      identity: 'front_desk',
+      status: 200,
+    });
+    assert.equal(
+      refreshed.data.locked,
+      operation.locked,
+      'customer detail must reflect the completed lock operation'
+    );
+    const missing = await request({
+      origin: admin,
+      route: '/api/customers/smoke_missing/lock',
+      identity: 'admin',
+      method: operation.method,
+      status: 404,
+    });
+    assert.deepEqual(missing, { success: false, error: 'User not found' });
+  }
+  assert.equal(clerkMutationAttempts, beforeCustomerLockAttempts + 4);
+  assert.equal(calls.length, beforeCustomerLockProviders);
+  assert.equal(
+    JSON.stringify(await Booking.find().sort({ _id: 1 }).lean()),
+    customerReadSnapshot
+  );
+  console.log(
+    'PASS customer lock/unlock authorization, acknowledgements and cached detail refresh without booking/payment/email changes'
+  );
+
   const beforeReporting = JSON.stringify(
     await Booking.find().sort({ _id: 1 }).lean()
   );

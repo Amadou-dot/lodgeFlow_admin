@@ -36,6 +36,10 @@ Memory Server binary download. No application credentials are required.
   and dates rejected without writes, and preserved read permissions.
 - Admin dining/experience catalog JSON and partial edits; booking/customer/Settings,
   reporting, staff/audit and reservation/calendar responses and permissions.
+- Admin customer lock/unlock: non-admin denial before provider calls, the real
+  Clerk SDK against a stateful local provider, distinct acknowledgement fields,
+  immediate cached detail rereads and missing-user errors. Booking data and
+  payment/email calls remain unchanged throughout this sequence.
 - Strict catalog/booking/reservation request fields, invalid JSON/IDs, denied
   effects, safe provider/database failures and successful retries.
 - Dining catalog updates reject impossible effective party-size ranges without
