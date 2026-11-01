@@ -7,6 +7,7 @@ import type {
 
 import { SWR_CONFIG } from '@/lib/config';
 import { fetchCustomersList } from '@/lib/customer-list';
+import { changeCustomerLock } from '@/lib/customer-lock';
 import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type {
   Customer,
@@ -18,8 +19,6 @@ import type { ApiAcknowledgement } from '@/types/api-response';
 import type {
   CustomerResponse,
   CustomerMutationResponse,
-  CustomerLockResponse,
-  CustomerUnlockResponse,
 } from '@/types/customer-responses';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import useSWR, { useSWRConfig } from 'swr';
@@ -234,22 +233,7 @@ export const useDeleteCustomer = () => {
 export const useLockCustomer = () => {
   const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<{ success: boolean }, Error, string>({
-    mutationFn: async (id: string): Promise<{ success: boolean }> => {
-      const response = await fetch(`/api/customers/${id}/lock`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to lock customer');
-      }
-
-      const result: CustomerLockResponse = await response.json();
-      if (result.success) {
-        return { success: true };
-      }
-      throw new Error(result.error || 'Failed to lock customer');
-    },
+    mutationFn: (id: string) => changeCustomerLock({ id, action: 'lock' }),
     onSuccess: () => refreshCustomerCaches(),
   });
 };
@@ -258,22 +242,7 @@ export const useLockCustomer = () => {
 export const useUnlockCustomer = () => {
   const refreshCustomerCaches = useRefreshCustomerCaches();
   return useMutation<{ success: boolean }, Error, string>({
-    mutationFn: async (id: string): Promise<{ success: boolean }> => {
-      const response = await fetch(`/api/customers/${id}/lock`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to unlock customer');
-      }
-
-      const result: CustomerUnlockResponse = await response.json();
-      if (result.success) {
-        return { success: true };
-      }
-      throw new Error(result.error || 'Failed to unlock customer');
-    },
+    mutationFn: (id: string) => changeCustomerLock({ id, action: 'unlock' }),
     onSuccess: () => refreshCustomerCaches(),
   });
 };

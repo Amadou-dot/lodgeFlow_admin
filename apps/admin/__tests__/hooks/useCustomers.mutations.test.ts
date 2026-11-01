@@ -218,7 +218,13 @@ describe('useDeleteCustomer', () => {
 describe('useLockCustomer / useUnlockCustomer', () => {
   it('locks via POST to the lock endpoint', async () => {
     mockFetch.mockResolvedValue(
-      Response.json({ success: true }, { status: 200 })
+      Response.json(
+        {
+          success: true,
+          data: { locked: true, lockedAt: '2030-01-02T03:04:05.000Z' },
+        },
+        { status: 200 }
+      )
     );
 
     useLockCustomer();
@@ -232,7 +238,13 @@ describe('useLockCustomer / useUnlockCustomer', () => {
 
   it('unlocks via DELETE to the lock endpoint', async () => {
     mockFetch.mockResolvedValue(
-      Response.json({ success: true }, { status: 200 })
+      Response.json(
+        {
+          success: true,
+          data: { locked: false, unlockedAt: '2030-01-02T03:04:05.000Z' },
+        },
+        { status: 200 }
+      )
     );
 
     useUnlockCustomer();

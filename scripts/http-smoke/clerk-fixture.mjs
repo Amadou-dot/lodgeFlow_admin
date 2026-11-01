@@ -19,7 +19,9 @@ export function createClerkFixture({ organizationId, users }) {
       { ...publicKey.export({ format: 'jwk' }), kid, use: 'sig', alg: 'RS256' },
     ],
   };
-  const identities = new Map(users.map(user => [user.id, { ...user }]));
+  const identities = new Map(
+    users.map(user => [user.id, { ...user, locked: false }])
+  );
 
   function userPayload(user) {
     const emailId = `idn_${user.id}`;
@@ -51,7 +53,7 @@ export function createClerkFixture({ organizationId, users }) {
       last_sign_in_at: 1700000000000,
       last_active_at: 1700000000000,
       banned: false,
-      locked: false,
+      locked: user.locked,
     };
   }
 
@@ -90,6 +92,25 @@ export function createClerkFixture({ organizationId, users }) {
   /** Return false for endpoints belonging to another provider fixture. */
   function handleRequest(request, response) {
     const url = new URL(request.url, 'http://127.0.0.1');
+    const lockAction = url.pathname.match(
+      /^\/v1\/users\/([^/]+)\/(lock|unlock)$/
+    );
+    if (request.method === 'POST' && lockAction) {
+      const user = identities.get(decodeURIComponent(lockAction[1]));
+      if (user) user.locked = lockAction[2] === 'lock';
+      reply({
+        response,
+        status: user ? 200 : 404,
+        body: user
+          ? userPayload(user)
+          : {
+              errors: [
+                { code: 'resource_not_found', message: 'User not found' },
+              ],
+            },
+      });
+      return true;
+    }
     if (request.method !== 'GET') return false;
     if (url.pathname === '/v1/jwks') {
       reply({ response, body: jwks });
