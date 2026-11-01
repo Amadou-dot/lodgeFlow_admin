@@ -80,7 +80,7 @@ detail/mutation/lock/unlock aliases describe their actual serialized payloads.
       modified admin test separately; expected: pass without suppressions.
 - [x] Run `pnpm ci:check`, `pnpm test:http`, both app type checks, clean-copy builds,
       source/build comparison, documentation formatting/links and `git diff --check`.
-- [ ] Obtain one fresh whole-branch review, resolve actionable findings with
+- [x] Obtain one fresh whole-branch review, resolve actionable findings with
       regressions, and document remaining V03/O01 and browser acceptance debt.
 
 **Delivery:** Commit, push and open a review PR linked with `Part of #150`.

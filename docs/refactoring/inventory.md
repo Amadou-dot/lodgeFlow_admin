@@ -1857,6 +1857,8 @@ app credentials, using CI's throwaway Clerk public key. After the hook correctio
 the admin build passes again from fresh output. Existing optional Sharp/module-type
 and absent-database/static-generation diagnostics remain non-blocking. No hosted
 login, full browser workflows or live provider operations were exercised.
+A fresh whole-branch review of `79ecabc..12d188b` found no actionable introduced
+defects; the following response/runtime and acceptance gaps remain explicit.
 
 Remaining concrete V03 debt includes runtime response parsing in admin
 `hooks/useCustomers.ts`, `hooks/useInfiniteCustomers.ts`, `hooks/useData.ts` and
