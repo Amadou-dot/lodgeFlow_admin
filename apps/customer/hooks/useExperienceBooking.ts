@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/nextjs';
 import {
   fetchConfirmationDetail,
   type ConfirmationDetailOptions,
@@ -50,13 +51,15 @@ export const useCreateExperienceBooking = () => {
  * Hook to fetch experience booking history for the current user
  */
 export const useExperienceBookingHistory = (status?: string) => {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   return useQuery({
-    queryFn: async (): Promise<ExperienceReservationHistory[]> => {
+    enabled: isLoaded && isSignedIn && !!userId && !!sessionId,
+    queryFn: async ({ signal }): Promise<ExperienceReservationHistory[]> => {
       const url = status
         ? `/api/experience-bookings/history?status=${status}`
         : '/api/experience-bookings/history';
 
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
 
       if (!response.ok) {
         throw new Error('Failed to fetch experience booking history');
@@ -66,7 +69,7 @@ export const useExperienceBookingHistory = (status?: string) => {
         await response.json();
       return data.data || [];
     },
-    queryKey: ['experience-bookings-history', status],
+    queryKey: ['experience-bookings-history', status, userId, sessionId],
   });
 };
 

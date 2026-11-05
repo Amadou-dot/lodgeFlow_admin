@@ -5,7 +5,7 @@ of [tracking issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/15
 starting from `9f8b1a8` with Phases 0–3 merged. The user authorized this phase
 and a draft PR; Phase 5 provider-origin work and Phase 6 remain separate.
 
-## Delivery status (reconciled 2026-10-31)
+## Delivery status (reconciled 2026-11-03)
 
 [PR #195](https://github.com/Amadou-dot/lodgeFlow_admin/pull/195) merged on
 2026-10-09 as `d0870e124b866ed9ce10c5c66399707c75532665` after the final review
@@ -14,10 +14,14 @@ passed at that SHA. The earlier references to a draft/local-only checkpoint in
 this document are historical, not the current delivery state.
 
 The PR's full-browser checkbox is checked, while its own notes say full
-application browser checks were unrun. The supported Chromium evidence covers
-the isolated print-popup lifecycle. Keep representative customer/staff browser
-acceptance unchecked until full-flow evidence or an explicit user sign-off is
-recorded; neither merge nor HTTP smoke silently satisfies that gate.
+application browser checks were unrun. The earlier supported Chromium evidence
+covers the isolated print-popup lifecycle. The user's 2026-11-03 production
+browser report now records mixed results and unresolved failures, including
+private history after sign-out, stale cabin links, Settings saves, stay-date
+display, direct PDF and mobile layouts. See the
+[browser findings and triage](phase-4-browser-review.md) for passed checks,
+reproductions and verification limits. Acceptance remains unchecked pending
+fixes and retesting; neither merge nor HTTP smoke satisfies that gate.
 
 ## Preserved contracts
 
@@ -200,17 +204,28 @@ review, followed by a bounded fix round and scoped re-review. Final integration
 review is recorded with the draft PR. Remote CI and preview status belong to the
 exact pushed commit; the local results above do not assert those outcomes.
 
-Representative application browser interactions remain unchecked. The original
-implementation reported an unavailable connected CUA workflow and no installed
+At the original implementation checkpoint, representative application browser
+interactions were unchecked. The implementation reported an unavailable connected
+CUA workflow and no installed
 Playwright runner in this checkout. Review and the corrections above used cached
 Chromium directly for the isolated native popup lifecycle check; no runner was
 installed or security setting changed. Hosted Clerk login/sign-out, responsive
-layout, keyboard/focus behavior and visual rendering still need browser review.
-jsdom and the HTTP harness cover their stated local boundaries only.
+layout, keyboard/focus behavior and visual rendering were outside that evidence.
+The subsequent user-run production review is recorded in
+[phase-4-browser-review.md](phase-4-browser-review.md); failures and incomplete
+checks keep acceptance open. jsdom and the HTTP harness cover their stated local
+boundaries only.
+
+The [2026-11-05 follow-up](phase-4-browser-fixes-plan.md) implements the approved
+single print/download preview button, history isolation across authentication
+changes and fresh public cabin links. Its 2,743 passing package tests, strict
+types, isolated HTTP, real production catalog regression and clean builds support
+review; hosted browser retesting and the other reported findings remain open.
 
 The unchanged `apps/customer/app/payments/success/page.tsx` displays static payment
 success wording without checking settlement; correcting that page is separate
 work. This phase introduces no settlement inference. No live payment/email
 operation was performed. The original local checkpoint preceded the subsequent
-#195 merge and its post-merge checks recorded above. Phases 5–6 and the overall
-milestone remain open; issues #136 and #139 remain excluded.
+#195 merge and its post-merge checks recorded above. Current later-phase and
+milestone status is recorded in [plan.md](plan.md); issues #136 and #139 remain
+excluded.

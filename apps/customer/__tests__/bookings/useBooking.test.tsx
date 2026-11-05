@@ -16,6 +16,15 @@ import {
 import { createTestQueryClient } from '@/__tests__/shared/test-utils';
 import { QueryClientProvider } from '@tanstack/react-query';
 
+jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: 'user_customer',
+    sessionId: 'customer-session',
+  }),
+}));
+
 function historyBooking({
   id,
   status,
@@ -156,7 +165,9 @@ describe('useBookingHistory', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/bookings/history');
+    expect(global.fetch).toHaveBeenCalledWith('/api/bookings/history', {
+      signal: expect.any(AbortSignal),
+    });
     expect(result.current.data).toEqual(mockBookings);
   });
 
@@ -175,7 +186,8 @@ describe('useBookingHistory', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/bookings/history?status=confirmed'
+      '/api/bookings/history?status=confirmed',
+      { signal: expect.any(AbortSignal) }
     );
   });
 
