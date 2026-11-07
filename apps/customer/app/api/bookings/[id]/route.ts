@@ -209,15 +209,13 @@ export async function DELETE(
     // Empty/non-JSON DELETE bodies retain the optional-reason contract.
     let cancellationReason: string | undefined;
     if (request.headers.get('content-type')?.includes('application/json')) {
-      const text = await request.text();
-      if (text.trim()) {
-        const json = await readJsonRequestBody({ text: async () => text });
-        if (!json.success) return validationErrorResponse(json.error);
-        const validation = validateRequest(cancelBookingSchema, json.data);
-        if (!validation.success)
-          return validationErrorResponse(validation.error);
-        cancellationReason = validation.data.reason;
-      }
+      const json = await readJsonRequestBody(request, {
+        emptyBody: 'empty-object',
+      });
+      if (!json.success) return validationErrorResponse(json.error);
+      const validation = validateRequest(cancelBookingSchema, json.data);
+      if (!validation.success) return validationErrorResponse(validation.error);
+      cancellationReason = validation.data.reason;
     }
 
     // Find the booking with cabin populated for email

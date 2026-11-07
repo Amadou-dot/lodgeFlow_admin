@@ -159,7 +159,8 @@ for (const profile of profiles) {
       async ({ method, invoke }) => {
         mockAuth.mockResolvedValueOnce({ userId: null });
         const input = request({ method, body: '{' });
-        const read = jest.spyOn(input, 'text');
+        if (!input.body) throw new Error('Expected a request body');
+        const read = jest.spyOn(input.body, 'getReader');
         const response = await invoke(input);
         expect(response.status).toBe(401);
         expect(await response.json()).toEqual({
@@ -248,7 +249,8 @@ for (const profile of profiles) {
     });
     test('DELETE ignores the request body and keeps cancellation success', async () => {
       const input = request({ method: 'DELETE', body: '{' });
-      const read = jest.spyOn(input, 'text');
+      if (!input.body) throw new Error('Expected a request body');
+      const read = jest.spyOn(input.body, 'getReader');
       const response = await profile.remove(input, params);
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({

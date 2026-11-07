@@ -89,7 +89,8 @@ test.each(mutations)(
   async ({ invoke }) => {
     mockAuth.mockResolvedValueOnce({ userId: null });
     const request = req('{');
-    const read = jest.spyOn(request, 'text');
+    if (!request.body) throw new Error('Expected a request body');
+    const read = jest.spyOn(request.body, 'getReader');
     expect((await invoke(request)).status).toBe(401);
     expect(read).not.toHaveBeenCalled();
     expect(mockConnect).not.toHaveBeenCalled();
@@ -115,3 +116,33 @@ test('empty cancellation body remains optional', async () => {
   expect((await DELETE(req(''), params)).status).toBe(404);
   expect(mockFind).toHaveBeenCalled();
 });
+
+test.each(mutations)(
+  '$name rejects oversized JSON before effects',
+  async ({ invoke }) => {
+    const response = await invoke(req(' '.repeat(1024 * 1024 + 1)));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'JSON body exceeds 1048576 bytes',
+    });
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  }
+);
+
+test.each(mutations.slice(0, 2))(
+  '$name rejects oversized special requests before effects',
+  async ({ invoke, input }) => {
+    const response = await invoke(
+      req(
+        JSON.stringify({ ...input, specialRequests: Array(101).fill('note') })
+      )
+    );
+    expect(response.status).toBe(400);
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  }
+);

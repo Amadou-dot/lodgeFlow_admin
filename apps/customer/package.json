@@ -67,7 +67,7 @@
     "resend": "^6.7.0",
     "stripe": "^20.2.0",
     "swr": "^2.3.8",
-    "zod": "^4.3.6",
+    "zod": "^4.6.7",
     "@lodgeflow/database": "workspace:*"
   },
   "devDependencies": {

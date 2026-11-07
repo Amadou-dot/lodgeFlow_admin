@@ -83,7 +83,8 @@ describe('admin welcome characterization', () => {
       const denied = createErrorResponse('Denied', status);
       mockAuth.mockResolvedValue({ authenticated: false, error: denied });
       const input = request();
-      const parse = jest.spyOn(input, 'json');
+      if (!input.body) throw new Error('Expected a request body');
+      const parse = jest.spyOn(input.body, 'getReader');
       expect(await invoke(input)).toBe(denied);
       expect(mockAuth.mock.calls).toEqual([[]]);
       expect(mockRateLimit).not.toHaveBeenCalled();
@@ -101,7 +102,8 @@ describe('admin welcome characterization', () => {
       resetTime: Date.now() + 30000,
     });
     const input = request();
-    const parse = jest.spyOn(input, 'json');
+    if (!input.body) throw new Error('Expected a request body');
+    const parse = jest.spyOn(input.body, 'getReader');
     const response = await invoke(input);
     expect(response.status).toBe(429);
     expect(await response.json()).toEqual({

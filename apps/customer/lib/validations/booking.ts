@@ -1,3 +1,4 @@
+import { bookingNotesSchema } from './booking-notes';
 import { z } from 'zod';
 import { objectRequestSchema } from './object-request';
 export const bookingIdSchema = z
@@ -50,7 +51,7 @@ const createFieldsSchema = z
     checkOutDate: requestDateSchema,
     numGuests: z.number().int().min(1, 'At least 1 guest required').max(50),
     extras: bookingExtrasSchema.optional().default({}),
-    specialRequests: z.array(z.string()).optional().default([]),
+    specialRequests: bookingNotesSchema.optional().default([]),
     observations: z.string().max(1000).optional(),
   })
   .refine(data => data.checkOutDate > data.checkInDate, {
@@ -64,7 +65,7 @@ const createFieldsSchema = z
  */
 const updateFieldsSchema = z.strictObject({
   numGuests: z.number().int().min(1).max(50).optional(),
-  specialRequests: z.array(z.string()).optional(),
+  specialRequests: bookingNotesSchema.optional(),
   extras: bookingExtrasSchema.optional(),
 });
 
