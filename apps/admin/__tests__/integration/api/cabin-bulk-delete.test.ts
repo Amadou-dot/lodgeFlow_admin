@@ -75,7 +75,8 @@ test.each([401, 403])(
       .mocked(requireApiAuth)
       .mockResolvedValue({ authenticated: false, error });
     const input = request(['not-an-id']);
-    const parse = jest.spyOn(input, 'json');
+    if (!input.body) throw new Error('Expected a request body');
+    const parse = jest.spyOn(input.body, 'getReader');
     expect(await POST(input)).toBe(error);
     expect(requireApiAuth).toHaveBeenCalledWith({ permission: 'cabins:write' });
     expect(parse).not.toHaveBeenCalled();

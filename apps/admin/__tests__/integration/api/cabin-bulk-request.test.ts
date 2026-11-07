@@ -66,7 +66,8 @@ describe('bulk request characterization', () => {
         ids: [id],
         discount: 5,
       });
-      const parse = jest.spyOn(input, 'json');
+      if (!input.body) throw new Error('Expected a request body');
+      const parse = jest.spyOn(input.body, 'getReader');
       expect(await POST(input)).toBe(error);
       expect(requireApiAuth).toHaveBeenCalledWith({
         permission: 'cabins:write',
@@ -109,9 +110,9 @@ describe('bulk request characterization', () => {
       'Each id must be a valid ObjectId string',
     ],
     [
-      'invalid IDs before count',
+      'count before invalid IDs',
       { action: 'delete', ids: Array(51).fill('bad') },
-      'Each id must be a valid ObjectId string',
+      'Cannot process more than 50 items at once',
     ],
     [
       'count before action',
