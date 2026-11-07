@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/nextjs';
 import {
   fetchConfirmationDetail,
   type ConfirmationDetailOptions,
@@ -53,13 +54,15 @@ export const useCreateDiningReservation = () => {
  * Hook to fetch dining reservation history for the current user
  */
 export const useDiningReservationHistory = (status?: string) => {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   return useQuery({
-    queryFn: async (): Promise<DiningReservationHistory[]> => {
+    enabled: isLoaded && isSignedIn && !!userId && !!sessionId,
+    queryFn: async ({ signal }): Promise<DiningReservationHistory[]> => {
       const url = status
         ? `/api/dining-reservations/history?status=${status}`
         : '/api/dining-reservations/history';
 
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
 
       if (!response.ok) {
         throw new Error('Failed to fetch dining reservation history');
@@ -69,7 +72,7 @@ export const useDiningReservationHistory = (status?: string) => {
         await response.json();
       return data.data || [];
     },
-    queryKey: ['dining-reservations-history', status],
+    queryKey: ['dining-reservations-history', status, userId, sessionId],
   });
 };
 

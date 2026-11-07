@@ -4,6 +4,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
 import { useTheme } from 'next-themes';
 import { ReactNode, useEffect, useState } from 'react';
+import { CustomerHistoryCache } from './CustomerHistoryCache';
 
 interface DynamicClerkProviderProps {
   children: ReactNode;
@@ -22,6 +23,8 @@ export function DynamicClerkProvider({ children }: DynamicClerkProviderProps) {
   const clerkTheme = mounted && resolvedTheme === 'dark' ? dark : undefined;
 
   return (
-    <ClerkProvider appearance={{ theme: clerkTheme }}>{children}</ClerkProvider>
+    <ClerkProvider appearance={{ theme: clerkTheme }}>
+      <CustomerHistoryCache>{children}</CustomerHistoryCache>
+    </ClerkProvider>
   );
 }

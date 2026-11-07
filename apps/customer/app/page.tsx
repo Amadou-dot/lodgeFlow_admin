@@ -4,6 +4,7 @@ import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
 import { Image } from '@heroui/image';
 import { Phone, Mail } from 'lucide-react';
+import { connection } from 'next/server';
 
 import { siteConfig } from '@/config/site';
 import { siteToLodgingBusiness } from '@/lib/seo/jsonLd';
@@ -30,6 +31,8 @@ async function getFeaturedCabins() {
 }
 
 export default async function Home() {
+  // Featured links must follow the current catalog, including replaced records.
+  await connection();
   const featuredCabins = await getFeaturedCabins();
 
   const features = [

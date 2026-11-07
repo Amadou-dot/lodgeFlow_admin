@@ -78,7 +78,7 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-11-01): Phase 0 is complete. Remaining Phase 1–2
+Current execution status (2026-11-03): Phase 0 is complete. Remaining Phase 1–2
 boundaries merged in [PR #190](https://github.com/Amadou-dot/lodgeFlow_admin/pull/190)
 at `b8eea6b`; review fixes followed in #191/#192. Phase 3 merged in
 [PR #194](https://github.com/Amadou-dot/lodgeFlow_admin/pull/194) at `9f8b1a8`.
@@ -86,9 +86,17 @@ Phase 4 merged in [PR #195](https://github.com/Amadou-dot/lodgeFlow_admin/pull/1
 at `d0870e1`; its final review corrections brought the package total to 2,524
 passing tests. [Post-merge CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/37979772079)
 passed at that commit. The [UI state/cache evidence](phase-4-ui-state.md) records
-the remaining browser boundary: the PR checkbox is checked but its notes still
-say full application browser checks were unrun. Keep that acceptance item open
-until the evidence is reconciled.
+the browser boundary. The user's 2026-11-03 production review reports mixed
+results and unresolved failures; [browser findings and triage](phase-4-browser-review.md)
+record the evidence, passed checks and follow-up order. Keep that acceptance item
+open pending fixes and retesting.
+
+The approved [2026-11-05 browser fixes](phase-4-browser-fixes-plan.md) implement one
+print/download preview entry point, private history isolation across user/session
+changes, and request-time cabin listings. Local validation passes 2,743 package
+tests, type/lint/format checks, isolated HTTP, a production catalog regression and
+clean builds. Review and production browser retesting are separate delivery gates;
+Settings, admin stay dates and mobile findings remain for subsequent slices.
 
 The remaining [Phase 5 origin/configuration slice](phase-5-provider-origins.md)
 merged in [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198) as
@@ -103,8 +111,10 @@ All five main CI jobs and both exact-SHA production deployments passed; read-onl
 customer/admin smoke checks passed. The [customer list slice](phase-6-customer-list-plan.md)
 merged in [PR #200](https://github.com/Amadou-dot/lodgeFlow_admin/pull/200) as
 `5bd96fa`; all five main CI jobs, both exact-SHA production deployments and
-read-only smoke checks passed. The next [customer lock slice](phase-6-customer-lock-plan.md)
-validates lock acknowledgements and corrects stale server-cached lock status.
+read-only smoke checks passed. The [customer lock slice](phase-6-customer-lock-plan.md)
+merged in [PR #201](https://github.com/Amadou-dot/lodgeFlow_admin/pull/201) as
+`216970d`; it validates lock acknowledgements and corrects stale server-cached
+lock status.
 Remaining V03 response boundaries, O01 test infrastructure and full browser
 acceptance stay open.
 PRs #196/#197 remain separate demo-data/guest-identity fixes.
@@ -315,8 +325,9 @@ Acceptance:
 - [ ] Representative customer/staff interactions are checked in-browser where credentials permit; blockers remain explicit.
 
 Implementation, regression evidence and the browser verification limits are
-recorded in [phase-4-ui-state.md](phase-4-ui-state.md). PR #195 is merged; its
-conflicting full-browser checklist and notes do not establish browser sign-off.
+recorded in [phase-4-ui-state.md](phase-4-ui-state.md). PR #195 is merged. The
+[2026-11-03 production browser review](phase-4-browser-review.md) records failures
+and incomplete checks; acceptance remains open pending fixes and retesting.
 
 ### Phase 5 — Provider configuration and existing email repair
 

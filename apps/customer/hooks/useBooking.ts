@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/nextjs';
 import { useSWRConfig } from 'swr';
 import {
   fetchConfirmationDetail,
@@ -59,13 +60,15 @@ export const useCreateBooking = () => {
  * @param status - Optional status filter (unconfirmed, confirmed, checked-in, checked-out, cancelled)
  */
 export const useBookingHistory = (status?: string) => {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   return useQuery({
-    queryFn: async (): Promise<BookingHistoryItem[]> => {
+    enabled: isLoaded && isSignedIn && !!userId && !!sessionId,
+    queryFn: async ({ signal }): Promise<BookingHistoryItem[]> => {
       const url = status
         ? `/api/bookings/history?status=${status}`
         : '/api/bookings/history';
 
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
 
       if (!response.ok) {
         throw new Error('Failed to fetch booking history');
@@ -74,7 +77,7 @@ export const useBookingHistory = (status?: string) => {
       const data: ApiResponse<BookingHistoryItem[]> = await response.json();
       return data.data || [];
     },
-    queryKey: ['bookings-history', status],
+    queryKey: ['bookings-history', status, userId, sessionId],
   });
 };
 

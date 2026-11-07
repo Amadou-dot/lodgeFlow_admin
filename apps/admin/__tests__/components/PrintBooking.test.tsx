@@ -12,7 +12,6 @@ jest.mock('@/hooks/usePrintBooking', () => ({
     isGeneratingPDF: false,
     handlePrint: jest.fn(),
     handleDownloadPDF: jest.fn(),
-    handleBrowserPrint: jest.fn(),
   }),
 }));
 
@@ -222,7 +221,7 @@ describe('Print Functionality', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByText('Print Booking Details')).toBeInTheDocument();
+      expect(screen.getByText('Print / Download')).toBeInTheDocument();
     });
 
     it('shows check-in button for confirmed bookings', () => {
@@ -245,7 +244,7 @@ describe('Print Functionality', () => {
       expect(screen.getByText('Record Payment')).toBeInTheDocument();
     });
 
-    it('opens print dropdown when clicked', async () => {
+    it('opens print preview when clicked', async () => {
       const user = userEvent.setup();
 
       render(
@@ -254,13 +253,15 @@ describe('Print Functionality', () => {
         </TestWrapper>
       );
 
-      const printButton = screen.getByText('Print Booking Details');
+      const printButton = screen.getByText('Print / Download');
       await user.click(printButton);
 
       // Check that dropdown options appear
-      expect(screen.getByText('Print Booking')).toBeInTheDocument();
-      expect(screen.getByText('Download as PDF')).toBeInTheDocument();
-      expect(screen.getByText('Browser Print')).toBeInTheDocument();
+      expect(await screen.findByText('Print Preview')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Download PDF' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument();
     });
   });
 });

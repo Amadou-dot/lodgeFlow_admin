@@ -18,7 +18,6 @@ interface UsePrintBookingReturn {
     elementId: string,
     options?: UsePrintBookingOptions
   ) => Promise<void>;
-  handleBrowserPrint: () => void;
 }
 
 export const usePrintBooking = (
@@ -55,17 +54,6 @@ export const usePrintBooking = (
     },
     [booking]
   );
-
-  // Browser print functionality
-  const handleBrowserPrint = useCallback(() => {
-    if (activeOperation.current !== 'idle') return;
-    begin('printing');
-    try {
-      window.print();
-    } finally {
-      finish();
-    }
-  }, [begin, finish]);
 
   // HTML element to canvas and then to PDF
   const handleDownloadPDF = useCallback(
@@ -272,6 +260,5 @@ export const usePrintBooking = (
     isGeneratingPDF: operation === 'pdf',
     handlePrint,
     handleDownloadPDF,
-    handleBrowserPrint,
   };
 };

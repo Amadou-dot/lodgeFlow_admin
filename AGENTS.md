@@ -56,6 +56,16 @@ plan and existing-issue triage; issues #136 and #139 are outside that effort.
 - Admin hooks commonly use SWR for reads and TanStack Query for mutations;
   customer hooks commonly use TanStack Query for both. Preserve and test the
   relevant cache invalidation behavior when refactoring mutations.
+- Customer history queries include the Clerk user and session after the resource
+  and status key. Keep their auth enablement, abort signals and prefix invalidation.
+  `CustomerHistoryCache` clears obsolete history under the mounted Clerk provider,
+  including when the history page is absent; the page guard and session key also
+  discard retained dialogs. Preserve public catalog caches during this cleanup.
+- Public cabin listing and homepage featured-cabin reads require a live request
+  through `connection()` before database access. Keep that request boundary outside
+  database error fallbacks so builds cannot freeze links to later-replaced records.
+  The production catalog regression in `scripts/http-smoke/catalog-freshness.mjs`
+  exercises this behavior with disposable data.
 - `@/` resolves within each app. Import shared models/helpers through
   `@lodgeflow/database` or subpaths declared in its `package.json` exports.
   App-local connection/pricing/lock files include compatibility re-exports.

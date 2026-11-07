@@ -76,3 +76,5 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Exercise isolated HTTP contracts and gate failure detection
         run: pnpm test:http
+      - name: Verify production cabin listing freshness
+        run: pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/catalog-freshness.mjs
