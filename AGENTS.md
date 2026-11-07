@@ -106,6 +106,11 @@ already complies.
 - Treat request bodies, query strings, provider payloads, and cache entries as
   untrusted. Parse with the relevant app's Zod schemas in `lib/validations` and
   infer input/output types from those schemas.
+- JSON mutation readers in both apps cap streamed input at 1 MiB before parsing,
+  including missing or misleading Content-Length. Oversize input uses the existing
+  400 validation response. Cabin/reservation special-request lists and customer
+  dining dietary lists allow at most 100 strings of 1,000 characters each. Keep
+  these limits on creates and edits; the signed Stripe raw webhook is separate.
 - Put cross-field rules that depend only on the payload in `.superRefine()` or
   `.refine()`, with errors attached to the relevant fields. A successful parse
   must not require a forgotten `assertParsedInput()` afterward.

@@ -1,3 +1,4 @@
+import { readJsonRequestBody } from './request-body';
 import { z } from 'zod';
 
 export const welcomeEmailSchema = z.object({
@@ -17,7 +18,17 @@ export async function readWelcomeEmailRequest(
 ): Promise<WelcomeEmailRequest> {
   let body: unknown;
   try {
-    body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success) {
+      return {
+        success: false,
+        error:
+          json.error === 'Invalid JSON body'
+            ? 'Invalid welcome email data'
+            : json.error,
+      };
+    }
+    body = json.data;
   } catch {
     return { success: false, error: 'Invalid welcome email data' };
   }

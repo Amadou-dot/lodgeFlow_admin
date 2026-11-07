@@ -1,3 +1,4 @@
+import { readJsonRequestBody } from './request-body';
 import { priceAmountSchema } from './money';
 import { z } from 'zod';
 
@@ -37,11 +38,13 @@ export const bulkCabinSchema = z
 
 export type BulkCabinInput = z.output<typeof bulkCabinSchema>;
 
-// Preserve legacy error precedence: required fields, ID format, count, action,
-// then discount. Only the complete schema's output reaches the operation.
+// Required fields precede count, ID format, action, then discount. Oversized
+// collections now fail before element validation; only complete schema output
+// reaches the operation.
 const envelopeSchema = z.object({
   action: z.unknown().refine(Boolean),
-  ids: z.array(z.unknown()).min(1),
+  // Check the envelope without traversing or copying an oversized collection.
+  ids: z.custom<unknown[]>(value => Array.isArray(value) && value.length > 0),
   discount: z.unknown().optional(),
 });
 
@@ -53,7 +56,14 @@ export async function readBulkCabinRequest(
 ): Promise<BulkCabinRequest> {
   let body: unknown;
   try {
-    body = await request.json();
+    const json = await readJsonRequestBody(request);
+    if (!json.success) {
+      return {
+        success: false,
+        error: json.error === 'Invalid JSON body' ? INVALID_DATA : json.error,
+      };
+    }
+    body = json.data;
   } catch {
     return { success: false, error: INVALID_DATA };
   }
@@ -68,6 +78,12 @@ export async function readBulkCabinRequest(
       error: envelope.error.issues.some(issue => issue.path.length === 0)
         ? INVALID_DATA
         : REQUIRED_FIELDS,
+    };
+  }
+  if (envelope.data.ids.length > MAX_BULK_ITEMS) {
+    return {
+      success: false,
+      error: `Cannot process more than ${MAX_BULK_ITEMS} items at once`,
     };
   }
   const ids = idsSchema.safeParse(envelope.data.ids);
