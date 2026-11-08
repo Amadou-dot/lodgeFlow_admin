@@ -20,6 +20,10 @@ import { sendPaymentConfirmationEmail } from '@/lib/email';
 import type { PaymentEmailCabin } from '@/types/payment-email';
 import { serializePaymentEmailBooking } from '@/lib/serializers/payment-email';
 import { getStripe } from '@/lib/stripe';
+import {
+  logStripeWebhookFailure,
+  type StripeWebhookVerificationStage,
+} from '@/lib/stripe-webhook-diagnostics';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
@@ -31,13 +35,19 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   let event: Stripe.Event;
+  let stage: StripeWebhookVerificationStage = 'stripe-client';
   try {
-    event = getStripe().webhooks.constructEvent(
-      await request.text(),
+    const stripe = getStripe();
+    stage = 'request-body';
+    const body = await request.text();
+    stage = 'signature';
+    event = stripe.webhooks.constructEvent(
+      body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch {
+  } catch (error) {
+    logStripeWebhookFailure({ stage, error, signature });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
   try {
