@@ -1984,3 +1984,40 @@ dashboard/analytics/resource reads, customer-app consumers and webhook contracts
 O01 and full hosted/browser acceptance remain open. Adding lock/unlock audit
 events is a separate feature; no new events or live provider operations are part
 of this slice. The user-owned untracked notes file is preserved and uncommitted.
+
+## Phase 4 browser follow-up: print, private history and cabin freshness (2026-11-05)
+
+The approved [browser-fix slice](phase-4-browser-fixes-plan.md) intentionally repairs
+three reported behaviors. Admin `QuickActionsCard` now opens its existing preview
+from one Print / Download button; the unused whole-page print handler is removed.
+Print and PDF controls remain inside the preview where the template is mounted.
+
+Customer `useBookingHistory`, `useDiningReservationHistory` and
+`useExperienceBookingHistory` require resolved authentication, scope cache keys to
+user/session and pass abort signals. `CustomerHistoryCache`, beneath the mounted
+Clerk provider, removes obsolete private history even away from the page while
+preserving public caches. `app/bookings/page.tsx` guards rendering and keys its
+stateful subtree by user/session so retained records, drafts and late edits cannot
+affect a new account's dialog. Mutation invalidation prefixes are preserved.
+
+`apps/customer/lib/data/cabins.ts` and `app/page.tsx` use a request boundary before
+their catalog reads. Homepage and catalog links now follow the current database
+instead of a production prerender. This trades static rendering for request-time
+database reads without changing public response shapes or stored data.
+`scripts/http-smoke/catalog-freshness.mjs` reproduces and verifies the behavior
+using an actual production build and disposable record replacement; CI runs it.
+
+Sixteen new component/hook tests and the production stale-link assertion fail
+against the old implementation and pass with these changes. Final package tests
+pass: admin 1,708, customer 936, database 96 and email 3 (2,743 total). Both app
+type checks, strict changed-admin-test types, read-only lint, formatting, isolated
+HTTP, the production catalog gate, frozen install and all clean builds pass.
+Independent review found no runtime defect; its pending-edit coverage gap was
+closed with failing-before/passing-after resolve and reject cases.
+
+Hosted sign-out/account switching, native Back/bfcache, visual PDF pagination and
+responsive layout still require the [browser retest](phase-4-browser-review.md).
+Settings payloads, admin stay-date display, mobile Dining/Calendar/toasts and
+incomplete booking/payment acceptance remain open. The payment/active-checkout
+repricing guard is preserved. This slice does not change V03/O01 status or complete
+Phase 4 acceptance. The original user notes and browser report remain uncommitted.

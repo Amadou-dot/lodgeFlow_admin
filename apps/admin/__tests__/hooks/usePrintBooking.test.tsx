@@ -69,7 +69,7 @@ test('PDF failure rejects, clears busy state and permits a retry with the same f
   });
   expect(mockSave).toHaveBeenCalledWith('receipt.pdf');
 });
-test('a pending PDF excludes duplicate PDF, popup print and browser print until it completes', async () => {
+test('a pending PDF excludes duplicate PDF and popup print until it completes', async () => {
   let finish: (canvas: HTMLCanvasElement) => void = () => {
     throw new Error('not started');
   };
@@ -79,7 +79,6 @@ test('a pending PDF excludes duplicate PDF, popup print and browser print until 
         finish = resolve;
       })
   );
-  const browserPrint = jest.spyOn(window, 'print').mockImplementation(() => {});
   const open = jest.spyOn(window, 'open').mockReturnValue(null);
   const { result } = renderHook(() => usePrintBooking(booking));
   let pending: Promise<void> = Promise.resolve();
@@ -95,11 +94,9 @@ test('a pending PDF excludes duplicate PDF, popup print and browser print until 
     await expect(
       result.current.handlePrint('booking-pdf-template')
     ).rejects.toThrow(/in progress/);
-    result.current.handleBrowserPrint();
   });
   expect(html2canvas).toHaveBeenCalledTimes(1);
   expect(open).not.toHaveBeenCalled();
-  expect(browserPrint).not.toHaveBeenCalled();
   const canvas = document.createElement('canvas');
   canvas.width = 100;
   canvas.height = 100;
@@ -111,8 +108,6 @@ test('a pending PDF excludes duplicate PDF, popup print and browser print until 
     await pending;
   });
   expect(result.current.isGeneratingPDF).toBe(false);
-  act(() => result.current.handleBrowserPrint());
-  expect(browserPrint).toHaveBeenCalledTimes(1);
 });
 test('popup failures release the print operation for retry', async () => {
   jest.spyOn(window, 'open').mockReturnValue(null);

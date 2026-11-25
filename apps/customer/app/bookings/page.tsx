@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SignInButton, useAuth } from '@clerk/nextjs';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
@@ -85,6 +86,21 @@ type BookingDialog =
   | { kind: 'edit'; bookingId: string; numGuests: number };
 
 export default function BookingsPage() {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
+  if (!isLoaded) return <Spinner label='Loading your bookings...' />;
+  if (!isSignedIn || !userId || !sessionId) {
+    return (
+      <div className='py-12 text-center'>
+        <SignInButton mode='modal'>
+          <Button color='primary'>Sign in to view your bookings</Button>
+        </SignInButton>
+      </div>
+    );
+  }
+  return <BookingHistory key={`${userId}:${sessionId}`} />;
+}
+
+function BookingHistory() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialog, setDialog] = useState<BookingDialog>({ kind: 'closed' });

@@ -56,7 +56,6 @@ jest.mock('@/hooks/usePrintBooking', () => ({
     isGeneratingPDF: false,
     handlePrint: jest.fn(),
     handleDownloadPDF: mockPDF,
-    handleBrowserPrint: jest.fn(),
   }),
 }));
 jest.mock('@/components/BookingDetails/BookingPDFTemplate', () => ({
@@ -135,12 +134,7 @@ test('print preview replaces payment, failed PDF stays open and succeeds on retr
   mockPDF.mockRejectedValueOnce(new Error('Canvas failed'));
   show();
   fireEvent.click(screen.getByRole('button', { name: 'Record Payment' }));
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Print Booking Details' })
-  );
-  fireEvent.click(
-    await screen.findByRole('menuitem', { name: 'Print Booking' })
-  );
+  fireEvent.click(screen.getByRole('button', { name: 'Print / Download' }));
   await screen.findByText('Print Preview');
   expect(
     screen.queryByRole('dialog', { name: 'Payment' })
@@ -168,12 +162,7 @@ test('payment completion cannot close a newly opened print session', async () =>
   fireEvent.click(screen.getByRole('button', { name: 'Submit payment' }));
   await screen.findByRole('button', { name: 'Recording payment' });
   fireEvent.click(screen.getByRole('button', { name: 'Cancel payment' }));
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Print Booking Details' })
-  );
-  fireEvent.click(
-    await screen.findByRole('menuitem', { name: 'Print Booking' })
-  );
+  fireEvent.click(screen.getByRole('button', { name: 'Print / Download' }));
   await screen.findByText('Print Preview');
   await act(async () => {
     finish();

@@ -11,6 +11,16 @@ import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 
 const mockUpdateBooking = jest.fn();
 let mockBookings: BookingHistoryItem[];
+let mockAuth = {
+  isLoaded: true,
+  isSignedIn: true,
+  userId: 'user_customer',
+  sessionId: 'session-one',
+};
+jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => mockAuth,
+  SignInButton: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 const mockBooking: BookingHistoryItem = {
   _id: '507f1f77bcf86cd799439011',
@@ -114,12 +124,103 @@ jest.mock('@/components/PaymentButton', () => ({
 jest.mock('@heroui/date-picker', () => ({ DatePicker: () => <div /> }));
 
 beforeEach(() => {
+  mockAuth = {
+    isLoaded: true,
+    isSignedIn: true,
+    userId: 'user_customer',
+    sessionId: 'session-one',
+  };
   mockUpdateBooking.mockReset();
   mockBookings = [mockBooking];
 });
 afterEach(() => jest.restoreAllMocks());
 
 describe('booking history JSON in the bookings page', () => {
+  it('hides history and the open dialog on sign-out and a signed-out remount', () => {
+    const view = render(<BookingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+    expect(screen.getByText('January 1, 2030')).toBeInTheDocument();
+    mockAuth = { isLoaded: true, isSignedIn: false, userId: '', sessionId: '' };
+    view.rerender(<BookingsPage />);
+    expect(screen.queryByText('Pine')).not.toBeInTheDocument();
+    expect(screen.queryByText('January 1, 2030')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /sign in/i })
+    ).toBeInTheDocument();
+    view.unmount();
+    render(<BookingsPage />);
+    expect(screen.queryByText('Pine')).not.toBeInTheDocument();
+  });
+
+  it.each(['account', 'session'])(
+    'discards retained details when the %s changes',
+    change => {
+      const view = render(<BookingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+      mockBookings = [];
+      mockAuth = {
+        ...mockAuth,
+        userId: change === 'account' ? 'another-customer' : 'user_customer',
+        sessionId: 'session-two',
+      };
+      view.rerender(<BookingsPage />);
+      expect(screen.queryByText('January 1, 2030')).not.toBeInTheDocument();
+      expect(screen.queryByText('Pine')).not.toBeInTheDocument();
+    }
+  );
+
+  it('hides retained history while authentication is unresolved', () => {
+    const view = render(<BookingsPage />);
+    mockAuth = { ...mockAuth, isLoaded: false };
+    view.rerender(<BookingsPage />);
+    expect(screen.queryByText('Pine')).not.toBeInTheDocument();
+  });
+
+  it.each(['resolve', 'reject'] as const)(
+    'an old account edit that later %ss cannot replace the new account dialog',
+    async outcome => {
+      let complete = () => {};
+      mockUpdateBooking.mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            complete = () =>
+              outcome === 'resolve'
+                ? resolve({ success: true })
+                : reject(new Error('Old edit failed'));
+          })
+      );
+      const view = render(<BookingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+      fireEvent.change(screen.getByRole('spinbutton'), {
+        target: { value: '3' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Update Booking' }));
+      expect(mockUpdateBooking).toHaveBeenCalledTimes(1);
+
+      mockAuth = { ...mockAuth, userId: 'bob', sessionId: 'bob-session' };
+      mockBookings = [
+        {
+          ...mockBooking,
+          _id: '507f1f77bcf86cd799439099',
+          customer: 'bob',
+          numGuests: 4,
+        },
+      ];
+      view.rerender(<BookingsPage />);
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+      fireEvent.change(screen.getByRole('spinbutton'), {
+        target: { value: '1' },
+      });
+      await act(async () => complete());
+      expect(screen.getByRole('spinbutton')).toHaveValue(1);
+      expect(
+        screen.getByRole('button', { name: 'Update Booking' })
+      ).toBeInTheDocument();
+      expect(mockUpdateBooking).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it.each(['America/Denver', 'Asia/Tokyo'])(
     'preserves stay dates in the %s history and details',
     zone => {

@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { connection } from 'next/server';
 
 import { Cabin, connectDB } from '@lodgeflow/database';
 import { logger } from '@lodgeflow/database/logger';
@@ -36,6 +37,9 @@ export const getCabinById = cache(
  */
 export const getAllActiveCabinsForListing = cache(
   async (): Promise<CabinType[]> => {
+    // Catalog records can be replaced after a deployment. Never prerender their IDs.
+    // Keep Next's request-boundary signal outside the database error fallback.
+    await connection();
     try {
       await connectDB();
       const docs = await Cabin.find({ status: 'active' }).sort({ price: 1 });

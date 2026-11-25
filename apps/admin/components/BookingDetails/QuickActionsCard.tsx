@@ -5,12 +5,6 @@ import { useSendConfirmationEmail } from '@/hooks/useSendEmail';
 import type { PopulatedBooking } from '@/types';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
-import {
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-} from '@heroui/dropdown';
 import { Modal, ModalBody, ModalContent } from '@heroui/modal';
 import { addToast } from '@heroui/toast';
 import { useEffect, useRef, useState } from 'react';
@@ -76,13 +70,8 @@ function QuickActionsContent({
   );
 
   // Initialize print functionality
-  const {
-    isPrinting,
-    isGeneratingPDF,
-    handlePrint,
-    handleDownloadPDF,
-    handleBrowserPrint,
-  } = usePrintBooking(booking);
+  const { isPrinting, isGeneratingPDF, handlePrint, handleDownloadPDF } =
+    usePrintBooking(booking);
 
   const handleSendConfirmation = async () => {
     if (!bookingData || !cabinData || !booking.customer) {
@@ -216,34 +205,19 @@ function QuickActionsContent({
             Send Confirmation Email
           </Button>
 
-          {/* Print Dropdown */}
-          <Dropdown>
-            <DropdownTrigger>
-              <Button
-                variant='flat'
-                fullWidth
-                isDisabled={isPrinting || isGeneratingPDF}
-                isLoading={isPrinting || isGeneratingPDF}
-              >
-                {isPrinting
-                  ? 'Printing...'
-                  : isGeneratingPDF
-                    ? 'Generating PDF...'
-                    : 'Print Booking Details'}
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu>
-              <DropdownItem key='print' onPress={onPrintModalOpen}>
-                Print Booking
-              </DropdownItem>
-              <DropdownItem key='pdf' onPress={handleDownloadBookingPDF}>
-                Download as PDF
-              </DropdownItem>
-              <DropdownItem key='browser-print' onPress={handleBrowserPrint}>
-                Browser Print
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          <Button
+            variant='flat'
+            fullWidth
+            onPress={onPrintModalOpen}
+            isDisabled={isPrinting || isGeneratingPDF}
+            isLoading={isPrinting || isGeneratingPDF}
+          >
+            {isPrinting
+              ? 'Printing...'
+              : isGeneratingPDF
+                ? 'Generating PDF...'
+                : 'Print / Download'}
+          </Button>
         </CardBody>
       </Card>
 

@@ -3,6 +3,12 @@ import mongoose, { type FilterQuery } from 'mongoose';
 import CabinModel, { type ICabin } from '@lodgeflow/database/models/Cabin';
 import { NextRequest } from 'next/server';
 
+// Request binding is exercised with the actual production build in the HTTP gate.
+jest.mock('next/server', () => ({
+  ...jest.requireActual<typeof import('next/server')>('next/server'),
+  connection: () => Promise.resolve(),
+}));
+
 const TypedCabin = mongoose.model<ICabin>('Cabin', CabinModel.schema);
 type CabinDocument = InstanceType<typeof TypedCabin>;
 const mockConnect = jest.fn<Promise<void>, []>();

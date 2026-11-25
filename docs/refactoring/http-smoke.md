@@ -14,6 +14,28 @@ replica set, local provider fixtures, and both actual Next.js applications. The
 Local execution needs permission to open listeners and may need the MongoDB
 Memory Server binary download. No application credentials are required.
 
+## Production cabin catalog regression
+
+The same CI job also runs:
+
+```sh
+pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/catalog-freshness.mjs
+```
+
+This separate gate builds and starts the real production customer app against
+disposable MongoDB. It verifies homepage and `/cabins` links, replaces the fixture
+cabin after the build and first requests, then requires both pages to render the
+replacement link. The current detail must load and the removed detail must return
+404. This catches build-time catalog snapshots that the development HTTP runner
+cannot reproduce. The pre-fix implementation failed this exact assertion.
+
+The runner excludes app environment files and uses an allowlisted child environment,
+throwaway Clerk configuration and its own database URI. It neither seeds production
+nor calls a live payment/email provider. Its temporary workspace, Next server and
+MongoDB are cleaned up in `finally`; CI's job timeout remains the outer deadline.
+These HTTP assertions do not establish client navigation, native Back/bfcache,
+hosted login or visual browser acceptance.
+
 ## What runs for real
 
 - Next.js routing and both original `proxy.ts` files, using Webpack development
