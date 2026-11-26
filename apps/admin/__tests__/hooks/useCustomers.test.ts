@@ -1,6 +1,11 @@
+/** @jest-environment ./__tests__/setup/fetch-jsdom.cjs */
 import useSWR from 'swr';
 
-import { customerJsonFixture } from '../setup/customer-json';
+import type { CustomerWithStats } from '@/types';
+import {
+  customerDetailFixture,
+  customerJsonFixture,
+} from '../setup/customer-json';
 
 const mockUseSWR = jest.mocked(useSWR);
 
@@ -137,6 +142,46 @@ describe('useCustomers', () => {
 });
 
 describe('useCustomer', () => {
+  it('preserves explicit null booking metadata in the checked detail read', async () => {
+    const customer: CustomerWithStats = {
+      ...customerDetailFixture,
+      recentBookings: [
+        {
+          _id: 'booking_legacy',
+          id: 'booking_legacy',
+          customer: customerDetailFixture.id,
+          cabin: null,
+          checkInDate: '2040-06-01T23:30:00.000Z',
+          checkOutDate: '2040-06-03T23:30:00.000Z',
+          numNights: 2,
+          numGuests: 2,
+          status: 'checked-out',
+          cabinPrice: 200,
+          extrasPrice: 0,
+          totalPrice: 200,
+          isPaid: false,
+          amountPaid: 0,
+          depositPaid: false,
+          depositAmount: 0,
+          remainingAmount: 200,
+          checkoutPending: null,
+          specialRequests: null,
+          refundStatus: null,
+        },
+      ],
+    };
+    jest
+      .mocked(global.fetch)
+      .mockResolvedValueOnce(Response.json({ success: true, data: customer }));
+    useCustomer(customer.id);
+    const [key, fetcher] = mockUseSWR.mock.calls[0] ?? [];
+    if (typeof key !== 'string' || typeof fetcher !== 'function') {
+      throw new Error('Expected the enabled customer detail fetcher');
+    }
+
+    await expect(fetcher(key)).resolves.toEqual(customer);
+  });
+
   it('passes null key when id is empty', () => {
     useCustomer('');
 

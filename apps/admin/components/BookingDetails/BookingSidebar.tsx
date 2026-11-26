@@ -34,7 +34,7 @@ export default function BookingSidebar({
         stripeSessionId={booking.stripeSessionId ?? undefined}
         stripePaymentIntentId={booking.stripePaymentIntentId ?? undefined}
         paymentConfirmationSentAt={booking.paymentConfirmationSentAt?.toString()}
-        refundStatus={booking.refundStatus}
+        refundStatus={booking.refundStatus ?? undefined}
         refundAmount={booking.refundAmount ?? undefined}
         refundedAt={booking.refundedAt?.toString()}
       />
