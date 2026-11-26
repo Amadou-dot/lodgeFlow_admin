@@ -1,21 +1,27 @@
 import { renderHook, act } from '@testing-library/react';
+import { ReadonlyURLSearchParams } from 'next/navigation';
 
-// Override the global next/navigation mock for this test
-const mockPush = jest.fn();
-const mockReplace = jest.fn();
-let currentSearchParams = new URLSearchParams();
+type Navigation = typeof import('next/navigation');
+type Router = ReturnType<Navigation['useRouter']>;
+type FilterRouter = Pick<Router, 'push' | 'replace'>;
+const mockPush = jest.fn<
+  ReturnType<Router['push']>,
+  Parameters<Router['push']>
+>();
+const mockReplace = jest.fn<
+  ReturnType<Router['replace']>,
+  Parameters<Router['replace']>
+>();
+let currentSearchParams = new ReadonlyURLSearchParams();
 
+// Override the global next/navigation mock for this test.
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    prefetch: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-  }),
-  useSearchParams: () => currentSearchParams,
-  usePathname: () => '/bookings',
+  ReadonlyURLSearchParams:
+    jest.requireActual<Navigation>('next/navigation').ReadonlyURLSearchParams,
+  useRouter: (): FilterRouter => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: (): ReturnType<Navigation['useSearchParams']> =>
+    currentSearchParams,
+  usePathname: (): ReturnType<Navigation['usePathname']> => '/bookings',
 }));
 
 import {
@@ -28,7 +34,7 @@ import {
 beforeEach(() => {
   mockPush.mockClear();
   mockReplace.mockClear();
-  currentSearchParams = new URLSearchParams();
+  currentSearchParams = new ReadonlyURLSearchParams();
 });
 
 describe('useURLFilters', () => {
@@ -46,7 +52,7 @@ describe('useURLFilters', () => {
     });
 
     it('parses string values from URL', () => {
-      currentSearchParams = new URLSearchParams('status=confirmed');
+      currentSearchParams = new ReadonlyURLSearchParams('status=confirmed');
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: bookingsFilterConfig })
@@ -56,7 +62,7 @@ describe('useURLFilters', () => {
     });
 
     it('parses number values from URL', () => {
-      currentSearchParams = new URLSearchParams('page=3&limit=20');
+      currentSearchParams = new ReadonlyURLSearchParams('page=3&limit=20');
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: bookingsFilterConfig })
@@ -67,7 +73,9 @@ describe('useURLFilters', () => {
     });
 
     it('rejects invalid enum values', () => {
-      currentSearchParams = new URLSearchParams('status=invalid_status');
+      currentSearchParams = new ReadonlyURLSearchParams(
+        'status=invalid_status'
+      );
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: bookingsFilterConfig })
@@ -77,7 +85,7 @@ describe('useURLFilters', () => {
     });
 
     it('handles NaN number values', () => {
-      currentSearchParams = new URLSearchParams('page=abc');
+      currentSearchParams = new ReadonlyURLSearchParams('page=abc');
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: bookingsFilterConfig })
@@ -90,7 +98,7 @@ describe('useURLFilters', () => {
       const config: URLFilterConfig = {
         active: { type: 'boolean', defaultValue: false },
       };
-      currentSearchParams = new URLSearchParams('active=true');
+      currentSearchParams = new ReadonlyURLSearchParams('active=true');
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: config })
@@ -140,7 +148,7 @@ describe('useURLFilters', () => {
         result.current.updateFilters({
           page: 2,
           status: 'checked-in',
-        } as any);
+        });
       });
 
       const calledURL = mockReplace.mock.calls[0][0];
@@ -149,7 +157,7 @@ describe('useURLFilters', () => {
     });
 
     it('removes params set to default value', () => {
-      currentSearchParams = new URLSearchParams('page=3');
+      currentSearchParams = new ReadonlyURLSearchParams('page=3');
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: bookingsFilterConfig })
@@ -164,7 +172,7 @@ describe('useURLFilters', () => {
     });
 
     it('removes params set to undefined via clearFilter', () => {
-      currentSearchParams = new URLSearchParams('search=test');
+      currentSearchParams = new ReadonlyURLSearchParams('search=test');
 
       const { result } = renderHook(() =>
         useURLFilters({ filterConfig: bookingsFilterConfig })
@@ -181,7 +189,7 @@ describe('useURLFilters', () => {
 
   describe('resetFilters', () => {
     it('resets all filters to defaults', () => {
-      currentSearchParams = new URLSearchParams(
+      currentSearchParams = new ReadonlyURLSearchParams(
         'page=5&status=confirmed&search=test'
       );
 

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { logger } from '@/lib/logger';
 jest.mock('@/lib/staff-access', () => ({
   resolveStaffRole: jest.fn().mockResolvedValue(null),
@@ -162,48 +164,44 @@ describe('api-utils', () => {
 
   describe('formatZodErrors', () => {
     it('formats errors by path', () => {
-      const mockZodError = {
-        issues: [
-          { path: ['name'], message: 'Name is required' },
-          { path: ['email'], message: 'Invalid email' },
-        ],
-      };
+      const error = new z.ZodError([
+        { code: 'custom', path: ['name'], message: 'Name is required' },
+        { code: 'custom', path: ['email'], message: 'Invalid email' },
+      ]);
 
-      const result = formatZodErrors(mockZodError as any);
+      const result = formatZodErrors(error);
 
       expect(result.name).toEqual(['Name is required']);
       expect(result.email).toEqual(['Invalid email']);
     });
 
     it('groups multiple errors for same path', () => {
-      const mockZodError = {
-        issues: [
-          { path: ['name'], message: 'Too short' },
-          { path: ['name'], message: 'Invalid characters' },
-        ],
-      };
+      const error = new z.ZodError([
+        { code: 'custom', path: ['name'], message: 'Too short' },
+        { code: 'custom', path: ['name'], message: 'Invalid characters' },
+      ]);
 
-      const result = formatZodErrors(mockZodError as any);
+      const result = formatZodErrors(error);
 
       expect(result.name).toEqual(['Too short', 'Invalid characters']);
     });
 
     it('handles nested paths', () => {
-      const mockZodError = {
-        issues: [{ path: ['address', 'city'], message: 'City required' }],
-      };
+      const error = new z.ZodError([
+        { code: 'custom', path: ['address', 'city'], message: 'City required' },
+      ]);
 
-      const result = formatZodErrors(mockZodError as any);
+      const result = formatZodErrors(error);
 
       expect(result['address.city']).toEqual(['City required']);
     });
 
     it('uses _root for root-level errors', () => {
-      const mockZodError = {
-        issues: [{ path: [], message: 'Invalid object' }],
-      };
+      const error = new z.ZodError([
+        { code: 'custom', path: [], message: 'Invalid object' },
+      ]);
 
-      const result = formatZodErrors(mockZodError as any);
+      const result = formatZodErrors(error);
 
       expect(result._root).toEqual(['Invalid object']);
     });
@@ -211,11 +209,11 @@ describe('api-utils', () => {
 
   describe('createValidationErrorResponse', () => {
     it('returns 400 with formatted errors', async () => {
-      const mockZodError = {
-        issues: [{ path: ['name'], message: 'Required' }],
-      };
+      const error = new z.ZodError([
+        { code: 'custom', path: ['name'], message: 'Required' },
+      ]);
 
-      const response = createValidationErrorResponse(mockZodError as any);
+      const response = createValidationErrorResponse(error);
       const body = await response.json();
 
       expect(response.status).toBe(400);

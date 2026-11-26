@@ -1,42 +1,45 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-// Mocks are hoisted above the imports, so the factories below reference the
-// `mock*` bindings lazily (inside arrow functions) to avoid a TDZ error.
-const mockGetUser = jest.fn();
-
-jest.mock('@clerk/nextjs/server', () => ({
-  clerkClient: jest.fn().mockResolvedValue({
-    users: {
-      getUser: (...args: any[]) => mockGetUser(...args),
-      getUserList: jest.fn(),
-      updateUser: jest.fn(),
-      updateUserMetadata: jest.fn(),
-      deleteUser: jest.fn(),
-    },
-  }),
-  User: {},
-}));
-
-const mockRedisGet = jest.fn();
-const mockRedisSet = jest.fn();
-const mockRedisMget = jest.fn();
-const mockRedisDel = jest.fn();
-
-jest.mock('@upstash/redis', () => ({
-  Redis: jest.fn().mockImplementation(() => ({
-    get: (...args: any[]) => mockRedisGet(...args),
-    set: (...args: any[]) => mockRedisSet(...args),
-    mget: (...args: any[]) => mockRedisMget(...args),
-    del: (...args: any[]) => mockRedisDel(...args),
-  })),
-}));
+import type { clerkClient } from '@clerk/nextjs/server';
+import type { Redis } from '@upstash/redis';
+import type { z } from 'zod';
 
 import {
   getClerkUser,
   getClerkUsersBatch,
   resetUserCache,
+  type CustomerClerkSource,
 } from '@/lib/clerk-users';
 import { resetRedisClient } from '@/lib/redis';
+import type { customerJsonSchema } from '@/lib/validations/customer-json';
+
+type ClerkUsers = Awaited<ReturnType<typeof clerkClient>>['users'];
+const mockGetUser = jest.fn<
+  Promise<CustomerClerkSource>,
+  Parameters<ClerkUsers['getUser']>
+>();
+
+jest.mock('@clerk/nextjs/server', () => ({
+  clerkClient: async () => ({ users: { getUser: mockGetUser } }),
+}));
+
+// The cache parses unknown JSON at the read boundary. Keep the command
+// arguments tied to the SDK and specialize mget's generic result to that input.
+const mockRedisGet = jest.fn<
+  ReturnType<Redis['get']>,
+  Parameters<Redis['get']>
+>();
+const mockRedisMget = jest.fn<Promise<unknown[]>, Parameters<Redis['mget']>>();
+const mockRedisSet = jest.fn<
+  ReturnType<Redis['set']>,
+  Parameters<Redis['set']>
+>();
+
+jest.mock('@upstash/redis', () => ({
+  Redis: jest.fn().mockImplementation(() => ({
+    get: mockRedisGet,
+    mget: mockRedisMget,
+    set: mockRedisSet,
+  })),
+}));
 
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
@@ -58,7 +61,7 @@ function uid(prefix = 'user'): string {
   return `${prefix}_${Date.now()}_${uniqueCounter}`;
 }
 
-function clerkUser(id: string, overrides: Record<string, any> = {}) {
+function clerkUser(id: string): CustomerClerkSource {
   return {
     id,
     firstName: 'Test',
@@ -77,12 +80,17 @@ function clerkUser(id: string, overrides: Record<string, any> = {}) {
     lastActiveAt: Date.now(),
     banned: false,
     locked: false,
-    ...overrides,
   };
 }
 
 /** A cache entry as it comes back from Redis: JSON, so Dates are ISO strings. */
-function redisEntry(id: string, overrides: Record<string, any> = {}) {
+function redisEntry({
+  id,
+  lastSignInAt,
+}: {
+  id: string;
+  lastSignInAt?: string;
+}): { data: z.input<typeof customerJsonSchema> } {
   return {
     data: {
       id,
@@ -95,7 +103,7 @@ function redisEntry(id: string, overrides: Record<string, any> = {}) {
       has_image: false,
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-02T00:00:00.000Z',
-      last_sign_in_at: null,
+      last_sign_in_at: lastSignInAt ?? null,
       last_active_at: '2026-01-03T00:00:00.000Z',
       banned: false,
       locked: false,
@@ -104,7 +112,6 @@ function redisEntry(id: string, overrides: Record<string, any> = {}) {
       totalSpent: 0,
       loyaltyTier: 'Bronze',
       fullAddress: '',
-      ...overrides,
     },
   };
 }
@@ -114,7 +121,6 @@ beforeEach(() => {
   resetUserCache();
   enableRedis();
   mockRedisSet.mockResolvedValue('OK');
-  mockRedisDel.mockResolvedValue(1);
   jest.spyOn(console, 'error').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -127,7 +133,7 @@ afterEach(() => {
 describe('getClerkUser — Redis-backed cache', () => {
   it('serves a hit from Redis without calling Clerk', async () => {
     const id = uid();
-    mockRedisGet.mockResolvedValue(redisEntry(id));
+    mockRedisGet.mockResolvedValue(redisEntry({ id }));
 
     const customer = await getClerkUser(id);
 
@@ -140,7 +146,7 @@ describe('getClerkUser — Redis-backed cache', () => {
   it('revives Date fields that JSON serialization flattened to strings', async () => {
     const id = uid();
     mockRedisGet.mockResolvedValue(
-      redisEntry(id, { last_sign_in_at: '2026-01-04T00:00:00.000Z' })
+      redisEntry({ id, lastSignInAt: '2026-01-04T00:00:00.000Z' })
     );
 
     const customer = await getClerkUser(id);
@@ -154,7 +160,7 @@ describe('getClerkUser — Redis-backed cache', () => {
 
   it('keeps a null last_sign_in_at as null rather than an Invalid Date', async () => {
     const id = uid();
-    mockRedisGet.mockResolvedValue(redisEntry(id));
+    mockRedisGet.mockResolvedValue(redisEntry({ id }));
 
     const customer = await getClerkUser(id);
 
@@ -232,7 +238,7 @@ describe('getClerkUser — Redis-backed cache', () => {
 describe('getClerkUsersBatch — Redis-backed cache', () => {
   it('reads every id in a single mget round trip', async () => {
     const ids = [uid(), uid(), uid()];
-    mockRedisMget.mockResolvedValue(ids.map(id => redisEntry(id)));
+    mockRedisMget.mockResolvedValue(ids.map(id => redisEntry({ id })));
 
     const { users, errors } = await getClerkUsersBatch(ids);
 
@@ -248,7 +254,7 @@ describe('getClerkUsersBatch — Redis-backed cache', () => {
   it('fetches only the ids that missed the cache', async () => {
     const cachedId = uid('cached');
     const freshId = uid('fresh');
-    mockRedisMget.mockResolvedValue([redisEntry(cachedId), null]);
+    mockRedisMget.mockResolvedValue([redisEntry({ id: cachedId }), null]);
     mockGetUser.mockResolvedValue(clerkUser(freshId));
 
     const { users } = await getClerkUsersBatch([cachedId, freshId]);
