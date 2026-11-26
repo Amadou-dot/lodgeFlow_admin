@@ -169,9 +169,10 @@ passed. Both production apps were Ready at the merge SHA. Read-only smoke found
 a 200 current cabin detail and admin sign-in page, and a 307 from the protected
 admin bookings API to sign-in.
 
-That retest confirms the logout → Back outcome the user observed. Hosted account
-switching while history reads or edits are pending, other Back/bfcache sequences
-and visual multi-page Print / Download still need representative browser evidence.
+That retest confirms the logout → Back outcome the user observed. The
+[remaining browser scenarios](#remaining-browser-and-payment-acceptance) cover
+the other sign-out paths, account switches during history reads and edits,
+and the desktop and phone print-preview workflows.
 Catalog replacement has the disposable production-build regression above and
 current links have read-only production coverage. Browser navigation after a
 catalog refresh remains a separate interaction check.
@@ -210,6 +211,19 @@ The following slices have local implementation and review evidence.
   active. The review correction passed 64 focused tests.
   [Booking editor regression](../../apps/admin/__tests__/components/BookingEditPage.test.tsx)
   [Admin PUT regression](../../apps/admin/__tests__/integration/api/bookings.test.ts)
+
+The final editor regressions exercise staff actions through the real form
+controls. A notes-only save works for a paid past stay and after guest or
+stay-length limits tighten. The picker exposes “Stay Duration” as its
+accessible name. A sparse update can clear an observation and preserves
+unedited refund details, receipts, dates and a later guest/extras reprice in
+the disposable PUT tests. An extras change preserves the latest unedited flags.
+
+The Settings page retains a newer draft through a transient GET failure in
+the same authorized session and hides the controls until recovery. A denied
+read or change of staff session discards the draft. Save and Reset serialize
+even with a previously opened confirmation. Keyboard entry and paste preserve
+fractional fees and deposit percentages.
 
 ### Guest/extras edit and checkout outcomes
 
@@ -254,8 +268,9 @@ MongoDB and controlled providers. The exact hosted expired/signed-out checkout
 response and its browser presentation remain unverified.
 [Checkout reader](../../apps/customer/lib/validations/checkout-response.ts)
 
-The two checkout routes return `Authentication required` in JSON if reached
-without a user. The isolated signed-out cabin HTTP check accepts either a
+Cabin, dining and experience checkout expose three endpoints. The cabin
+route and the shared dining/experience handler return `Authentication required`
+in JSON if reached without a user. The isolated signed-out cabin HTTP check accepts either a
 Clerk-marked 404 rewrite or a configured 307 sign-in redirect before the
 route. The UI fallback was verified with controlled responses.
 [HTTP auth assertion](../../scripts/http-smoke/assert-http.mjs)
@@ -306,9 +321,13 @@ recorded in the final Task 4 evidence.
 
 ## Remaining browser and payment acceptance
 
-- Complete representative hosted Clerk history/account transitions and
-  Print / Download rendering, including visual desktop/mobile multi-page output.
-  Keep the user's logout → Back confirmation as a completed observation.
+- The user confirmed that Back after logout prompts for sign-in. Complete the
+  remaining hosted sequences by signing out from booking history and from
+  another page, then using Back, including a back/forward-cache restore, and
+  checking that previous records and dialogs stay cleared. Switch accounts while a history read is pending and while an
+  edit is pending, and check the new account's records and dialogs.
+- On desktop and phone, use both Print and Download PDF, inspect the visual
+  multi-page output, then close and reopen the preview.
 - Recheck Settings save/reset/retry, the booking editor and stay labels with an
   authorized staff browser session. Exercise the customer history guest edit
   on an eligible unconfirmed booking with no receipt or active checkout in an

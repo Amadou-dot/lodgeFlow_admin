@@ -169,6 +169,51 @@ admin build recorded the existing Tailwind config module-type warning. The
 isolated `pnpm test:http` result is recorded in the checkout result above.
 Phase 4 browser and payment acceptance remains open.
 
+At `2302834`, the final Settings and booking corrections passed 102 focused
+tests in seven suites, including real controls, the staff guard and disposable
+booking PUTs. The full admin command `pnpm --filter @lodgeflow/admin test --runInBand`
+passed 1,763 tests in 124 suites. Admin app types, strict changed-test types,
+read-only admin ESLint and touched-source Prettier also passed.
+
+### Reproduce the focused checkpoints
+
+Run each command from the workspace root with the pinned Node and pnpm versions.
+
+Settings at `3a0d20f` passed 70 tests in eight suites.
+
+```sh
+pnpm --filter @lodgeflow/admin exec jest --runInBand --runTestsByPath \
+  __tests__/components/SettingsForm.test.tsx __tests__/hooks/useSettings.test.ts \
+  __tests__/hooks/useSettings.mutations.test.ts __tests__/hooks/cacheRefresh.test.tsx \
+  __tests__/validations/settings.test.ts __tests__/api/settings.test.ts \
+  __tests__/integration/api/settings.test.ts __tests__/integration/api/settings-json.test.ts
+```
+
+The initial booking editor checkpoint passed 90 tests in Denver, including
+the disposable PUT suite.
+
+```sh
+TZ=America/Denver pnpm --filter @lodgeflow/admin exec jest --runInBand \
+  --testPathPatterns='BookingEditPage|BookingJsonConsumers|useBookingForm|useInfiniteCustomers|useBooking.*Mutation|integration/api/bookings.test'
+```
+
+The booking editor at `d70260a` passed 64 tests in seven jsdom suites.
+
+```sh
+pnpm --filter @lodgeflow/admin exec jest --selectProjects jsdom --runInBand \
+  --testPathPatterns='BookingEditPage|BookingJsonConsumers|BookingDatesGuests|PaymentInformation|useBookingForm|useInfiniteCustomers|useBooking.*Mutation'
+```
+
+Checkout at `510f93d` passed 229 tests in eight suites.
+
+```sh
+pnpm --filter @lodgeflow/customer exec jest --runInBand --runTestsByPath \
+  __tests__/bookings/useCreateCheckout.test.tsx __tests__/lib/open-reservation-checkout.test.ts \
+  __tests__/reservations/confirmation-payments.test.tsx __tests__/bookings/BookingConfirmation.test.tsx \
+  __tests__/bookings/mutation-cache.test.tsx __tests__/api/create-checkout.test.ts \
+  __tests__/api/reservation-checkout.test.ts __tests__/api/booking-boundary.test.ts
+```
+
 ## Phase 6 handoff
 
 Continue the remaining V03 readers and O01 compiler/test-helper work from the
