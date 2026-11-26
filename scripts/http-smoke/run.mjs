@@ -2055,12 +2055,12 @@ try {
       },
     },
   };
-  const webhook = async (payload, signature) =>
+  const webhook = async (payload, { status = 200, signature } = {}) =>
     expectJson({
       url: `${customer}/api/payments/webhook`,
       method: 'POST',
       body: payload,
-      status: signature === 'invalid' ? 400 : 200,
+      status,
       headers: {
         'stripe-signature':
           signature ??
@@ -2070,13 +2070,42 @@ try {
           }),
       },
     });
-  assert.deepEqual(await webhook(event, 'invalid'), {
-    error: 'Invalid signature',
-  });
+  assert.deepEqual(
+    await webhook(event, { status: 400, signature: 'invalid' }),
+    {
+      error: 'Invalid signature',
+    }
+  );
+  assert.equal((await Booking.findById(bookingId).lean()).payments.length, 0);
+  const failedProcessing = { error: 'Webhook processing failed' };
+  assert.deepEqual(
+    await webhook({ id: event.id, type: 17 }, { status: 500 }),
+    failedProcessing
+  );
+  assert.equal(await ProcessedStripeEvent.exists({ eventId: event.id }), null);
+  assert.deepEqual(
+    await webhook(
+      {
+        ...event,
+        data: { object: { ...event.data.object, amount_total: 100 } },
+      },
+      { status: 500 }
+    ),
+    failedProcessing
+  );
+  assert.equal(await ProcessedStripeEvent.exists({ eventId: event.id }), null);
   assert.equal((await Booking.findById(bookingId).lean()).payments.length, 0);
   const paid = await webhook(event);
   assert.deepEqual(paid, { received: true });
   assert.deepEqual(await webhook(event), paid);
+  assert.deepEqual(await webhook({ id: event.id }), paid);
+  const future = { id: 'evt_future', type: 'future.event', extra: true };
+  assert.deepEqual(await webhook(future), paid);
+  assert.equal(
+    (await ProcessedStripeEvent.findOne({ eventId: future.id }).lean())
+      .eventType,
+    future.type
+  );
   assert.deepEqual(
     await webhook({ ...event, id: 'evt_smoke_duplicate' }),
     paid
@@ -4730,6 +4759,73 @@ try {
   );
   console.log(
     'PASS manual confirmation body validation, safe database/provider errors and no booking writes'
+  );
+
+  const pendingRefund = {
+    token: 'experience-refund',
+    amountCents: 100,
+    status: 'pending',
+    actor: 'staff',
+    reference: 'Smoke refund',
+    createdAt: new Date(),
+  };
+  await ExperienceBooking.updateOne(
+    { _id: experienceId },
+    { $set: { stripeRefund: pendingRefund } }
+  );
+  const beforeRefund = await ExperienceBooking.findById(experienceId).lean();
+  const refundMetadata = {
+    reservationKind: 'experience',
+    reservationId: experienceId,
+    refundToken: pendingRefund.token,
+  };
+  const signedRefund = {
+    id: 'evt_experience_refund',
+    type: 'refund.updated',
+    data: { object: { metadata: refundMetadata, status: 'succeeded' } },
+  };
+  const staleRefund = {
+    ...signedRefund,
+    id: 'evt_experience_refund_stale',
+    data: { object: { metadata: { ...refundMetadata, refundToken: 'old' } } },
+  };
+  assert.deepEqual(
+    await reservationWebhook({ payload: staleRefund, status: 200 }),
+    { received: true }
+  );
+  assert.ok(await ProcessedStripeEvent.exists({ eventId: staleRefund.id }));
+  assert.deepEqual(
+    await reservationWebhook({ payload: signedRefund, status: 500 }),
+    { error: 'Webhook processing failed' }
+  );
+  assert.equal(
+    await ProcessedStripeEvent.exists({ eventId: signedRefund.id }),
+    null
+  );
+  assert.deepEqual(
+    await ExperienceBooking.findById(experienceId).lean(),
+    beforeRefund
+  );
+  const correctedRefund = {
+    ...signedRefund,
+    data: { object: { ...signedRefund.data.object, id: 're_experience' } },
+  };
+  for (let delivery = 0; delivery < 2; delivery++)
+    assert.deepEqual(
+      await reservationWebhook({ payload: correctedRefund, status: 200 }),
+      { received: true }
+    );
+  const afterRefund = await ExperienceBooking.findById(experienceId).lean();
+  assert.equal(afterRefund.stripeRefund.status, 'succeeded');
+  assert.equal(afterRefund.stripeRefund.refundId, 're_experience');
+  assert.deepEqual(
+    afterRefund.receipts
+      .filter(receipt => receipt.type === 'refund')
+      .map(receipt => receipt.amountCents),
+    [100]
+  );
+  console.log(
+    'PASS signed reservation refund ignores stale details, retries missing provider ID and records one refund'
   );
 
   for (const call of calls.filter(call => call.route === '/resend/send')) {

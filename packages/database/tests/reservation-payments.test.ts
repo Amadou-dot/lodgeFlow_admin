@@ -654,3 +654,75 @@ test('a saved refund that exceeds available receipts fails before contacting Str
   assert.equal(providerCalls, 0);
   assert.deepEqual(await DiningReservation.findById(row.id).lean(), beforeRow);
 });
+
+test('requires usable receipt identifiers for a matching reservation checkout', async () => {
+  const row = await fixture('dining');
+  row.checkout = {
+    token: 'quote',
+    pending: true,
+    amountCents: 5000,
+    currency: 'usd',
+    createdAt: new Date(),
+  };
+  await row.save();
+  const checkout = {
+    kind: 'dining' as const,
+    id: row.id,
+    token: 'quote',
+    sessionId: 'cs_valid',
+    paymentIntentId: 'pi_valid',
+    amountCents: 5000,
+    currency: 'usd',
+  };
+  for (const invalid of [{ sessionId: ' ' }, { paymentIntentId: ' ' }]) {
+    await assert.rejects(
+      settleReservationCheckout({ ...checkout, ...invalid }),
+      ReservationRuleError
+    );
+  }
+  assert.equal(
+    (await DiningReservation.findById(row.id).orFail()).receipts.length,
+    0
+  );
+  await settleReservationCheckout(checkout);
+  await settleReservationCheckout(checkout);
+  assert.equal(
+    (await DiningReservation.findById(row.id).orFail()).receipts.length,
+    1
+  );
+});
+
+test('validates incoming refund details only for an applicable refund operation', async () => {
+  const row = await fixture('experience');
+  const event = {
+    kind: 'experience' as const,
+    id: row.id,
+    token: 'refund',
+    refundId: ' ',
+    status: ' ',
+  };
+  await settleReservationRefund(event);
+  row.stripeRefund = {
+    token: 'refund',
+    status: 'pending',
+    amountCents: 100,
+    createdAt: new Date(),
+    actor: 'staff',
+    reference: 'Cancel',
+  };
+  await row.save();
+  const beforeRow = await ExperienceBooking.findById(row.id).lean();
+  await settleReservationRefund({ ...event, token: 'old' });
+  await assert.rejects(
+    settleReservationRefund({ ...event, status: 'pending' }),
+    ReservationRuleError
+  );
+  await assert.rejects(
+    settleReservationRefund({ ...event, refundId: 're_valid' }),
+    ReservationRuleError
+  );
+  assert.deepEqual(await ExperienceBooking.findById(row.id).lean(), beforeRow);
+  row.stripeRefund.status = 'succeeded';
+  await row.save();
+  await settleReservationRefund(event);
+});
