@@ -41,12 +41,19 @@ const mockPayment = jest.fn<
 >();
 const mockReceiptRender = jest.fn<
   void,
-  [{ onReconciled: () => void; booking: PopulatedBooking }]
+  [
+    {
+      onReconciled: () => void;
+      booking: PopulatedBooking;
+      dialogId: symbol | null;
+    },
+  ]
 >();
 const mockPDF = jest.fn<Promise<void>, [string]>();
 jest.mock('@/hooks/useBookings', () => ({
   useBookingByEmail: () => ({ data: null, isLoading: false }),
   useRecordPayment: (options: {
+    dialogId: symbol | null;
     onReconciled: () => void;
     booking: PopulatedBooking;
   }) => {
@@ -194,11 +201,15 @@ test('reconciliation closes the submitting draft while preserving a newer paymen
   const previous = mockReceiptRender.mock.lastCall?.[0];
   if (!previous) throw new Error('Missing receipt dialog');
   expect(previous.booking).toEqual(booking);
+  expect(typeof previous.dialogId).toBe('symbol');
   act(previous.onReconciled);
   expect(
     screen.queryByRole('dialog', { name: 'Payment' })
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Record Payment' }));
+  expect(mockReceiptRender.mock.lastCall?.[0].dialogId).not.toBe(
+    previous.dialogId
+  );
   act(previous.onReconciled);
   expect(screen.getByRole('dialog', { name: 'Payment' })).toBeInTheDocument();
   expect(mockPayment).not.toHaveBeenCalled();

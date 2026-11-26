@@ -220,8 +220,16 @@ export const useCreateBooking = () => {
 };
 
 type Receipt = NonNullable<AdminBooking['payments']>[number];
-type ReceiptAttempt = Pick<Receipt, 'id' | 'amount' | 'method'> & {
+type StaffPayment = {
   bookingId: string;
+  paymentMethod: Receipt['method'];
+  amountPaid: number;
+  notes?: string;
+};
+type ReceiptAttempt = Pick<Receipt, 'id' | 'amount' | 'method'> & {
+  dialogId: symbol;
+  bookingId: string;
+  notes?: string;
   onReconciled: () => void;
 };
 
@@ -239,47 +247,67 @@ function confirmsReceipt(booking: AdminBooking, attempt: ReceiptAttempt) {
 
 export const useRecordPayment = ({
   booking,
+  dialogId,
   onReconciled,
 }: {
   booking: AdminBooking;
+  dialogId: symbol | null;
   onReconciled: () => void;
 }) => {
   const pending = useRef<ReceiptAttempt | null>(null);
   const refreshBookingCaches = useRefreshBookingCaches();
 
   const mutation = useMutation({
-    mutationFn: async (data: {
-      bookingId: string;
-      paymentMethod: Receipt['method'];
-      amountPaid: number;
-      notes?: string;
-    }): Promise<AdminBooking> => {
-      const { bookingId, ...paymentData } = data;
+    mutationFn: async (
+      data: StaffPayment | { retryReceiptId: string }
+    ): Promise<AdminBooking> => {
       const unresolved = pending.current;
-      if (
-        unresolved &&
-        (unresolved.bookingId !== bookingId ||
-          unresolved.amount !== data.amountPaid ||
-          unresolved.method !== data.paymentMethod)
-      ) {
-        throw new Error(
-          'Refresh this booking to confirm the previous payment before recording a different payment.'
-        );
+      let attempt = unresolved;
+      if ('retryReceiptId' in data) {
+        if (
+          !attempt ||
+          !dialogId ||
+          attempt.id !== data.retryReceiptId ||
+          attempt.bookingId !== booking._id
+        )
+          throw new Error('No previous payment is awaiting confirmation.');
+      } else if (attempt) {
+        if (
+          attempt.dialogId !== dialogId ||
+          attempt.bookingId !== data.bookingId ||
+          attempt.amount !== data.amountPaid ||
+          attempt.method !== data.paymentMethod ||
+          attempt.notes !== data.notes
+        ) {
+          throw new Error(
+            'Retry the original payment or refresh this booking to confirm the previous payment.'
+          );
+        }
+      } else {
+        if (!dialogId || booking._id !== data.bookingId)
+          throw new Error('Open the payment dialog for this booking.');
+        attempt = {
+          bookingId: data.bookingId,
+          id: crypto.randomUUID(),
+          amount: data.amountPaid,
+          method: data.paymentMethod,
+          notes: data.notes,
+          dialogId,
+          onReconciled,
+        };
+        pending.current = attempt;
       }
-      const attempt = {
-        bookingId,
-        id: unresolved?.id ?? crypto.randomUUID(),
-        amount: data.amountPaid,
-        method: data.paymentMethod,
-        onReconciled,
-      };
-      pending.current = attempt;
 
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+      const response = await fetch(`/api/bookings/${attempt.bookingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recordPayment: { ...paymentData, receiptId: attempt.id },
+          recordPayment: {
+            paymentMethod: attempt.method,
+            amountPaid: attempt.amount,
+            notes: attempt.notes,
+            receiptId: attempt.id,
+          },
         }),
       });
 
@@ -307,16 +335,36 @@ export const useRecordPayment = ({
     onSuccess: refreshBookingCaches,
   });
 
+  const { isError, reset } = mutation;
   useEffect(() => {
     const attempt = pending.current;
-    if (mutation.isError && attempt && confirmsReceipt(booking, attempt)) {
+    if (isError && attempt && confirmsReceipt(booking, attempt)) {
       pending.current = null;
+      reset();
       attempt.onReconciled();
       refreshBookingCaches();
     }
-  }, [booking, mutation.isError, refreshBookingCaches]);
+  }, [booking, isError, reset, refreshBookingCaches]);
 
-  return mutation;
+  // Each opening is a new draft. Replaying an older receipt requires an
+  // explicit action and must use the saved note as well as the original ID.
+  const previous =
+    isError && pending.current?.dialogId !== dialogId ? pending.current : null;
+  return {
+    ...mutation,
+    previousPayment: previous
+      ? {
+          amount: previous.amount,
+          method: previous.method,
+          notes: previous.notes,
+        }
+      : undefined,
+    retryPreviousPayment: async () => {
+      if (!previous)
+        throw new Error('No previous payment is awaiting confirmation.');
+      return mutation.mutateAsync({ retryReceiptId: previous.id });
+    },
+  };
 };
 
 // Update an existing booking

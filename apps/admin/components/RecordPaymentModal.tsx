@@ -29,6 +29,12 @@ export interface PaymentData {
 }
 
 interface RecordPaymentModalProps {
+  previousPayment?: {
+    amount: number;
+    method: PaymentData['paymentMethod'];
+    notes?: string;
+    onRetry: () => void;
+  };
   isOpen: boolean;
   isLoading: boolean;
   onClose: () => void;
@@ -80,6 +86,7 @@ export default function RecordPaymentModal({
   isLoading,
   onClose,
   onRecordPayment,
+  previousPayment,
   totalAmount,
   remainingAmount,
   bookingId,
@@ -110,7 +117,13 @@ export default function RecordPaymentModal({
   ];
 
   const handleSubmit = async () => {
-    if (isLoading || !paymentMethod || parsedAmount === undefined) return;
+    if (
+      isLoading ||
+      previousPayment ||
+      !paymentMethod ||
+      parsedAmount === undefined
+    )
+      return;
 
     try {
       await onRecordPayment({
@@ -136,7 +149,8 @@ export default function RecordPaymentModal({
     setAmountPaid(majorToFixed({ amount }));
   };
 
-  const isValid = paymentMethod && parsedAmount !== undefined;
+  const isValid =
+    !previousPayment && paymentMethod && parsedAmount !== undefined;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size='md'>
@@ -166,6 +180,28 @@ export default function RecordPaymentModal({
                 </span>
               </div>
             </div>
+
+            {previousPayment && (
+              <div className='space-y-2'>
+                <p>
+                  Confirm the previous {previousPayment.method} payment of $
+                  {majorToFixed({
+                    amount: majorAmount(previousPayment.amount, {
+                      precision: 'exact',
+                    }),
+                  })}{' '}
+                  before recording this payment.
+                </p>
+                {previousPayment.notes && <p>{previousPayment.notes}</p>}
+                <Button
+                  variant='bordered'
+                  onPress={previousPayment.onRetry}
+                  isDisabled={isLoading || remaining === null}
+                >
+                  Retry previous payment
+                </Button>
+              </div>
+            )}
 
             {/* Quick Amount Buttons */}
             <div className='space-y-2'>

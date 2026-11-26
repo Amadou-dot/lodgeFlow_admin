@@ -44,9 +44,9 @@ function QuickActionsContent({
   onPaymentRecorded,
 }: QuickActionsCardProps) {
   const { sendConfirmationEmail } = useSendConfirmationEmail();
-  const [dialog, setDialog] = useState<{
-    kind: 'closed' | 'payment' | 'print';
-  }>({ kind: 'closed' });
+  const [dialog, setDialog] = useState<
+    { kind: 'closed' | 'print' } | { kind: 'payment'; id: symbol }
+  >({ kind: 'closed' });
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
@@ -58,6 +58,7 @@ function QuickActionsContent({
     setDialog(current => (current === dialog ? { kind: 'closed' } : current));
   const recordPaymentMutation = useRecordPayment({
     booking,
+    dialogId: dialog.kind === 'payment' ? dialog.id : null,
     onReconciled: () => {
       closeDialog();
       addToast({
@@ -66,7 +67,8 @@ function QuickActionsContent({
       });
     },
   });
-  const onPaymentModalOpen = () => setDialog({ kind: 'payment' });
+  const onPaymentModalOpen = () =>
+    setDialog({ kind: 'payment', id: Symbol('payment dialog') });
   const onPrintModalOpen = () => setDialog({ kind: 'print' });
   const paymentLoading = recordPaymentMutation.isPending;
 
@@ -132,6 +134,24 @@ function QuickActionsContent({
         description: `Failed to record payment: ${(error as Error).message}`,
       });
       throw error; // Re-throw to keep modal open
+    }
+  };
+
+  const handleRetryPreviousPayment = async () => {
+    try {
+      await recordPaymentMutation.retryPreviousPayment();
+      addToast({
+        color: 'success',
+        description: 'Previously submitted payment confirmed',
+      });
+    } catch (error) {
+      addToast({
+        color: 'danger',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to confirm the previous payment',
+      });
     }
   };
 
@@ -237,6 +257,12 @@ function QuickActionsContent({
           isOpen
           onClose={closeDialog}
           onRecordPayment={handleRecordPayment}
+          previousPayment={
+            recordPaymentMutation.previousPayment && {
+              ...recordPaymentMutation.previousPayment,
+              onRetry: handleRetryPreviousPayment,
+            }
+          }
           totalAmount={booking.totalPrice}
           remainingAmount={booking.remainingAmount ?? null}
           bookingId={booking._id.toString()}
