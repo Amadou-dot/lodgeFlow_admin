@@ -164,8 +164,8 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** Runtime shapes for staff access `{userId, role, permissions}` using `StaffRole`, `Permission`, `PERMISSIONS`; roster `StaffMemberJson[]`; role change `{userId,role}`; audit `AuditHistoryJson` and redacted `AuditEventJson`.
 
-- [ ] Add malformed 2xx access examples (wrong role, non-array/invalid permission, missing user), verify protected shell is unavailable and server permissions remain authoritative. Retain session/user/org isolation, abort handling, no-store and view redirect policy. Keep roster optional identifiers/names, nullable roles, and status mutation behavior. Audit preserves filter/pagination, action options, redaction and loose before/after payloads already allowed.
-- [ ] Run `ADMIN '(AuthGuard|OperationsLoadState|staff-access|staff-audit-json|integration/api/audit)'`. Expect malformed data to fail before access/roster/audit state becomes valid, race tests to pass and route status/auth unchanged.
+- [x] Add malformed 2xx access examples (wrong role, non-array/invalid permission, missing user), verify protected shell is unavailable and server permissions remain authoritative. Retain session/user/org isolation, abort handling, no-store and view redirect policy. Keep roster optional identifiers/names, nullable roles, and status mutation behavior. Audit preserves filter/pagination, action options, redaction and loose before/after payloads already allowed.
+- [x] Run `ADMIN '(AuthGuard|OperationsLoadState|staff-access|staff-audit-json|integration/api/audit)'`. Expect malformed data to fail before access/roster/audit state becomes valid, race tests to pass and route status/auth unchanged.
 
 ### Task 11: Admin reservations inbox and calendar
 
