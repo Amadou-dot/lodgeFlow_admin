@@ -197,9 +197,12 @@ test('customer detail retains legacy booking nulls and omits unset metadata', as
       $set: {
         totalPrice: 200.125,
         payments: null,
+        checkoutPending: null,
         checkoutToken: null,
         checkoutAmount: null,
         paidAt: null,
+        specialRequests: null,
+        refundStatus: null,
         cancellationRefunds: null,
         refundAmount: null,
       },
@@ -211,7 +214,6 @@ test('customer detail retains legacy booking nulls and omits unset metadata', as
 
   expect(response.status).toBe(200);
   const body: unknown = await response.json();
-  customerDetailSuccessResponseSchema.parse(body);
   expect(body).toMatchObject({
     success: true,
     data: {
@@ -220,9 +222,12 @@ test('customer detail retains legacy booking nulls and omits unset metadata', as
           _id: String(booking._id),
           totalPrice: 200.125,
           payments: null,
+          checkoutPending: null,
           checkoutToken: null,
           checkoutAmount: null,
           paidAt: null,
+          specialRequests: null,
+          refundStatus: null,
           cancellationRefunds: null,
           refundAmount: null,
           cabin: {
@@ -239,6 +244,7 @@ test('customer detail retains legacy booking nulls and omits unset metadata', as
   expect(body).not.toHaveProperty(
     'data.recentBookings.0.paymentConfirmationSentAt'
   );
+  customerDetailSuccessResponseSchema.parse(body);
 });
 
 test('empty history keeps zero totals and omits lastBookingDate', async () => {

@@ -14,7 +14,14 @@ export type BookingCabin = Pick<
     discountedPrice?: number | null;
   };
 
-export interface AdminBooking extends Omit<BookingReadFields, 'customer'> {
+export interface AdminBooking extends Omit<
+  BookingReadFields,
+  'customer' | 'checkoutPending' | 'specialRequests' | 'refundStatus'
+> {
+  // Admin booking reads preserve explicit nulls on these legacy fields.
+  checkoutPending?: boolean | null;
+  specialRequests?: string[] | null;
+  refundStatus?: BookingReadFields['refundStatus'] | null;
   id: string;
   extrasPrice: number;
   isPaid: boolean;
