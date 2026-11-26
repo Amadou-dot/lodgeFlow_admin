@@ -84,6 +84,7 @@ interface BookingFormFieldsProps {
 
   // Edit mode
   excludeBookingId?: string;
+  hasSavedPaymentMethod?: boolean;
   preserveExistingPricing?: boolean;
 }
 
@@ -109,6 +110,7 @@ export default function BookingFormFields({
   showPayment = true,
   showPricing = true,
   excludeBookingId,
+  hasSavedPaymentMethod,
   preserveExistingPricing,
 }: BookingFormFieldsProps) {
   return (
@@ -186,7 +188,7 @@ export default function BookingFormFields({
       {/* Payment Information */}
       {showPayment && (
         <PaymentInformation
-          isEditing={Boolean(excludeBookingId)}
+          hasSavedPaymentMethod={hasSavedPaymentMethod}
           formData={formData}
           onInputChange={handleInputChange}
           settings={settings}

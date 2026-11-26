@@ -399,6 +399,7 @@ export function useBookingEditForm(booking: AdminBooking) {
 
   return {
     ...draft,
+    hasSavedPaymentMethod: Boolean(initialFormData.paymentMethod),
     buildBookingData: () =>
       buildBookingUpdateInput({
         booking,

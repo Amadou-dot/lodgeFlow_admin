@@ -45,7 +45,7 @@ const otherCustomer: Customer = {
   totalSpent: 0,
   loyaltyTier: 'Bronze',
 };
-const firstBooking: AdminBooking = {
+const bookingWithoutPaymentMethod: AdminBooking = {
   _id: '507f1f77bcf86cd799439012',
   id: '507f1f77bcf86cd799439012',
   cabin,
@@ -64,9 +64,12 @@ const firstBooking: AdminBooking = {
   amountPaid: 600,
   depositPaid: true,
   remainingAmount: 0,
-  paymentMethod: 'cash',
   observations: 'Saved observations',
   specialRequests: ['Extra blankets'],
+};
+const firstBooking: AdminBooking = {
+  ...bookingWithoutPaymentMethod,
+  paymentMethod: 'cash',
 };
 
 let mockBooking: AdminBooking | undefined;
@@ -483,6 +486,54 @@ test.each([
     expect(mockUpdate).toHaveBeenCalledTimes(1);
   }
 );
+
+test.each([
+  { savedMethod: 'absent', booking: bookingWithoutPaymentMethod },
+  {
+    savedMethod: 'null',
+    booking: { ...bookingWithoutPaymentMethod, paymentMethod: null },
+  },
+])(
+  'undoes the draft payment method before saving a note when the saved method is $savedMethod',
+  async ({ booking }) => {
+    const user = userEvent.setup();
+    mockBooking = booking;
+    mockIsLoading = false;
+    render(<BookingEditPage params={route(booking._id)} />);
+
+    const payment = screen.getByRole('button', { name: /Payment Method/ });
+    expect(payment).toHaveTextContent('Select payment method');
+    await user.click(payment);
+    await user.click(await screen.findByRole('option', { name: 'Cash' }));
+    expect(payment).toHaveTextContent('Cash');
+    await user.click(payment);
+    await user.click(await screen.findByRole('option', { name: 'Cash' }));
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Observations' }),
+      ' note'
+    );
+    await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+    expect(mockUpdate.mock.calls).toEqual([
+      [{ _id: booking._id, observations: 'Saved observations note' }],
+    ]);
+    expect(payment).toHaveTextContent('Select payment method');
+  }
+);
+
+test('keeps the payment method optional when creating a booking', async () => {
+  const user = userEvent.setup();
+  render(<BookingForm />);
+
+  const payment = screen.getByRole('button', { name: /Payment Method/ });
+  expect(payment).toHaveTextContent('Select payment method');
+  await user.click(payment);
+  await user.click(await screen.findByRole('option', { name: 'Cash' }));
+  expect(payment).toHaveTextContent('Cash');
+  await user.click(payment);
+  await user.click(await screen.findByRole('option', { name: 'Cash' }));
+  expect(payment).toHaveTextContent('Select payment method');
+});
 
 test('submits a cleared note without reverting a refreshed guest count, status, payment method or extras', async () => {
   const user = userEvent.setup();
