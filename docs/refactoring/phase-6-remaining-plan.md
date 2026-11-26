@@ -133,9 +133,9 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** `DiningJson` and `ExperienceJson` lists/create/update data, data `null` for successful deletes, existing messages/routing. Expose distinct item schema names and use their shared DTO/enum definitions.
 
-- [ ] Characterize histories of sparse/additive optional fields, finite price and nullable legacy fields, wrappers, deliberately accepted raw fallback and resource-specific failures. Reject invalid row and false or malformed 2xx mutation before invalidation. Preserve dialog pending behavior and async completion races.
-- [ ] Replace ten owned `any` nodes across the two hook tests and integration dining. Preserve the Next request typing from Task 2. Use separate dining/experience task commits if one region requires a broader compatibility fix. Rebase any mobile Dining changes first.
-- [ ] Run `ADMIN '(useDining|useExperiences|integration/api/(dining|dining-json|experience-json|catalog-boundary)|Catalog(PendingMutations|Dialogs)|ExperienceModalState)'`.
+- [x] Characterize histories of sparse/additive optional fields, finite price and nullable legacy fields, wrappers, deliberately accepted raw fallback and resource-specific failures. Reject invalid row and false or malformed 2xx mutation before invalidation. Preserve dialog pending behavior and async completion races.
+- [x] Replace ten owned `any` nodes across the two hook tests and integration dining. Preserve the Next request typing from Task 2. Use separate dining/experience task commits if one region requires a broader compatibility fix. Rebase any mobile Dining changes first.
+- [x] Run `ADMIN '(useDining|useExperiences|integration/api/(dining|dining-json|experience-json|catalog-boundary)|Catalog(PendingMutations|Dialogs)|ExperienceModalState)'`.
 
 ### Task 8: Admin booking reads and mutations
 
@@ -193,6 +193,7 @@ Tasks 12, 15 and 16 must run or port the real stored-record fixtures in `package
 
 **Interfaces** `CabinDetail` via the public list route, `DiningJson`, `ExperienceJson`, with browser DTOs derived from observed public rows. Customer catalogue JSON envelope/HTTP policy remains separate from admin.
 
+- [ ] Resolve Task7's deferred catalog coverage while sharing fields: admin negative cases must reject missing hydrated defaults and missing beverage IDs even when the lean public variant accepts omission. Exercise rejected JSON parsing, not only a parsed null, and preserve resource-specific failures.
 - [ ] Resolve the Task6 deferred full-cabin ID-alias finding while establishing the common catalog contract: real producers emit equal `_id` and `id`, while single edit and bulk selection consume different aliases. Reject a row carrying different aliases and test that it cannot enter either app's catalog data or trigger mutation success effects. Keep independent booking/lean projections separate.
 - [ ] Assert real public list and detail shapes, query/order/filter compatibility, empty arrays, nullable/sparse legacy properties, and invalid row rejection before cache. Preserve live server catalog reads and both `connection()` boundaries. Retain server freshness smoke.
 - [ ] Run `CUSTOMER '(useCabins|catalog-(details|order|pages)|cabin-catalog|dining-(catalog|query)|experience-query)'`. Reuse admin shape only after wire equivalence is verified. Include existing exact fresh-catalog gate at integration boundary.
