@@ -64,8 +64,8 @@ function wrapper({ children }: { children: ReactNode }) {
   );
 }
 const booking = (numGuests: number): PopulatedBooking => ({
-  _id: 'booking_1',
-  id: 'booking_1',
+  _id: '507f1f77bcf86cd799439011',
+  id: '507f1f77bcf86cd799439011',
   checkInDate: '2040-01-01T00:00:00.000Z',
   checkOutDate: '2040-01-02T00:00:00.000Z',
   numNights: 1,
@@ -83,6 +83,18 @@ const booking = (numGuests: number): PopulatedBooking => ({
   guest: { id: 'user_1', name: 'Jane Guest', email: 'jane@example.com' },
   cabin: null,
 });
+const bookingPagination = {
+  currentPage: 2,
+  totalPages: 2,
+  totalBookings: 2,
+  limit: 1,
+  hasNextPage: false,
+  hasPrevPage: true,
+};
+function leanBooking(guests: number) {
+  const { id, guest, ...stored } = booking(guests);
+  return { ...stored, customer: 'user_1' };
+}
 const bookingWithCustomer = (name: string): PopulatedBooking => ({
   ...booking(1),
   customer: { id: 'user_1', name, email: 'jane@example.com' },
@@ -173,11 +185,13 @@ test('booking success refreshes filtered list, detail, by-email and stats; failu
     if (url === '/api/sales' || url === '/api/dashboard') {
       return response({ revision: guests });
     }
+    if (url.startsWith('/api/bookings/by-email?'))
+      return response({ success: true, data: leanBooking(guests) });
     if (url.startsWith('/api/bookings?')) {
       return response({
         success: true,
         data: [booking(guests)],
-        pagination: { currentPage: 2 },
+        pagination: bookingPagination,
       });
     }
     return response({ success: true, data: booking(guests) });
@@ -186,7 +200,7 @@ test('booking success refreshes filtered list, detail, by-email and stats; failu
   const { result } = renderHook(
     () => ({
       list: useBookings({ page: 2, status: 'confirmed' }),
-      detail: useBooking('booking_1'),
+      detail: useBooking('507f1f77bcf86cd799439011'),
       email: useBookingByEmail('jane@example.com'),
       sales: useQuery({
         queryKey: ['sales'],
@@ -218,7 +232,7 @@ test('booking success refreshes filtered list, detail, by-email and stats; failu
   await act(async () => {
     expect(
       await result.current.update.mutateAsync({
-        _id: 'booking_1',
+        _id: '507f1f77bcf86cd799439011',
         numGuests: 2,
       })
     ).toEqual(booking(2));
@@ -254,7 +268,10 @@ test('booking success refreshes filtered list, detail, by-email and stats; failu
   failUpdate = true;
   await act(async () => {
     await expect(
-      result.current.update.mutateAsync({ _id: 'booking_1', numGuests: 3 })
+      result.current.update.mutateAsync({
+        _id: '507f1f77bcf86cd799439011',
+        numGuests: 3,
+      })
     ).rejects.toThrow('Rejected');
   });
   expect(fetchMock.mock.calls.length).toBe(beforeFailure + 1);
@@ -263,11 +280,109 @@ test('booking success refreshes filtered list, detail, by-email and stats; failu
   expect(result.current.sales.data).toEqual({ revision: 2 });
   expect(result.current.durations.data).toEqual({ revision: 2 });
 
+  fetchMock.mockResolvedValueOnce(
+    response({
+      success: true,
+      data: [{ ...booking(3), numGuests: null }],
+      pagination: bookingPagination,
+    })
+  );
+  await act(async () => {
+    await result.current.list.mutate();
+  });
+  expect(result.current.list.error?.message).toBe('Failed to fetch bookings');
+  expect(result.current.list.data?.bookings[0].numGuests).toBe(2);
   guests = 3;
   await act(async () => {
     await result.current.list.mutate();
   });
   expect(result.current.list.data?.bookings[0].numGuests).toBe(3);
+});
+
+test('malformed read variants cannot replace the last valid list, detail or lean row', async () => {
+  const valid = booking(2);
+  const stored = leanBooking(2);
+  const list = {
+    success: true,
+    data: [valid],
+    pagination: bookingPagination,
+    _clerkWarning: 'Partial Clerk lookup',
+  };
+  const detail = { success: true, data: valid };
+  const email = { success: true, data: stored };
+  fetchMock.mockImplementation(async url =>
+    response(
+      String(url).includes('by-email')
+        ? email
+        : String(url).includes('bookings?')
+          ? list
+          : detail
+    )
+  );
+  const { result } = renderHook(
+    () => ({
+      list: useBookings(),
+      detail: useBooking(valid._id),
+      email: useBookingByEmail('jane@example.com'),
+    }),
+    { wrapper }
+  );
+  await waitFor(() => {
+    expect(result.current.list.data?._clerkWarning).toBe(list._clerkWarning);
+    expect(result.current.detail.data).toEqual(valid);
+    expect(result.current.email.data).toEqual(stored);
+  });
+  for (const invalid of [
+    { ...list, pagination: { currentPage: 1 } },
+    { ...list, _clerkWarning: 42 },
+    { ...list, data: [{ ...valid, guest: null }] },
+  ]) {
+    fetchMock.mockResolvedValueOnce(response(invalid));
+    await act(async () => {
+      await result.current.list.mutate();
+    });
+    expect(result.current.list.error?.message).toBe('Failed to fetch bookings');
+    expect(result.current.list.data?.bookings).toEqual([valid]);
+  }
+  for (const invalid of [
+    { ...detail, data: { ...valid, id: 'bad' } },
+    { ...detail, data: { ...valid, checkInDate: '2040-02-30' } },
+    { ...detail, data: { ...valid, status: 'bogus' } },
+    { ...detail, data: { ...valid, totalPrice: null } },
+    { ...detail, data: { ...valid, customer: 'user_1' } },
+    { ...detail, data: { ...valid, extras: { petFee: 'bad' } } },
+    { ...detail, data: { ...valid, cancellationRefunds: [{ amount: 1 }] } },
+    {
+      ...detail,
+      data: {
+        ...valid,
+        id: '507f1f77bcf86cd799439012',
+        _id: '507f1f77bcf86cd799439012',
+      },
+    },
+  ]) {
+    fetchMock.mockResolvedValueOnce(response(invalid));
+    await act(async () => {
+      await result.current.detail.mutate();
+    });
+    expect(result.current.detail.error?.message).toBe(
+      'Failed to fetch booking'
+    );
+    expect(result.current.detail.data).toEqual(valid);
+  }
+  for (const invalid of [
+    stored,
+    detail,
+    { ...email, data: { ...stored, customer: '' } },
+    { ...email, data: { ...stored, cabin: { name: 'Pine' } } },
+  ]) {
+    fetchMock.mockResolvedValueOnce(response(invalid));
+    await act(async () => {
+      await result.current.email.mutate();
+    });
+    expect(result.current.email.error?.message).toBe('Failed to fetch booking');
+    expect(result.current.email.data).toEqual(stored);
+  }
 });
 
 test('customer success refreshes SWR list/detail and the infinite customer search; failure does not', async () => {
@@ -282,11 +397,16 @@ test('customer success refreshes SWR list/detail and the infinite customer searc
     }
     if (url === '/api/customers/user_1')
       return response({ success: true, data: customerDetail(name) });
+    if (url.startsWith('/api/bookings/by-email?'))
+      return response({
+        success: true,
+        data: { ...leanBooking(1), observations: name },
+      });
     if (url.startsWith('/api/bookings?')) {
       return response({
         success: true,
         data: [bookingWithCustomer(name)],
-        pagination: { currentPage: 2 },
+        pagination: bookingPagination,
       });
     }
     if (url.startsWith('/api/bookings/')) {
@@ -312,7 +432,7 @@ test('customer success refreshes SWR list/detail and the infinite customer searc
       detail: useCustomer('user_1'),
       infinite: useInfiniteCustomers(),
       bookingList: useBookings({ page: 2, search: 'jane' }),
-      bookingDetail: useBooking('booking_1'),
+      bookingDetail: useBooking('507f1f77bcf86cd799439011'),
       bookingEmail: useBookingByEmail('jane@example.com'),
       update: useUpdateCustomer(),
     }),
@@ -325,7 +445,7 @@ test('customer success refreshes SWR list/detail and the infinite customer searc
     expect(result.current.list.data[0]?.name).toBe('Jane Guest')
   );
   await waitFor(() =>
-    expect(result.current.bookingEmail.data?.guest?.name).toBe('Jane Guest')
+    expect(result.current.bookingEmail.data?.observations).toBe('Jane Guest')
   );
   await act(async () => {
     expect(
@@ -353,7 +473,7 @@ test('customer success refreshes SWR list/detail and the infinite customer searc
     expect(result.current.bookingDetail.data?.guest?.name).toBe('Janet Guest')
   );
   await waitFor(() =>
-    expect(result.current.bookingEmail.data?.guest?.name).toBe('Janet Guest')
+    expect(result.current.bookingEmail.data?.observations).toBe('Janet Guest')
   );
   expect(invalidated.mock.calls).toEqual([
     [{ queryKey: ['customers'] }],
@@ -488,8 +608,8 @@ test('customer create and delete refresh customer reads and their dashboard keys
 });
 
 const legacyBooking = {
-  _id: 'booking_legacy',
-  id: 'booking_legacy',
+  _id: '507f1f77bcf86cd799439012',
+  id: '507f1f77bcf86cd799439012',
   customer: 'user_1',
   checkInDate: '2040-06-01T23:30:00.000Z',
   checkOutDate: '2040-06-03T23:30:00.000Z',

@@ -22,8 +22,8 @@ export const initializeBookingForm = (
       observations: booking.observations || '',
       specialRequests: booking.specialRequests || [],
       paymentMethod: booking.paymentMethod || '',
-      isPaid: booking.isPaid,
-      depositPaid: booking.depositPaid,
+      isPaid: booking.isPaid === true,
+      depositPaid: booking.depositPaid === true,
     };
   }
 

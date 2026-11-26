@@ -89,7 +89,7 @@ beforeEach(() => {
   mockPayment.mockResolvedValue(undefined);
   mockPDF.mockResolvedValue(undefined);
 });
-function show() {
+function show(selected = booking) {
   const client = new QueryClient({
     defaultOptions: { mutations: { retry: false } },
   });
@@ -97,7 +97,7 @@ function show() {
   render(
     <QueryClientProvider client={client}>
       <QuickActionsCard
-        booking={booking}
+        booking={selected}
         onCheckIn={jest.fn()}
         onCheckOut={jest.fn()}
         actionLoading={null}
@@ -168,4 +168,12 @@ test('payment completion cannot close a newly opened print session', async () =>
     finish();
   });
   expect(screen.getByText('Print Preview')).toBeInTheDocument();
+});
+
+test('a null booking status keeps staff receipt access without offering a status transition', () => {
+  show({ ...booking, status: null });
+  expect(screen.getByRole('button', { name: 'Record Payment' })).toBeEnabled();
+  expect(
+    screen.queryByRole('button', { name: /Check (In|Out) Guest/ })
+  ).not.toBeInTheDocument();
 });

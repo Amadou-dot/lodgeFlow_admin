@@ -1,17 +1,17 @@
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Divider } from '@heroui/divider';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/utils/utilityFunctions';
+import { formatBookingAmount } from '@/utils/bookingUtils';
 
 interface PaymentSummaryCardProps {
   numNights: number;
   cabinPrice: number;
-  extrasPrice: number;
+  extrasPrice: number | null | undefined;
   totalPrice: number;
-  depositPaid: boolean;
-  depositAmount: number;
-  amountPaid: number;
-  remainingAmount: number;
+  depositPaid: boolean | null | undefined;
+  depositAmount: number | null | undefined;
+  amountPaid: number | null | undefined;
+  remainingAmount: number | null | undefined;
   paymentMethod?: string;
   paidAt?: string;
   stripeSessionId?: string;
@@ -62,40 +62,46 @@ export default function PaymentSummaryCard({
         <div className='space-y-2 text-sm'>
           <div className='flex justify-between'>
             <span>Cabin ({numNights} nights)</span>
-            <span>{formatCurrency(cabinPrice)}</span>
+            <span>{formatBookingAmount(cabinPrice)}</span>
           </div>
-          {extrasPrice > 0 && (
+          {(extrasPrice == null || extrasPrice > 0) && (
             <div className='flex justify-between'>
               <span>Extras</span>
-              <span>{formatCurrency(extrasPrice)}</span>
+              <span>{formatBookingAmount(extrasPrice)}</span>
             </div>
           )}
           <Divider />
           <div className='flex justify-between font-semibold'>
             <span>Total</span>
-            <span>{formatCurrency(totalPrice)}</span>
+            <span>{formatBookingAmount(totalPrice)}</span>
           </div>
         </div>
 
         <Divider />
 
         <div className='space-y-2 text-sm'>
-          {depositAmount > 0 && (
+          {(depositAmount == null || depositAmount > 0) && (
             <div className='flex justify-between text-success'>
               <span>Required deposit{depositPaid ? ' (received)' : ''}</span>
-              <span>{formatCurrency(depositAmount)}</span>
+              <span>{formatBookingAmount(depositAmount)}</span>
             </div>
           )}
           <div className='flex justify-between text-success'>
             <span>Payments received</span>
-            <span>{formatCurrency(amountPaid)}</span>
+            <span>{formatBookingAmount(amountPaid)}</span>
           </div>
           <div className='flex justify-between'>
             <span>Remaining</span>
             <span
-              className={remainingAmount > 0 ? 'text-warning' : 'text-success'}
+              className={
+                remainingAmount == null
+                  ? 'text-default-500'
+                  : remainingAmount > 0
+                    ? 'text-warning'
+                    : 'text-success'
+              }
             >
-              {formatCurrency(remainingAmount)}
+              {formatBookingAmount(remainingAmount)}
             </span>
           </div>
         </div>
@@ -164,7 +170,7 @@ export default function PaymentSummaryCard({
               {refundAmount !== undefined && (
                 <div className='flex justify-between gap-2'>
                   <span className='text-default-500'>Refund Amount</span>
-                  <span>{formatCurrency(refundAmount)}</span>
+                  <span>{formatBookingAmount(refundAmount)}</span>
                 </div>
               )}
               {refundedAt && (

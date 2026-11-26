@@ -1,18 +1,11 @@
 import { Card, CardBody, CardHeader } from '@heroui/card';
 
+import type { AdminBooking } from '@/types/booking-read';
 interface ExtrasCardProps {
-  extras?: {
-    hasBreakfast: boolean;
-    breakfastPrice?: number;
-    hasPets: boolean;
-    petFee?: number;
-    hasParking: boolean;
-    parkingFee?: number;
-    hasEarlyCheckIn: boolean;
-    earlyCheckInFee?: number;
-    hasLateCheckOut: boolean;
-    lateCheckOutFee?: number;
-  };
+  extras?: NonNullable<AdminBooking['extras']>;
+}
+function fee(amount: number | null | undefined) {
+  return amount == null ? 'Unavailable' : `$${amount}`;
 }
 
 export default function ExtrasCard({ extras }: ExtrasCardProps) {
@@ -38,31 +31,31 @@ export default function ExtrasCard({ extras }: ExtrasCardProps) {
           {extras.hasBreakfast && (
             <div className='flex justify-between items-center'>
               <span>Breakfast</span>
-              <span className='font-medium'>${extras.breakfastPrice}</span>
+              <span className='font-medium'>{fee(extras.breakfastPrice)}</span>
             </div>
           )}
           {extras.hasPets && (
             <div className='flex justify-between items-center'>
               <span>Pet Fee</span>
-              <span className='font-medium'>${extras.petFee}</span>
+              <span className='font-medium'>{fee(extras.petFee)}</span>
             </div>
           )}
           {extras.hasParking && (
             <div className='flex justify-between items-center'>
               <span>Parking</span>
-              <span className='font-medium'>${extras.parkingFee}</span>
+              <span className='font-medium'>{fee(extras.parkingFee)}</span>
             </div>
           )}
           {extras.hasEarlyCheckIn && (
             <div className='flex justify-between items-center'>
               <span>Early Check-in</span>
-              <span className='font-medium'>${extras.earlyCheckInFee}</span>
+              <span className='font-medium'>{fee(extras.earlyCheckInFee)}</span>
             </div>
           )}
           {extras.hasLateCheckOut && (
             <div className='flex justify-between items-center'>
               <span>Late Check-out</span>
-              <span className='font-medium'>${extras.lateCheckOutFee}</span>
+              <span className='font-medium'>{fee(extras.lateCheckOutFee)}</span>
             </div>
           )}
         </div>

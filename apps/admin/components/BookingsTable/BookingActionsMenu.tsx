@@ -1,6 +1,6 @@
 'use client';
 
-import type { BookingStatus } from '@/lib/config';
+import type { AdminBooking } from '@/types/booking-read';
 import type { BookingStatusChangeHandler } from '@/types/booking-actions';
 import { Button } from '@heroui/button';
 import {
@@ -11,10 +11,7 @@ import {
 } from '@heroui/dropdown';
 import { MoreVertical } from 'lucide-react';
 
-interface BookingActionData {
-  _id: string;
-  status: BookingStatus;
-}
+type BookingActionData = Pick<AdminBooking, '_id' | 'status'>;
 
 interface BookingActionsMenuProps<TBooking extends BookingActionData> {
   booking: TBooking;

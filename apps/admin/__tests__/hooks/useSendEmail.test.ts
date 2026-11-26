@@ -60,3 +60,17 @@ test.each([
     expected
   );
 });
+
+test.each([{ remainingAmount: null }, { extras: { hasBreakfast: true } }])(
+  'rejects incomplete lean booking fields before sending',
+  async fields => {
+    const { result } = renderHook(() => useSendConfirmationEmail());
+    await expect(
+      result.current.sendConfirmationEmail({
+        ...payload,
+        bookingData: { ...payload.bookingData, ...fields },
+      })
+    ).rejects.toThrow();
+    expect(global.fetch).not.toHaveBeenCalled();
+  }
+);

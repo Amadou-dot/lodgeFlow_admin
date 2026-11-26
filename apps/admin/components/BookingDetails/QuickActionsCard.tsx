@@ -229,7 +229,7 @@ function QuickActionsContent({
           onClose={closeDialog}
           onRecordPayment={handleRecordPayment}
           totalAmount={booking.totalPrice}
-          remainingAmount={booking.remainingAmount}
+          remainingAmount={booking.remainingAmount ?? null}
           bookingId={booking._id.toString()}
           guestName={firstName}
         />

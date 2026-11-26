@@ -1,5 +1,6 @@
+import { formatCurrency } from './utilityFunctions';
 import { formatBookingStayDate } from '@/lib/booking-stay-date';
-import type { BOOKING_STATUSES } from '@lodgeflow/database/config';
+import type { AdminBooking } from '@/types/booking-read';
 import { formatDistanceToNow, isAfter } from 'date-fns';
 
 export const formatBookingDates = ({
@@ -11,7 +12,7 @@ export const formatBookingDates = ({
   checkIn: string;
   checkOut: string;
   numNights: number;
-  status: (typeof BOOKING_STATUSES)[number];
+  status: AdminBooking['status'];
 }) => {
   const checkInDate = new Date(checkIn);
   const checkOutDate = new Date(checkOut);
@@ -69,7 +70,9 @@ export const formatBookingDates = ({
 export type ChipColor =
   'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
 
-export const getStatusColor = (status: string): ChipColor => {
+export const getStatusColor = (
+  status: string | null | undefined
+): ChipColor => {
   switch (status) {
     case 'unconfirmed':
       return 'warning';
@@ -86,7 +89,7 @@ export const getStatusColor = (status: string): ChipColor => {
   }
 };
 
-export const getStatusLabel = (status: string) => {
+export const getStatusLabel = (status: string | null | undefined) => {
   switch (status) {
     case 'unconfirmed':
       return 'Unconfirmed';
@@ -99,6 +102,10 @@ export const getStatusLabel = (status: string) => {
     case 'cancelled':
       return 'Cancelled';
     default:
-      return status;
+      return status ?? 'Unavailable';
   }
 };
+
+export function formatBookingAmount(amount: number | null | undefined) {
+  return amount == null ? 'Unavailable' : formatCurrency(amount);
+}

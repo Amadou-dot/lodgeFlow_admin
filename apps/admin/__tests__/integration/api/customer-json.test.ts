@@ -196,6 +196,10 @@ test('customer detail retains legacy booking nulls and omits unset metadata', as
     {
       $set: {
         totalPrice: 200.125,
+        extras: null,
+        extrasPrice: null,
+        remainingAmount: null,
+        status: null,
         payments: null,
         checkoutPending: null,
         checkoutToken: null,
@@ -221,6 +225,10 @@ test('customer detail retains legacy booking nulls and omits unset metadata', as
         {
           _id: String(booking._id),
           totalPrice: 200.125,
+          extras: {},
+          extrasPrice: null,
+          remainingAmount: null,
+          status: null,
           payments: null,
           checkoutPending: null,
           checkoutToken: null,
