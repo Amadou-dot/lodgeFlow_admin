@@ -204,8 +204,8 @@ Tasks 12, 15 and 16 must run or port the real stored-record fixtures in `package
 
 **Interfaces** One customer cabin availability envelope validator sees `cabinId`, `unavailableDates[{start,end}]`, `queryRange`; current query hooks retain cache policies. Wrap existing `diningDayAvailabilitySchema` inside its success-envelope validator. Admin availability is a different contract and already has a parser.
 
-- [ ] Characterize valid empty ranges, calendar strings, exclusive checkout days, nullable dining capacity/time, inactive dining rules, and wrong-shape 2xx/error-only responses. Neither consumer may treat malformed data as a valid empty all-available result. Keep current error presentation and any Phase 4 form hydration behavior while preserving SWR/TanStack keys/options.
-- [ ] Run `CUSTOMER '(cabin-(availability-request|calendar)|reservation-availability|dining-availability|CabinAvailabilityPreview|BookingFormMobile|BookingFormSubmission)'`. Expect compatible route outputs and safe caching behavior.
+- [x] Characterize valid empty ranges, calendar strings, exclusive checkout days, nullable dining capacity/time, inactive dining rules, and wrong-shape 2xx/error-only responses. Neither consumer may treat malformed data as a valid empty all-available result. Keep current error presentation and any Phase 4 form hydration behavior while preserving SWR/TanStack keys/options.
+- [x] Run `CUSTOMER '(cabin-(availability-request|calendar)|reservation-availability|dining-availability|CabinAvailabilityPreview|BookingFormMobile|BookingFormSubmission)'`. Expect compatible route outputs and safe caching behavior.
 
 ### Task 15: Customer booking and reservation history/detail, confirmation and refund estimate
 
