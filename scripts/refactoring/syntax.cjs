@@ -5,12 +5,33 @@ const ts = createRequire(require.resolve('../../apps/admin/package.json'))(
 
 const isAssertion = node =>
   ts.isAsExpression(node) || ts.isTypeAssertionExpression(node);
+// Emit a complete declaration with stable whitespace, punctuation and literal quoting.
+const declarationPrinter = ts.createPrinter(
+  { removeComments: true },
+  {
+    substituteNode: (_hint, node) =>
+      ts.isStringLiteral(node)
+        ? ts.factory.createStringLiteral(node.text)
+        : node,
+  }
+);
+
+function assertedType(node) {
+  if (isAssertion(node)) return node.type;
+  if (
+    ts.isParenthesizedExpression(node) &&
+    node.flags & ts.NodeFlags.JavaScriptFile
+  )
+    return ts.getJSDocTypeTag(node)?.typeExpression?.type;
+}
+
 function bareType(node) {
   while (node && ts.isParenthesizedTypeNode(node)) node = node.type;
   return node;
 }
 function bareExpression(node) {
-  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  while (ts.isParenthesizedExpression(node) && !assertedType(node))
+    node = node.expression;
   return node;
 }
 
@@ -18,7 +39,7 @@ function scanSyntax(file, text) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const findings = [];
   const seen = new Set();
-  function add(node, rule) {
+  function add(node, rule, syntax = node.getText(source)) {
     const { line, character } = source.getLineAndCharacterOfPosition(
       node.getStart(source)
     );
@@ -39,19 +60,16 @@ function scanSyntax(file, text) {
       column: character + 1,
       rule,
       owner: owner?.name?.getText(source) ?? '<module>',
-      syntax: node.getText(source),
+      syntax,
     });
   }
   function visit(node) {
     if (seen.has(node)) return;
     seen.add(node);
     if (node.kind === ts.SyntaxKind.AnyKeyword) add(node, 'any');
-    if (isAssertion(node)) {
+    if (assertedType(node)) {
       const inner = bareExpression(node.expression);
-      if (
-        isAssertion(inner) &&
-        bareType(inner.type).kind === ts.SyntaxKind.UnknownKeyword
-      )
+      if (bareType(assertedType(inner))?.kind === ts.SyntaxKind.UnknownKeyword)
         add(node, 'double-cast');
     }
     if (node.parameters) {
@@ -85,7 +103,11 @@ function scanSyntax(file, text) {
         type => bareType(type).getText(source) === 'null'
       )
     )
-      add(node.name, 'optional-null');
+      add(
+        node.name,
+        'optional-null',
+        declarationPrinter.printNode(ts.EmitHint.Unspecified, node, source)
+      );
     if (
       ts.isInterfaceDeclaration(node) &&
       node.heritageClauses?.some(clause =>
