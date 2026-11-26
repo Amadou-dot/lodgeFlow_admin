@@ -1,3 +1,4 @@
+import { useCustomerWriteScope } from './useCustomerWriteScope';
 import { readResponse } from '@/lib/validations/read-response';
 import {
   createdBookingResult,
@@ -27,14 +28,16 @@ import type { RefundEstimateResponse } from '@/types';
 /**
  * Hook to create a new booking
  */
-export const useCreateBooking = () => {
-  const { userId } = useAuth();
+export const useCreateBooking = (cabinId: string) => {
+  const scope = useCustomerWriteScope([cabinId]);
   const queryClient = useQueryClient();
   const { mutate } = useSWRConfig();
 
   return useMutation({
+    meta: scope.meta,
     retry: false,
-    mutationFn: async (bookingData: CreateBookingRequest) => {
+    mutationFn: async (bookingData: CreateBookingRequest, context) => {
+      const userId = scope.customerIdFor(context, bookingData.cabinId);
       const request = fetch('/api/bookings', {
         body: JSON.stringify(bookingData),
         headers: { 'Content-Type': 'application/json' },
@@ -46,7 +49,7 @@ export const useCreateBooking = () => {
         status: 201,
         schema: createdBookingResult({
           customerId: userId,
-          cabinId: bookingData.cabinId,
+          selection: bookingData,
         }),
         fallback: 'Failed to create booking',
       });
@@ -130,18 +133,23 @@ export const useBookingById = (
 /**
  * Hook to update a booking
  */
-export const useUpdateBooking = () => {
-  const { userId } = useAuth();
+export const useUpdateBooking = (selectedId: string | undefined) => {
+  const scope = useCustomerWriteScope(selectedId ? [selectedId] : []);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      bookingId,
-      updates,
-    }: {
-      bookingId: string;
-      updates: UpdateBookingDetailsInput;
-    }) => {
+    meta: scope.meta,
+    mutationFn: async (
+      {
+        bookingId,
+        updates,
+      }: {
+        bookingId: string;
+        updates: UpdateBookingDetailsInput;
+      },
+      context
+    ) => {
+      const userId = scope.customerIdFor(context, bookingId);
       const request = fetch(`/api/bookings/${bookingId}`, {
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },
@@ -195,19 +203,24 @@ export const useRefundEstimate = (bookingId: string) => {
 /**
  * Hook to cancel a booking with refund processing
  */
-export const useCancelBooking = () => {
-  const { userId } = useAuth();
+export const useCancelBooking = (selectedId: string | undefined) => {
+  const scope = useCustomerWriteScope(selectedId ? [selectedId] : []);
   const queryClient = useQueryClient();
   const { mutate } = useSWRConfig();
 
   return useMutation({
-    mutationFn: async ({
-      bookingId,
-      reason,
-    }: {
-      bookingId: string;
-      reason?: string;
-    }) => {
+    meta: scope.meta,
+    mutationFn: async (
+      {
+        bookingId,
+        reason,
+      }: {
+        bookingId: string;
+        reason?: string;
+      },
+      context
+    ) => {
+      const userId = scope.customerIdFor(context, bookingId);
       const request = fetch(`/api/bookings/${bookingId}`, {
         body: JSON.stringify({ reason }),
         headers: { 'Content-Type': 'application/json' },

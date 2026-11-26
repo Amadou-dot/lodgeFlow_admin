@@ -1,3 +1,4 @@
+import { CreateAttemptRecovery } from './CreateAttemptRecovery';
 import { subtitle, title } from '@/components/primitives';
 import { useCreateAttempt } from '@/hooks/useCreateAttempt';
 import { useCreateBooking } from '@/hooks/useBooking';
@@ -58,7 +59,7 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
   const [hasEarlyCheckIn, setHasEarlyCheckIn] = useState(false);
   const [hasLateCheckOut, setHasLateCheckOut] = useState(false);
   const { isSignedIn, isLoaded, user } = useUser();
-  const { mutate: createBooking } = useCreateBooking();
+  const { mutate: createBooking } = useCreateBooking(cabin._id);
   const { data: settings } = useSettings();
   const router = useRouter();
   const createAttempt = useCreateAttempt(cabin._id);
@@ -135,8 +136,10 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
     if (!attempt) return;
     createBooking(bookingData, {
       onSuccess: response => {
-        if (attempt.current())
-          router.push(`/cabins/confirmation/${response.data._id}`);
+        if (!attempt.current()) return;
+        const href = `/cabins/confirmation/${response.data._id}`;
+        attempt.confirmed(href);
+        router.push(href);
       },
       onError: error => {
         const notice = attempt.failed(error);
@@ -489,9 +492,7 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
               )}
             </div>
 
-            {createAttempt.notice && (
-              <p role='status'>{createAttempt.notice}</p>
-            )}
+            <CreateAttemptRecovery recovery={createAttempt.recovery} />
             <Button
               className='w-full'
               color='primary'

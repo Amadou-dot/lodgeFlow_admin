@@ -1,5 +1,6 @@
 'use client';
 
+import { CreateAttemptRecovery } from './CreateAttemptRecovery';
 import {
   useCreateAttempt,
   missingCreatedDetail,
@@ -30,7 +31,7 @@ export default function ExperienceBookingForm({
   const { user } = useUser();
   const router = useRouter();
   const createAttempt = useCreateAttempt(experience._id);
-  const createBooking = useCreateExperienceBooking();
+  const createBooking = useCreateExperienceBooking(experience._id);
 
   const [date, setDate] = useState<CalendarDate | null>(null);
   const [numParticipants, setNumParticipants] = useState(1);
@@ -93,13 +94,14 @@ export default function ExperienceBookingForm({
         });
         return;
       }
+      const confirmationUrl = `/experiences/confirmation/${result.data._id}`;
+      attempt.confirmed(confirmationUrl);
       addToast({
         title: 'Booking Created!',
         description: 'Your experience booking has been submitted.',
         color: 'success',
       });
 
-      const confirmationUrl = `/experiences/confirmation/${result.data._id}`;
       if (result.data.totalPrice > 0 && !result.data.isPaid) {
         try {
           await openReservationCheckout({
@@ -199,7 +201,7 @@ export default function ExperienceBookingForm({
           </div>
         </div>
 
-        {createAttempt.notice && <p role='status'>{createAttempt.notice}</p>}
+        <CreateAttemptRecovery recovery={createAttempt.recovery} />
         {/* Submit Button */}
         <Button
           className='w-full'

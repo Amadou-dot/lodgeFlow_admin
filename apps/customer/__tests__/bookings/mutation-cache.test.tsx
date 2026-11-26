@@ -1,6 +1,10 @@
 import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  onlineManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import useSWR, { SWRConfig } from 'swr';
 import {
   useCancelBooking,
@@ -17,6 +21,16 @@ import {
 } from '@/hooks/useExperienceBooking';
 import { useCreateCheckoutSession } from '@/hooks/usePayment';
 
+let mockActor = 'test-user-id';
+let mockSession = 'session-one';
+jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: mockActor,
+    sessionId: mockSession,
+  }),
+}));
 const id = '507f1f77bcf86cd7994390ab';
 const other = '507f1f77bcf86cd7994390cd';
 const cabinDetail = {
@@ -93,8 +107,8 @@ test.each(['create', 'cancel'] as const)(
           '/api/cabins/cabin/availability',
           readAvailability
         ),
-        create: useCreateBooking(),
-        cancel: useCancelBooking(),
+        create: useCreateBooking('cabin'),
+        cancel: useCancelBooking(id),
       }),
       { wrapper }
     );
@@ -141,8 +155,8 @@ test.each(['dining', 'experience'] as const)(
     } as Response);
     const { result } = renderHook(
       () => ({
-        dining: useCancelDiningReservation(),
-        experience: useCancelExperienceBooking(),
+        dining: useCancelDiningReservation(['record']),
+        experience: useCancelExperienceBooking(['record']),
       }),
       { wrapper }
     );
@@ -161,7 +175,7 @@ test('dining creation invalidates existing availability variants', async () => {
     status: 201,
     json: async () => ({ success: true, data: null }),
   } as Response);
-  const { result } = renderHook(() => useCreateDiningReservation(), {
+  const { result } = renderHook(() => useCreateDiningReservation('listing'), {
     wrapper,
   });
   await act(async () => {
@@ -214,10 +228,10 @@ test('failed reservation mutations keep cached data fresh', async () => {
   } as Response);
   const { result } = renderHook(
     () => ({
-      cabin: useCancelBooking(),
-      dining: useCancelDiningReservation(),
-      experience: useCancelExperienceBooking(),
-      createExperience: useCreateExperienceBooking(),
+      cabin: useCancelBooking('record'),
+      dining: useCancelDiningReservation(['record']),
+      experience: useCancelExperienceBooking(['record']),
+      createExperience: useCreateExperienceBooking('listing'),
       checkout: useCreateCheckoutSession(),
     }),
     { wrapper }
@@ -263,7 +277,7 @@ test('a failed SWR availability refresh does not reject a committed booking', as
       availability: useSWR('/api/cabins/cabin/availability', readAvailability, {
         shouldRetryOnError: false,
       }),
-      create: useCreateBooking(),
+      create: useCreateBooking('cabin'),
     }),
     { wrapper }
   );
@@ -306,8 +320,8 @@ test.each([
     jest.mocked(fetch).mockImplementation(async () => FetchResponse.json(data));
     const { result } = renderHook(
       () => ({
-        dining: useCancelDiningReservation(),
-        experience: useCancelExperienceBooking(),
+        dining: useCancelDiningReservation([id]),
+        experience: useCancelExperienceBooking([id]),
       }),
       { wrapper }
     );
@@ -347,8 +361,8 @@ test.each(['dining', 'experience'] as const)(
     };
     const { result } = renderHook(
       () => ({
-        dining: useCancelDiningReservation(),
-        experience: useCancelExperienceBooking(),
+        dining: useCancelDiningReservation([id]),
+        experience: useCancelExperienceBooking([id]),
       }),
       { wrapper }
     );
@@ -396,7 +410,7 @@ test.each([
     jest
       .mocked(fetch)
       .mockResolvedValue(FetchResponse.json({ success: true, data }));
-    const { result } = renderHook(useCancelBooking, { wrapper });
+    const { result } = renderHook(() => useCancelBooking(id), { wrapper });
     await expect(
       result.current.mutateAsync({ bookingId: id })
     ).rejects.toThrow();
@@ -419,7 +433,7 @@ test('cabin edits bind the request ID, changes and owner before any invalidation
     extras: { hasBreakfast: true },
   };
   const variables = { bookingId: id.toUpperCase(), updates };
-  const { result } = renderHook(useUpdateBooking, { wrapper });
+  const { result } = renderHook(() => useUpdateBooking(id), { wrapper });
   for (const invalid of [
     { ...data, id: other, _id: other },
     { ...data, id: other },
@@ -446,3 +460,111 @@ test('cabin edits bind the request ID, changes and owner before any invalidation
   });
   expect(invalidated).toHaveBeenCalledTimes(2);
 });
+
+test.each([
+  'same scope',
+  'new session',
+  'new owner',
+  'new resource',
+  'removed and restored target',
+  'unmount',
+] as const)(
+  'offline writes preserve the original dispatch scope on reconnect: %s',
+  async change => {
+    mockActor = 'test-user-id';
+    mockSession = 'session-one';
+    const { client, wrapper } = setup();
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+    jest.mocked(fetch).mockImplementation(async (url, init) => {
+      const create = init?.method === 'POST';
+      const data = String(url).startsWith('/api/bookings')
+        ? init?.method === 'DELETE'
+          ? { booking: null, refund }
+          : cabinDetail
+        : null;
+      return FetchResponse.json(
+        { success: true, data },
+        { status: create ? 201 : 200 }
+      );
+    });
+    const hooks = renderHook(
+      ({ target }: { target: string }) => ({
+        cabin: useCreateBooking(target),
+        dining: useCreateDiningReservation(target),
+        experience: useCreateExperienceBooking(target),
+        edit: useUpdateBooking(target),
+        cancel: useCancelBooking(target),
+        cancelDining: useCancelDiningReservation([target]),
+        cancelExperience: useCancelExperienceBooking([target]),
+      }),
+      { wrapper, initialProps: { target: id } }
+    );
+    const { current } = hooks.result;
+    onlineManager.setOnline(false);
+    try {
+      const requests = Promise.allSettled([
+        current.cabin.mutateAsync({
+          cabinId: id,
+          checkInDate: cabinDetail.checkInDate,
+          checkOutDate: cabinDetail.checkOutDate,
+          numGuests: 2,
+        }),
+        current.dining.mutateAsync({
+          diningId: id,
+          date: '2040-01-01',
+          numGuests: 2,
+          time: '17:00',
+        }),
+        current.experience.mutateAsync({
+          experienceId: id,
+          date: '2040-01-01',
+          numParticipants: 2,
+        }),
+        current.edit.mutateAsync({ bookingId: id, updates: { numGuests: 2 } }),
+        current.cancel.mutateAsync({ bookingId: id }),
+        current.cancelDining.mutateAsync(id),
+        current.cancelExperience.mutateAsync(id),
+      ]);
+      await waitFor(() =>
+        expect(
+          client
+            .getMutationCache()
+            .getAll()
+            .filter(m => m.state.isPaused)
+        ).toHaveLength(7)
+      );
+      expect(fetch).not.toHaveBeenCalled();
+      if (change === 'new owner') mockActor = 'replacement';
+      if (change === 'new session') mockSession = 'replacement-session';
+      if (change === 'unmount') hooks.unmount();
+      else if (change === 'removed and restored target') {
+        hooks.rerender({ target: other });
+        hooks.rerender({ target: id });
+      } else hooks.rerender({ target: change === 'new resource' ? other : id });
+      // A connected app has a mounted QueryClient above Clerk, even after this component unmounts.
+      await act(async () => {
+        onlineManager.setOnline(true);
+        await client.resumePausedMutations();
+      });
+      const outcomes = await requests;
+      if (change === 'same scope') {
+        expect(fetch).toHaveBeenCalledTimes(7);
+        expect(outcomes.every(result => result.status === 'fulfilled')).toBe(
+          true
+        );
+        expect(invalidate).toHaveBeenCalled();
+      } else {
+        expect(fetch).not.toHaveBeenCalled();
+        expect(outcomes.every(result => result.status === 'rejected')).toBe(
+          true
+        );
+        expect(invalidate).not.toHaveBeenCalled();
+      }
+    } finally {
+      onlineManager.setOnline(true);
+      mockActor = 'test-user-id';
+      mockSession = 'session-one';
+      client.clear();
+    }
+  }
+);

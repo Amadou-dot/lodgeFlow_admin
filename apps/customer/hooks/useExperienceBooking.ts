@@ -1,3 +1,4 @@
+import { useCustomerWriteScope } from './useCustomerWriteScope';
 import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { readResponse } from '@/lib/validations/read-response';
 import {
@@ -17,13 +18,15 @@ import type { CreateExperienceBookingData } from '@/types';
 /**
  * Hook to create a new experience booking
  */
-export const useCreateExperienceBooking = () => {
-  const { userId } = useAuth();
+export const useCreateExperienceBooking = (listingId: string) => {
+  const scope = useCustomerWriteScope([listingId]);
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: scope.meta,
     retry: false,
-    mutationFn: async (bookingData: CreateExperienceBookingData) => {
+    mutationFn: async (bookingData: CreateExperienceBookingData, context) => {
+      const userId = scope.customerIdFor(context, bookingData.experienceId);
       const request = fetch('/api/experience-bookings', {
         body: JSON.stringify(bookingData),
         headers: { 'Content-Type': 'application/json' },
@@ -114,12 +117,14 @@ export const useExperienceBookingById = (
 /**
  * Hook to cancel an experience booking
  */
-export const useCancelExperienceBooking = () => {
-  const { userId } = useAuth();
+export const useCancelExperienceBooking = (bookingIds: readonly string[]) => {
+  const scope = useCustomerWriteScope(bookingIds);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (bookingId: string) => {
+    meta: scope.meta,
+    mutationFn: async (bookingId: string, context) => {
+      const userId = scope.customerIdFor(context, bookingId);
       const request = fetch(`/api/experience-bookings/${bookingId}`, {
         method: 'DELETE',
       });

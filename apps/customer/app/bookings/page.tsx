@@ -1,5 +1,6 @@
 'use client';
 
+import { ObsoleteCustomerWriteError } from '@/hooks/useCustomerWriteScope';
 import { useEffect, useRef, useState } from 'react';
 import { SignInButton, useAuth } from '@clerk/nextjs';
 import { Button } from '@heroui/button';
@@ -85,6 +86,18 @@ type BookingDialog =
   | { kind: 'details' | 'cancel'; bookingId: string }
   | { kind: 'edit'; bookingId: string; numGuests: number };
 
+const canCancelBooking = (booking: BookingHistoryItem) => {
+  return booking.status === 'unconfirmed' || booking.status === 'confirmed';
+};
+
+const canModifyBooking = (booking: BookingHistoryItem) => {
+  return booking.status === 'unconfirmed';
+};
+
+function canCancelReservation(status: string | null | undefined) {
+  return status === 'pending' || status === 'confirmed';
+}
+
 export default function BookingsPage() {
   const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   if (!isLoaded) return <Spinner label='Loading your bookings...' />;
@@ -102,6 +115,7 @@ export default function BookingsPage() {
 
 function BookingHistory() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState('cabins');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dialog, setDialog] = useState<BookingDialog>({ kind: 'closed' });
   // Retain the last available query record when a filter hides the selection.
@@ -125,8 +139,20 @@ function BookingHistory() {
       : (bookings?.find(booking => booking._id === dialog.bookingId) ??
         bookingContext.current.get(dialog.bookingId));
 
-  const cancelBooking = useCancelBooking();
-  const updateBooking = useUpdateBooking();
+  const cancelBooking = useCancelBooking(
+    dialog.kind === 'cancel' &&
+      selectedBooking &&
+      canCancelBooking(selectedBooking)
+      ? dialog.bookingId
+      : undefined
+  );
+  const updateBooking = useUpdateBooking(
+    dialog.kind === 'edit' &&
+      selectedBooking &&
+      canModifyBooking(selectedBooking)
+      ? dialog.bookingId
+      : undefined
+  );
 
   // Experience bookings
   const [expStatusFilter, setExpStatusFilter] = useState<string>('all');
@@ -137,7 +163,13 @@ function BookingHistory() {
   } = useExperienceBookingHistory(
     expStatusFilter === 'all' ? undefined : expStatusFilter
   );
-  const cancelExpBooking = useCancelExperienceBooking();
+  const cancelExpBooking = useCancelExperienceBooking(
+    activeTab !== 'experiences' || expLoading || expError
+      ? []
+      : (experienceBookings
+          ?.filter(row => canCancelReservation(row.status))
+          .map(row => row._id) ?? [])
+  );
 
   // Dining reservations
   const [diningStatusFilter, setDiningStatusFilter] = useState<string>('all');
@@ -148,7 +180,13 @@ function BookingHistory() {
   } = useDiningReservationHistory(
     diningStatusFilter === 'all' ? undefined : diningStatusFilter
   );
-  const cancelDiningReservation = useCancelDiningReservation();
+  const cancelDiningReservation = useCancelDiningReservation(
+    activeTab !== 'dining' || diningLoading || diningError
+      ? []
+      : (diningReservations
+          ?.filter(row => canCancelReservation(row.status))
+          .map(row => row._id) ?? [])
+  );
 
   const handleViewDetails = (booking: BookingHistoryItem) => {
     bookingContext.current.set(booking._id, booking);
@@ -197,6 +235,7 @@ function BookingHistory() {
         current === submittedDialog ? { kind: 'closed' } : current
       );
     } catch (error) {
+      if (error instanceof ObsoleteCustomerWriteError) return;
       addToast({
         title: 'Error',
         description:
@@ -230,6 +269,7 @@ function BookingHistory() {
         current === submittedDialog ? { kind: 'closed' } : current
       );
     } catch (error) {
+      if (error instanceof ObsoleteCustomerWriteError) return;
       addToast({
         title: 'Error',
         description: 'Failed to cancel booking. Please try again.',
@@ -246,14 +286,6 @@ function BookingHistory() {
     });
   };
 
-  const canCancelBooking = (booking: BookingHistoryItem) => {
-    return booking.status === 'unconfirmed' || booking.status === 'confirmed';
-  };
-
-  const canModifyBooking = (booking: BookingHistoryItem) => {
-    return booking.status === 'unconfirmed';
-  };
-
   return (
     <section className='flex flex-col items-center justify-center gap-4 py-8 md:py-10 px-4'>
       <div className='w-full max-w-7xl'>
@@ -264,7 +296,13 @@ function BookingHistory() {
           </h2>
         </div>
 
-        <Tabs className='mb-6' color='primary' variant='underlined'>
+        <Tabs
+          className='mb-6'
+          color='primary'
+          selectedKey={activeTab}
+          variant='underlined'
+          onSelectionChange={key => setActiveTab(String(key))}
+        >
           <Tab key='cabins' title='Cabin Bookings'>
             {/* Cabin Bookings Content */}
             {/* Filters */}
@@ -643,8 +681,7 @@ function BookingHistory() {
                             )}
 
                           <div className='flex gap-2 pt-4'>
-                            {(booking.status === 'pending' ||
-                              booking.status === 'confirmed') && (
+                            {canCancelReservation(booking.status) && (
                               <Button
                                 color='danger'
                                 isLoading={cancelExpBooking.isPending}
@@ -661,7 +698,12 @@ function BookingHistory() {
                                         'Your experience booking has been cancelled.',
                                       color: 'success',
                                     });
-                                  } catch {
+                                  } catch (error) {
+                                    if (
+                                      error instanceof
+                                      ObsoleteCustomerWriteError
+                                    )
+                                      return;
                                     addToast({
                                       title: 'Error',
                                       description: 'Failed to cancel booking.',
@@ -829,8 +871,7 @@ function BookingHistory() {
                             )}
 
                           <div className='flex gap-2 pt-4'>
-                            {(reservation.status === 'pending' ||
-                              reservation.status === 'confirmed') && (
+                            {canCancelReservation(reservation.status) && (
                               <Button
                                 color='danger'
                                 isLoading={cancelDiningReservation.isPending}
@@ -847,7 +888,12 @@ function BookingHistory() {
                                         'Your dining reservation has been cancelled.',
                                       color: 'success',
                                     });
-                                  } catch {
+                                  } catch (error) {
+                                    if (
+                                      error instanceof
+                                      ObsoleteCustomerWriteError
+                                    )
+                                      return;
                                     addToast({
                                       title: 'Error',
                                       description:

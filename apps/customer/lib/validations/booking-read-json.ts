@@ -7,7 +7,10 @@ import {
 } from '@lodgeflow/database/reservation-read-fields';
 import { CABIN_STATUSES } from '@lodgeflow/database/config';
 import { ownedDetail, type MutationTarget } from './mutation-response';
-import type { UpdateBookingDetailsInput } from './booking';
+import type {
+  CreateBookingRequest,
+  UpdateBookingDetailsInput,
+} from './booking';
 import { decodeSuccess, forDetailId } from './read-response';
 
 const detailCabin: z.ZodType<BookingDetailCabin, BookingDetailCabin> =
@@ -42,13 +45,16 @@ export const decodeBookingDetail = (id: string) =>
 
 export function createdBookingResult({
   customerId,
-  cabinId,
-}: Pick<MutationTarget, 'customerId'> & { cabinId: string }) {
+  selection,
+}: Pick<MutationTarget, 'customerId'> & { selection: CreateBookingRequest }) {
   return ownedDetail(bookingDetail, { customerId }).refine(
     row =>
       row.status === 'unconfirmed' &&
+      row.numGuests === selection.numGuests &&
+      Date.parse(row.checkInDate) === Date.parse(selection.checkInDate) &&
+      Date.parse(row.checkOutDate) === Date.parse(selection.checkOutDate) &&
       (row.cabin === null ||
-        row.cabin._id.toLowerCase() === cabinId.toLowerCase())
+        row.cabin._id.toLowerCase() === selection.cabinId.toLowerCase())
   );
 }
 const extraChoices = [
