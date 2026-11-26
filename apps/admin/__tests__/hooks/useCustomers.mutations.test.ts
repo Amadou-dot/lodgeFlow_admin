@@ -3,7 +3,7 @@ import type {
   CreateCustomerInput,
   UpdateCustomerRequest,
 } from '@/lib/validations/customer';
-import type { Customer } from '@/types';
+import { customerJsonFixture } from '../setup/customer-json';
 type MutationInput =
   CreateCustomerInput | (UpdateCustomerRequest & { id: string }) | string;
 interface MutationConfig {
@@ -53,48 +53,42 @@ beforeEach(() => {
   mockFetch.mockReset();
 });
 
-const customerJson: Customer = {
-  id: 'user_1',
-  name: 'Jane Guest',
-  first_name: 'Jane',
-  last_name: 'Guest',
-  username: null,
+const createInput: CreateCustomerInput = {
+  firstName: 'Jane',
+  lastName: 'Guest',
   email: 'jane@example.com',
-  image_url: '',
-  has_image: false,
-  created_at: '2030-01-01T00:00:00.000Z',
-  updated_at: '2030-01-01T00:00:00.000Z',
-  last_sign_in_at: null,
-  last_active_at: '2030-01-01T00:00:00.000Z',
-  banned: false,
-  locked: false,
-  lockout_expires_in_seconds: null,
-  totalBookings: 0,
-  totalSpent: 0,
-  loyaltyTier: 'Bronze',
+  password: 'test-password',
+};
+
+const customerJson = {
+  ...customerJsonFixture,
+  name: 'Jane Guest',
+  id: 'user_1',
+  totalSpent: -10.125,
+  nationalId: 'legacy-id',
+  emergencyContact: { name: 'Legacy contact', future: 'retained' },
+  future: 'retained',
 };
 
 describe('useCreateCustomer', () => {
-  const customer = {
-    firstName: 'Jane',
-    lastName: 'Guest',
-    email: 'jane@example.com',
-    password: 'test-password',
-  } satisfies CreateCustomerInput;
-
   it('POSTs the customer payload and returns the created customer', async () => {
     const created = customerJson;
     mockFetch.mockResolvedValue(
-      Response.json({ success: true, data: created }, { status: 200 })
+      Response.json({
+        success: true,
+        data: created,
+        message: 'Customer created successfully',
+        future: true,
+      })
     );
 
     useCreateCustomer();
-    const result = await mutation().mutationFn(customer);
+    const result = await mutation().mutationFn(createInput);
 
     expect(global.fetch).toHaveBeenCalledWith('/api/customers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(customer),
+      body: JSON.stringify(createInput),
     });
     expect(result).toEqual(created);
   });
@@ -106,7 +100,7 @@ describe('useCreateCustomer', () => {
 
     useCreateCustomer();
 
-    await expect(mutation().mutationFn(customer)).rejects.toThrow(
+    await expect(mutation().mutationFn(createInput)).rejects.toThrow(
       'Email already exists'
     );
   });
@@ -118,7 +112,9 @@ describe('useCreateCustomer', () => {
 
     useCreateCustomer();
 
-    await expect(mutation().mutationFn(customer)).rejects.toThrow('Rejected');
+    await expect(mutation().mutationFn(createInput)).rejects.toThrow(
+      'Rejected'
+    );
   });
 
   it.each([
@@ -133,7 +129,7 @@ describe('useCreateCustomer', () => {
   ])('preserves the missing-data fallback: $error', async ({ body, error }) => {
     mockFetch.mockResolvedValue(Response.json(body));
     useCreateCustomer();
-    await expect(mutation().mutationFn(customer)).rejects.toThrow(error);
+    await expect(mutation().mutationFn(createInput)).rejects.toThrow(error);
   });
 });
 
@@ -213,6 +209,106 @@ describe('useDeleteCustomer', () => {
       'Cannot delete customer'
     );
   });
+});
+
+describe.each([
+  {
+    action: 'create',
+    useMutation: useCreateCustomer,
+    input: createInput,
+    success: { success: true, data: customerJson },
+  },
+  {
+    action: 'update',
+    useMutation: useUpdateCustomer,
+    input: { id: 'user_1', firstName: 'Janet' },
+    success: { success: true, data: customerJson },
+  },
+  {
+    action: 'delete',
+    useMutation: useDeleteCustomer,
+    input: 'user_1',
+    success: { success: true },
+  },
+])('$action response boundary', ({ action, useMutation, input, success }) => {
+  const fallback = `Failed to ${action} customer`;
+
+  test.each([
+    { label: 'null', body: null },
+    { label: 'primitive', body: 42 },
+    { label: 'nonliteral success', body: { ...success, success: 1 } },
+    { label: 'wrong message type', body: { ...success, message: false } },
+    {
+      label: 'malformed error',
+      body: { ...success, error: { secret: 'provider detail' } },
+    },
+    { label: 'empty error', body: { success: false, error: '' } },
+    {
+      label: 'object error',
+      body: { success: false, error: { secret: 'provider detail' } },
+    },
+  ])('uses the safe fallback for $label', async ({ body }) => {
+    mockFetch.mockResolvedValue(Response.json(body));
+    useMutation();
+    await expect(mutation().mutationFn(input)).rejects.toThrow(fallback);
+  });
+
+  test.each([200, 502])(
+    'uses the safe fallback for invalid JSON at HTTP %s',
+    async status => {
+      mockFetch.mockResolvedValue(
+        new Response('<html>Private error</html>', { status })
+      );
+      useMutation();
+      await expect(mutation().mutationFn(input)).rejects.toThrow(fallback);
+    }
+  );
+
+  test('uses the safe fallback for a success body on HTTP failure', async () => {
+    mockFetch.mockResolvedValue(Response.json(success, { status: 500 }));
+    useMutation();
+    await expect(mutation().mutationFn(input)).rejects.toThrow(fallback);
+  });
+
+  test.each([
+    { status: 400, body: { error: 'Rejected' } },
+    { status: 200, body: { error: 'Rejected' } },
+    { status: 200, body: { success: false, error: 'Rejected' } },
+    { status: 200, body: { ...success, error: 'Rejected' } },
+  ])(
+    'retains the API error at HTTP $status for $body',
+    async ({ status, body }) => {
+      mockFetch.mockResolvedValue(Response.json(body, { status }));
+      useMutation();
+      await expect(mutation().mutationFn(input)).rejects.toThrow('Rejected');
+    }
+  );
+});
+
+describe.each([
+  { action: 'create', useMutation: useCreateCustomer, input: createInput },
+  { action: 'update', useMutation: useUpdateCustomer, input: { id: 'user_1' } },
+])('$action customer JSON', ({ action, useMutation, input }) => {
+  test.each([true, { ...customerJson, totalSpent: '10' }])(
+    'rejects malformed customer data %p',
+    async data => {
+      mockFetch.mockResolvedValue(Response.json({ success: true, data }));
+      useMutation();
+      await expect(mutation().mutationFn(input)).rejects.toThrow(
+        `Failed to ${action} customer`
+      );
+    }
+  );
+});
+
+test('delete rejects a data-bearing success envelope', async () => {
+  mockFetch.mockResolvedValue(
+    Response.json({ success: true, data: customerJson })
+  );
+  useDeleteCustomer();
+  await expect(mutation().mutationFn('user_1')).rejects.toThrow(
+    'Failed to delete customer'
+  );
 });
 
 describe('useLockCustomer / useUnlockCustomer', () => {

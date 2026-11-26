@@ -17,6 +17,11 @@ import {
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { isCustomersSuccessResponse } from '@/lib/validations/customer-list';
+import {
+  customerDeleteSuccessResponseSchema,
+  customerDetailSuccessResponseSchema,
+  customerMutationSuccessResponseSchema,
+} from '@/lib/validations/customer-responses';
 import type { Customer } from '@/types/clerk';
 
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
@@ -166,7 +171,9 @@ test.each([false, true])(
       .orFail();
     const response = await getById(request(), params());
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    const body: unknown = await response.json();
+    customerDetailSuccessResponseSchema.parse(body);
+    expect(body).toEqual({
       success: true,
       data: json({
         ...customer,
@@ -182,9 +189,64 @@ test.each([false, true])(
   }
 );
 
+test('customer detail retains legacy booking nulls and omits unset metadata', async () => {
+  const { booking } = await fixture();
+  await Booking.collection.updateOne(
+    { _id: booking._id },
+    {
+      $set: {
+        totalPrice: 200.125,
+        payments: null,
+        checkoutToken: null,
+        checkoutAmount: null,
+        paidAt: null,
+        cancellationRefunds: null,
+        refundAmount: null,
+      },
+      $unset: { paymentConfirmationSentAt: '', observations: '' },
+    }
+  );
+
+  const response = await getById(request(), params());
+
+  expect(response.status).toBe(200);
+  const body: unknown = await response.json();
+  customerDetailSuccessResponseSchema.parse(body);
+  expect(body).toMatchObject({
+    success: true,
+    data: {
+      recentBookings: [
+        {
+          _id: String(booking._id),
+          totalPrice: 200.125,
+          payments: null,
+          checkoutToken: null,
+          checkoutAmount: null,
+          paidAt: null,
+          cancellationRefunds: null,
+          refundAmount: null,
+          cabin: {
+            name: 'Pine',
+            capacity: 4,
+            price: 100,
+            discountedPrice: null,
+          },
+        },
+      ],
+    },
+  });
+  expect(body).not.toHaveProperty('data.recentBookings.0.observations');
+  expect(body).not.toHaveProperty(
+    'data.recentBookings.0.paymentConfirmationSentAt'
+  );
+});
+
 test('empty history keeps zero totals and omits lastBookingDate', async () => {
   const response = await getById(request(), params());
-  expect(await response.json()).toEqual({
+  expect(response.status).toBe(200);
+  const body: unknown = await response.json();
+  customerDetailSuccessResponseSchema.parse(body);
+  expect(body).toEqual({
     success: true,
     data: json({
       ...customer,
@@ -222,7 +284,9 @@ test.each(['POST', 'PUT'])(
     const response =
       method === 'POST' ? await POST(req) : await PUT(req, params());
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    const body: unknown = await response.json();
+    customerMutationSuccessResponseSchema.parse(body);
+    expect(body).toEqual({
       success: true,
       data: json(customer),
       ...(method === 'POST'
@@ -235,7 +299,9 @@ test.each(['POST', 'PUT'])(
 test('customer deletion returns a message acknowledgement without data', async () => {
   const response = await deleteById(request(), params());
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const body: unknown = await response.json();
+  customerDeleteSuccessResponseSchema.parse(body);
+  expect(body).toEqual({
     success: true,
     message: 'Customer deleted successfully',
   });

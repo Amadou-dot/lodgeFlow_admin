@@ -9,7 +9,10 @@ export type BookingCabin = Pick<
   CabinDetail,
   '_id' | 'id' | 'name' | 'image' | 'capacity' | 'price'
 > &
-  Partial<CabinDetail>;
+  Partial<Omit<CabinDetail, 'discountedPrice'>> & {
+    // Projections without discount serialize the computed price as null.
+    discountedPrice?: number | null;
+  };
 
 export interface AdminBooking extends Omit<BookingReadFields, 'customer'> {
   id: string;

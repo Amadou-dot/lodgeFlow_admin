@@ -1,3 +1,4 @@
+import type { CustomerWithStats } from '@/types';
 import type { CustomerJson } from '@/types/customer-json';
 
 export const customerJsonFixture: CustomerJson = {
@@ -19,4 +20,12 @@ export const customerJsonFixture: CustomerJson = {
   totalBookings: 0,
   totalSpent: 0,
   loyaltyTier: 'Bronze',
+};
+
+export const customerDetailFixture: CustomerWithStats = {
+  ...customerJsonFixture,
+  completedBookings: 0,
+  totalRevenue: 0,
+  averageStayLength: 0,
+  recentBookings: [],
 };

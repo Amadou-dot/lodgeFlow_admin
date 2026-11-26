@@ -1,3 +1,4 @@
+/** @jest-environment ./__tests__/setup/fetch-jsdom.cjs */
 import { createElement, type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import {
@@ -26,7 +27,14 @@ import {
   useSettings,
   useUpdateSettings,
 } from '@/hooks/useSettings';
-import type { AppSettings, Customer, PopulatedBooking } from '@/types';
+import type {
+  AppSettings,
+  Customer,
+  CustomerWithStats,
+  PopulatedBooking,
+} from '@/types';
+
+import { customerDetailFixture } from '../setup/customer-json';
 
 jest.unmock('swr');
 
@@ -35,11 +43,7 @@ const fetchMock = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
 let client: QueryClient;
 
 function response(body: unknown, ok = true): Response {
-  const checked = { ok, json: async () => body } satisfies Pick<
-    Response,
-    'ok' | 'json'
-  >;
-  return checked as Response;
+  return Response.json(body, { status: ok ? 200 : 400 });
 }
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(
@@ -52,6 +56,7 @@ function wrapper({ children }: { children: ReactNode }) {
           provider: () => new Map(),
           dedupingInterval: 0,
           revalidateOnFocus: false,
+          shouldRetryOnError: false,
         },
       },
       children
@@ -102,6 +107,11 @@ const customer = (name: string): Customer => ({
   totalBookings: 0,
   totalSpent: 0,
   loyaltyTier: 'Bronze',
+});
+const customerDetail = (name: string): CustomerWithStats => ({
+  ...customerDetailFixture,
+  ...customer(name),
+  recentBookings: [],
 });
 const settings: AppSettings = {
   _id: 'settings',
@@ -262,16 +272,16 @@ test('booking success refreshes filtered list, detail, by-email and stats; failu
 
 test('customer success refreshes SWR list/detail and the infinite customer search; failure does not', async () => {
   let name = 'Jane Guest';
-  let failUpdate = false;
+  let updateFailure: Response | undefined;
   fetchMock.mockImplementation(async (input, init) => {
     const url = String(input);
     if (init?.method === 'PUT') {
-      if (failUpdate) return response({ error: 'Rejected' }, false);
+      if (updateFailure) return updateFailure;
       name = 'Janet Guest';
       return response({ success: true, data: customer(name) });
     }
     if (url === '/api/customers/user_1')
-      return response({ success: true, data: customer(name) });
+      return response({ success: true, data: customerDetail(name) });
     if (url.startsWith('/api/bookings?')) {
       return response({
         success: true,
@@ -345,61 +355,290 @@ test('customer success refreshes SWR list/detail and the infinite customer searc
   await waitFor(() =>
     expect(result.current.bookingEmail.data?.guest?.name).toBe('Janet Guest')
   );
-  expect(invalidated).toHaveBeenCalledWith({ queryKey: ['customers'] });
-  expect(invalidated).toHaveBeenCalledWith({ queryKey: ['activities'] });
+  expect(invalidated.mock.calls).toEqual([
+    [{ queryKey: ['customers'] }],
+    [{ queryKey: ['activities'] }],
+  ]);
 
   const beforeFailure = fetchMock.mock.calls.length;
   const beforeInvalidations = invalidated.mock.calls.length;
-  failUpdate = true;
+  updateFailure = response({ error: 'Rejected' }, false);
   await act(async () => {
     await expect(
       result.current.update.mutateAsync({ id: 'user_1', firstName: 'No' })
     ).rejects.toThrow('Rejected');
   });
-  expect(fetchMock.mock.calls.length).toBe(beforeFailure + 1);
+  updateFailure = response({
+    success: true,
+    data: { ...customer('No'), totalSpent: 'unknown' },
+  });
+  await act(async () => {
+    await expect(
+      result.current.update.mutateAsync({ id: 'user_1', firstName: 'No' })
+    ).rejects.toThrow('Failed to update customer');
+  });
+  expect(fetchMock.mock.calls.length).toBe(beforeFailure + 2);
   expect(invalidated).toHaveBeenCalledTimes(beforeInvalidations);
+  expect(result.current.detail.data).toEqual(customerDetail('Janet Guest'));
+  expect(result.current.list.data).toEqual([customer('Janet Guest')]);
+  expect(result.current.infinite.customers).toEqual([customer('Janet Guest')]);
   expect(result.current.bookingList.data?.bookings[0].guest?.name).toBe(
     'Janet Guest'
   );
 });
 
-test('customer create and delete also refresh the dashboard customer count', async () => {
-  fetchMock.mockImplementation(async (_input, init) =>
-    response(
-      init?.method === 'DELETE'
-        ? { success: true }
-        : { success: true, data: customer('Jane Guest') }
-    )
-  );
+test('customer create and delete refresh customer reads and their dashboard keys only after valid replies', async () => {
+  let name = 'Jane Guest';
+  let malformed = false;
+  fetchMock.mockImplementation(async (url, init) => {
+    if (init?.method === 'POST') {
+      if (malformed) return response({ success: true, data: { id: 'broken' } });
+      name = 'Created Guest';
+      return response({
+        success: true,
+        data: customer(name),
+        message: 'Customer created successfully',
+      });
+    }
+    if (init?.method === 'DELETE') {
+      if (malformed) return response({ success: 1 });
+      name = 'Remaining Guest';
+      return response({ success: true });
+    }
+    if (url === '/api/customers/user_1')
+      return response({ success: true, data: customerDetail(name) });
+    return response({
+      success: true,
+      data: [customer(name)],
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalCustomers: 1,
+        limit: 20,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+    });
+  });
   const invalidated = jest.spyOn(client, 'invalidateQueries');
   const { result } = renderHook(
     () => ({
       create: useCreateCustomer(),
       remove: useDeleteCustomer(),
+      detail: useCustomer('user_1'),
+      list: useCustomers(),
+      infinite: useInfiniteCustomers(),
     }),
     { wrapper }
   );
-  const input = {
+  const waitForCustomers = async (expectedName: string) => {
+    await waitFor(() => {
+      expect(result.current.detail.data).toEqual(customerDetail(expectedName));
+      expect(result.current.list.data).toEqual([customer(expectedName)]);
+      expect(result.current.infinite.customers).toEqual([
+        customer(expectedName),
+      ]);
+    });
+  };
+  await waitForCustomers('Jane Guest');
+  const input: CreateCustomerInput = {
     firstName: 'Jane',
     lastName: 'Guest',
     email: 'jane@example.com',
     password: 'test-password',
-  } satisfies CreateCustomerInput;
+  };
   await act(async () => {
     expect(await result.current.create.mutateAsync(input)).toEqual(
-      customer('Jane Guest')
+      customer('Created Guest')
     );
   });
-  expect(invalidated).toHaveBeenCalledWith({ queryKey: ['overview'] });
+  await waitForCustomers('Created Guest');
+  expect(invalidated.mock.calls).toEqual([
+    [{ queryKey: ['customers'] }],
+    [{ queryKey: ['overview'] }],
+  ]);
+
   invalidated.mockClear();
+  malformed = true;
+  const requestsBeforeFailures = fetchMock.mock.calls.length;
+  await act(async () => {
+    await expect(result.current.create.mutateAsync(input)).rejects.toThrow(
+      'Failed to create customer'
+    );
+    await expect(result.current.remove.mutateAsync('user_1')).rejects.toThrow(
+      'Failed to delete customer'
+    );
+  });
+  expect(invalidated).not.toHaveBeenCalled();
+  expect(fetchMock).toHaveBeenCalledTimes(requestsBeforeFailures + 2);
+  await waitForCustomers('Created Guest');
+
+  malformed = false;
   await act(async () => {
     expect(await result.current.remove.mutateAsync('user_1')).toEqual({
       success: true,
     });
   });
-  expect(invalidated).toHaveBeenCalledWith({ queryKey: ['overview'] });
-  expect(invalidated).toHaveBeenCalledWith({ queryKey: ['activities'] });
+  await waitForCustomers('Remaining Guest');
+  expect(invalidated.mock.calls).toEqual([
+    [{ queryKey: ['customers'] }],
+    [{ queryKey: ['overview'] }],
+    [{ queryKey: ['activities'] }],
+  ]);
 });
+
+const legacyBooking = {
+  _id: 'booking_legacy',
+  id: 'booking_legacy',
+  customer: 'user_1',
+  checkInDate: '2040-06-01T23:30:00.000Z',
+  checkOutDate: '2040-06-03T23:30:00.000Z',
+  numNights: 2,
+  numGuests: 2,
+  status: 'checked-out',
+  cabinPrice: 100.125,
+  extrasPrice: 0,
+  totalPrice: 100.125,
+  isPaid: false,
+  amountPaid: 0,
+  depositPaid: false,
+  depositAmount: 0,
+  remainingAmount: 100.125,
+  cabin: null,
+  payments: null,
+  checkoutToken: null,
+  refundAmount: null,
+  cancelledAt: null,
+  future: { note: 'Preserved' },
+} satisfies CustomerWithStats['recentBookings'][number] & { future: unknown };
+
+const richCustomer = {
+  ...customerDetail('Jane Guest'),
+  recentBookings: [legacyBooking],
+  preferences: { dietaryRestrictions: ['Vegan'], future: 'retained' },
+  totalRevenue: -100.125,
+  future: 'retained',
+};
+const detailSuccess = { success: true, data: richCustomer, future: true };
+
+test('customer detail preserves legacy amounts, sparse metadata and additive nested values', async () => {
+  fetchMock.mockResolvedValue(response(detailSuccess));
+  const { result } = renderHook(() => useCustomer('user_1'), { wrapper });
+  await waitFor(() => expect(result.current.data).toEqual(richCustomer));
+  expect(result.current.data?.recentBookings[0]?.cabin).toBeNull();
+  expect(result.current.data?.lastBookingDate).toBeUndefined();
+});
+
+test.each([
+  { label: 'JSON null', reply: () => response(null) },
+  { label: 'JSON primitive', reply: () => response(42) },
+  {
+    label: 'invalid JSON',
+    reply: () => new Response('<html>Private error</html>'),
+  },
+  { label: 'missing data', reply: () => response({ success: true }) },
+  { label: 'wrong data', reply: () => response({ success: true, data: [] }) },
+  {
+    label: 'missing completed bookings',
+    reply: () =>
+      response({
+        ...detailSuccess,
+        data: { ...richCustomer, completedBookings: undefined },
+      }),
+  },
+  {
+    label: 'wrong total revenue',
+    reply: () =>
+      response({
+        ...detailSuccess,
+        data: { ...richCustomer, totalRevenue: 'unknown' },
+      }),
+  },
+  {
+    label: 'wrong average stay length',
+    reply: () =>
+      response({
+        ...detailSuccess,
+        data: { ...richCustomer, averageStayLength: null },
+      }),
+  },
+  {
+    label: 'missing recent bookings',
+    reply: () =>
+      response({
+        ...detailSuccess,
+        data: { ...richCustomer, recentBookings: undefined },
+      }),
+  },
+  {
+    label: 'malformed booking',
+    reply: () =>
+      response({
+        ...detailSuccess,
+        data: {
+          ...richCustomer,
+          recentBookings: [{ ...legacyBooking, cabin: { name: 'Pine' } }],
+        },
+      }),
+  },
+  {
+    label: 'unknown booking status',
+    reply: () =>
+      response({
+        ...detailSuccess,
+        data: {
+          ...richCustomer,
+          recentBookings: [{ ...legacyBooking, status: 'bogus' }],
+        },
+      }),
+  },
+  {
+    label: 'nonliteral success',
+    reply: () => response({ ...detailSuccess, success: 'true' }),
+  },
+  {
+    label: 'malformed message',
+    reply: () => response({ ...detailSuccess, message: {} }),
+  },
+  {
+    label: 'malformed error',
+    reply: () => response({ ...detailSuccess, error: 123 }),
+  },
+  {
+    label: 'contradictory error',
+    reply: () => response({ ...detailSuccess, error: 'Rejected' }),
+  },
+  {
+    label: '2xx API error',
+    reply: () => response({ success: false, error: 'Private error' }),
+  },
+  {
+    label: 'HTTP failure with a valid body',
+    reply: () => response(detailSuccess, false),
+  },
+])(
+  'customer detail retains valid data after $label and recovers on retry',
+  async ({ reply }) => {
+    fetchMock.mockResolvedValue(response(detailSuccess));
+    const { result } = renderHook(() => useCustomer('user_1'), { wrapper });
+    await waitFor(() => expect(result.current.data).toEqual(richCustomer));
+
+    fetchMock.mockResolvedValue(reply());
+    await act(async () => {
+      await result.current.mutate();
+    });
+    expect(result.current.error?.message).toBe('Failed to fetch customer');
+    expect(result.current.data).toEqual(richCustomer);
+
+    const recovered = customerDetail('Janet Guest');
+    fetchMock.mockResolvedValue(response({ success: true, data: recovered }));
+    await act(async () => {
+      await result.current.mutate();
+    });
+    expect(result.current.error).toBeUndefined();
+    expect(result.current.data).toEqual(recovered);
+  }
+);
 
 test('settings update and reset refresh the mounted read; failed update does not', async () => {
   let current = settings;
