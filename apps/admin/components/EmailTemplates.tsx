@@ -136,38 +136,15 @@ export function WelcomeEmail({ firstName }: EmailTemplateProps) {
   );
 }
 
-const isoCalendarDate = /^(?:\d{4}|[+-]\d{6})(?:-\d{2}){0,2}$/;
-const namedTimeZone = /\b(?:gmt|utc?|[ecmp][sd]t|z)\b|\dz\b/i;
-const numericTimeZone = /(?:\s|:\d+(?:\.\d+)?(?:\s*[ap]m)?)[+-]\d/i;
+const isoStayDate =
+  /^(?:\d{4}|[+-]\d{6})-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2}))?$/i;
 
 function formatConfirmationStayDate(date: string) {
-  const trimmed = date.trim();
-  if (isoCalendarDate.test(trimmed)) {
-    return formatBookingStayDate({ date: trimmed, style: 'long-weekday' });
-  }
-
-  // Date.parse ignores parenthesized annotations, even when they name a zone.
-  let zoneText = '';
-  let commentDepth = 0;
-  for (const character of trimmed) {
-    if (character === '(') {
-      if (commentDepth === 0) zoneText += ' ';
-      commentDepth++;
-    } else if (character === ')' && commentDepth > 0) {
-      commentDepth--;
-    } else if (commentDepth === 0) {
-      zoneText += character;
-    }
-  }
-
-  if (
-    namedTimeZone.test(zoneText) ||
-    (zoneText.includes(':') && numericTimeZone.test(zoneText))
-  ) {
+  if (isoStayDate.test(date)) {
     return formatBookingStayDate({ date, style: 'long-weekday' });
   }
 
-  // Legacy inputs without an offset represent a wall-clock date.
+  // The endpoint also accepts legacy strings with native local formatting.
   return new Date(date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
