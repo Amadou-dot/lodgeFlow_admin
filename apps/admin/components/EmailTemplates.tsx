@@ -136,6 +136,46 @@ export function WelcomeEmail({ firstName }: EmailTemplateProps) {
   );
 }
 
+const isoCalendarDate = /^(?:\d{4}|[+-]\d{6})(?:-\d{2}){0,2}$/;
+const namedTimeZone = /\b(?:gmt|utc?|[ecmp][sd]t|z)\b|\dz\b/i;
+const numericTimeZone = /(?:\s|:\d+(?:\.\d+)?(?:\s*[ap]m)?)[+-]\d/i;
+
+function formatConfirmationStayDate(date: string) {
+  const trimmed = date.trim();
+  if (isoCalendarDate.test(trimmed)) {
+    return formatBookingStayDate({ date: trimmed, style: 'long-weekday' });
+  }
+
+  // Date.parse ignores parenthesized annotations, even when they name a zone.
+  let zoneText = '';
+  let commentDepth = 0;
+  for (const character of trimmed) {
+    if (character === '(') {
+      if (commentDepth === 0) zoneText += ' ';
+      commentDepth++;
+    } else if (character === ')' && commentDepth > 0) {
+      commentDepth--;
+    } else if (commentDepth === 0) {
+      zoneText += character;
+    }
+  }
+
+  if (
+    namedTimeZone.test(zoneText) ||
+    (zoneText.includes(':') && numericTimeZone.test(zoneText))
+  ) {
+    return formatBookingStayDate({ date, style: 'long-weekday' });
+  }
+
+  // Legacy inputs without an offset represent a wall-clock date.
+  return new Date(date).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
 export function BookingConfirmationEmail({
   firstName,
   bookingData,
@@ -190,19 +230,13 @@ export function BookingConfirmationEmail({
           <div style={emailStyles.row}>
             <span style={emailStyles.label}>Check-in:</span>
             <span style={emailStyles.value}>
-              {formatBookingStayDate({
-                date: bookingData.checkInDate,
-                style: 'long-weekday',
-              })}
+              {formatConfirmationStayDate(bookingData.checkInDate)}
             </span>
           </div>
           <div style={emailStyles.row}>
             <span style={emailStyles.label}>Check-out:</span>
             <span style={emailStyles.value}>
-              {formatBookingStayDate({
-                date: bookingData.checkOutDate,
-                style: 'long-weekday',
-              })}
+              {formatConfirmationStayDate(bookingData.checkOutDate)}
             </span>
           </div>
           <div style={emailStyles.row}>

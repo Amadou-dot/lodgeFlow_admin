@@ -101,6 +101,75 @@ test('retains staff authorization, rate key, sender, recipient, rendered fields 
   expect(html).toContain('Sunday, January 1, 2040');
   expect(html).toContain('Tuesday, January 3, 2040');
 });
+test.each([
+  {
+    form: 'offset-free ISO date-times',
+    checkInDate: '2027-03-20T23:30:00',
+    checkOutDate: '2027-03-23T00:30:00',
+  },
+  {
+    form: 'legacy numeric and written date-times',
+    checkInDate: '03/20/2027 23:30:00',
+    checkOutDate: 'March 23, 2027 00:30:00',
+  },
+  {
+    form: 'ISO and legacy date-only strings',
+    checkInDate: '2027-03-20',
+    checkOutDate: '03-23-2027',
+  },
+  {
+    form: 'legacy date-times with comments',
+    checkInDate: 'March 20, 2027 23:30:00 ((local) UTC)',
+    checkOutDate: 'March 23, 2027 00:30:00 (local time)',
+  },
+])(
+  'preserves the stated calendar days for $form',
+  async ({ checkInDate, checkOutDate }) => {
+    const response = await POST(
+      request({
+        ...payload,
+        bookingData: { ...payload.bookingData, checkInDate, checkOutDate },
+      })
+    );
+    expect(response.status).toBe(200);
+    const html = renderToStaticMarkup(mockSend.mock.calls[0][0].react);
+    expect(html).toContain('Saturday, March 20, 2027');
+    expect(html).toContain('Tuesday, March 23, 2027');
+  }
+);
+
+test.each([
+  {
+    form: 'ISO numeric offsets',
+    checkInDate: '2027-03-20T23:30:00-06:00',
+    checkOutDate: '2027-03-23T00:30:00+09:00',
+  },
+  {
+    form: 'legacy named zones',
+    checkInDate: 'Sat, 20 Mar 2027 23:30:00 MST',
+    checkOutDate: 'Tue Mar 23 2027 00:30:00 GMT+0900 (Japan Standard Time)',
+  },
+  {
+    form: 'legacy numeric offsets',
+    checkInDate: 'Mar 20 2027 11:30 pm-0600',
+    checkOutDate: '00:30:00 03-23-2027 +0900',
+  },
+])(
+  'uses the UTC day for explicit instants with $form',
+  async ({ checkInDate, checkOutDate }) => {
+    const response = await POST(
+      request({
+        ...payload,
+        bookingData: { ...payload.bookingData, checkInDate, checkOutDate },
+      })
+    );
+    expect(response.status).toBe(200);
+    const html = renderToStaticMarkup(mockSend.mock.calls[0][0].react);
+    expect(html).toContain('Sunday, March 21, 2027');
+    expect(html).toContain('Monday, March 22, 2027');
+  }
+);
+
 test('auth and rate denials precede parsing and sending', async () => {
   mockAuth.mockResolvedValueOnce({
     authenticated: false,
