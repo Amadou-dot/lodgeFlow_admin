@@ -51,23 +51,27 @@
 
 **Context:** `/tmp/lodgeflow-phase4-contract-audit.md` section 2 inventories all relevant consumers. Existing editor/calendar/inbox consumers already use UTC date keys. Other absolute stay labels format UTC-midnight values in the viewer timezone and display the previous day in Denver.
 
-**Interfaces:** Export `formatBookingStayDate({ date, style })`, accepting only the serialized string and a small union of the existing presentation variants. Use a fixed en-US/UTC calendar formatter and preserve each caller's existing month/day padding and malformed-date fallback. Apply only to planned stay labels. Admin booking confirmation email shares the label formatter without changing sending behavior.
+**Interfaces:** Export `formatBookingStayDate({ date, style })`, accepting only the serialized string and a small union of the existing presentation variants. Use a fixed en-US/UTC calendar formatter and preserve each caller's existing month/day padding and malformed-date fallback. Apply only to planned stay labels. Admin booking confirmation email shares the label formatter for canonical ISO calendar dates and explicitly zoned ISO instants. Its existing permissive input boundary retains prior native local formatting for offset-free date-times and non-ISO legacy forms, without changing accepted inputs or sending behavior.
 
-- [ ] Reproduce March 20–23, 2027 displaying a day early in Denver using failing helper/component assertions before implementation.
-- [ ] Cover UTC midnight, a non-midnight legacy ISO instant, month/year or DST boundary and existing invalid-input fallbacks. Assert unchanged strings/stay lengths and local actual event timestamps.
-- [ ] Implement the one browser-safe formatting boundary and migrate the inventoried absolute stay-label consumers.
-- [ ] Run focused tests in separate processes under `TZ=America/Denver`, `TZ=UTC`, `TZ=Asia/Tokyo`; run affected booking/print/email suites, admin types and strict changed-test types. Preserve passing UTC picker/transport coverage.
-- [ ] Record the display-only behavior correction, format touched files and commit the slice.
+- [x] Reproduce March 20–23, 2027 displaying a day early in Denver using failing helper/component assertions before implementation.
+- [x] Cover UTC midnight, a non-midnight legacy ISO instant, month/year or DST boundary and existing invalid-input fallbacks. Assert unchanged strings/stay lengths and local actual event timestamps.
+- [x] Implement the one browser-safe formatting boundary and migrate the inventoried absolute stay-label consumers.
+- [x] Run focused tests in separate processes under `TZ=America/Denver`, `TZ=UTC`, `TZ=Asia/Tokyo`; run affected booking/print/email suites, admin types and strict changed-test types. Preserve passing UTC picker/transport coverage.
+- [x] Record the display-only behavior correction, format touched files and commit the slice.
 
 ### Task 3: Preserve booking edit initialization and selected customer
 
-**Ownership:** Admin booking edit page, `hooks/useBookingForm.ts` and `components/BookingForm/CustomerSelection.tsx` plus directly related types and tests. Determine exact files from `/tmp/lodgeflow-phase4-mobile-audit.md`; no booking request/domain/payment changes.
+**Ownership:** Admin booking edit page, `hooks/useBookingForm.ts` and `components/BookingForm/CustomerSelection.tsx` plus directly related types, form/page tests and focused existing admin booking route integration tests. Determine exact files from `/tmp/lodgeflow-phase4-mobile-audit.md`; no server request-schema, domain or payment-policy changes.
 
-**Interfaces:** The form initializes from the fetched booking before user editing, or explicitly hydrates once per booking identity without overwriting subsequent edits. A selected customer with known identity remains an option even if absent from the first twenty/search results. Missing/deleted customer references remain explicit; never invent an identity or bypass guest eligibility.
+**Context:** `/tmp/lodgeflow-admin-legacy-date-audit.md` additionally reproduces a false paid-booking repricing conflict: the current editor rewrites untouched legacy stay timestamps to midnight during a notes-only edit. The existing PUT schema and `UpdateBookingInput` already permit omitted dates. Retaining one legacy endpoint when moving the other changes the existing Denver stay-length calculation, so avoid that mixed-endpoint change.
+
+**Interfaces:** Mount the loaded edit form keyed by booking ID after the resolved DTO matches the current route ID (`keepPreviousData` can retain a different record). Same-record revalidation preserves its draft and initialization baseline. A selected customer with known identity remains an option even if absent from the first twenty/search results; deduplicate by the Clerk ID. Missing/deleted customer references remain explicit; never invent an identity or bypass guest eligibility.
+
+For an edit, omit both stay-date fields when the complete selected calendar range equals that same-record initialization baseline, including after a change is reverted. When either selected day actually changes, keep the existing two UTC-midnight fields. Creation also keeps both fields. Use the supported typed update shape without unsafe assertions. Do not alter server calculation, guards, stored values or the actual-date-change policy.
 
 - [ ] Add a regression for a cold detail fetch resolving after initial render and for the saved customer being absent from a paginated/search list.
-- [ ] Cover user edits while data revalidates, switching record identity, and a legitimate missing populated customer.
-- [ ] Fix the initialization and selected-option boundaries with the smallest state change. Preserve submit/reset semantics, search pagination and request types.
+- [ ] Cover user edits while data revalidates, switching record identity, a legitimate missing populated customer, replacement/clear of the selected customer and both confirmed/unconfirmed initialization.
+- [ ] Fix the initialization and selected-option boundaries with the smallest state change. Preserve submit/reset semantics and search pagination. Add RED/GREEN form payload and actual PUT coverage for a paid non-midnight stay with only special requests changed: omit the unchanged date pair, save the note, and preserve exact stored dates/nights/receipts. A real date move still sends both existing midnight values and returns the receipt/checkout conflict; creation and change-then-revert behavior remain explicit.
 - [ ] Run focused form/page/selector tests, surrounding mutation tests, admin types and strict changed-test types. Preserve unpaid versus paid/active-checkout guards; characterize any relevant eligible edit path with existing fixtures rather than changing policy.
 - [ ] Format touched files, document the correction and commit the slice.
 
