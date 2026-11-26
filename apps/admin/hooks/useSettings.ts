@@ -2,7 +2,8 @@
 
 import useSWR, { useSWRConfig } from 'swr';
 import { useMutation } from '@tanstack/react-query';
-import { AppSettings } from '@/types';
+import type { AppSettings } from '@/types';
+import type { UpdateSettingsInput } from '@/lib/validations/settings';
 
 // Fetcher function for SWR
 const fetcher = (url: string) =>
@@ -44,11 +45,11 @@ export const useSettings = () => {
 export const useUpdateSettings = () => {
   const { mutate } = useSWRConfig();
   return useMutation({
-    mutationFn: async (settings: Partial<AppSettings>) => {
+    mutationFn: async (changes: UpdateSettingsInput): Promise<AppSettings> => {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(changes),
       });
 
       if (!response.ok) {

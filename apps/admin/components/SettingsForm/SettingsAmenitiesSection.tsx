@@ -1,22 +1,14 @@
-import type { AppSettings } from '@/types';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
 import { Divider } from '@heroui/divider';
 import { Input } from '@heroui/input';
 import { Switch } from '@heroui/switch';
-
-interface SettingsAmenitiesSectionProps {
-  formData: Partial<AppSettings>;
-  onInputChange: (
-    field: keyof AppSettings,
-    value: AppSettings[keyof AppSettings]
-  ) => void;
-}
+import type { SettingsSectionProps } from './types';
 
 export default function SettingsAmenitiesSection({
   formData,
   onInputChange,
-}: SettingsAmenitiesSectionProps) {
+}: SettingsSectionProps) {
   return (
     <Card>
       <CardHeader>
@@ -38,7 +30,9 @@ export default function SettingsAmenitiesSection({
             </div>
             <Switch
               isSelected={formData.wifiIncluded || false}
-              onValueChange={value => onInputChange('wifiIncluded', value)}
+              onValueChange={value =>
+                onInputChange({ field: 'wifiIncluded', value })
+              }
             />
           </div>
 
@@ -51,7 +45,9 @@ export default function SettingsAmenitiesSection({
             </div>
             <Switch
               isSelected={formData.parkingIncluded || false}
-              onValueChange={value => onInputChange('parkingIncluded', value)}
+              onValueChange={value =>
+                onInputChange({ field: 'parkingIncluded', value })
+              }
             />
           </div>
 
@@ -61,7 +57,10 @@ export default function SettingsAmenitiesSection({
               type='number'
               value={formData.parkingFee?.toString() || ''}
               onChange={e =>
-                onInputChange('parkingFee', parseInt(e.target.value) || 0)
+                onInputChange({
+                  field: 'parkingFee',
+                  value: parseInt(e.target.value) || 0,
+                })
               }
               startContent='$'
               endContent='per night'
@@ -80,7 +79,9 @@ export default function SettingsAmenitiesSection({
             </div>
             <Switch
               isSelected={formData.allowPets || false}
-              onValueChange={value => onInputChange('allowPets', value)}
+              onValueChange={value =>
+                onInputChange({ field: 'allowPets', value })
+              }
             />
           </div>
 
@@ -93,7 +94,9 @@ export default function SettingsAmenitiesSection({
             </div>
             <Switch
               isSelected={formData.smokingAllowed || false}
-              onValueChange={value => onInputChange('smokingAllowed', value)}
+              onValueChange={value =>
+                onInputChange({ field: 'smokingAllowed', value })
+              }
             />
           </div>
         </div>

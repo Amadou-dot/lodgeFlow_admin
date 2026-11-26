@@ -2,6 +2,7 @@
 
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useResetSettings, useUpdateSettings } from '@/hooks/useSettings';
+import type { UpdateSettingsInput } from '@/lib/validations/settings';
 import type { AppSettings } from '@/types';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -11,17 +12,14 @@ import {
   SettingsCheckInOutSection,
   SettingsPricingSection,
 } from './SettingsForm/index';
+import type { SettingsEdit } from './SettingsForm/types';
 
 interface SettingsFormProps {
   settings: AppSettings;
   onSettingsUpdate: () => void;
 }
 
-type DraftChange = {
-  field: keyof AppSettings;
-  value: AppSettings[keyof AppSettings];
-  revision: number;
-};
+type DraftChange = SettingsEdit & { revision: number };
 
 type EditorState = {
   server: AppSettings;
@@ -105,7 +103,7 @@ export default function SettingsForm({
     }));
   }, [settings]);
 
-  const formData = useMemo<AppSettings>(
+  const formData = useMemo<Partial<AppSettings>>(
     () => ({
       ...editor.server,
       ...Object.fromEntries(
@@ -114,17 +112,15 @@ export default function SettingsForm({
     }),
     [editor]
   );
-  const hasChanges = editor.changes.some(
+  const unsavedChanges = editor.changes.filter(
     change =>
       !sameValue({ left: change.value, right: editor.server[change.field] })
   );
 
-  const handleInputChange = (
-    field: keyof AppSettings,
-    value: AppSettings[keyof AppSettings]
-  ) => {
+  const handleInputChange = (edit: SettingsEdit) => {
     setSaveError(null);
     setEditor(previous => {
+      const { field, value } = edit;
       const revision = previous.revision + 1;
       const otherChanges = previous.changes.filter(
         change => change.field !== field
@@ -140,23 +136,26 @@ export default function SettingsForm({
         changes:
           equalsServer && previous.pendingRevision === null
             ? otherChanges
-            : [...otherChanges, { field, value, revision }],
+            : [...otherChanges, { ...edit, revision }],
       };
     });
   };
 
   const handleSave = async () => {
     const submittedRevision = editor.revision;
+    const changes: UpdateSettingsInput = Object.fromEntries(
+      unsavedChanges.map(({ field, value }) => [field, value])
+    );
     setSaveError(null);
     setEditor(previous => ({
       ...previous,
       pendingRevision: submittedRevision,
     }));
     try {
-      await updateSettings.mutateAsync(formData);
+      const saved = await updateSettings.mutateAsync(changes);
       setEditor(previous => ({
         ...previous,
-        server: formData,
+        server: saved,
         changes: pendingChanges({
           current: previous.changes,
           submittedRevision,
@@ -234,7 +233,7 @@ export default function SettingsForm({
       />
 
       <SettingsActionsSection
-        hasChanges={hasChanges}
+        hasChanges={unsavedChanges.length > 0}
         onSave={handleSave}
         onDiscard={handleDiscard}
         onReset={handleReset}

@@ -1,22 +1,14 @@
-import type { AppSettings } from '@/types';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
 import { Input } from '@heroui/input';
 import { Select, SelectItem } from '@heroui/select';
 import type { SharedSelection } from '@heroui/system';
-
-interface SettingsBookingSectionProps {
-  formData: Partial<AppSettings>;
-  onInputChange: (
-    field: keyof AppSettings,
-    value: AppSettings[keyof AppSettings]
-  ) => void;
-}
+import type { SettingsSectionProps } from './types';
 
 export default function SettingsBookingSection({
   formData,
   onInputChange,
-}: SettingsBookingSectionProps) {
+}: SettingsSectionProps) {
   return (
     <Card>
       <CardHeader>
@@ -34,7 +26,10 @@ export default function SettingsBookingSection({
             type='number'
             value={formData.minBookingLength?.toString() || ''}
             onChange={e =>
-              onInputChange('minBookingLength', parseInt(e.target.value) || 1)
+              onInputChange({
+                field: 'minBookingLength',
+                value: parseInt(e.target.value) || 1,
+              })
             }
             endContent='nights'
             min='1'
@@ -45,7 +40,10 @@ export default function SettingsBookingSection({
             type='number'
             value={formData.maxBookingLength?.toString() || ''}
             onChange={e =>
-              onInputChange('maxBookingLength', parseInt(e.target.value) || 1)
+              onInputChange({
+                field: 'maxBookingLength',
+                value: parseInt(e.target.value) || 1,
+              })
             }
             endContent='nights'
             min='1'
@@ -59,10 +57,10 @@ export default function SettingsBookingSection({
             type='number'
             value={formData.maxGuestsPerBooking?.toString() || ''}
             onChange={e =>
-              onInputChange(
-                'maxGuestsPerBooking',
-                parseInt(e.target.value) || 1
-              )
+              onInputChange({
+                field: 'maxGuestsPerBooking',
+                value: parseInt(e.target.value) || 1,
+              })
             }
             endContent='guests'
             min='1'
@@ -74,8 +72,15 @@ export default function SettingsBookingSection({
               formData.cancellationPolicy ? [formData.cancellationPolicy] : []
             }
             onSelectionChange={(keys: SharedSelection) => {
-              const value = Array.from(keys)[0] as string;
-              onInputChange('cancellationPolicy', value);
+              const value = Array.from(keys)[0];
+              if (
+                value === undefined ||
+                value === 'flexible' ||
+                value === 'moderate' ||
+                value === 'strict'
+              ) {
+                onInputChange({ field: 'cancellationPolicy', value });
+              }
             }}
           >
             <SelectItem key='flexible'>Flexible</SelectItem>

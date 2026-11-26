@@ -8,13 +8,19 @@ import {
   waitFor,
 } from '@testing-library/react';
 import SettingsForm from '@/components/SettingsForm';
+import type { SettingsSectionProps } from '@/components/SettingsForm/types';
 import type { AppSettings } from '@/types';
 import type { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import {
+  stripSettingsMongoMetadata,
+  updateSettingsSchema,
+  type UpdateSettingsInput,
+} from '@/lib/validations/settings';
 
 type ConfirmOptions = Parameters<
   ReturnType<typeof useConfirmDialog>['showConfirm']
 >[0];
-const mockUpdate = jest.fn<Promise<AppSettings>, [Partial<AppSettings>]>();
+const mockUpdate = jest.fn<Promise<AppSettings>, [UpdateSettingsInput]>();
 const mockReset = jest.fn<Promise<AppSettings>, []>();
 const mockShowConfirm = jest.fn<void, [ConfirmOptions]>();
 
@@ -30,57 +36,24 @@ jest.mock('@/hooks/useConfirmDialog', () => ({
 }));
 jest.mock('@/components/SettingsForm/index', () => {
   const React = jest.requireActual<typeof import('react')>('react');
-  type SectionProps = {
-    formData: Partial<AppSettings>;
-    onInputChange: (
-      field: keyof AppSettings,
-      value: AppSettings[keyof AppSettings]
-    ) => void;
-  };
   return {
-    SettingsBookingSection: ({ formData, onInputChange }: SectionProps) =>
-      React.createElement(
-        'div',
-        {},
-        React.createElement('input', {
-          'aria-label': 'Minimum Booking Length',
-          value: formData.minBookingLength,
-          onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
-            onInputChange('minBookingLength', Number(event.target.value)),
-        }),
-        React.createElement(
-          'span',
-          {},
-          `Breakfast rate: ${formData.breakfastPrice}`
-        ),
-        React.createElement(
-          'button',
-          {
-            onClick: () => {
-              if (formData.notifications) {
-                onInputChange('notifications', { ...formData.notifications });
-              }
-            },
-          },
-          'Clone notifications'
-        ),
-        React.createElement(
-          'button',
-          {
-            onClick: () => {
-              if (formData.businessHours) {
-                onInputChange('businessHours', {
-                  ...formData.businessHours,
-                  daysOpen: [...formData.businessHours.daysOpen],
-                });
-              }
-            },
-          },
-          'Clone hours'
-        )
-      ),
+    SettingsBookingSection: ({
+      formData,
+      onInputChange,
+    }: SettingsSectionProps) =>
+      React.createElement('input', {
+        'aria-label': 'Minimum Booking Length',
+        value: formData.minBookingLength,
+        onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+          onInputChange({
+            field: 'minBookingLength',
+            value: Number(event.target.value),
+          }),
+      }),
     SettingsCheckInOutSection: () => null,
-    SettingsPricingSection: () => null,
+    SettingsPricingSection: jest.requireActual<
+      typeof import('@/components/SettingsForm/SettingsPricingSection')
+    >('@/components/SettingsForm/SettingsPricingSection').default,
     SettingsAmenitiesSection: () => null,
     SettingsActionsSection: ({
       hasChanges,
@@ -108,10 +81,13 @@ jest.mock('@/components/SettingsForm/index', () => {
 });
 
 const settings: AppSettings = {
-  _id: 'settings',
-  id: 'settings',
+  _id: '66ecbf94495f2679035c9687',
+  id: '66ecbf94495f2679035c9687',
   singleton: 'global',
   fullAddress: '',
+  createdAt: '2026-09-11T12:00:00.000Z',
+  updatedAt: '2026-09-12T12:00:00.000Z',
+  __v: 2,
   minBookingLength: 1,
   maxBookingLength: 30,
   maxGuestsPerBooking: 8,
@@ -131,7 +107,7 @@ const settings: AppSettings = {
   parkingFee: 1,
   currency: 'EUR',
   timezone: 'UTC',
-  businessHours: { open: '09:00', close: '17:00', daysOpen: ['Monday'] },
+  businessHours: { open: '09:00', close: '17:00', daysOpen: ['monday'] },
   notifications: {
     emailEnabled: true,
     smsEnabled: false,
@@ -147,52 +123,86 @@ beforeEach(() => {
   mockShowConfirm.mockReset();
 });
 
-test('nested clones stay clean; refresh preserves edits and save can retry', async () => {
+test('saves only the edited breakfast price from a legacy Settings response', async () => {
+  // GET can return explicit null for untouched legacy contact information.
+  const readSettings: AppSettings = JSON.parse(
+    JSON.stringify({ ...settings, contactInfo: null })
+  );
+  mockUpdate.mockImplementation(async changes => {
+    const body: unknown = JSON.parse(JSON.stringify(changes));
+    const updated = updateSettingsSchema.parse(
+      stripSettingsMongoMetadata(body)
+    );
+    return {
+      ...readSettings,
+      breakfastPrice: updated.breakfastPrice ?? readSettings.breakfastPrice,
+    };
+  });
+  const onSettingsUpdate = jest.fn();
+  render(
+    createElement(SettingsForm, { settings: readSettings, onSettingsUpdate })
+  );
+
+  fireEvent.change(screen.getByLabelText('Breakfast Price'), {
+    target: { value: '15' },
+  });
+  fireEvent.click(screen.getByText('Save'));
+
+  await waitFor(() => expect(onSettingsUpdate).toHaveBeenCalledTimes(1));
+  expect(mockUpdate).toHaveBeenCalledWith({ breakfastPrice: 15 });
+});
+
+test('refresh preserves edits; retry and discard use the server response', async () => {
   const onSettingsUpdate = jest.fn();
   const view = render(
     createElement(SettingsForm, { settings, onSettingsUpdate })
   );
   expect(screen.getByText('Save')).toBeDisabled();
-  fireEvent.click(screen.getByText('Clone notifications'));
-  fireEvent.click(screen.getByText('Clone hours'));
-  expect(screen.getByText('Save')).toBeDisabled();
-
   fireEvent.change(screen.getByLabelText('Minimum Booking Length'), {
     target: { value: '2' },
   });
   expect(screen.getByText('Save')).toBeEnabled();
-  const refreshed = { ...settings, breakfastPrice: 3 };
+  const refreshed = {
+    ...settings,
+    breakfastPrice: 3,
+    notifications: { ...settings.notifications },
+    businessHours: {
+      ...settings.businessHours,
+      daysOpen: [...settings.businessHours.daysOpen],
+    },
+  };
   view.rerender(
     createElement(SettingsForm, { settings: refreshed, onSettingsUpdate })
   );
   expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('2');
-  expect(screen.getByText('Breakfast rate: 3')).toBeInTheDocument();
+  expect(screen.getByLabelText('Breakfast Price')).toHaveValue(3);
   expect(screen.getByText('Save')).toBeEnabled();
 
   mockUpdate.mockRejectedValueOnce(new Error('Network error'));
   fireEvent.click(screen.getByText('Save'));
   await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+  expect(mockUpdate).toHaveBeenNthCalledWith(1, { minBookingLength: 2 });
   expect(onSettingsUpdate).not.toHaveBeenCalled();
   expect(screen.getByRole('alert')).toHaveTextContent('Network error');
   expect(screen.getByText('Save')).toBeEnabled();
 
-  const saved = { ...refreshed, minBookingLength: 2 };
+  const saved = { ...refreshed, minBookingLength: 2, breakfastPrice: 5 };
   mockUpdate.mockResolvedValueOnce(saved);
   fireEvent.click(screen.getByText('Save'));
   await waitFor(() => expect(onSettingsUpdate).toHaveBeenCalledTimes(1));
-  expect(mockUpdate).toHaveBeenLastCalledWith(saved);
+  expect(screen.getByLabelText('Breakfast Price')).toHaveValue(5);
+  expect(mockUpdate).toHaveBeenNthCalledWith(2, { minBookingLength: 2 });
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByText('Save')).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Breakfast Price'), {
+    target: { value: '8' },
+  });
+  fireEvent.click(screen.getByText('Discard'));
+  expect(screen.getByLabelText('Breakfast Price')).toHaveValue(5);
   expect(screen.getByText('Save')).toBeDisabled();
   view.rerender(
     createElement(SettingsForm, { settings: saved, onSettingsUpdate })
   );
-  expect(screen.getByText('Save')).toBeDisabled();
-
-  fireEvent.change(screen.getByLabelText('Minimum Booking Length'), {
-    target: { value: '4' },
-  });
-  fireEvent.click(screen.getByText('Discard'));
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('2');
   expect(screen.getByText('Save')).toBeDisabled();
 });
 
@@ -245,6 +255,11 @@ test('an edit made while save is pending survives the saved response and server 
   );
   expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('3');
   expect(screen.getByText('Save')).toBeEnabled();
+
+  mockUpdate.mockResolvedValueOnce({ ...settings, minBookingLength: 3 });
+  fireEvent.click(screen.getByText('Save'));
+  await waitFor(() => expect(screen.getByText('Save')).toBeDisabled());
+  expect(mockUpdate).toHaveBeenNthCalledWith(2, { minBookingLength: 3 });
 });
 
 test('a pending save preserves a newer edit that reverts to the old server value', async () => {
@@ -284,6 +299,11 @@ test('a pending save preserves a newer edit that reverts to the old server value
   );
   expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('1');
   expect(screen.getByText('Save')).toBeEnabled();
+
+  mockUpdate.mockResolvedValueOnce(settings);
+  fireEvent.click(screen.getByText('Save'));
+  await waitFor(() => expect(screen.getByText('Save')).toBeDisabled());
+  expect(mockUpdate).toHaveBeenNthCalledWith(2, { minBookingLength: 1 });
 });
 
 test('a pending reset preserves a newer edit that reverts to the old server value', async () => {
@@ -321,4 +341,9 @@ test('a pending reset preserves a newer edit that reverts to the old server valu
   );
   expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('1');
   expect(screen.getByText('Save')).toBeEnabled();
+
+  mockUpdate.mockResolvedValueOnce(settings);
+  fireEvent.click(screen.getByText('Save'));
+  await waitFor(() => expect(screen.getByText('Save')).toBeDisabled());
+  expect(mockUpdate).toHaveBeenCalledWith({ minBookingLength: 1 });
 });

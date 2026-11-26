@@ -1,20 +1,12 @@
-import type { AppSettings } from '@/types';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
 import { Input } from '@heroui/input';
-
-interface SettingsCheckInOutSectionProps {
-  formData: Partial<AppSettings>;
-  onInputChange: (
-    field: keyof AppSettings,
-    value: AppSettings[keyof AppSettings]
-  ) => void;
-}
+import type { SettingsSectionProps } from './types';
 
 export default function SettingsCheckInOutSection({
   formData,
   onInputChange,
-}: SettingsCheckInOutSectionProps) {
+}: SettingsSectionProps) {
   return (
     <Card>
       <CardHeader>
@@ -31,13 +23,17 @@ export default function SettingsCheckInOutSection({
             label='Check-in Time'
             type='time'
             value={formData.checkInTime || ''}
-            onChange={e => onInputChange('checkInTime', e.target.value)}
+            onChange={e =>
+              onInputChange({ field: 'checkInTime', value: e.target.value })
+            }
           />
           <Input
             label='Check-out Time'
             type='time'
             value={formData.checkOutTime || ''}
-            onChange={e => onInputChange('checkOutTime', e.target.value)}
+            onChange={e =>
+              onInputChange({ field: 'checkOutTime', value: e.target.value })
+            }
           />
         </div>
 
@@ -47,7 +43,10 @@ export default function SettingsCheckInOutSection({
             type='number'
             value={formData.earlyCheckInFee?.toString() || ''}
             onChange={e =>
-              onInputChange('earlyCheckInFee', parseInt(e.target.value) || 0)
+              onInputChange({
+                field: 'earlyCheckInFee',
+                value: parseInt(e.target.value) || 0,
+              })
             }
             startContent='$'
             min='0'
@@ -57,7 +56,10 @@ export default function SettingsCheckInOutSection({
             type='number'
             value={formData.lateCheckOutFee?.toString() || ''}
             onChange={e =>
-              onInputChange('lateCheckOutFee', parseInt(e.target.value) || 0)
+              onInputChange({
+                field: 'lateCheckOutFee',
+                value: parseInt(e.target.value) || 0,
+              })
             }
             startContent='$'
             min='0'
