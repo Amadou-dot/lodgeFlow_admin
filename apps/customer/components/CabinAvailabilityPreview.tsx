@@ -1,5 +1,9 @@
 'use client';
 import { useCabinAvailability } from '@/hooks/useCabinAvailability';
+import {
+  isCabinDateUnavailable,
+  type CabinAvailabilityRange,
+} from '@/lib/validations/cabin-availability-json';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Skeleton } from '@heroui/skeleton';
 import { useState } from 'react';
@@ -10,28 +14,13 @@ interface Props {
 
 const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-function parseLocalDate(dateStr: string): number {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d).getTime();
-}
-
-function isDateUnavailable(
-  date: Date,
-  ranges: { start: string; end: string }[]
-): boolean {
-  const ts = date.getTime();
-  return ranges.some(
-    ({ end, start }) => ts >= parseLocalDate(start) && ts < parseLocalDate(end)
-  );
-}
-
 function MonthCalendar({
   month,
   unavailableRanges,
   year,
 }: {
   month: number;
-  unavailableRanges: { start: string; end: string }[];
+  unavailableRanges: CabinAvailabilityRange[];
   year: number;
 }) {
   const firstDay = new Date(year, month, 1).getDay();
@@ -65,7 +54,11 @@ function MonthCalendar({
           const date = new Date(year, month, day);
           const isPast = date < today;
           const unavailable =
-            !isPast && isDateUnavailable(date, unavailableRanges);
+            !isPast &&
+            isCabinDateUnavailable({
+              utcDay: Date.UTC(year, month, day),
+              ranges: unavailableRanges,
+            });
           return (
             <div
               key={day}

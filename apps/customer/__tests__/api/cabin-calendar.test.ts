@@ -107,6 +107,44 @@ describe('cabin calendar characterization', () => {
     if (!query || query.includes('startDate=&'))
       expect(input.checkInDate.getTime()).toBe(now.getTime());
   });
+  test('keeps equal UTC days after truncating an ordered intraday period', async () => {
+    mockOverlap.mockResolvedValue([
+      {
+        checkInDate: new Date('2030-06-01T09:00:00Z'),
+        checkOutDate: new Date('2030-06-01T19:00:00Z'),
+      },
+    ]);
+    const response = await calendar({
+      query: '?startDate=2030-06-01T08:00:00Z&endDate=2030-06-01T20:00:00Z',
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      data: {
+        cabinId,
+        unavailableDates: [{ start: '2030-06-01', end: '2030-06-01' }],
+        queryRange: { start: '2030-06-01', end: '2030-06-01' },
+      },
+    });
+  });
+
+  test('keeps signed ISO calendar years emitted by Date', async () => {
+    mockOverlap.mockResolvedValue([
+      {
+        checkInDate: new Date('-000001-01-01T00:00:00.000Z'),
+        checkOutDate: new Date('+010000-06-01T00:00:00.000Z'),
+      },
+    ]);
+    const response = await calendar();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: {
+        unavailableDates: [{ start: '-000001-01-01', end: '+010000-06-01' }],
+      },
+    });
+  });
+
   test('retains calendar-month rollover in the six-month default', async () => {
     const start = new Date(2030, 7, 31, 12, 30);
     const end = new Date(2031, 2, 3, 12, 30);

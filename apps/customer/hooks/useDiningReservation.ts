@@ -3,8 +3,7 @@ import {
   fetchConfirmationDetail,
   type ConfirmationDetailOptions,
 } from '@/hooks/useConfirmation';
-import { diningDayAvailabilitySchema } from '@/lib/validations/reservation-availability';
-import type { DiningDayAvailability } from '@/types/reservation-availability';
+import { diningDayAvailabilityResponseSchema } from '@/lib/validations/reservation-availability';
 import type { DiningReservationHistory } from '@lodgeflow/database/reservation-json';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -169,7 +168,7 @@ export const useDiningAvailability = ({
 }) => {
   return useQuery({
     enabled: !!diningId && !!date,
-    queryFn: async (): Promise<DiningDayAvailability | null> => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (date) params.append('date', date);
       if (time) params.append('time', time);
@@ -182,8 +181,18 @@ export const useDiningAvailability = ({
         throw new Error('Failed to fetch dining availability');
       }
 
-      const data: ApiResponse<unknown> = await response.json();
-      return data.data ? diningDayAvailabilitySchema.parse(data.data) : null;
+      const body: unknown = await response.json().catch(() => undefined);
+      const result = diningDayAvailabilityResponseSchema.safeParse(body);
+      if (
+        !result.success ||
+        result.data.data.diningId.toLowerCase() !== diningId.toLowerCase() ||
+        result.data.data.date !== date ||
+        result.data.data.time !== (time || null)
+      ) {
+        throw new Error('Failed to fetch dining availability');
+      }
+
+      return result.data.data;
     },
     queryKey: ['dining-availability', diningId, date, time],
     staleTime: 2 * 60 * 1000,
