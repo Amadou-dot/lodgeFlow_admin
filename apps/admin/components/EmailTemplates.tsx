@@ -137,7 +137,7 @@ export function WelcomeEmail({ firstName }: EmailTemplateProps) {
 }
 
 const isoStayDate =
-  /^(?:\d{4}|[+-]\d{6})-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2}))?$/i;
+  /^(?:\d{4}|\+\d{6}|-(?!000000)\d{6})-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2}))?$/i;
 
 function formatConfirmationStayDate(date: string) {
   if (isoStayDate.test(date)) {

@@ -175,6 +175,11 @@ test.each([
     checkInDate: 'Mar 20 2027 11:30 pm-0600',
     checkOutDate: '00:30:00 03-23-2027 +0900',
   },
+  {
+    form: 'legacy negative-zero year',
+    checkInDate: '-000000-03-20',
+    checkOutDate: '-000000-03-23',
+  },
 ])(
   'preserves the original local-calendar presentation for $form',
   async ({ checkInDate, checkOutDate }) => {
