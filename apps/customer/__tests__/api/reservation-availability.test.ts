@@ -137,3 +137,29 @@ test('dining outside-window time returns unavailable without querying reservatio
   });
   expect(mockFind).not.toHaveBeenCalled();
 });
+
+test('an inactive dining item still reports seating capacity on the public read', async () => {
+  mockCatalog.mockResolvedValueOnce({
+    isAvailable: false,
+    maxPeople: 4,
+    servingTime: { start: '17:00', end: '22:00' },
+  });
+  const uppercaseId = '507F1F77BCF86CD7994390AB';
+  const date = '2040-06-01T15:00:00.000Z';
+  const response = await dining(request(`date=${date}`), {
+    params: Promise.resolve({ id: uppercaseId }),
+  });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    success: true,
+    data: {
+      diningId: uppercaseId,
+      date,
+      time: null,
+      seatsRemaining: 1,
+      maxPeople: 4,
+      isAvailable: true,
+      servingTime: { start: '17:00', end: '22:00' },
+    },
+  });
+});

@@ -3,6 +3,10 @@ import { useCreateBooking } from '@/hooks/useBooking';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSettings } from '@/hooks/useSettings';
 import type { CreateBookingRequest } from '@/lib/validations/booking';
+import {
+  fetchCabinAvailability,
+  isCabinDateUnavailable,
+} from '@/lib/validations/cabin-availability-json';
 import { useUser } from '@clerk/nextjs';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
@@ -14,7 +18,6 @@ import { Select, SelectItem } from '@heroui/select';
 import { addToast } from '@heroui/toast';
 import {
   getLocalTimeZone,
-  parseDate,
   toCalendarDate,
   today,
   type DateValue,
@@ -42,22 +45,6 @@ interface BookingFormProps {
   };
 }
 
-interface UnavailableDateRange {
-  start: string;
-  end: string;
-}
-
-interface AvailabilityData {
-  cabinId: string;
-  unavailableDates: UnavailableDateRange[];
-  queryRange: {
-    start: string;
-    end: string;
-  };
-}
-
-const fetcher = (url: string) => fetch(url).then(res => res.json());
-
 export default function BookingForm({ cabin, userData }: BookingFormProps) {
   const [dateRange, setDateRange] = useState<RangeValue<DateValue> | null>(
     null
@@ -74,29 +61,18 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
 
-  const { data: availabilityData, error: availabilityError } = useSWR<{
-    success: boolean;
-    data: AvailabilityData;
-  }>(cabin?._id ? `/api/cabins/${cabin._id}/availability` : null, fetcher);
+  const { data: availability, error: availabilityError } = useSWR(
+    cabin?._id ? `/api/cabins/${cabin._id}/availability` : null,
+    () => fetchCabinAvailability(cabin._id)
+  );
 
   const todayDate = today(getLocalTimeZone());
-
-  const isDateUnavailable = (date: DateValue) => {
-    if (!availabilityData?.success || !availabilityData.data.unavailableDates) {
-      return false;
-    }
-
-    const calendarDate = toCalendarDate(date);
-
-    return availabilityData.data.unavailableDates.some(range => {
-      const startDate = parseDate(range.start);
-      const endDate = parseDate(range.end);
-      return (
-        calendarDate.compare(startDate) >= 0 &&
-        calendarDate.compare(endDate) < 0
-      );
+  const isDateUnavailable = (date: DateValue) =>
+    !!availability &&
+    isCabinDateUnavailable({
+      utcDay: toCalendarDate(date).toDate('UTC').getTime(),
+      ranges: availability.data.unavailableDates,
     });
-  };
 
   if (!isSignedIn || !user) {
     return (
@@ -335,19 +311,18 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
             value={dateRange}
             visibleMonths={isMobile ? 1 : 2}
             description={
-              availabilityData?.success
-                ? 'Select your check-in and check-out dates. Unavailable dates are crossed out.'
-                : 'Select your check-in and check-out dates'
-            }
-            errorMessage={
-              availabilityError ? 'Failed to load availability data' : undefined
+              availabilityError
+                ? 'Failed to load availability data'
+                : availability
+                  ? 'Select your check-in and check-out dates. Unavailable dates are crossed out.'
+                  : 'Select your check-in and check-out dates'
             }
             onChange={setDateRange}
           />
 
-          {availabilityData?.success && (
+          {!availabilityError && availability && (
             <div className='text-xs text-default-500'>
-              {availabilityData.data.unavailableDates.length > 0 ? (
+              {availability.data.unavailableDates.length > 0 ? (
                 <>Unavailable dates are crossed out and cannot be selected.</>
               ) : (
                 <>All dates in the next 6 months are available for booking.</>

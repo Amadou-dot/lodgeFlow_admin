@@ -1,3 +1,4 @@
+import { catalogIdSchema } from '@/lib/validations/catalog';
 import { z } from 'zod';
 const rangeDate = z
   .string()
@@ -77,13 +78,18 @@ export const reservationAvailabilityQuerySchema = z
         }
   );
 
-export const diningDayAvailabilitySchema = z.object({
-  diningId: z.string(),
+export const diningDayAvailabilitySchema = z.looseObject({
+  diningId: catalogIdSchema,
   date: z.string(),
   time: z.string().nullable(),
   seatsRemaining: z.number().nullable(),
   maxPeople: z.number().nullable(),
   isAvailable: z.boolean(),
-  servingTime: z.object({ start: z.string(), end: z.string() }),
+  servingTime: z.looseObject({ start: z.string(), end: z.string() }),
   reason: z.string().optional(),
+});
+
+export const diningDayAvailabilityResponseSchema = z.looseObject({
+  success: z.literal(true),
+  data: diningDayAvailabilitySchema,
 });
