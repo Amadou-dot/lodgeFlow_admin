@@ -124,8 +124,7 @@ read-only smoke checks passed. The [customer lock slice](phase-6-customer-lock-p
 merged in [PR #201](https://github.com/Amadou-dot/lodgeFlow_admin/pull/201) as
 `216970d`; it validates lock acknowledgements and corrects stale server-cached
 lock status.
-Remaining V03 response boundaries, O01 test infrastructure and full browser
-acceptance stay open.
+The remaining Phase 6 branch implements V03 and O01. Its local gates and outstanding hosted/browser acceptance are listed in the [execution evidence](phase-6-remaining-plan.md#branch-verification).
 PRs #196/#197 remain separate demo-data/guest-identity fixes.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
@@ -412,14 +411,11 @@ preserves the existing wire behavior and is delivered in #199. The second slice
 validates customer list JSON through a shared read schema, preserving Date revival
 only in the server cache adapter, and is delivered in #200. The third bounded
 slice validates lock/unlock acknowledgements and invalidates stale server profiles
-after provider success. Detail/create/update/delete and other response parsing,
-customer-app/webhook contracts, O01 and final browser acceptance remain.
+after provider success. The remaining review branch now covers detail/create/update/delete, customer and webhook contracts, the strict admin test/script project and the targeted syntax guard. The [current inventory](inventory.md#phase-6-remaining-boundaries-on-the-review-branch-2026-11-26) identifies the retained compatibility endpoints and external acceptance.
 
 The Phase 4 [checkout response reader](../../apps/customer/lib/validations/checkout-response.ts)
 already validates the shared cabin/dining/experience success boundary and controls
-fallbacks before navigation or cache invalidation. The follow-on Phase 6 checkout
-task should consume that implementation, run its focused route/consumer regressions
-and the isolated HTTP gate, and address only a demonstrated remaining gap.
+fallbacks before navigation or cache invalidation. The Phase 6 checkout slice reuses that reader and tests delayed standalone redirects, queued cabin checkout and create-to-checkout session replacement through the mounted consumers.
 Keep hosted signed-out/browser behavior and provider settlement in their
 respective acceptance checks. Reuse Phase 4's sparse Settings write and booking
 draft/calendar behavior when adding response readers to those flows.

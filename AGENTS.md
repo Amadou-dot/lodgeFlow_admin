@@ -290,6 +290,12 @@ incompatible duplicate date-picker types.
 - App `lint` scripts use `--fix`; use `exec eslint .` for verification.
   Root `ci:check` is read-only but **does not include builds**. CI runs formatting,
   read-only lint, tests, and build separately for admin, customer, database, and email.
+- `pnpm check:syntax` runs the AST fixtures and rejects explicit TypeScript/JSDoc
+  `any` and chained unknown assertions in tracked admin tests and scripts. It
+  runs in local `ci:check` and the admin CI job. Run
+  `pnpm --filter @lodgeflow/admin check:types:test-scripts` for strict compilation
+  of those inputs, including JS/CJS test support. The admin package test runs
+  deterministic factory schema validation through Node/tsx before Jest.
 - Run `pnpm test:http` for the isolated HTTP gate as well. It starts disposable
   app copies and MongoDB, uses real Clerk signature verification against local
   test identities, and controls external payment/email responses. See
