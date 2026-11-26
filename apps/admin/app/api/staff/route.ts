@@ -8,7 +8,7 @@ import {
   requireApiAuth,
 } from '@/lib/api-utils';
 import type { StaffRole } from '@/lib/permissions';
-import type { StaffMemberJson } from '@/types/staff-audit';
+import type { StaffMemberJson, StaffRoleChangeJson } from '@/types/staff-audit';
 import { logger } from '@/lib/logger';
 import { readJsonRequestBody } from '@/lib/validations/request-body';
 import { staffRoleRequestSchema } from '@/lib/validations/staff-audit';
@@ -133,7 +133,10 @@ export async function PUT(request: Request) {
       before: { role: previousRole },
       after: { role },
     });
-    return createSuccessResponse({ userId: body.userId, role });
+    return createSuccessResponse<StaffRoleChangeJson>({
+      userId: body.userId,
+      role,
+    });
   } catch (error: unknown) {
     logger.error('Unable to update staff access', error);
     return createErrorResponse('Unable to update staff access', 503);

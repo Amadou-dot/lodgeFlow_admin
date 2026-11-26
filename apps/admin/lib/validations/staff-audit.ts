@@ -1,6 +1,6 @@
 import { objectRequestSchema } from './object-request';
 import { z } from 'zod';
-import { AUDIT_ACTIONS } from '@lodgeflow/database/models/AuditLog';
+import { AUDIT_ACTIONS } from '@lodgeflow/database/config';
 
 const staffRoleFieldsSchema = z
   .strictObject({

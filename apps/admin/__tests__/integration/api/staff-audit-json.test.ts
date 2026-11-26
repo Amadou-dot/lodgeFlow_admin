@@ -5,6 +5,12 @@ import AuditLog, { AUDIT_ACTIONS } from '@lodgeflow/database/models/AuditLog';
 import { requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { logger } from '@/lib/logger';
+import {
+  auditHistoryJsonSchema,
+  readStaffAuditResponse,
+  staffRoleChangeJsonSchema,
+  staffRosterJsonSchema,
+} from '@/lib/validations/staff-audit-json';
 
 type MemberSource = {
   publicUserData?: {
@@ -88,20 +94,30 @@ test('staff JSON preserves current-organization assignments, unassigned roles an
           identifier: 'other@example.invalid',
         },
       },
+      { publicUserData: { userId: 'user_without_name' } },
       {},
     ],
-    totalCount: 3,
+    totalCount: 4,
   });
   const response = await staff();
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const expected = [
+    { userId: 'user_guest', name: 'Test Guest', role: 'manager' },
+    { userId: 'user_other', name: 'other@example.invalid', role: null },
+    { userId: 'user_without_name', role: null },
+    { role: null },
+  ];
+  expect(await response.clone().json()).toStrictEqual({
     success: true,
-    data: [
-      { userId: 'user_guest', name: 'Test Guest', role: 'manager' },
-      { userId: 'user_other', name: 'other@example.invalid', role: null },
-      { role: null },
-    ],
+    data: expected,
   });
+  await expect(
+    readStaffAuditResponse({
+      response,
+      schema: staffRosterJsonSchema,
+      fallback: 'Invalid staff roster',
+    })
+  ).resolves.toStrictEqual(expected);
 });
 
 test('audit JSON preserves full lean records, snapshots, timestamps and metadata', async () => {
@@ -112,23 +128,31 @@ test('audit JSON preserves full lean records, snapshots, timestamps and metadata
     action: 'staff.role_change',
     resourceType: 'staff',
     resourceId: 'user_guest',
-    before: { role: null },
-    after: { role: 'manager' },
-    createdAt: new Date('2030-01-01'),
+    before: { role: null, legacy: [{ name: 'setting', value: null }, true, 1] },
+    after: { role: 'manager', legacy: { nested: [null, 'value'] } },
+    createdAt: new Date('+010000-01-01T00:00:00.000Z'),
   });
   const stored = await AuditLog.findById(event._id).lean().orFail();
   const response = await audit(new Request('https://admin.test/api/audit'));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const expected = {
+    events: [json(stored)],
+    total: 1,
+    page: 1,
+    limit: 25,
+    actions: AUDIT_ACTIONS,
+  };
+  expect(await response.clone().json()).toStrictEqual({
     success: true,
-    data: {
-      events: [json(stored)],
-      total: 1,
-      page: 1,
-      limit: 25,
-      actions: AUDIT_ACTIONS,
-    },
+    data: expected,
   });
+  await expect(
+    readStaffAuditResponse({
+      response,
+      schema: auditHistoryJsonSchema,
+      fallback: 'Invalid audit history',
+    })
+  ).resolves.toStrictEqual(expected);
 });
 
 test.each([
@@ -155,16 +179,45 @@ test('staff role changes preserve response JSON and actor-attributed audit snaps
     })
   );
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
-    success: true,
-    data: { userId: 'user_guest', role: 'manager' },
-  });
+  await expect(
+    readStaffAuditResponse({
+      response,
+      schema: staffRoleChangeJsonSchema,
+      fallback: 'Invalid role change',
+    })
+  ).resolves.toStrictEqual({ userId: 'user_guest', role: 'manager' });
   expect(await AuditLog.findOne().lean()).toMatchObject({
     actor: 'user_admin',
     actorRole: 'admin',
     organizationId,
     before: { role: null },
     after: { role: 'manager' },
+  });
+
+  const revoke = await PUT(
+    new Request('https://admin.test/api/staff', {
+      method: 'PUT',
+      body: JSON.stringify({ userId: 'user_guest', role: null }),
+    })
+  );
+  expect(revoke.status).toBe(200);
+  expect(await revoke.clone().json()).toStrictEqual({
+    success: true,
+    data: { userId: 'user_guest', role: null },
+  });
+  await expect(
+    readStaffAuditResponse({
+      response: revoke,
+      schema: staffRoleChangeJsonSchema,
+      fallback: 'Invalid role revocation',
+    })
+  ).resolves.toStrictEqual({ userId: 'user_guest', role: null });
+  expect(await AuditLog.findOne({ 'after.role': null }).lean()).toMatchObject({
+    actor: 'user_admin',
+    actorRole: 'admin',
+    organizationId,
+    before: { role: 'manager' },
+    after: { role: null },
   });
 });
 

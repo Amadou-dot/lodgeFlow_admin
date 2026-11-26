@@ -23,6 +23,7 @@ function response(permissions: readonly string[] = PERMISSIONS) {
   return {
     ok: true,
     json: async () => ({
+      success: true,
       data: { userId: 'staff-1', role: 'admin', permissions },
     }),
   };
@@ -82,10 +83,43 @@ it('blocks a restricted route immediately using known permissions', async () => 
   expect(screen.queryByText('Dashboard shell')).not.toBeInTheDocument();
   expect(replace).toHaveBeenCalledWith('/unauthorized');
 });
-it('clears access when background revalidation is denied', async () => {
+it('clears access when background revalidation is denied without waiting for the body', async () => {
   const view = render(dashboard());
   await screen.findByText('Dashboard shell');
-  request.mockResolvedValueOnce({ ok: false });
+  request.mockResolvedValueOnce({
+    ok: false,
+    json: () => new Promise(() => {}),
+  });
+  pathname.mockReturnValue('/calendar');
+  view.rerender(dashboard());
+  await waitFor(() => expect(replace).toHaveBeenCalledWith('/unauthorized'));
+  expect(screen.queryByText('Dashboard shell')).not.toBeInTheDocument();
+});
+it.each([
+  ['an unknown role', { role: 'org:admin' }],
+  ['a non-array permission value', { permissions: 'bookings:read' }],
+  ['an unknown permission', { permissions: ['bookings:read', 'unknown'] }],
+  ['a missing user ID', { userId: undefined }],
+  ['a different user ID', { userId: 'staff-2' }],
+])('hides the shell when access returns %s', async (_label, fields) => {
+  request.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      success: true,
+      data: { ...(await response().json()).data, ...fields },
+    }),
+  });
+  render(dashboard());
+  await waitFor(() => expect(replace).toHaveBeenCalledWith('/unauthorized'));
+  expect(screen.queryByText('Dashboard shell')).not.toBeInTheDocument();
+});
+it('clears verified access on a 2xx error envelope during navigation', async () => {
+  const view = render(dashboard());
+  await screen.findByText('Dashboard shell');
+  request.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ ...(await response().json()), success: false }),
+  });
   pathname.mockReturnValue('/calendar');
   view.rerender(dashboard());
   await waitFor(() => expect(replace).toHaveBeenCalledWith('/unauthorized'));
@@ -112,6 +146,10 @@ it('ignores an old request after switching organizations', async () => {
   request.mockImplementationOnce(() => new Promise(() => {}));
   auth.mockReturnValue({ ...identity, orgId: 'org-2' });
   view.rerender(dashboard());
+  expect(request).toHaveBeenNthCalledWith(1, '/api/staff/access', {
+    cache: 'no-store',
+    signal: expect.objectContaining({ aborted: true }),
+  });
   await act(async () => resolve(response()));
   expect(screen.queryByText('Dashboard shell')).not.toBeInTheDocument();
   expect(replace).not.toHaveBeenCalled();

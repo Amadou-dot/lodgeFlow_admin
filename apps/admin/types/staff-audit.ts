@@ -1,31 +1,14 @@
+import type { z } from 'zod';
 import type {
-  IAuditLog,
-  AuditAction,
-} from '@lodgeflow/database/models/AuditLog';
-import type { StaffRole } from '@/lib/permissions';
+  auditEventJsonSchema,
+  auditHistoryJsonSchema,
+  staffAccessJsonSchema,
+  staffMemberJsonSchema,
+  staffRoleChangeJsonSchema,
+} from '@/lib/validations/staff-audit-json';
 
-export interface StaffMemberJson {
-  userId?: string;
-  name?: string;
-  role: StaffRole | null;
-}
-
-export type AuditEventJson = Pick<
-  IAuditLog,
-  | 'organizationId'
-  | 'actor'
-  | 'actorRole'
-  | 'action'
-  | 'resourceType'
-  | 'resourceId'
-  | 'before'
-  | 'after'
-> & { _id: string; createdAt: string; __v?: number };
-
-export interface AuditHistoryJson {
-  events: AuditEventJson[];
-  total: number;
-  page: number;
-  limit: number;
-  actions: readonly AuditAction[];
-}
+export type StaffAccessJson = z.infer<typeof staffAccessJsonSchema>;
+export type StaffMemberJson = z.infer<typeof staffMemberJsonSchema>;
+export type StaffRoleChangeJson = z.infer<typeof staffRoleChangeJsonSchema>;
+export type AuditEventJson = z.infer<typeof auditEventJsonSchema>;
+export type AuditHistoryJson = z.infer<typeof auditHistoryJsonSchema>;

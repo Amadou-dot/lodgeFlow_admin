@@ -1,34 +1,19 @@
 import mongoose, { Schema, type Document, type Model } from 'mongoose';
-export const AUDIT_ACTIONS = [
-  'booking.create',
-  'booking.update',
-  'booking.status_change',
-  'booking.cancel',
-  'booking.reprice',
-  'booking.delete',
-  'payment.record',
-  'refund.record',
-  'dining_reservation.status_change',
-  'experience_booking.status_change',
-  'cabin.create',
-  'cabin.update',
-  'cabin.delete',
-  'settings.update',
-  'staff.role_change',
-] as const;
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+  type AuditAction,
+  type AuditResourceType,
+} from '../config';
+
+export { AUDIT_ACTIONS, type AuditAction } from '../config';
+
 export interface IAuditLog extends Document {
   organizationId: string;
   actor: string;
   actorRole: 'front_desk' | 'manager' | 'admin';
   action: AuditAction;
-  resourceType:
-    | 'booking'
-    | 'dining_reservation'
-    | 'experience_booking'
-    | 'cabin'
-    | 'settings'
-    | 'staff';
+  resourceType: AuditResourceType;
   resourceId: string;
   before: Record<string, unknown>;
   after: Record<string, unknown>;
@@ -53,14 +38,7 @@ const schema = new Schema<IAuditLog>(
     resourceType: {
       type: String,
       required: true,
-      enum: [
-        'booking',
-        'dining_reservation',
-        'experience_booking',
-        'cabin',
-        'settings',
-        'staff',
-      ],
+      enum: AUDIT_RESOURCE_TYPES,
       immutable: true,
     },
     resourceId: { type: String, required: true, immutable: true },

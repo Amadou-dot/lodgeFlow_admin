@@ -10,6 +10,7 @@ import type { OperationsSelect } from '@/components/OperationsPage';
 import type { StaffMemberJson } from '@/types/staff-audit';
 import type { ReservationInboxJson } from '@/types/reservation-calendar';
 import ReservationsPage from '@/app/(dashboard)/reservations/page';
+import AuditPage from '@/app/(dashboard)/audit/page';
 import StaffPage from '@/app/(dashboard)/staff/page';
 import type { AppSettings } from '@/types';
 import { legacyCurrencySettings } from '../setup/settings-fixture';
@@ -110,7 +111,7 @@ test('staff save failure keeps loaded rows; successful retry posts same role and
       ok: false,
       json: async () => ({ error: 'Access denied' }),
     })
-    .mockResolvedValueOnce(ok(null))
+    .mockResolvedValueOnce(ok({ userId: 'other', role: 'manager' }))
     .mockResolvedValueOnce(ok([{ ...staff[1], role: 'manager' }]));
   render(<StaffPage />);
   await screen.findByText('Avery');
@@ -137,6 +138,104 @@ test('staff save failure keeps loaded rows; successful retry posts same role and
   expect(fetchMock).toHaveBeenCalledTimes(4);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+test('staff rejects an invalid role before showing roster rows', async () => {
+  fetchMock.mockResolvedValueOnce(ok([{ ...staff[1], role: 'owner' }]));
+  render(<StaffPage />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Unable to load staff'
+  );
+  expect(screen.queryByText('Avery')).not.toBeInTheDocument();
+});
+
+test.each([
+  ['a missing acknowledgement', null],
+  ['a different target', { userId: 'self', role: null }],
+  ['a different role', { userId: 'other', role: 'manager' }],
+])(
+  'staff does not refresh on %s and can retry a revocation',
+  async (_label, acknowledgement) => {
+    const revoked = { ...staff[1], role: null };
+    fetchMock
+      .mockResolvedValueOnce(ok(staff))
+      .mockResolvedValueOnce(ok(acknowledgement))
+      .mockResolvedValueOnce(ok({ userId: 'other', role: null }))
+      .mockResolvedValueOnce(ok([revoked]));
+    render(<StaffPage />);
+    const select = await screen.findByLabelText('Access for Avery');
+    fireEvent.change(select, { target: { value: '' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to update access'
+    );
+    expect(select).toHaveValue('front_desk');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.change(select, { target: { value: '' } });
+    await waitFor(() => expect(select).toHaveValue(''));
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  }
+);
+
+const auditEvent = {
+  _id: '507f1f77bcf86cd799439011',
+  organizationId: 'org_lodgeflow',
+  actor: 'user_admin',
+  actorRole: 'admin',
+  action: 'staff.role_change',
+  resourceType: 'staff',
+  resourceId: 'user_guest',
+  before: { role: null },
+  after: { role: 'manager' },
+  createdAt: '2030-01-01T00:00:00.000Z',
+};
+const auditHistory = {
+  events: [auditEvent],
+  total: 1,
+  page: 1,
+  limit: 25,
+  actions: ['staff.role_change'],
+};
+
+test.each([
+  ['an invalid event', { events: [{ ...auditEvent, actorRole: 'owner' }] }],
+  ['an invalid total', { total: '1' }],
+  ['an unknown action option', { actions: ['unknown'] }],
+])('audit rejects %s before showing history', async (_label, fields) => {
+  fetchMock.mockResolvedValueOnce(ok({ ...auditHistory, ...fields }));
+  render(<AuditPage />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Unable to load history'
+  );
+  expect(screen.queryByText('1 events')).not.toBeInTheDocument();
+});
+
+test('audit ignores late history after changing filters', async () => {
+  let finish: (value: ReturnType<typeof ok>) => void = () => {
+    throw new Error('not started');
+  };
+  fetchMock
+    .mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        })
+    )
+    .mockResolvedValueOnce(ok(auditHistory));
+  render(<AuditPage />);
+  fireEvent.change(screen.getByLabelText('Through'), {
+    target: { value: '2030-01-01' },
+  });
+  await screen.findByText('user_admin (admin) · staff: user_guest');
+  expect(fetchMock).toHaveBeenNthCalledWith(
+    2,
+    '/api/audit?page=1&limit=25&to=2030-01-01T23%3A59%3A59.999Z',
+    { cache: 'no-store', signal: expect.any(AbortSignal) }
+  );
+  expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  await act(async () => finish(ok({ ...auditHistory, total: 0, events: [] })));
+  expect(screen.getByText('1 events')).toBeInTheDocument();
+  expect(screen.queryByText('0 events')).not.toBeInTheDocument();
+});
+
 test('inbox retry keeps page/limit filters and clears a failed load', async () => {
   fetchMock
     .mockRejectedValueOnce(new Error('Offline'))
