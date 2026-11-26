@@ -1,31 +1,12 @@
-export interface CabinStats {
-  totalCabins: number;
-  totalCapacity: number;
-  averagePrice: number | null;
-  cabinsWithDiscount: number;
-  activeCabins: number;
-  inactiveCabins: number;
-  maintenanceCabins: number;
-}
+import type {
+  bookingStatsJsonSchema,
+  cabinStatsJsonSchema,
+  diningStatsJsonSchema,
+  experienceStatsJsonSchema,
+} from '@/lib/validations/reporting-json';
+import type { z } from 'zod';
 
-export interface DiningStats {
-  totalItems: number;
-  menuCount: number;
-  experienceCount: number;
-  averagePrice: number | null;
-  availableItems: number;
-}
-
-export interface ExperienceStats {
-  totalExperiences: number;
-  averagePrice: number | null;
-  popularCount: number;
-  totalCapacity: number;
-}
-
-export interface BookingStats {
-  todayCheckIns: number;
-  todayCheckOuts: number;
-  checkedIn: number;
-  unconfirmed: number;
-}
+export type CabinStats = z.output<typeof cabinStatsJsonSchema>;
+export type DiningStats = z.output<typeof diningStatsJsonSchema>;
+export type ExperienceStats = z.output<typeof experienceStatsJsonSchema>;
+export type BookingStats = z.output<typeof bookingStatsJsonSchema>;

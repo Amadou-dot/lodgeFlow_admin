@@ -1,3 +1,7 @@
+import {
+  experienceStatsJsonSchema,
+  parseReportJson,
+} from '@/lib/validations/reporting-json';
 import { useQuery } from '@tanstack/react-query';
 
 import type { ExperienceStats } from '@/types/catalog-stats';
@@ -7,11 +11,15 @@ export function useExperienceStats() {
     queryKey: ['experience-stats'],
     queryFn: async () => {
       const response = await fetch('/api/experiences/stats');
-      if (!response.ok) {
-        throw new Error('Failed to fetch experience stats');
-      }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      const errorMessage = 'Failed to fetch experience stats';
+      if (!response.ok) throw new Error(errorMessage);
+      const value: unknown = await response.json();
+      return parseReportJson({
+        value,
+        schema: experienceStatsJsonSchema,
+        format: 'wrapped-or-bare',
+        errorMessage,
+      });
     },
   });
 }

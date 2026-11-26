@@ -6,6 +6,13 @@ import { GET as sales } from '@/app/api/sales/route';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { logger } from '@/lib/logger';
+import {
+  bookingAnalyticsJsonSchema,
+  dashboardJsonSchema,
+  parseReportJson,
+  salesJsonSchema,
+} from '@/lib/validations/reporting-json';
+import type { z } from 'zod';
 
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 jest.mock('@clerk/nextjs/server', () => ({
@@ -17,6 +24,25 @@ const DAY = 86_400_000;
 function json(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
 }
+async function readReport<Report>({
+  response,
+  schema,
+  format = 'wrapped',
+}: {
+  response: Response;
+  schema: z.ZodType<Report, Report>;
+  format?: 'wrapped' | 'bare';
+}) {
+  expect(response.status).toBe(200);
+  const value: unknown = await response.json();
+  return parseReportJson({
+    value,
+    schema,
+    format,
+    errorMessage: 'Unexpected report response',
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(requireApiAuth).mockResolvedValue({
@@ -114,9 +140,8 @@ test('dashboard preserves paid-only revenue, cancellation scope, occupancy and s
   const { cabin, booking } = await fixture();
   const before = json(await Booking.find().sort({ _id: 1 }).lean());
   const response = await dashboard();
-  expect(response.status).toBe(200);
-  const body = await response.json();
-  expect(body.data.overview).toEqual({
+  const data = await readReport({ response, schema: dashboardJsonSchema });
+  expect(data.overview).toEqual({
     totalBookings: 2,
     totalRevenue: 200,
     totalCabins: 1,
@@ -126,8 +151,8 @@ test('dashboard preserves paid-only revenue, cancellation scope, occupancy and s
     checkInsToday: 0,
     checkOutsToday: 0,
   });
-  expect(body.data.recentActivity).toHaveLength(3);
-  expect(body.data.recentActivity).toContainEqual({
+  expect(data.recentActivity).toHaveLength(3);
+  expect(data.recentActivity).toContainEqual({
     id: String(booking._id),
     customerName: 'Unavailable guest',
     cabinName: cabin.name,
@@ -137,11 +162,11 @@ test('dashboard preserves paid-only revenue, cancellation scope, occupancy and s
     status: 'confirmed',
     createdAt: booking.createdAt.toISOString(),
   });
-  expect(body.data.charts.durations).toEqual([
+  expect(data.charts.durations).toEqual([
     { name: '1-2 nights', value: 1, color: '#3b82f6' },
     { name: '3-4 nights', value: 1, color: '#10b981' },
   ]);
-  expect(body.data.charts.revenue).toEqual([
+  expect(data.charts.revenue).toEqual([
     { week: expect.any(String), revenue: 200, bookings: 1 },
   ]);
   expect(json(await Booking.find().sort({ _id: 1 }).lean())).toEqual(before);
@@ -151,21 +176,23 @@ test('dashboard retains missing-cabin and missing-customer fallbacks', async () 
   const { cabin } = await fixture();
   await Cabin.deleteOne({ _id: cabin._id });
   const response = await dashboard();
-  const body = await response.json();
+  const data = await readReport({ response, schema: dashboardJsonSchema });
   expect(
-    body.data.recentActivity.every(
-      (row: { cabinName: string; customerName: string }) =>
+    data.recentActivity.every(
+      row =>
         row.cabinName === 'Unknown' && row.customerName === 'Unavailable guest'
     )
   ).toBe(true);
-  expect(body.data.charts.occupancy).toEqual([]);
+  expect(data.charts.occupancy).toEqual([]);
 });
 
 test('analytics preserves totals, averages, extras, status counts and catalog revenue semantics', async () => {
   await fixture();
   const response = await analytics(request());
-  expect(response.status).toBe(200);
-  const { data } = await response.json();
+  const data = await readReport({
+    response,
+    schema: bookingAnalyticsJsonSchema,
+  });
   expect(data.summary).toEqual({
     totalRevenue: 200,
     totalBookings: 2,
@@ -198,35 +225,33 @@ test('analytics preserves totals, averages, extras, status counts and catalog re
 test('daily reports retain zero-filled windows and the bare sales envelope', async () => {
   await fixture();
   const recent = await analytics(request('7d'));
-  const { data } = await recent.json();
+  const data = await readReport({
+    response: recent,
+    schema: bookingAnalyticsJsonSchema,
+  });
   expect(data.revenueOverTime).toHaveLength(7);
   expect(
-    data.revenueOverTime.reduce(
-      (total: number, row: { revenue: number }) => total + row.revenue,
-      0
-    )
+    data.revenueOverTime.reduce((total, row) => total + row.revenue, 0)
   ).toBe(200);
   const response = await sales();
-  expect(response.status).toBe(200);
-  const rows = await response.json();
+  const rows = await readReport({
+    response,
+    schema: salesJsonSchema,
+    format: 'bare',
+  });
   expect(rows).toHaveLength(30);
-  expect(
-    rows.reduce(
-      (total: number, row: { bookings: number }) => total + row.bookings,
-      0
-    )
-  ).toBe(2);
-  expect(
-    rows.reduce((total: number, row: { sales: number }) => total + row.sales, 0)
-  ).toBe(200);
+  expect(rows.reduce((total, row) => total + row.bookings, 0)).toBe(2);
+  expect(rows.reduce((total, row) => total + row.sales, 0)).toBe(200);
 });
 
 test.each(['7d', '30d', '90d', '1y', 'all'])(
   'empty analytics for %s has no fabricated totals',
   async period => {
     const response = await analytics(request(period));
-    expect(response.status).toBe(200);
-    const { data } = await response.json();
+    const data = await readReport({
+      response,
+      schema: bookingAnalyticsJsonSchema,
+    });
     expect(data.summary).toEqual({
       totalRevenue: 0,
       totalBookings: 0,
@@ -235,8 +260,102 @@ test.each(['7d', '30d', '90d', '1y', 'all'])(
     });
     expect(data.statusDistribution).toEqual([]);
     expect(data.popularCabins).toEqual([]);
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 0;
+    expect(data.revenueOverTime).toHaveLength(days);
+    expect(
+      data.revenueOverTime.every(row => row.revenue === 0 && row.bookings === 0)
+    ).toBe(true);
   }
 );
+
+test('empty dashboard keeps its wrapped overview and empty charts', async () => {
+  const response = await dashboard();
+  const data = await readReport({ response, schema: dashboardJsonSchema });
+  expect(data).toEqual({
+    overview: {
+      totalBookings: 0,
+      totalRevenue: 0,
+      totalCabins: 0,
+      totalCustomers: 3,
+      totalCancellations: 0,
+      occupancyRate: 0,
+      checkInsToday: 0,
+      checkOutsToday: 0,
+    },
+    recentActivity: [],
+    charts: { occupancy: [], revenue: [], durations: [] },
+  });
+});
+
+test('empty sales retains a bare 30-day zero-filled series', async () => {
+  const rows = await readReport({
+    response: await sales(),
+    schema: salesJsonSchema,
+    format: 'bare',
+  });
+
+  expect(rows).toHaveLength(30);
+  expect(rows.every(row => row.sales === 0 && row.bookings === 0)).toBe(true);
+});
+
+test('dashboard preserves legacy activity values and null zero-capacity occupancy', async () => {
+  const { cabin, booking } = await fixture();
+  await Cabin.collection.updateOne(
+    { _id: cabin._id },
+    { $set: { capacity: 0 } }
+  );
+  await Booking.collection.updateOne(
+    { _id: booking._id },
+    { $unset: { totalPrice: '' } }
+  );
+  await Booking.collection.updateOne(
+    { status: 'unconfirmed' },
+    { $set: { status: null, totalPrice: null } }
+  );
+  await Booking.collection.updateOne(
+    { status: 'cancelled' },
+    { $set: { status: 'legacy-status', totalPrice: -12.345 } }
+  );
+
+  const response = await dashboard();
+  const data = await readReport({ response, schema: dashboardJsonSchema });
+  expect(data.overview.occupancyRate).toBeNull();
+  const rows = data.recentActivity;
+  expect(rows).toContainEqual(
+    expect.objectContaining({ status: null, totalPrice: null })
+  );
+  expect(rows).toContainEqual(
+    expect.objectContaining({ status: 'legacy-status', totalPrice: -12.345 })
+  );
+  expect(rows.find(row => row.id === String(booking._id))).not.toHaveProperty(
+    'totalPrice'
+  );
+});
+
+test('all-time analytics preserves nullable buckets and omitted legacy cabin labels', async () => {
+  const { cabin, booking } = await fixture();
+  await Cabin.collection.updateOne(
+    { _id: cabin._id },
+    { $unset: { name: '' } }
+  );
+  await Booking.collection.updateOne(
+    { _id: booking._id },
+    { $set: { totalPrice: -12.345 }, $unset: { status: '', createdAt: '' } }
+  );
+
+  const response = await analytics(request());
+  const data = await readReport({
+    response,
+    schema: bookingAnalyticsJsonSchema,
+  });
+  expect(data.statusDistribution).toContainEqual({ status: null, count: 1 });
+  expect(data.revenueOverTime).toContainEqual({
+    date: null,
+    revenue: -12.345,
+    bookings: 1,
+  });
+  expect(data.popularCabins).toEqual([{ bookingCount: 2, revenue: 288 }]);
+});
 
 test.each(['dashboard', 'analytics', 'sales'])(
   '%s denies before database and provider access',

@@ -1,175 +1,171 @@
-// Mock @tanstack/react-query before imports
-let capturedQueryConfig: any = null;
+/** @jest-environment node */
+import { useBookingStats } from '@/hooks/useBookingStats';
+import { useCabinStats } from '@/hooks/useCabinStats';
+import { useDiningStats } from '@/hooks/useDiningStats';
+import { useExperienceStats } from '@/hooks/useExperienceStats';
+import type {
+  BookingStats,
+  CabinStats,
+  DiningStats,
+  ExperienceStats,
+} from '@/types/catalog-stats';
+
+interface QueryConfig {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<unknown>;
+}
+
+let capturedQueryConfig: QueryConfig | null = null;
+const mockFetch = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
 
 jest.mock('@tanstack/react-query', () => ({
-  useQuery: jest.fn((config: any) => {
+  useQuery: jest.fn((config: QueryConfig) => {
     capturedQueryConfig = config;
-    return {
-      data: undefined,
-      error: undefined,
-      isLoading: true,
-      isFetching: false,
-      refetch: jest.fn(),
-    };
   }),
 }));
+
+function query(): QueryConfig {
+  if (!capturedQueryConfig) throw new Error('Query not initialized');
+  return capturedQueryConfig;
+}
 
 beforeEach(() => {
   capturedQueryConfig = null;
   jest.clearAllMocks();
-  (global.fetch as jest.Mock) = jest.fn();
+  global.fetch = mockFetch;
+  mockFetch.mockReset();
 });
 
-import { useCabinStats } from '@/hooks/useCabinStats';
-import { useDiningStats } from '@/hooks/useDiningStats';
-import { useExperienceStats } from '@/hooks/useExperienceStats';
-import { useBookingStats } from '@/hooks/useBookingStats';
-
-describe('useCabinStats', () => {
-  it('uses cabin-stats query key', () => {
-    useCabinStats();
-
-    expect(capturedQueryConfig.queryKey).toEqual(['cabin-stats']);
-  });
-
-  it('fetches from /api/cabins/stats', async () => {
-    const mockStats = {
+describe.each([
+  {
+    resource: 'cabin',
+    url: '/api/cabins/stats',
+    hook: useCabinStats,
+    stats: {
       totalCabins: 10,
       totalCapacity: 40,
-      averagePrice: 250,
+      averagePrice: null,
       cabinsWithDiscount: 3,
-    };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockStats }),
-    });
-
-    useCabinStats();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/cabins/stats');
-    expect(result).toEqual(mockStats);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useCabinStats();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch cabin stats'
-    );
-  });
-});
-
-describe('useDiningStats', () => {
-  it('uses dining-stats query key', () => {
-    useDiningStats();
-
-    expect(capturedQueryConfig.queryKey).toEqual(['dining-stats']);
-  });
-
-  it('fetches from /api/dining/stats', async () => {
-    const mockStats = {
+      activeCabins: 7,
+      inactiveCabins: 2,
+      maintenanceCabins: 1,
+    } satisfies CabinStats,
+    invalid: { activeCabins: '7' },
+  },
+  {
+    resource: 'dining',
+    url: '/api/dining/stats',
+    hook: useDiningStats,
+    stats: {
       totalItems: 25,
       menuCount: 20,
       experienceCount: 5,
-      averagePrice: 18.5,
+      averagePrice: -18.5,
       availableItems: 22,
-    };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockStats }),
-    });
-
-    useDiningStats();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/dining/stats');
-    expect(result).toEqual(mockStats);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useDiningStats();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch dining stats'
-    );
-  });
-});
-
-describe('useExperienceStats', () => {
-  it('uses experience-stats query key', () => {
-    useExperienceStats();
-
-    expect(capturedQueryConfig.queryKey).toEqual(['experience-stats']);
-  });
-
-  it('fetches from /api/experiences/stats', async () => {
-    const mockStats = {
+    } satisfies DiningStats,
+    invalid: { availableItems: null },
+  },
+  {
+    resource: 'experience',
+    url: '/api/experiences/stats',
+    hook: useExperienceStats,
+    stats: {
       totalExperiences: 8,
-      averagePrice: 95,
+      averagePrice: null,
       popularCount: 3,
-      totalCapacity: 120,
-    };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockStats }),
-    });
-
-    useExperienceStats();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/experiences/stats');
-    expect(result).toEqual(mockStats);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useExperienceStats();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch experience stats'
-    );
-  });
-});
-
-describe('useBookingStats', () => {
-  it('uses booking-stats query key', () => {
-    useBookingStats();
-
-    expect(capturedQueryConfig.queryKey).toEqual(['booking-stats']);
-  });
-
-  it('fetches from /api/bookings/stats', async () => {
-    const mockStats = {
+      totalCapacity: 0,
+    } satisfies ExperienceStats,
+    invalid: { totalCapacity: '120' },
+  },
+  {
+    resource: 'booking',
+    url: '/api/bookings/stats',
+    hook: useBookingStats,
+    stats: {
       todayCheckIns: 3,
       todayCheckOuts: 2,
       checkedIn: 15,
-      unconfirmed: 5,
-    };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockStats }),
-    });
+      unconfirmed: 0,
+    } satisfies BookingStats,
+    invalid: { unconfirmed: [] },
+  },
+])('$resource stats', ({ resource, url, hook, stats, invalid }) => {
+  it('keeps its cache key and fetches wrapped stats', async () => {
+    const data = { ...stats, collectedAt: '2026-11-25T00:00:00.000Z' };
+    mockFetch.mockResolvedValue(Response.json({ success: true, data }));
 
-    useBookingStats();
-    const result = await capturedQueryConfig.queryFn();
+    hook();
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/bookings/stats');
-    expect(result).toEqual(mockStats);
+    expect(query().queryKey).toEqual([`${resource}-stats`]);
+    await expect(query().queryFn()).resolves.toEqual(data);
+    expect(mockFetch).toHaveBeenCalledWith(url);
   });
 
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+  it('accepts a legacy raw stats payload', async () => {
+    mockFetch.mockResolvedValue(Response.json(stats));
 
-    useBookingStats();
+    hook();
 
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch booking stats'
+    await expect(query().queryFn()).resolves.toEqual(stats);
+  });
+
+  it('rejects a malformed wrapped stats payload', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        success: true,
+        data: { ...stats, ...invalid },
+      })
     );
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      `Failed to fetch ${resource} stats`
+    );
+  });
+
+  it('rejects an incomplete raw stats payload', async () => {
+    mockFetch.mockResolvedValue(Response.json({ averagePrice: null }));
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      `Failed to fetch ${resource} stats`
+    );
+  });
+
+  it('rejects an error envelope from an HTTP 200', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        success: false,
+        error: 'Stats unavailable',
+      })
+    );
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      `Failed to fetch ${resource} stats`
+    );
+  });
+
+  it('keeps its HTTP failure message', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 500 }));
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      `Failed to fetch ${resource} stats`
+    );
+  });
+
+  it('rejects malformed JSON', async () => {
+    mockFetch.mockResolvedValue(new Response('{'));
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toMatchObject({
+      name: 'SyntaxError',
+    });
   });
 });

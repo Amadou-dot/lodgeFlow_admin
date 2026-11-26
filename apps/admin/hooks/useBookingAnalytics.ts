@@ -1,4 +1,7 @@
-import type { ApiResponse } from '@/types/api-response';
+import {
+  bookingAnalyticsJsonSchema,
+  parseReportJson,
+} from '@/lib/validations/reporting-json';
 import { useQuery } from '@tanstack/react-query';
 
 import type { AnalyticsPeriod, BookingAnalyticsData } from '@/types/reporting';
@@ -12,14 +15,14 @@ export function useBookingAnalytics(period: AnalyticsPeriod = '30d') {
       if (!response.ok) {
         throw new Error('Failed to fetch booking analytics');
       }
-      const result: ApiResponse<BookingAnalyticsData> | BookingAnalyticsData =
-        await response.json();
-      if ('success' in result) {
-        if (!result.success)
-          throw new Error(result.error || 'Failed to fetch booking analytics');
-        return result.data;
-      }
-      return result;
+      const value: unknown = await response.json();
+      return parseReportJson({
+        value,
+        schema: bookingAnalyticsJsonSchema,
+        format: 'wrapped-or-bare',
+        errorMessage: 'Failed to fetch booking analytics',
+        useWrappedError: true,
+      });
     },
   });
 }

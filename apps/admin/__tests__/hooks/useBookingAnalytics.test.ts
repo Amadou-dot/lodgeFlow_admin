@@ -61,9 +61,16 @@ import {
 
 describe('useBookingAnalytics', () => {
   it('keeps compatibility with a bare analytics response', async () => {
-    mockFetch.mockResolvedValue(Response.json(emptyReport));
+    const rawReport = {
+      ...emptyReport,
+      revenueOverTime: [
+        { date: '2024-01-01', revenue: -12.345, bookings: 1, source: 'legacy' },
+      ],
+      diagnostics: { version: 1 },
+    };
+    mockFetch.mockResolvedValue(Response.json(rawReport));
     useBookingAnalytics();
-    expect(await query().queryFn()).toEqual(emptyReport);
+    expect(await query().queryFn()).toEqual(rawReport);
   });
   it('rejects an error envelope even when HTTP transport succeeds', async () => {
     mockFetch.mockResolvedValue(
@@ -138,6 +145,61 @@ describe('useBookingAnalytics', () => {
     const result = await query().queryFn();
 
     expect(result).toEqual(mockData);
+  });
+
+  it('rejects a wrapped report with incomplete extras', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        success: true,
+        data: {
+          ...emptyReport,
+          demographics: { ...emptyReport.demographics, extras: {} },
+        },
+      })
+    );
+
+    useBookingAnalytics();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      'Failed to fetch booking analytics'
+    );
+  });
+
+  it('rejects a raw report with a string revenue amount', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        ...emptyReport,
+        revenueOverTime: [{ date: '2024-01-01', revenue: '10', bookings: 1 }],
+      })
+    );
+
+    useBookingAnalytics();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      'Failed to fetch booking analytics'
+    );
+  });
+
+  it('rejects a non-boolean success marker', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ success: 'true', data: emptyReport })
+    );
+
+    useBookingAnalytics();
+
+    await expect(query().queryFn()).rejects.toThrow(
+      'Failed to fetch booking analytics'
+    );
+  });
+
+  it('rejects malformed JSON', async () => {
+    mockFetch.mockResolvedValue(new Response('{'));
+
+    useBookingAnalytics();
+
+    await expect(query().queryFn()).rejects.toMatchObject({
+      name: 'SyntaxError',
+    });
   });
 
   it('throws on non-ok response', async () => {

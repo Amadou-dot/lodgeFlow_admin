@@ -1,11 +1,7 @@
 'use client';
 
+import type { BookingAnalyticsData } from '@/types/reporting';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-
-interface StatusItem {
-  status: string;
-  count: number;
-}
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -29,15 +25,15 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 interface Props {
-  data?: StatusItem[];
+  data?: BookingAnalyticsData['statusDistribution'];
   isLoading: boolean;
 }
 
 export default function StatusDistributionChart({ data, isLoading }: Props) {
   const chartData = (data || []).map(item => ({
-    name: STATUS_LABELS[item.status] || item.status,
+    name: STATUS_LABELS[String(item.status)] || item.status,
     value: item.count,
-    color: STATUS_COLORS[item.status] || '#9ca3af',
+    color: STATUS_COLORS[String(item.status)] || '#9ca3af',
   }));
 
   const sortedData = [...chartData].sort((a, b) => b.value - a.value);
