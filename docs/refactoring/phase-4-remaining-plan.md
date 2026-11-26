@@ -109,11 +109,11 @@ The approved admin toast accessibility correction renders the existing ToastProv
 
 **Interfaces:** Consume Tasks 1–5 reports and the accepted #202 delivery. Preserve dated original browser findings as historical evidence, record each implemented fix and actual checks, and keep genuine hosted/device/payment acceptance gaps explicit.
 
-- [ ] Record #202 user acceptance and b190f44 base, and update stale statements that no browser retest occurred.
-- [ ] Record the existing guest/extras edit eligibility, exact guard outcomes and controlled checkout response correction. Distinguish the API's confirmed/unconfirmed allowance from the unchanged history UI eligibility.
-- [ ] Reconcile the real provider toast fixture and native/mobile/booking/payment verification limits. Normal Chromium toast visibility passes; consume the follow-up Zen/Gecko responsive evidence. Pinch viewport and modal accessibility observations are separate. The original failing action is unknown; do not describe the responsive-emulation report as a native iPhone keyboard report. Do not label Phase 4 complete solely because code/tests pass.
-- [ ] Replace ephemeral audit pointers in the tracked plan with durable source/test/finding references where possible; retain actual local evidence paths in the task report. Record exact commands/results and update remaining Phase 6 overlap so its checkout task consumes this implemented boundary.
-- [ ] Update documentation with remaining acceptance and Phase 6 work, run formatting/path checks and commit. The controller then performs the whole-plan review and continues the separately scoped Phase 6 plan.
+- [x] Record #202 user acceptance and b190f44 base, and update stale statements that no browser retest occurred.
+- [x] Record the existing guest/extras edit eligibility, exact guard outcomes and controlled checkout response correction. Distinguish the API's confirmed/unconfirmed allowance from the unchanged history UI eligibility.
+- [x] Reconcile the real provider toast fixture and native/mobile/booking/payment verification limits. Normal Chromium toast visibility passes; consume the follow-up Zen/Gecko responsive evidence. Pinch viewport and modal accessibility observations are separate. The original failing action is unknown; do not describe the responsive-emulation report as a native iPhone keyboard report. Do not label Phase 4 complete solely because code/tests pass.
+- [x] Replace ephemeral audit pointers in the tracked plan with durable source/test/finding references where possible; retain actual local evidence paths in the task report. Record exact commands/results and update remaining Phase 6 overlap so its checkout task consumes this implemented boundary.
+- [x] Update documentation with remaining acceptance and Phase 6 work, run formatting/path checks and commit. The controller then performs the whole-plan review and continues the separately scoped Phase 6 plan.
 
 ## Recorded validation
 
@@ -225,3 +225,18 @@ and extend the reader only for a demonstrated remaining gap. Keep Settings
 response parsing compatible with the sparse writable input, and keep booking
 response readers compatible with stay labels, retained editor drafts and
 calendar positioning. [Milestone Phase 6 gates](plan.md#phase-6--remaining-debt-and-milestone-verification)
+
+## Review and delivery checkpoint
+
+The final integration corrections in `2302834` passed all 1,763 admin tests and
+102 focused tests. The controller then passed frozen installation, `pnpm ci:check`
+(2,914 tests: admin 1,763, customer 1,052, database 96, email 3), `pnpm test:http`,
+the production catalog-freshness command above and `pnpm build` at `a5d8ced`.
+The scoped re-review cleared all twelve assigned corrections with no remaining
+Critical or Important finding. Hosted/browser acceptance remains separate.
+
+One nonblocking follow-on remains: for a legacy booking with an absent or null
+payment method, selecting and then undoing a new method still retains that new
+selection. The next bounded slice will restore the ability to return that draft
+to blank without permitting a saved method to disappear. This is recorded in the
+Phase 4 PR and assigned before the remaining Phase 6 response/typing work.
