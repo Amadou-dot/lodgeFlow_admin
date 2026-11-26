@@ -50,7 +50,7 @@ export default function CabinModal({
     name: '',
     image: '',
     images: [] as string[],
-    status: 'active' as 'active' | 'maintenance' | 'inactive',
+    status: 'active' as Cabin['status'],
     capacity: 0,
     price: 0,
     discount: 0,
@@ -78,7 +78,7 @@ export default function CabinModal({
         name: cabin.name,
         image: cabin.image,
         images: cabin.images || [],
-        status: cabin.status || 'active',
+        status: cabin.status,
         capacity: cabin.capacity,
         price: cabin.price,
         discount: cabin.discount ?? 0,
@@ -138,7 +138,10 @@ export default function CabinModal({
     if (isSaving) return;
     try {
       if (mode === 'create') {
-        await onCreateSubmit(formData);
+        await onCreateSubmit({
+          ...formData,
+          status: formData.status ?? 'active',
+        });
       } else if (mode === 'edit' && cabin) {
         const {
           amenities,
@@ -168,8 +171,7 @@ export default function CabinModal({
               : extraGuestFee,
           images:
             cabin.images === null && images.length === 0 ? undefined : images,
-          status:
-            cabin.status === null && status === 'active' ? undefined : status,
+          status: status ?? undefined,
         });
       }
       onClose();
@@ -226,6 +228,7 @@ export default function CabinModal({
   } as const;
 
   const isViewMode = mode === 'view';
+  const viewStatus = formData.status ?? 'active';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size='2xl' scrollBehavior='inside'>
@@ -250,12 +253,12 @@ export default function CabinModal({
                     className='w-full h-56 object-cover rounded-lg'
                   />
                   <Chip
-                    color={statusColorMap[formData.status]}
+                    color={statusColorMap[viewStatus]}
                     variant='solid'
                     size='sm'
                     className='absolute top-2 right-2 shadow-md capitalize'
                   >
-                    {formData.status}
+                    {viewStatus}
                   </Chip>
                 </div>
               )}
@@ -501,7 +504,9 @@ export default function CabinModal({
               {mode === 'edit' && (
                 <Select
                   label='Status'
-                  selectedKeys={[formData.status]}
+                  selectedKeys={
+                    formData.status === null ? [] : [formData.status]
+                  }
                   onSelectionChange={(keys: SharedSelection) => {
                     const value = Array.from(keys)[0] as
                       'active' | 'maintenance' | 'inactive';
