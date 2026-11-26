@@ -79,8 +79,8 @@ export const DiningModal = ({
       size='5xl'
       scrollBehavior='inside'
       classNames={{
-        base: 'max-h-[90vh]',
-        body: 'p-6',
+        base: 'max-h-[calc(100%_-_0.5rem)] sm:max-h-[min(90vh,calc(100%_-_8rem))]',
+        body: 'min-h-0 p-6',
       }}
     >
       <ModalContent>

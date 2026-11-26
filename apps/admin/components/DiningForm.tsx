@@ -1,4 +1,4 @@
-import { Dining } from '@/types';
+import type { Dining } from '@/types';
 import { useEffect, useState } from 'react';
 import {
   DiningBasicInfo,
@@ -97,10 +97,7 @@ export const DiningForm = ({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className='space-y-6 max-h-[80vh] overflow-y-auto'
-    >
+    <form onSubmit={handleSubmit} className='space-y-6'>
       <DiningBasicInfo
         formData={formData}
         onFormDataChange={setFormData}
