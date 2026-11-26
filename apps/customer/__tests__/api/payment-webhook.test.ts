@@ -529,3 +529,194 @@ it('retries confirmation delivery after settlement without treating an unpaid ev
   ).toBe(200);
   expect(sendReservationConfirmation).not.toHaveBeenCalled();
 });
+
+it.each([null, 4, {}, { id: null }, { id: 7 }, { id: '  ' }])(
+  'rejects an unusable signed event ID before deduplication',
+  async event => {
+    const response = await POST(signedRequest(event));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: 'Webhook processing failed',
+    });
+    expect(ProcessedStripeEvent.exists).not.toHaveBeenCalled();
+    expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+  }
+);
+
+it.each([undefined, null, 7, '  '])(
+  'requires a usable event type only after checking the signed event ID',
+  async type => {
+    const event = { id: ' opaque duplicate ', type };
+    jest
+      .mocked(ProcessedStripeEvent.exists)
+      .mockResolvedValueOnce({ _id: new Types.ObjectId() });
+    const duplicate = await POST(signedRequest(event));
+    expect(duplicate.status).toBe(200);
+    expect(await duplicate.json()).toEqual({ received: true });
+    expect(ProcessedStripeEvent.exists).toHaveBeenCalledWith({
+      eventId: ' opaque duplicate ',
+    });
+    const fresh = await POST(signedRequest(event));
+    expect(fresh.status).toBe(500);
+    expect(await fresh.json()).toEqual({ error: 'Webhook processing failed' });
+    expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  { type: 'future.event', data: null },
+  {
+    type: 'checkout.session.completed',
+    data: { object: { payment_status: 'paid', metadata: null } },
+  },
+  {
+    type: 'checkout.session.async_payment_succeeded',
+    data: { object: { payment_status: 'unpaid', metadata: 7 } },
+  },
+  { type: 'checkout.session.expired', data: { object: { metadata: null } } },
+  {
+    type: 'refund.created',
+    data: {
+      object: { metadata: { reservationKind: 'other', reservationId: 7 } },
+    },
+  },
+  { type: 'charge.refunded', data: { object: { payment_intent: null } } },
+])(
+  'records a signed $type no-op without consuming unused fields',
+  async event => {
+    const response = await POST(
+      signedRequest({ id: 'opaque', ...event, additional: { field: 1 } })
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+    expect(ProcessedStripeEvent.updateOne).toHaveBeenCalledWith(
+      { eventId: 'opaque' },
+      {
+        $setOnInsert: {
+          eventId: 'opaque',
+          eventType: event.type,
+          processedAt: expect.any(Date),
+        },
+      },
+      { upsert: true }
+    );
+    expect(settleCheckoutPayment).not.toHaveBeenCalled();
+    expect(settleReservationRefund).not.toHaveBeenCalled();
+    expect(Booking.findOne).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  ['checkout.session.completed', 7],
+  ['checkout.session.completed', { payment_status: null }],
+  ['checkout.session.completed', { payment_status: 'paid', metadata: 7 }],
+  [
+    'checkout.session.completed',
+    { ...paidEvent.data.object, metadata: { bookingId: 7 } },
+  ],
+  [
+    'checkout.session.async_payment_succeeded',
+    { ...paidEvent.data.object, payment_intent: { id: 7 } },
+  ],
+  ['checkout.session.expired', { metadata: { bookingId: 'booking' } }],
+  [
+    'checkout.session.expired',
+    {
+      metadata: {
+        reservationKind: 'dining',
+        reservationId: 'reservation',
+        quoteToken: 7,
+      },
+    },
+  ],
+  [
+    'refund.failed',
+    { metadata: { reservationKind: 'experience', reservationId: 7 } },
+  ],
+  ['charge.refunded', { payment_intent: { id: 7 }, amount_refunded: 100 }],
+  ['charge.refunded', { payment_intent: 7, amount_refunded: 100 }],
+])('leaves unusable consumed fields on %s retryable', async (type, object) => {
+  const response = await POST(
+    signedRequest({ id: 'evt_shape', type, data: { object } })
+  );
+  expect(response.status).toBe(500);
+  expect(await response.json()).toEqual({ error: 'Webhook processing failed' });
+  expect(ProcessedStripeEvent.updateOne).not.toHaveBeenCalled();
+  expect(Booking.findOne).not.toHaveBeenCalled();
+  expect(Booking.updateOne).not.toHaveBeenCalled();
+  expect(expireReservationCheckout).not.toHaveBeenCalled();
+  expect(settleReservationRefund).not.toHaveBeenCalled();
+  expect(settleCheckoutPayment).not.toHaveBeenCalled();
+});
+
+it('reads the opaque ID from expanded checkout and charge payment intents', async () => {
+  (settleCheckoutPayment as jest.Mock).mockResolvedValue({ changed: false });
+  for (const type of [
+    'checkout.session.async_payment_succeeded',
+    'charge.refunded',
+  ]) {
+    const response = await POST(
+      signedRequest({
+        id: 'evt_' + type,
+        type,
+        data: {
+          object: {
+            ...paidEvent.data.object,
+            amount_refunded: 0,
+            payment_intent: { id: ' ref ', additive: true },
+          },
+        },
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+  }
+  expect(settleCheckoutPayment).toHaveBeenCalledWith(
+    expect.objectContaining({ paymentIntentId: ' ref ' })
+  );
+  expect(Booking.findOne).toHaveBeenCalledWith({
+    'payments.paymentIntentId': ' ref ',
+  });
+});
+
+it('rejects a missing signature before verification or database work', async () => {
+  const response = await POST(
+    new NextRequest('http://localhost/api/payments/webhook', {
+      method: 'POST',
+      body: '{}',
+    })
+  );
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    error: 'Missing stripe-signature header',
+  });
+  expect(getStripe).not.toHaveBeenCalled();
+  expect(ProcessedStripeEvent.exists).not.toHaveBeenCalled();
+});
+
+it('retains null refund status as pending and leaves unmatched tokens to the domain', async () => {
+  const event = {
+    id: 'evt_refund_pending',
+    type: 'refund.updated',
+    data: {
+      object: {
+        id: 're_pending',
+        status: null,
+        metadata: {
+          reservationKind: 'experience',
+          reservationId: 'reservation',
+        },
+      },
+    },
+  };
+  const response = await POST(signedRequest(event));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ received: true });
+  expect(settleReservationRefund).toHaveBeenCalledWith({
+    kind: 'experience',
+    id: 'reservation',
+    token: '',
+    refundId: 're_pending',
+    status: 'pending',
+  });
+});

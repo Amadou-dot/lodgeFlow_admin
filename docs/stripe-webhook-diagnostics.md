@@ -24,3 +24,11 @@ The November 2026 incident produced a real signature mismatch with both keys pre
 ## Regression coverage
 
 The route tests exercise real SDK mismatch and timestamp failures, malformed headers, signed invalid JSON, initialization and body-read errors, arbitrary thrown values, log redaction, logger failure, and unchanged valid event processing.
+
+## Signed event processing
+
+The SDK verifies the raw request and then decodes JSON. The handler checks for a usable event ID before its processed-event lookup. A previously processed ID receives `200 { "received": true }` immediately. A fresh event also needs a usable type. Unknown types and supported events with no applicable work receive the same acknowledgement after the handler records the event.
+
+A signed event with unusable fields required for an operation receives `500 { "error": "Webhook processing failed" }` and remains eligible for retry. The handler accepts string and expanded payment intent references. Null checkout metadata can identify a session with no LodgeFlow reservation. Expiration of an identified checkout requires its quote token. A stale or already-completed reservation refund ignores unused provider details.
+
+Dining and experience confirmation failures leave the event available for retry after settlement. Cabin email delivery is best effort after a changed receipt. Local signed HTTP tests cover these responses, durable receipts, and replay against a disposable database with controlled provider responses.

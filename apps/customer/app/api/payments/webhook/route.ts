@@ -19,6 +19,14 @@ import {
 import { sendPaymentConfirmationEmail } from '@/lib/email';
 import type { PaymentEmailCabin } from '@/types/payment-email';
 import { serializePaymentEmailBooking } from '@/lib/serializers/payment-email';
+import {
+  assertWebhookObject,
+  optionalWebhookId,
+  requireWebhookString,
+  reservationTarget,
+  webhookMetadata,
+  webhookPaymentIntent,
+} from '@/lib/stripe-webhook-event';
 import { getStripe } from '@/lib/stripe';
 import {
   logStripeWebhookFailure,
@@ -51,98 +59,85 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
   try {
+    const eventId = requireWebhookString(event?.id);
     await connectDB();
-    if (await ProcessedStripeEvent.exists({ eventId: event.id }))
+    if (await ProcessedStripeEvent.exists({ eventId }))
       return NextResponse.json({ received: true });
+    const eventType = requireWebhookString(event.type);
     if (
       event.type === 'checkout.session.completed' ||
       event.type === 'checkout.session.async_payment_succeeded'
     ) {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const kind = session.metadata?.reservationKind;
-      if (
-        session.payment_status === 'paid' &&
-        (kind === 'dining' || kind === 'experience') &&
-        session.metadata?.reservationId
-      ) {
-        await settleReservationCheckout({
-          kind,
-          id: session.metadata.reservationId,
-          token: session.metadata.quoteToken ?? '',
-          sessionId: session.id,
-          amountCents: cents(session.amount_total ?? 0, { sign: 'positive' }),
-          currency: session.currency ?? '',
-          paymentIntentId:
-            typeof session.payment_intent === 'string'
-              ? session.payment_intent
-              : (session.payment_intent?.id ?? ''),
-        });
-      }
-      if (
-        session.payment_status === 'paid' &&
-        (kind === 'dining' || kind === 'experience') &&
-        session.metadata?.reservationId
-      )
-        await sendReservationConfirmation({
-          kind,
-          id: session.metadata.reservationId,
-        });
-      if (session.payment_status === 'paid' && session.metadata?.bookingId) {
-        const amount = centsToMajor(
-          cents(session.amount_total ?? 0, { sign: 'positive' })
-        );
-        const result = await settleCheckoutPayment({
-          bookingId: session.metadata.bookingId,
-          sessionId: session.id,
-          quoteToken: session.metadata.quoteToken ?? '',
-          amount,
-          currency: session.currency ?? '',
-          paymentIntentId:
-            typeof session.payment_intent === 'string'
-              ? session.payment_intent
-              : (session.payment_intent?.id ?? ''),
-        });
-        if (result.changed && result.booking) {
-          const booking = await result.booking.populate<{
-            cabin: PaymentEmailCabin | null;
-          }>('cabin');
-          // Email is best-effort; durable receipt accounting has already succeeded.
-          try {
-            if (booking.cabin) {
-              const email = await sendPaymentConfirmationEmail({
-                booking: serializePaymentEmailBooking(booking),
-                cabin: { name: booking.cabin.name },
-                amountPaid: amount,
-                isDeposit: session.metadata.isDeposit === 'true',
-              });
-              if (email.success)
-                await Booking.updateOne(
-                  { _id: booking._id },
-                  { $set: { paymentConfirmationSentAt: new Date() } }
-                );
+      const session = event.data?.object;
+      assertWebhookObject(session);
+      if (requireWebhookString(session.payment_status) === 'paid') {
+        const metadata = webhookMetadata(session.metadata);
+        const target = reservationTarget(metadata);
+        if (target) {
+          await settleReservationCheckout({
+            ...target,
+            token: requireWebhookString(metadata.quoteToken),
+            sessionId: session.id,
+            amountCents: cents(session.amount_total ?? 0, { sign: 'positive' }),
+            currency: session.currency ?? '',
+            paymentIntentId: webhookPaymentIntent(session.payment_intent) ?? '',
+          });
+          await sendReservationConfirmation(target);
+        }
+        const bookingId = optionalWebhookId(metadata.bookingId);
+        if (bookingId) {
+          const amount = centsToMajor(
+            cents(session.amount_total ?? 0, { sign: 'positive' })
+          );
+          const result = await settleCheckoutPayment({
+            bookingId,
+            sessionId: session.id,
+            quoteToken: requireWebhookString(metadata.quoteToken),
+            amount,
+            currency: session.currency ?? '',
+            paymentIntentId: webhookPaymentIntent(session.payment_intent) ?? '',
+          });
+          if (result.changed && result.booking) {
+            const booking = await result.booking.populate<{
+              cabin: PaymentEmailCabin | null;
+            }>('cabin');
+            // Email is best-effort; durable receipt accounting has already succeeded.
+            try {
+              if (booking.cabin) {
+                const email = await sendPaymentConfirmationEmail({
+                  booking: serializePaymentEmailBooking(booking),
+                  cabin: { name: booking.cabin.name },
+                  amountPaid: amount,
+                  isDeposit: metadata.isDeposit === 'true',
+                });
+                if (email.success)
+                  await Booking.updateOne(
+                    { _id: booking._id },
+                    { $set: { paymentConfirmationSentAt: new Date() } }
+                  );
+              }
+            } catch (error) {
+              logger.error('Payment confirmation email failed:', error);
             }
-          } catch (error) {
-            logger.error('Payment confirmation email failed:', error);
           }
         }
       }
     } else if (event.type === 'checkout.session.expired') {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const kind = session.metadata?.reservationKind;
-      if (
-        (kind === 'dining' || kind === 'experience') &&
-        session.metadata?.reservationId
-      )
+      const session = event.data?.object;
+      assertWebhookObject(session);
+      const metadata = webhookMetadata(session.metadata);
+      const target = reservationTarget(metadata);
+      if (target)
         await expireReservationCheckout({
-          kind,
-          id: session.metadata.reservationId,
-          token: session.metadata.quoteToken ?? '',
+          ...target,
+          token: requireWebhookString(metadata.quoteToken),
         });
-      if (session.metadata?.bookingId)
+      const bookingId = optionalWebhookId(metadata.bookingId);
+      if (bookingId)
         await Booking.updateOne(
           {
-            _id: session.metadata.bookingId,
-            checkoutToken: session.metadata.quoteToken,
+            _id: bookingId,
+            checkoutToken: requireWebhookString(metadata.quoteToken),
             checkoutPending: true,
           },
           {
@@ -156,25 +151,22 @@ export async function POST(request: NextRequest) {
       event.type === 'refund.updated' ||
       event.type === 'refund.failed'
     ) {
-      const refund = event.data.object as Stripe.Refund;
-      const kind = refund.metadata?.reservationKind;
-      if (
-        (kind === 'dining' || kind === 'experience') &&
-        refund.metadata?.reservationId
-      )
+      const refund = event.data?.object;
+      assertWebhookObject(refund);
+      const metadata = webhookMetadata(refund.metadata);
+      const target = reservationTarget(metadata);
+      if (target)
         await settleReservationRefund({
-          kind,
-          id: refund.metadata.reservationId,
-          token: refund.metadata.refundToken ?? '',
+          ...target,
+          // The domain compares this token strictly before consuming refund details.
+          token: refund.metadata?.refundToken ?? '',
           refundId: refund.id,
           status: refund.status ?? 'pending',
         });
     } else if (event.type === 'charge.refunded') {
-      const charge = event.data.object as Stripe.Charge;
-      const intent =
-        typeof charge.payment_intent === 'string'
-          ? charge.payment_intent
-          : charge.payment_intent?.id;
+      const charge = event.data?.object;
+      assertWebhookObject(charge);
+      const intent = webhookPaymentIntent(charge.payment_intent);
       if (intent) {
         const providerRefund = centsToMajor(cents(charge.amount_refunded));
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -232,11 +224,11 @@ export async function POST(request: NextRequest) {
     // Mark only after success. Receipt IDs make concurrent/retried processing safe;
     // a failed request leaves no premature claim that could swallow Stripe retries.
     await ProcessedStripeEvent.updateOne(
-      { eventId: event.id },
+      { eventId },
       {
         $setOnInsert: {
-          eventId: event.id,
-          eventType: event.type,
+          eventId,
+          eventType,
           processedAt: new Date(),
         },
       },

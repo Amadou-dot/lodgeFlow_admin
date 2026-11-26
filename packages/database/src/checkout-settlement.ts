@@ -17,6 +17,8 @@ export async function settleCheckoutPayment(receipt: CheckoutReceipt) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const booking = await Booking.findById(receipt.bookingId);
     if (!booking) return { booking: null, changed: false };
+    if (typeof receipt.sessionId !== 'string' || !receipt.sessionId.trim())
+      throw new BookingPaymentError('Payment is missing its provider session');
     const prior = booking.payments.find(p => p.id === receipt.sessionId);
     if (prior) {
       if (

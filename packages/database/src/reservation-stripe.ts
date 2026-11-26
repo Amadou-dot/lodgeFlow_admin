@@ -219,7 +219,10 @@ export async function settleReservationCheckout({
       quote.token !== token ||
       quote.amountCents !== receivedCents ||
       quote.currency !== currency ||
-      !paymentIntentId ||
+      typeof sessionId !== 'string' ||
+      !sessionId.trim() ||
+      typeof paymentIntentId !== 'string' ||
+      !paymentIntentId.trim() ||
       (quote.sessionId && quote.sessionId !== sessionId)
     )
       throw new ReservationRuleError(
@@ -408,6 +411,13 @@ export async function settleReservationRefund({
       operation.status === 'succeeded'
     )
       return;
+    if (
+      typeof refundId !== 'string' ||
+      !refundId.trim() ||
+      typeof status !== 'string' ||
+      !status.trim()
+    )
+      throw new ReservationRuleError('Invalid provider refund details');
     const summary = reservationPaymentSummary(row);
     const reservedCents = reservationMoney(() =>
       cents(operation.amountCents, { sign: 'positive' })

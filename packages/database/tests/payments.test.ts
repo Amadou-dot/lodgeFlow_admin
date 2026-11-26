@@ -341,3 +341,41 @@ test('paid customer updates permit special requests while preserving quote and r
   assert.equal(after.isPaid, true);
   assert.equal(after.depositPaid, true);
 });
+
+test('requires a usable session ID for an existing booking and preserves missing bookings and receipt replays', async () => {
+  const booking = await createCustomerBooking(await selection());
+  Object.assign(booking, {
+    checkoutPending: true,
+    checkoutToken: 'quote',
+    checkoutAmount: 150,
+    checkoutTotalPrice: 600,
+    checkoutCurrency: 'usd',
+  });
+  await booking.save();
+  const receipt = {
+    bookingId: String(booking._id),
+    quoteToken: 'quote',
+    sessionId: '  ',
+    paymentIntentId: 'pi_valid',
+    amount: 150,
+    currency: 'usd',
+  };
+  assert.deepEqual(
+    await settleCheckoutPayment({
+      ...receipt,
+      bookingId: new mongoose.Types.ObjectId().toString(),
+    }),
+    { booking: null, changed: false }
+  );
+  await assert.rejects(settleCheckoutPayment(receipt), BookingPaymentError);
+  assert.equal(
+    (await Booking.findById(booking._id).orFail()).payments.length,
+    0
+  );
+  const valid = { ...receipt, sessionId: 'cs_valid' };
+  assert.equal((await settleCheckoutPayment(valid)).changed, true);
+  assert.equal(
+    (await settleCheckoutPayment({ ...valid, currency: '' })).changed,
+    false
+  );
+});
