@@ -72,6 +72,7 @@ export default function CabinTableView({
   };
 
   const renderCell = (cabin: Cabin, columnKey: string) => {
+    const discount = cabin.discount ?? 0;
     switch (columnKey) {
       case 'image':
         return (
@@ -122,10 +123,10 @@ export default function CabinTableView({
           <span className='text-default-400'>-</span>
         );
       case 'price':
-        return cabin.discount > 0 ? (
+        return discount > 0 ? (
           <div className='flex items-center gap-1'>
             <span className='font-semibold text-success'>
-              ${cabin.price - cabin.discount}
+              ${cabin.price - discount}
             </span>
             <span className='text-xs text-default-400 line-through'>
               ${cabin.price}
@@ -135,9 +136,9 @@ export default function CabinTableView({
           <span className='font-semibold'>${cabin.price}</span>
         );
       case 'discount':
-        return cabin.discount > 0 ? (
+        return discount > 0 ? (
           <Chip size='sm' color='danger' variant='flat'>
-            ${cabin.discount} off
+            ${discount} off
           </Chip>
         ) : (
           <span className='text-default-400'>-</span>

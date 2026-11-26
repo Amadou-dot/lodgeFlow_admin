@@ -88,6 +88,41 @@ test('edits JSON data with omitted legacy null options and only writable fields'
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
 });
 
+test('preserves legacy null fields and blank amenity entries during unrelated edits', async () => {
+  const legacy = {
+    ...cabin,
+    discount: null,
+    discountedPrice: cabin.price,
+    images: null,
+    status: null,
+    extraGuestFee: null,
+    amenities: ['WiFi', null, ''],
+  };
+  render(
+    <CabinModal
+      {...mutationProps}
+      isOpen
+      onClose={jest.fn()}
+      cabin={legacy}
+      mode='edit'
+    />
+  );
+  expect(await screen.findByPlaceholderText('Enter discount')).toHaveValue(0);
+  fireEvent.change(screen.getByDisplayValue('Pine Cabin'), {
+    target: { value: 'Renamed Cabin' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+  expect(JSON.parse(JSON.stringify(mockUpdate.mock.calls[0][0]))).toEqual({
+    _id: cabin._id,
+    name: 'Renamed Cabin',
+    image: cabin.image,
+    price: cabin.price,
+    capacity: cabin.capacity,
+    description: cabin.description,
+  });
+});
+
 test('view mode passes the same JSON cabin to the edit action', async () => {
   const edit = jest.fn();
   render(

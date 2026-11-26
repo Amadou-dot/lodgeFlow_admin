@@ -16,6 +16,13 @@ jest.mock('@/hooks/useSettings', () => ({
   }),
 }));
 
+const namedAmenities = [
+  'WiFi',
+  'Kitchen',
+  'Parking',
+  'Hot Tub',
+  'Mountain View',
+];
 const mockCabin = createCabinFixture({
   _id: '1',
   name: 'Luxury Mountain Cabin',
@@ -25,7 +32,7 @@ const mockCabin = createCabinFixture({
   discount: 0,
   description:
     'A beautiful mountain cabin with stunning views and modern amenities.',
-  amenities: ['WiFi', 'Kitchen', 'Parking', 'Hot Tub', 'Mountain View'],
+  amenities: namedAmenities,
 });
 
 describe('CabinDetails Component', () => {
@@ -45,9 +52,17 @@ describe('CabinDetails Component', () => {
     ).toBeInTheDocument();
 
     // Check that each amenity is rendered
-    mockCabin.amenities.forEach(amenity => {
+    namedAmenities.forEach(amenity => {
       expect(screen.getByText(amenity)).toBeInTheDocument();
     });
+  });
+
+  it('renders named amenities even when the catalog contains a null member', () => {
+    render(
+      <CabinDetails cabin={{ ...mockCabin, amenities: [null, '', 'WiFi'] }} />
+    );
+
+    expect(screen.getByText('WiFi')).toBeInTheDocument();
   });
 
   it('renders cabin information section', () => {

@@ -4,6 +4,7 @@ import { GET as cabins } from '@/app/api/cabins/route';
 import { GET as dining } from '@/app/api/dining/route';
 import { GET as experiences } from '@/app/api/experiences/route';
 import { requireApiAuth } from '@/lib/api-utils';
+import { cabinListResponseSchema } from '@/lib/validations/cabin-json';
 beforeEach(() =>
   jest.mocked(requireApiAuth).mockResolvedValue({
     authenticated: true,
@@ -30,11 +31,8 @@ test('cabin queries retain literal search, ignored unknown capacity and safe fal
     )
   );
   expect(response.status).toBe(200);
-  const body = await response.json();
-  expect(body.data.map((item: { name: string }) => item.name)).toEqual([
-    'Zulu*',
-    'Alpha*',
-  ]);
+  const data = cabinListResponseSchema.parse(await response.json());
+  expect(data.map(item => item.name)).toEqual(['Zulu*', 'Alpha*']);
 });
 test('dining retains non-true availability as false and literal combined filters', async () => {
   const item = {

@@ -142,45 +142,68 @@ describe('useCustomers', () => {
 });
 
 describe('useCustomer', () => {
-  it('preserves explicit null booking metadata in the checked detail read', async () => {
-    const customer: CustomerWithStats = {
-      ...customerDetailFixture,
-      recentBookings: [
-        {
-          _id: 'booking_legacy',
-          id: 'booking_legacy',
-          customer: customerDetailFixture.id,
-          cabin: null,
-          checkInDate: '2040-06-01T23:30:00.000Z',
-          checkOutDate: '2040-06-03T23:30:00.000Z',
-          numNights: 2,
-          numGuests: 2,
-          status: 'checked-out',
-          cabinPrice: 200,
-          extrasPrice: 0,
-          totalPrice: 200,
-          isPaid: false,
-          amountPaid: 0,
-          depositPaid: false,
-          depositAmount: 0,
-          remainingAmount: 200,
-          checkoutPending: null,
-          specialRequests: null,
-          refundStatus: null,
-        },
-      ],
-    };
-    jest
-      .mocked(global.fetch)
-      .mockResolvedValueOnce(Response.json({ success: true, data: customer }));
-    useCustomer(customer.id);
-    const [key, fetcher] = mockUseSWR.mock.calls[0] ?? [];
-    if (typeof key !== 'string' || typeof fetcher !== 'function') {
-      throw new Error('Expected the enabled customer detail fetcher');
-    }
+  it.each([
+    { label: 'missing cabin', cabin: null },
+    {
+      label: 'cabin with nullable metadata',
+      cabin: {
+        _id: '507f1f77bcf86cd799439011',
+        id: '507f1f77bcf86cd799439011',
+        name: 'Pine',
+        image: 'https://example.invalid/pine.jpg',
+        capacity: 4,
+        price: 100,
+        discount: null,
+        images: null,
+        extraGuestFee: null,
+        status: null,
+        amenities: ['WiFi', null, ''],
+      },
+    },
+  ])(
+    'preserves explicit null booking metadata with $label',
+    async ({ cabin }) => {
+      const customer: CustomerWithStats = {
+        ...customerDetailFixture,
+        recentBookings: [
+          {
+            _id: 'booking_legacy',
+            id: 'booking_legacy',
+            customer: customerDetailFixture.id,
+            cabin,
+            checkInDate: '2040-06-01T23:30:00.000Z',
+            checkOutDate: '2040-06-03T23:30:00.000Z',
+            numNights: 2,
+            numGuests: 2,
+            status: 'checked-out',
+            cabinPrice: 200,
+            extrasPrice: 0,
+            totalPrice: 200,
+            isPaid: false,
+            amountPaid: 0,
+            depositPaid: false,
+            depositAmount: 0,
+            remainingAmount: 200,
+            checkoutPending: null,
+            specialRequests: null,
+            refundStatus: null,
+          },
+        ],
+      };
+      jest
+        .mocked(global.fetch)
+        .mockResolvedValueOnce(
+          Response.json({ success: true, data: customer })
+        );
+      useCustomer(customer.id);
+      const [key, fetcher] = mockUseSWR.mock.calls[0] ?? [];
+      if (typeof key !== 'string' || typeof fetcher !== 'function') {
+        throw new Error('Expected the enabled customer detail fetcher');
+      }
 
-    await expect(fetcher(key)).resolves.toEqual(customer);
-  });
+      await expect(fetcher(key)).resolves.toEqual(customer);
+    }
+  );
 
   it('passes null key when id is empty', () => {
     useCustomer('');

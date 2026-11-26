@@ -1,3 +1,11 @@
+import {
+  cabinBulkDeleteResponseSchema,
+  cabinBulkDiscountResponseSchema,
+  cabinDeleteResponseSchema,
+  cabinListResponseSchema,
+  cabinMutationErrorSchema,
+  cabinResponseSchema,
+} from '@/lib/validations/cabin-json';
 import type {
   Cabin,
   CabinFilters,
@@ -6,6 +14,43 @@ import type {
 } from '@/types';
 import { displayToast } from '@/utils/toastUtils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import type { ZodType } from 'zod';
+
+function parseResponse<T>({
+  body,
+  schema,
+  fallback,
+}: {
+  body: unknown;
+  schema: ZodType<T>;
+  fallback: string;
+}): T {
+  const result = schema.safeParse(body);
+  if (!result.success) throw new Error(fallback);
+  return result.data;
+}
+
+async function readMutation<T>({
+  response,
+  schema,
+  fallback,
+  showErrorToast = false,
+}: {
+  response: Response;
+  schema: ZodType<T>;
+  fallback: string;
+  showErrorToast?: boolean;
+}): Promise<T> {
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const result = cabinMutationErrorSchema.safeParse(body);
+    const error = result.success ? result.data : undefined;
+    if (showErrorToast) displayToast(error?.message || fallback, 'error');
+    throw new Error(error?.error || fallback);
+  }
+  return parseResponse({ body, schema, fallback });
+}
 
 export function useCabins(filters: CabinFilters = {}) {
   const queryParams = new URLSearchParams();
@@ -25,8 +70,11 @@ export function useCabins(filters: CabinFilters = {}) {
       if (!response.ok) {
         throw new Error('Failed to fetch cabins');
       }
-      const result = await response.json();
-      return result.success ? result.data : result; // Handle both old and new format
+      return parseResponse({
+        body: await response.json(),
+        schema: cabinListResponseSchema,
+        fallback: 'Failed to fetch cabins',
+      });
     },
   });
 }
@@ -44,8 +92,11 @@ export function useCabin(id: string) {
         throw new Error('Failed to fetch cabin');
       }
 
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return parseResponse({
+        body: await response.json(),
+        schema: cabinResponseSchema,
+        fallback: 'Failed to fetch cabin',
+      });
     },
     enabled: !!id, // Only run query if id is provided
   });
@@ -64,14 +115,12 @@ export function useCreateCabin() {
         body: JSON.stringify(cabin),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        displayToast(error.message || 'Failed to create cabin', 'error');
-        throw new Error(error.error || 'Failed to create cabin');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readMutation({
+        response,
+        schema: cabinResponseSchema,
+        fallback: 'Failed to create cabin',
+        showErrorToast: true,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
@@ -94,14 +143,12 @@ export function useUpdateCabin() {
         body: JSON.stringify(cabin),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        displayToast(error.message || 'Failed to update cabin', 'error');
-        throw new Error(error.error || 'Failed to update cabin');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readMutation({
+        response,
+        schema: cabinResponseSchema,
+        fallback: 'Failed to update cabin',
+        showErrorToast: true,
+      });
     },
     onSuccess: (_data, cabin) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
@@ -121,13 +168,11 @@ export function useDeleteCabin() {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete cabin');
-      }
-
-      const result = await response.json();
-      return result.success ? result : result;
+      return readMutation({
+        response,
+        schema: cabinDeleteResponseSchema,
+        fallback: 'Failed to delete cabin',
+      });
     },
     onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
@@ -148,15 +193,13 @@ export function useBulkDeleteCabins() {
         body: JSON.stringify({ action: 'delete', ids }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete cabins');
-      }
-
-      const result = await response.json();
-      return result.data;
+      return readMutation({
+        response,
+        schema: cabinBulkDeleteResponseSchema,
+        fallback: 'Failed to delete cabins',
+      });
     },
-    onSuccess: (data: { deletedCount: number }, ids) => {
+    onSuccess: (data, ids) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
       queryClient.invalidateQueries({ queryKey: ['cabin-stats'] });
       ids.forEach(id =>
@@ -187,15 +230,13 @@ export function useBulkUpdateDiscount() {
         body: JSON.stringify({ action: 'update-discount', ids, discount }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update discounts');
-      }
-
-      const result = await response.json();
-      return result.data;
+      return readMutation({
+        response,
+        schema: cabinBulkDiscountResponseSchema,
+        fallback: 'Failed to update discounts',
+      });
     },
-    onSuccess: (data: { modifiedCount: number }, { ids }) => {
+    onSuccess: (data, { ids }) => {
       queryClient.invalidateQueries({ queryKey: ['cabins'] });
       queryClient.invalidateQueries({ queryKey: ['cabin-stats'] });
       ids.forEach(id =>

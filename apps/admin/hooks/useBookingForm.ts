@@ -175,10 +175,9 @@ function useBookingFormDraft({
       };
     }
 
+    const discount = selectedCabin.discount ?? 0;
     const discountedPrice =
-      selectedCabin.discount > 0
-        ? selectedCabin.price - selectedCabin.discount
-        : selectedCabin.price;
+      discount > 0 ? selectedCabin.price - discount : selectedCabin.price;
     const cabinPrice = discountedPrice * numNights;
 
     const breakfastPrice = formData.hasBreakfast

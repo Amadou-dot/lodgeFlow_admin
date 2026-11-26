@@ -31,6 +31,10 @@ interface CabinModalProps {
   isSaving: boolean;
 }
 
+function isNamedAmenity(value: string | null): value is string {
+  return value !== null && value.trim().length > 0;
+}
+
 export default function CabinModal({
   isOpen,
   onClose,
@@ -77,9 +81,9 @@ export default function CabinModal({
         status: cabin.status || 'active',
         capacity: cabin.capacity,
         price: cabin.price,
-        discount: cabin.discount,
+        discount: cabin.discount ?? 0,
         description: cabin.description,
-        amenities: cabin.amenities,
+        amenities: cabin.amenities.filter(isNamedAmenity),
         bedrooms: cabin.bedrooms ?? undefined,
         bathrooms: cabin.bathrooms ?? undefined,
         size: cabin.size ?? undefined,
@@ -136,9 +140,36 @@ export default function CabinModal({
       if (mode === 'create') {
         await onCreateSubmit(formData);
       } else if (mode === 'edit' && cabin) {
+        const {
+          amenities,
+          discount,
+          extraGuestFee,
+          images,
+          status,
+          ...fields
+        } = formData;
+        const originalAmenities = cabin.amenities.filter(isNamedAmenity);
+        const unchangedLegacyAmenities =
+          originalAmenities.length < cabin.amenities.length &&
+          originalAmenities.length === amenities.length &&
+          originalAmenities.every(
+            (amenity, index) => amenity === amenities[index]
+          );
+
         await onUpdateSubmit({
-          ...formData,
+          ...fields,
           _id: cabin._id,
+          amenities: unchangedLegacyAmenities ? undefined : amenities,
+          discount:
+            cabin.discount === null && discount === 0 ? undefined : discount,
+          extraGuestFee:
+            cabin.extraGuestFee === null && extraGuestFee === 0
+              ? undefined
+              : extraGuestFee,
+          images:
+            cabin.images === null && images.length === 0 ? undefined : images,
+          status:
+            cabin.status === null && status === 'active' ? undefined : status,
         });
       }
       onClose();

@@ -7,12 +7,12 @@ export interface CabinSummary {
   _id: string;
   name: string;
   image: string;
-  images: string[];
+  images: string[] | null;
   capacity: number;
   price: number;
-  discount: number;
+  discount: number | null;
   description: string;
-  status: (typeof CABIN_STATUSES)[number];
+  status: (typeof CABIN_STATUSES)[number] | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   size?: number | null;
@@ -22,8 +22,8 @@ export interface CabinSummary {
 /** Full cabin JSON used by catalog, availability and populated booking reads. */
 export interface CabinDetail extends CabinSummary {
   id: string;
-  amenities: string[];
-  extraGuestFee?: number;
+  amenities: (string | null)[];
+  extraGuestFee?: number | null;
   discountedPrice?: number;
   createdAt?: string | null;
   updatedAt?: string | null;

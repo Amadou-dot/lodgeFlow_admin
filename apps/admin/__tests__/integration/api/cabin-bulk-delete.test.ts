@@ -6,6 +6,8 @@ import { POST } from '@/app/api/cabins/bulk/route';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 
+import { cabinBulkDeleteResponseSchema } from '@/lib/validations/cabin-json';
+
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 
 const originalOrganization = process.env.LODGEFLOW_STAFF_ORG_ID;
@@ -174,9 +176,13 @@ test.each<IBooking['status']>(['cancelled', 'checked-out'])(
       ])
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    const body: unknown = await response.json();
+    expect(body).toEqual({
       success: true,
       data: { deletedCount: 1 },
+    });
+    expect(cabinBulkDeleteResponseSchema.parse(body)).toEqual({
+      deletedCount: 1,
     });
     expect(await Cabin.findById(cabin._id)).toBeNull();
     expect(await Cabin.countDocuments()).toBe(1);
@@ -200,9 +206,13 @@ test.each<IBooking['status']>(['cancelled', 'checked-out'])(
 test('returns zero without auditing when none of the IDs exist', async () => {
   const response = await POST(request([String(new Types.ObjectId())]));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const body: unknown = await response.json();
+  expect(body).toEqual({
     success: true,
     data: { deletedCount: 0 },
+  });
+  expect(cabinBulkDeleteResponseSchema.parse(body)).toEqual({
+    deletedCount: 0,
   });
   expect(await AuditLog.countDocuments()).toBe(0);
 });

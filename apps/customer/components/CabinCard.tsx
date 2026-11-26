@@ -17,8 +17,8 @@ function isPseudoPopular(cabinId: string): boolean {
 }
 
 export default function CabinCard({ cabin }: CabinCardProps) {
-  const discountedPrice =
-    cabin.discount > 0 ? cabin.price - cabin.discount : cabin.price;
+  const discount = cabin.discount ?? 0;
+  const discountedPrice = discount > 0 ? cabin.price - discount : cabin.price;
 
   return (
     <Card className='w-full h-full'>
@@ -40,13 +40,13 @@ export default function CabinCard({ cabin }: CabinCardProps) {
               Popular
             </Chip>
           )}
-          {cabin.discount > 0 && (
+          {discount > 0 && (
             <Chip
               className='absolute top-2 right-2'
               color='danger'
               variant='solid'
             >
-              ${cabin.discount} OFF
+              ${discount} OFF
             </Chip>
           )}
         </div>
@@ -106,7 +106,7 @@ export default function CabinCard({ cabin }: CabinCardProps) {
         )}
 
         <div className='flex items-center gap-2'>
-          {cabin.discount > 0 && (
+          {discount > 0 && (
             <span className='text-small text-default-400 line-through'>
               ${cabin.price}/night
             </span>

@@ -94,6 +94,50 @@ describe('cabin query contracts', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([cabin]);
   });
+  test('preserves additive and legacy nullable values in the cache', async () => {
+    const legacy = {
+      ...cabin,
+      discount: null,
+      images: null,
+      extraGuestFee: null,
+      status: null,
+      bedrooms: null,
+      amenities: ['WiFi', null, ''],
+      updatedAt: '+010000-01-01T00:00:00.000Z',
+      additive: { imported: true },
+    };
+    fetchMock.mockResolvedValue(
+      response({ body: { success: true, data: [legacy] } })
+    );
+    const { result } = renderHook(() => useCabins(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.getQueryData(['cabins', {}])).toEqual([legacy]);
+  });
+  test.each([
+    { ...cabin, price: '200' },
+    { ...cabin, amenities: null },
+    { ...cabin, createdAt: '2026-02-30T00:00:00.000Z' },
+  ])(
+    'rejects a malformed list member before it reaches the cache',
+    async invalid => {
+      fetchMock.mockResolvedValue(
+        response({ body: { success: true, data: [cabin, invalid] } })
+      );
+      const { result } = renderHook(() => useCabins(), { wrapper });
+      await waitFor(() => expect(result.current.isFetching).toBe(false));
+      expect(result.current.error?.message).toBe('Failed to fetch cabins');
+      expect(client.getQueryData(['cabins', {}])).toBeUndefined();
+    }
+  );
+  test('does not cache a detail error envelope received with HTTP success', async () => {
+    fetchMock.mockResolvedValue(
+      response({ body: { success: false, error: 'Missing' } })
+    );
+    const { result } = renderHook(() => useCabin(cabin._id), { wrapper });
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.error?.message).toBe('Failed to fetch cabin');
+    expect(client.getQueryData(['cabin', cabin._id])).toBeUndefined();
+  });
   test('reports read failure', async () => {
     fetchMock.mockResolvedValue(response({ ok: false, body: {} }));
     const { result } = renderHook(() => useCabins(), { wrapper });
@@ -125,6 +169,86 @@ describe('cabin query contracts', () => {
 });
 
 describe('cabin mutation contracts', () => {
+  test.each(['create', 'update'] as const)(
+    'retains a legacy bare cabin on successful %s',
+    async action => {
+      fetchMock.mockResolvedValue(response({ body: cabin }));
+      const { result } = renderHook(
+        () => ({ create: useCreateCabin(), update: useUpdateCabin() }),
+        { wrapper }
+      );
+      await act(async () => {
+        const operation =
+          action === 'create'
+            ? result.current.create.mutateAsync(createInput)
+            : result.current.update.mutateAsync({ _id: cabin._id });
+        await expect(operation).resolves.toEqual(cabin);
+      });
+    }
+  );
+  test.each([
+    { action: 'create', body: { success: true, data: { _id: cabin._id } } },
+    { action: 'update', body: { ...cabin, capacity: '4' } },
+    { action: 'remove', body: { success: true } },
+    { action: 'remove', body: { success: true, data: {} } },
+    {
+      action: 'bulkRemove',
+      body: { success: true, data: { modifiedCount: 1 } },
+    },
+    {
+      action: 'bulkRemove',
+      body: { success: true, data: { deletedCount: 1, modifiedCount: 1 } },
+    },
+    {
+      action: 'bulkDiscount',
+      body: { success: true, data: { deletedCount: 1 } },
+    },
+    {
+      action: 'bulkDiscount',
+      body: { success: false, data: { modifiedCount: 1 } },
+    },
+  ] as const)(
+    'rejects malformed $action success before success effects ($body)',
+    async ({ action, body }) => {
+      fetchMock.mockResolvedValue(response({ body }));
+      const invalidated = jest.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(
+        () => ({
+          create: useCreateCabin(),
+          update: useUpdateCabin(),
+          remove: useDeleteCabin(),
+          bulkRemove: useBulkDeleteCabins(),
+          bulkDiscount: useBulkUpdateDiscount(),
+        }),
+        { wrapper }
+      );
+      const mutate = {
+        create: () => result.current.create.mutateAsync(createInput),
+        update: () => result.current.update.mutateAsync({ _id: cabin._id }),
+        remove: () => result.current.remove.mutateAsync(cabin._id),
+        bulkRemove: () => result.current.bulkRemove.mutateAsync([cabin._id]),
+        bulkDiscount: () =>
+          result.current.bulkDiscount.mutateAsync({
+            ids: [cabin._id],
+            discount: 15,
+          }),
+      };
+      let error: unknown;
+      await act(async () => {
+        try {
+          await mutate[action]();
+        } catch (caught) {
+          error = caught;
+        }
+      });
+      expect(invalidated).not.toHaveBeenCalled();
+      expect(addToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ color: 'success' })
+      );
+      expect(error).toBeInstanceOf(Error);
+    }
+  );
+
   test('creates with the exact request, returns JSON and invalidates catalog/statistics', async () => {
     fetchMock.mockResolvedValue(
       response({ body: { success: true, data: cabin } })
@@ -284,7 +408,7 @@ describe('cabin mutation contracts', () => {
       );
     }
   );
-  test.each([1, 2])(
+  test.each([0, 1, 2])(
     'keeps bulk discount request, count %i, toast and invalidation',
     async modifiedCount => {
       fetchMock.mockResolvedValue(
@@ -368,7 +492,11 @@ test.each(['delete', 'discount'] as const)(
       )
       .mockResolvedValueOnce(
         response({
-          body: { success: true, data: { deletedCount: 2, modifiedCount: 2 } },
+          body: {
+            success: true,
+            data:
+              action === 'delete' ? { deletedCount: 2 } : { modifiedCount: 2 },
+          },
         })
       );
     const invalidated = jest.spyOn(client, 'invalidateQueries');

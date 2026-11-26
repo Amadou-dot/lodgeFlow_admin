@@ -49,8 +49,8 @@ export default function CabinDetailClient({ cabin }: CabinDetailClientProps) {
 
   const bookingCabin = {
     _id: cabinId,
-    discount: cabin.discount,
-    extraGuestFee: cabin.extraGuestFee,
+    discount: cabin.discount ?? undefined,
+    extraGuestFee: cabin.extraGuestFee ?? undefined,
     image: cabin.image,
     maxCapacity: cabin.capacity,
     name: cabin.name,
@@ -135,7 +135,10 @@ export default function CabinDetailClient({ cabin }: CabinDetailClientProps) {
 
       {/* Price Calculator - mobile only */}
       <div className='mt-8 lg:hidden'>
-        <CabinPricingCalculator discount={cabin.discount} price={cabin.price} />
+        <CabinPricingCalculator
+          discount={cabin.discount ?? 0}
+          price={cabin.price}
+        />
       </div>
 
       {/* Similar Cabins */}

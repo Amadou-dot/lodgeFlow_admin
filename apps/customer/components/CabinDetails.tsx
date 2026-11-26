@@ -124,7 +124,11 @@ export function CabinDescriptionSection({ cabin }: CabinDetailsProps) {
 }
 
 export function CabinAmenitiesSection({ cabin }: CabinDetailsProps) {
-  if (!cabin.amenities || cabin.amenities.length === 0) return null;
+  const amenities = cabin.amenities?.filter(
+    (amenity): amenity is string =>
+      amenity !== null && amenity.trim().length > 0
+  );
+  if (!amenities?.length) return null;
 
   return (
     <Card className='w-full'>
@@ -139,7 +143,7 @@ export function CabinAmenitiesSection({ cabin }: CabinDetailsProps) {
       <Divider />
       <CardBody>
         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
-          {cabin.amenities.map((amenity, index) => {
+          {amenities.map((amenity, index) => {
             const Icon = getAmenityIcon(amenity);
 
             return (

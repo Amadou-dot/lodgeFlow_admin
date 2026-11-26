@@ -6,6 +6,8 @@ import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { logger } from '@/lib/logger';
 
+import { cabinBulkDiscountResponseSchema } from '@/lib/validations/cabin-json';
+
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 jest.mock('@/lib/logger', () => ({
   logger: { error: jest.fn(), info: jest.fn() },
@@ -192,9 +194,13 @@ describe('bulk request characterization', () => {
         })
       );
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      const body: unknown = await response.json();
+      expect(body).toEqual({
         success: true,
         data: { modifiedCount: 1 },
+      });
+      expect(cabinBulkDiscountResponseSchema.parse(body)).toEqual({
+        modifiedCount: 1,
       });
       expect(await Cabin.findById(selected._id).lean()).toMatchObject({
         name: 'River',
@@ -226,9 +232,13 @@ describe('bulk request characterization', () => {
       })
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    const body: unknown = await response.json();
+    expect(body).toEqual({
       success: true,
       data: { modifiedCount: 0 },
+    });
+    expect(cabinBulkDiscountResponseSchema.parse(body)).toEqual({
+      modifiedCount: 0,
     });
     expect(await AuditLog.countDocuments()).toBe(0);
   });

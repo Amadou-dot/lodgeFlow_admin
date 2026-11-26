@@ -52,7 +52,8 @@ export default function CabinSelection({
               </span>
               <span className='text-tiny text-default-400 truncate'>
                 {formatCurrency(cabin.price)}/night • Capacity: {cabin.capacity}
-                {cabin.discount > 0 &&
+                {cabin.discount != null &&
+                  cabin.discount > 0 &&
                   ` • ${formatCurrency(cabin.discount)} discount`}
               </span>
             </div>
