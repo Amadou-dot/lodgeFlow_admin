@@ -83,3 +83,13 @@ test('preview retains fixed ungrouped strings, fractional price arithmetic and p
   ).toBeInTheDocument();
   expect(screen.getByRole('checkbox', { name: /Breakfast/ })).not.toBeChecked();
 });
+
+test('keeps a valid nightly rate when the selected stay total exceeds the display range', () => {
+  render(<CabinPricingCalculator discount={0} price={4e13} />);
+  expect(screen.getByText('$40000000000000.00/night')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Choose Check-in' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Choose Check-out' }));
+  expect(screen.getAllByText('Unavailable')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Clear Dates' }));
+  expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
+});

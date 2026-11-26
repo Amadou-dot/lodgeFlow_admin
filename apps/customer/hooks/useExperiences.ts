@@ -1,5 +1,9 @@
+import {
+  readCatalogResponse,
+  experienceListSchema,
+} from '@/lib/validations/catalog-json';
 import { useQuery } from '@tanstack/react-query';
-import type { Experience, ExperienceQueryParams, ApiResponse } from '@/types';
+import type { Experience, ExperienceQueryParams } from '@/types';
 
 const fetchExperiences = async (
   params: ExperienceQueryParams = {}
@@ -20,17 +24,11 @@ const fetchExperiences = async (
 
   const response = await fetch(url);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch experiences');
-  }
-
-  const result: ApiResponse<Experience[]> = await response.json();
-
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch experiences');
-  }
-
-  return result.data || [];
+  return readCatalogResponse({
+    response,
+    schema: experienceListSchema,
+    fallback: 'Failed to fetch experiences',
+  });
 };
 
 export function useExperiences(params: ExperienceQueryParams = {}) {

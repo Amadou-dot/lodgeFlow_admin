@@ -19,6 +19,23 @@ describe('useCabins', () => {
     jest.resetAllMocks();
   });
 
+  test.each([
+    [
+      'unreadable JSON',
+      async () => {
+        throw new SyntaxError('Invalid JSON');
+      },
+    ],
+    ['false data', async () => ({ success: true, data: false })],
+    ['a nonliteral success flag', async () => ({ success: 1, data: null })],
+    ['a false success with data', async () => ({ success: false, data: [] })],
+  ] as const)('rejects %s before caching', async (_label, json) => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json });
+    const { result } = renderHook(() => useCabins(), { wrapper });
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.error?.message).toBe('Failed to fetch cabins');
+    expect(result.current.data).toBeUndefined();
+  });
   it('sends explicit zero price bounds', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock;
@@ -37,13 +54,13 @@ describe('useCabins', () => {
   it('fetches all cabins without parameters', async () => {
     const mockCabins = [
       createCabinFixture({
-        _id: '1',
+        _id: '507f1f77bcf86cd7994390ab',
         name: 'Cabin 1',
         capacity: 4,
         price: 200,
       }),
       createCabinFixture({
-        _id: '2',
+        _id: '507f1f77bcf86cd7994390ac',
         name: 'Cabin 2',
         capacity: 2,
         price: 150,
@@ -66,7 +83,7 @@ describe('useCabins', () => {
   it('fetches cabins with capacity filter', async () => {
     const mockCabins = [
       createCabinFixture({
-        _id: '1',
+        _id: '507f1f77bcf86cd7994390ab',
         name: 'Large Cabin',
         capacity: 4,
         price: 200,
@@ -89,7 +106,11 @@ describe('useCabins', () => {
 
   it('fetches cabins with price range filters', async () => {
     const mockCabins = [
-      createCabinFixture({ _id: '1', name: 'Mid-Range Cabin', price: 175 }),
+      createCabinFixture({
+        _id: '507f1f77bcf86cd7994390ab',
+        name: 'Mid-Range Cabin',
+        price: 175,
+      }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -111,7 +132,11 @@ describe('useCabins', () => {
 
   it('fetches cabins with availability filter', async () => {
     const mockCabins = [
-      createCabinFixture({ _id: '1', name: 'Available Cabin', price: 200 }),
+      createCabinFixture({
+        _id: '507f1f77bcf86cd7994390ab',
+        name: 'Available Cabin',
+        price: 200,
+      }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -130,7 +155,11 @@ describe('useCabins', () => {
 
   it('fetches cabins with search query', async () => {
     const mockCabins = [
-      createCabinFixture({ _id: '1', name: 'Luxury Suite', price: 300 }),
+      createCabinFixture({
+        _id: '507f1f77bcf86cd7994390ab',
+        name: 'Luxury Suite',
+        price: 300,
+      }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -149,7 +178,11 @@ describe('useCabins', () => {
 
   it('fetches cabins with multiple filters', async () => {
     const mockCabins = [
-      createCabinFixture({ _id: '1', name: 'Perfect Match', price: 180 }),
+      createCabinFixture({
+        _id: '507f1f77bcf86cd7994390ab',
+        name: 'Perfect Match',
+        price: 180,
+      }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -211,20 +244,40 @@ describe('useCabins', () => {
     expect(result.current.error?.message).toBe('Failed to fetch cabins');
   });
 
-  it('returns empty array when data is null', async () => {
+  it.each([{}, { data: null }])(
+    'preserves empty success for nullish data (%j)',
+    async fields => {
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, ...fields }),
+      });
+
+      const { result } = renderHook(() => useCabins(), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual([]);
+    }
+  );
+
+  it.each([
+    [
+      'mismatched ID aliases',
+      createCabinFixture({ id: '507f1f77bcf86cd7994390ac' }),
+    ],
+    ['an inactive public listing', createCabinFixture({ status: 'inactive' })],
+  ] as const)('rejects %s before caching', async (_reason, row) => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ success: true, data: null }),
+      json: async () => ({ success: true, data: [createCabinFixture(), row] }),
     });
-
     const { result } = renderHook(() => useCabins(), { wrapper });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([]);
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.error?.message).toBe('Failed to fetch cabins');
+    expect(result.current.data).toBeUndefined();
   });
 
   it('caches data with correct staleTime', async () => {
-    const mockCabins = [{ _id: '1', name: 'Cabin 1' }];
+    const mockCabins = [createCabinFixture()];
 
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,

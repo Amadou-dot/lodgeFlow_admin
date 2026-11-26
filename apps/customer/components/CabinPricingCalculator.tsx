@@ -9,7 +9,20 @@ import { Link } from '@heroui/link';
 import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date';
 import { useState } from 'react';
 import { useSettings } from '@/hooks/useSettings';
-import { formatFixedMajorAmount as formatPrice } from '@/lib/money-display';
+import { MoneyError } from '@lodgeflow/database/money';
+import { formatFixedMajorAmount } from '@/lib/money-display';
+
+function formatPrice(
+  amount: number,
+  { prefix = '$', suffix = '' }: { prefix?: string; suffix?: string } = {}
+) {
+  try {
+    return prefix + formatFixedMajorAmount(amount) + suffix;
+  } catch (error) {
+    if (error instanceof MoneyError) return 'Unavailable';
+    throw error;
+  }
+}
 
 interface CabinPricingCalculatorProps {
   discount: number;
@@ -82,15 +95,15 @@ export default function CabinPricingCalculator({
       <span className='text-base font-bold'>Price Calculator</span>
       {hasDiscount && (
         <span className='text-sm text-default-400 line-through'>
-          ${formatPrice(price)}/night
+          {formatPrice(price, { suffix: '/night' })}
         </span>
       )}
       <span className='font-bold text-success'>
-        ${formatPrice(effectiveRate)}/night
+        {formatPrice(effectiveRate, { suffix: '/night' })}
       </span>
       {hasDiscount && (
         <span className='font-semibold text-sm text-success'>
-          Save ${formatPrice(discount)}/night
+          {formatPrice(discount, { prefix: 'Save $', suffix: '/night' })}
         </span>
       )}
     </div>
@@ -181,47 +194,51 @@ export default function CabinPricingCalculator({
               <div className='space-y-2'>
                 <div className='flex items-center justify-between text-sm'>
                   <span>
-                    ${formatPrice(effectiveRate)} &times; {validNights} night
+                    {formatPrice(effectiveRate)} &times; {validNights} night
                     {validNights > 1 ? 's' : ''}
                   </span>
-                  <span>${formatPrice(cabinSubtotal!)}</span>
+                  <span>{formatPrice(cabinSubtotal!)}</span>
                 </div>
 
                 {savings !== null && savings > 0 && (
                   <div className='flex items-center justify-between rounded-lg bg-success-50 px-3 py-2 text-sm font-semibold text-success'>
                     <span>Savings</span>
-                    <span>-${formatPrice(savings)}</span>
+                    <span>{formatPrice(savings, { prefix: '-$' })}</span>
                   </div>
                 )}
 
                 {breakfastFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Breakfast</span>
-                    <span>+${formatPrice(breakfastFee)}</span>
+                    <span>{formatPrice(breakfastFee, { prefix: '+$' })}</span>
                   </div>
                 )}
                 {petFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Pet fee</span>
-                    <span>+${formatPrice(petFee)}</span>
+                    <span>{formatPrice(petFee, { prefix: '+$' })}</span>
                   </div>
                 )}
                 {parkingFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Parking</span>
-                    <span>+${formatPrice(parkingFee)}</span>
+                    <span>{formatPrice(parkingFee, { prefix: '+$' })}</span>
                   </div>
                 )}
                 {earlyCheckInFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Early check-in</span>
-                    <span>+${formatPrice(earlyCheckInFee)}</span>
+                    <span>
+                      {formatPrice(earlyCheckInFee, { prefix: '+$' })}
+                    </span>
                   </div>
                 )}
                 {lateCheckOutFee > 0 && (
                   <div className='flex items-center justify-between text-sm'>
                     <span>Late check-out</span>
-                    <span>+${formatPrice(lateCheckOutFee)}</span>
+                    <span>
+                      {formatPrice(lateCheckOutFee, { prefix: '+$' })}
+                    </span>
                   </div>
                 )}
 
@@ -230,7 +247,7 @@ export default function CabinPricingCalculator({
                 <div className='flex items-center justify-between font-bold text-base'>
                   <span>Total</span>
                   <span className='text-success'>
-                    ${formatPrice(grandTotal)}
+                    {formatPrice(grandTotal)}
                   </span>
                 </div>
               </div>

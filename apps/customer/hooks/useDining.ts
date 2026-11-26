@@ -1,5 +1,9 @@
+import {
+  readCatalogResponse,
+  diningListSchema,
+} from '@/lib/validations/catalog-json';
 import { useQuery } from '@tanstack/react-query';
-import type { Dining, DiningQueryParams, ApiResponse } from '@/types';
+import type { Dining, DiningQueryParams } from '@/types';
 
 const fetchDining = async (
   params: DiningQueryParams = {}
@@ -23,17 +27,11 @@ const fetchDining = async (
 
   const response = await fetch(url);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch dining options');
-  }
-
-  const result: ApiResponse<Dining[]> = await response.json();
-
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch dining options');
-  }
-
-  return result.data || [];
+  return readCatalogResponse({
+    response,
+    schema: diningListSchema,
+    fallback: 'Failed to fetch dining options',
+  });
 };
 
 export function useDining(params: DiningQueryParams = {}) {

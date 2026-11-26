@@ -1,5 +1,9 @@
+import {
+  readCatalogResponse,
+  cabinListSchema,
+} from '@/lib/validations/catalog-json';
 import { useQuery } from '@tanstack/react-query';
-import type { Cabin, ApiResponse, CabinsQueryParams } from '@/types';
+import type { Cabin, CabinsQueryParams } from '@/types';
 
 const fetchCabins = async (
   params: CabinsQueryParams = {}
@@ -20,17 +24,11 @@ const fetchCabins = async (
 
   const response = await fetch(url);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch cabins');
-  }
-
-  const result: ApiResponse<Cabin[]> = await response.json();
-
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch cabins');
-  }
-
-  return result.data || [];
+  return readCatalogResponse({
+    response,
+    schema: cabinListSchema,
+    fallback: 'Failed to fetch cabins',
+  });
 };
 
 export function useCabins(params: CabinsQueryParams = {}) {

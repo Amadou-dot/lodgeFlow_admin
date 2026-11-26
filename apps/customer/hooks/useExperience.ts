@@ -1,20 +1,18 @@
+import {
+  readCatalogResponse,
+  experienceDetailSchema,
+} from '@/lib/validations/catalog-json';
 import { useQuery } from '@tanstack/react-query';
-import type { Experience, ApiResponse } from '@/types';
+import type { Experience } from '@/types';
 
 const fetchExperience = async (experienceId: string): Promise<Experience> => {
   const response = await fetch(`/api/experiences/${experienceId}`);
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch experience');
-  }
-
-  const result: ApiResponse<Experience> = await response.json();
-
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch experience');
-  }
-
-  return result.data!;
+  return readCatalogResponse({
+    response,
+    schema: experienceDetailSchema(experienceId),
+    fallback: 'Failed to fetch experience',
+  });
 };
 
 export function useExperience(experienceId: string) {

@@ -1,6 +1,10 @@
+import {
+  readCatalogResponse,
+  diningDetailSchema,
+} from '@/lib/validations/catalog-json';
 import { useQuery } from '@tanstack/react-query';
 
-import type { ApiResponse, Dining } from '@/types';
+import type { Dining } from '@/types';
 
 /**
  * Hook to fetch a single dining item by ID
@@ -8,15 +12,14 @@ import type { ApiResponse, Dining } from '@/types';
 export const useDiningItem = (diningId: string) => {
   return useQuery({
     enabled: !!diningId,
-    queryFn: async (): Promise<Dining | null> => {
+    queryFn: async (): Promise<Dining> => {
       const response = await fetch(`/api/dining/${diningId}`);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch dining item');
-      }
-
-      const data: ApiResponse<Dining> = await response.json();
-      return data.data || null;
+      return readCatalogResponse({
+        response,
+        schema: diningDetailSchema(diningId),
+        fallback: 'Failed to fetch dining item',
+      });
     },
     queryKey: ['dining-item', diningId],
     staleTime: 5 * 60 * 1000,
