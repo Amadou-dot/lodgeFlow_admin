@@ -1,26 +1,23 @@
 'use client';
 import { useRef, useState } from 'react';
 import { usePermission } from './AuthGuard';
-import type {
-  ReservationReceiptJson,
-  ReservationPaymentJson,
-} from '@lodgeflow/database/reservation-json';
+import {
+  readReservationPayment,
+  type ReservationKind,
+  type ReservationPaymentFields,
+  type PaymentSummary,
+} from '@/lib/validations/reservation-operations-json';
+import type { ReservationReceiptJson } from '@lodgeflow/database/reservation-json';
 import {
   cents,
+  centsToMajor,
   formatCents,
   majorAmount,
   majorToCents,
   MoneyError,
 } from '@lodgeflow/database/money';
-export interface PaymentSummary {
-  totalCents: number;
-  paidCents: number;
-  refundedCents: number;
-  balanceCents: number;
-  refundableCents: number;
-  legacyPaid: boolean;
-}
 export function ReservationPayments({
+  kind,
   endpoint,
   payment,
   currency,
@@ -29,11 +26,12 @@ export function ReservationPayments({
   stripeRefund,
   status,
   reload,
-}: ReservationPaymentJson & {
+}: ReservationPaymentFields & {
+  kind: ReservationKind;
   endpoint: string;
   payment: PaymentSummary;
-  currency: string;
-  status: string;
+  currency: string | null;
+  status: string | null;
   reload: () => Promise<void>;
 }) {
   const canManage = usePermission('bookings:manage');
@@ -47,36 +45,56 @@ export function ReservationPayments({
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'error'; message: string }
   >({ kind: 'idle' });
   const request = useRef<{ body: string; id: string }>();
-  const format = (amount: number) =>
-    formatCents({ amount: cents(amount), currency });
-  async function submit(retry = false) {
+  const currencyCode = currency || 'USD';
+  function format(value: number) {
+    const amount = cents(value);
+    try {
+      return /^[a-z]{3}$/i.test(currencyCode)
+        ? formatCents({ amount, currency: currencyCode })
+        : `${centsToMajor(amount)} ${currencyCode}`;
+    } catch (error) {
+      if (!(error instanceof MoneyError)) throw error;
+      // Some safe integer cents have no exact numeric major-unit representation.
+      return `${amount} cents (${currencyCode})`;
+    }
+  }
+  const retryDetails =
+    stripeRefund?.status === 'pending' &&
+    stripeRefund.token &&
+    typeof stripeRefund.reference === 'string'
+      ? {
+          token: stripeRefund.token,
+          amountCents: stripeRefund.amountCents,
+          reference: stripeRefund.reference,
+        }
+      : undefined;
+  async function submit(retry?: NonNullable<typeof retryDetails>) {
     let transaction;
     try {
       if (!retry && !/^\d+(\.\d{1,2})?$/.test(amount)) {
         throw new MoneyError('Invalid amount');
       }
-      transaction =
-        retry && stripeRefund
-          ? {
-              type: 'refund',
-              method: 'stripe',
-              amountCents: cents(stripeRefund.amountCents, {
+      transaction = retry
+        ? {
+            type: 'refund' as const,
+            method: 'stripe' as const,
+            amountCents: cents(retry.amountCents, {
+              sign: 'positive',
+            }),
+            reference: retry.reference,
+          }
+        : {
+            type,
+            method,
+            amountCents: majorToCents({
+              amount: majorAmount(Number(amount), {
+                precision: 'exact',
                 sign: 'positive',
               }),
-              reference: stripeRefund.reference,
-            }
-          : {
-              type,
-              method,
-              amountCents: majorToCents({
-                amount: majorAmount(Number(amount), {
-                  precision: 'exact',
-                  sign: 'positive',
-                }),
-                rounding: 'exact',
-              }),
-              reference,
-            };
+              rounding: 'exact',
+            }),
+            reference,
+          };
     } catch (error) {
       if (!(error instanceof MoneyError)) throw error;
       setState({
@@ -89,7 +107,7 @@ export function ReservationPayments({
     if (request.current?.body !== body)
       request.current = {
         body,
-        id: retry && stripeRefund ? stripeRefund.token : crypto.randomUUID(),
+        id: retry ? retry.token : crypto.randomUUID(),
       };
     setState({ kind: 'busy' });
     try {
@@ -98,9 +116,10 @@ export function ReservationPayments({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...transaction, id: request.current!.id }),
       });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || 'Unable to record transaction');
+      await readReservationPayment(response, {
+        kind,
+        method: transaction.method,
+      });
       await reload();
       request.current = undefined;
       setAmount('');
@@ -145,10 +164,10 @@ export function ReservationPayments({
       {stripeRefund?.status === 'pending' && (
         <div>
           <p>Online refund is pending.</p>
-          {canRefund && (
+          {canRefund && retryDetails && (
             <button
               disabled={state.kind === 'busy'}
-              onClick={() => void submit(true)}
+              onClick={() => void submit(retryDetails)}
               className='underline'
             >
               Check or retry refund
@@ -207,7 +226,7 @@ export function ReservationPayments({
             </select>
           </label>
           <label className='block'>
-            Amount ({currency})
+            Amount ({currencyCode})
             <input
               className='block border rounded p-2 bg-background'
               inputMode='decimal'
@@ -237,7 +256,8 @@ export function ReservationPayments({
               state.kind === 'busy' ||
               (type === 'payment'
                 ? payment.balanceCents <= 0 ||
-                  ['cancelled', 'no-show'].includes(status)
+                  status === 'cancelled' ||
+                  status === 'no-show'
                 : !canRefund || payment.refundableCents <= 0)
             }
           >
