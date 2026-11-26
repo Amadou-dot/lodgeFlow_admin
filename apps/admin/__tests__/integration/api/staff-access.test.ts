@@ -7,6 +7,11 @@ import StaffAccess from '@lodgeflow/database/models/StaffAccess';
 import { resolveStaffRole } from '@/lib/staff-access';
 import { requireApiAuth } from '@/lib/api-utils';
 import { PUT } from '@/app/api/staff/route';
+import { GET as getAccess } from '@/app/api/staff/access/route';
+import {
+  readStaffAuditResponse,
+  staffAccessJsonSchema,
+} from '@/lib/validations/staff-audit-json';
 const mockAuth = jest.fn<
   Promise<Pick<Awaited<ReturnType<typeof auth>>, 'userId' | 'orgId' | 'has'>>,
   []
@@ -158,6 +163,29 @@ it('enforces permissions independently of Clerk role claims', async () => {
   assert(!defaultAccess.authenticated);
   expect(defaultAccess.error.status).toBe(403);
   expect((await PUT(request('user_guest', 'admin')))?.status).toBe(403);
+});
+it('returns only the active staff role’s permissions to the protected shell', async () => {
+  mockAuth.mockResolvedValue({
+    userId: 'user_front',
+    orgId: organizationId,
+    has: () => true,
+  });
+  const response = await getAccess();
+  expect(response.status).toBe(200);
+  await expect(
+    readStaffAuditResponse({
+      response,
+      schema: staffAccessJsonSchema,
+      fallback: 'Invalid staff access',
+    })
+  ).resolves.toEqual({
+    userId: 'user_front',
+    role: 'front_desk',
+    permissions: ['bookings:read', 'bookings:manage'],
+  });
+
+  await StaffAccess.deleteOne({ organizationId, userId: 'user_front' });
+  expect((await getAccess()).status).toBe(403);
 });
 it('allows assignment and revocation, but rejects outsiders and self changes', async () => {
   expect((await PUT(request('user_guest', 'manager')))?.status).toBe(200);

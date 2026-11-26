@@ -108,3 +108,32 @@ export const EXPERIENCE_STATUS_TRANSITIONS: Record<string, readonly string[]> =
     completed: [],
     cancelled: [],
   };
+
+export const AUDIT_ACTIONS = [
+  'booking.create',
+  'booking.update',
+  'booking.status_change',
+  'booking.cancel',
+  'booking.reprice',
+  'booking.delete',
+  'payment.record',
+  'refund.record',
+  'dining_reservation.status_change',
+  'experience_booking.status_change',
+  'cabin.create',
+  'cabin.update',
+  'cabin.delete',
+  'settings.update',
+  'staff.role_change',
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export const AUDIT_RESOURCE_TYPES = [
+  'booking',
+  'dining_reservation',
+  'experience_booking',
+  'cabin',
+  'settings',
+  'staff',
+] as const;
+export type AuditResourceType = (typeof AUDIT_RESOURCE_TYPES)[number];

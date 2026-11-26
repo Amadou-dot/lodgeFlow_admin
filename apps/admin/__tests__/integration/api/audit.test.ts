@@ -17,6 +17,10 @@ import {
 } from '@/lib/audit';
 import { GET } from '@/app/api/audit/route';
 import {
+  auditHistoryJsonSchema,
+  readStaffAuditResponse,
+} from '@/lib/validations/staff-audit-json';
+import {
   POST as createCabin,
   PUT as updateCabin,
 } from '@/app/api/cabins/route';
@@ -65,6 +69,13 @@ it('records actual cabin changes, omits no-ops, and redacts free text', async ()
   expect(created?.actorRole).toBe('admin');
   expect(created?.after.description).toBe('[redacted]');
   expect(JSON.stringify(created)).not.toContain(cabinData.description);
+  const history = await readStaffAuditResponse({
+    response: await GET(request('/api/audit?action=cabin.create')),
+    schema: auditHistoryJsonSchema,
+    fallback: 'Invalid audit history',
+  });
+  expect(history.events[0].after.description).toBe('[redacted]');
+  expect(JSON.stringify(history)).not.toContain(cabinData.description);
   await updateCabin(
     request('/api/cabins', 'PUT', { _id: cabin._id, price: 240 })
   );

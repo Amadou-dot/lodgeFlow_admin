@@ -535,6 +535,7 @@ test('a verified replacement staff session starts with server settings after a r
   const staffResponse = {
     ok: true,
     json: async () => ({
+      success: true,
       data: { userId: 'staff-1', role: 'admin', permissions: PERMISSIONS },
     }),
   };

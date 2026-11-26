@@ -7,15 +7,14 @@ import {
   pagePermission,
   PERMISSIONS,
   type Permission,
-  type StaffRole,
 } from '@/lib/permissions';
+import {
+  readStaffAuditResponse,
+  staffAccessJsonSchema,
+} from '@/lib/validations/staff-audit-json';
+import type { StaffAccessJson } from '@/types/staff-audit';
 
-type Access = {
-  userId: string;
-  role: StaffRole;
-  permissions: readonly Permission[];
-};
-const AccessContext = createContext<Access | null>(null);
+const AccessContext = createContext<StaffAccessJson | null>(null);
 export function useStaffAccess() {
   return useContext(AccessContext);
 }
@@ -41,7 +40,7 @@ function ClerkAuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [verified, setVerified] = useState<{
-    access: Access;
+    access: StaffAccessJson;
     userId: typeof userId;
     orgId: typeof orgId;
     sessionId: typeof sessionId;
@@ -68,9 +67,14 @@ function ClerkAuthGuard({ children }: { children: React.ReactNode }) {
     fetch('/api/staff/access', { cache: 'no-store', signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error('Staff access denied');
-        const { data } = await response.json();
+        const access = await readStaffAuditResponse({
+          response,
+          schema: staffAccessJsonSchema,
+          fallback: 'Staff access denied',
+        });
+        if (access.userId !== userId) throw new Error('Staff access denied');
         if (!controller.signal.aborted)
-          setVerified({ access: data, userId, orgId, sessionId });
+          setVerified({ access, userId, orgId, sessionId });
       })
       .catch(() => {
         if (!controller.signal.aborted) {

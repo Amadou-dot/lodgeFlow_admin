@@ -19,7 +19,12 @@ import {
 } from '@heroui/table';
 import { Spinner } from '@heroui/spinner';
 import type { StaffMemberJson as Member } from '@/types/staff-audit';
-import type { ApiResponse } from '@/types/api-response';
+import { isStaffRole } from '@/lib/permissions';
+import {
+  readStaffAuditResponse,
+  staffRoleChangeJsonSchema,
+  staffRosterJsonSchema,
+} from '@/lib/validations/staff-audit-json';
 export default function StaffPage() {
   const access = useStaffAccess();
   return <StaffContent key={access?.userId ?? ''} access={access} />;
@@ -35,12 +40,11 @@ function StaffContent({
   const request = useCallback(
     async (signal: AbortSignal): Promise<Member[]> => {
       const response = await fetch('/api/staff', { cache: 'no-store', signal });
-      const result: ApiResponse<Member[]> = await response.json();
-      if (!response.ok || !result.success)
-        throw new Error(
-          !result.success ? result.error : 'Unable to load staff'
-        );
-      return result.data;
+      return readStaffAuditResponse({
+        response,
+        schema: staffRosterJsonSchema,
+        fallback: 'Unable to load staff',
+      });
     },
     []
   );
@@ -57,18 +61,24 @@ function StaffContent({
       : state.kind === 'error'
         ? state.message
         : '';
-  async function change(member: Member, role: string) {
-    if (!member.userId || busy) return;
+  async function change(member: Member, selection: string) {
+    const role = selection === '' ? null : selection;
+    if (!member.userId || busy || (role !== null && !isStaffRole(role))) return;
+    const userId = member.userId;
     setAction({ kind: 'saving' });
     try {
       const response = await fetch('/api/staff', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: member.userId, role: role || null }),
+        body: JSON.stringify({ userId, role }),
       });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || 'Unable to update access');
+      const result = await readStaffAuditResponse({
+        response,
+        schema: staffRoleChangeJsonSchema,
+        fallback: 'Unable to update access',
+      });
+      if (result.userId !== userId || result.role !== role)
+        throw new Error('Unable to update access');
       await load();
       setAction({ kind: 'idle' });
     } catch (e) {

@@ -11,7 +11,10 @@ import { Input } from '@heroui/input';
 import { Chip } from '@heroui/chip';
 import { useEffect, useState } from 'react';
 import type { AuditHistoryJson } from '@/types/staff-audit';
-import type { ApiResponse } from '@/types/api-response';
+import {
+  auditHistoryJsonSchema,
+  readStaffAuditResponse,
+} from '@/lib/validations/staff-audit-json';
 export default function AuditPage() {
   const [filters, setFilters] = useState({
     actor: '',
@@ -39,15 +42,18 @@ export default function AuditPage() {
       cache: 'no-store',
     })
       .then(async response => {
-        const result: ApiResponse<AuditHistoryJson> = await response.json();
-        if (!response.ok || !result.success)
-          throw new Error(
-            !result.success ? result.error : 'Unable to load history'
-          );
-        if (!controller.signal.aborted) setData(result.data);
+        const history = await readStaffAuditResponse({
+          response,
+          schema: auditHistoryJsonSchema,
+          fallback: 'Unable to load history',
+        });
+        if (!controller.signal.aborted) setData(history);
       })
-      .catch(e => {
-        if (!controller.signal.aborted) setError(e.message);
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setError(
+            error instanceof Error ? error.message : 'Unable to load history'
+          );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
