@@ -193,10 +193,10 @@ Tasks 12, 15 and 16 must run or port the real stored-record fixtures in `package
 
 **Interfaces** `CabinDetail` via the public list route, `DiningJson`, `ExperienceJson`, with browser DTOs derived from observed public rows. Customer catalogue JSON envelope/HTTP policy remains separate from admin.
 
-- [ ] Resolve Task7's deferred catalog coverage while sharing fields: admin negative cases must reject missing hydrated defaults and missing beverage IDs even when the lean public variant accepts omission. Exercise rejected JSON parsing, not only a parsed null, and preserve resource-specific failures.
-- [ ] Resolve the Task6 deferred full-cabin ID-alias finding while establishing the common catalog contract: real producers emit equal `_id` and `id`, while single edit and bulk selection consume different aliases. Reject a row carrying different aliases and test that it cannot enter either app's catalog data or trigger mutation success effects. Keep independent booking/lean projections separate.
-- [ ] Assert real public list and detail shapes, query/order/filter compatibility, empty arrays, nullable/sparse legacy properties, and invalid row rejection before cache. Preserve live server catalog reads and both `connection()` boundaries. Retain server freshness smoke.
-- [ ] Run `CUSTOMER '(useCabins|catalog-(details|order|pages)|cabin-catalog|dining-(catalog|query)|experience-query)'`. Reuse admin shape only after wire equivalence is verified. Include existing exact fresh-catalog gate at integration boundary.
+- [x] Resolve Task7's deferred catalog coverage while sharing fields: admin negative cases must reject missing hydrated defaults and missing beverage IDs even when the lean public variant accepts omission. Exercise rejected JSON parsing, not only a parsed null, and preserve resource-specific failures.
+- [x] Resolve the Task6 deferred full-cabin ID-alias finding while establishing the common catalog contract: real producers emit equal `_id` and `id`, while single edit and bulk selection consume different aliases. Reject a row carrying different aliases and test that it cannot enter either app's catalog data or trigger mutation success effects. Keep independent booking/lean projections separate.
+- [x] Assert real public list and detail shapes, query/order/filter compatibility, empty arrays, nullable/sparse legacy properties, and invalid row rejection before cache. Preserve live server catalog reads and both `connection()` boundaries. Retain server freshness smoke.
+- [x] Run `CUSTOMER '(useCabins|catalog-(details|order|pages)|cabin-catalog|dining-(catalog|query)|experience-query)'`. Reuse admin shape only after wire equivalence is verified. Include existing exact fresh-catalog gate at integration boundary.
 
 ### Task 14: Customer cabin/dining availability readers
 
