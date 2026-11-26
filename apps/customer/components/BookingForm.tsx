@@ -4,6 +4,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSettings } from '@/hooks/useSettings';
 import type { CreateBookingRequest } from '@/lib/validations/booking';
 import {
+  cabinAvailabilityUrl,
   fetchCabinAvailability,
   isCabinDateUnavailable,
 } from '@/lib/validations/cabin-availability-json';
@@ -62,8 +63,8 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
   const isMobile = useIsMobile();
 
   const { data: availability, error: availabilityError } = useSWR(
-    cabin?._id ? `/api/cabins/${cabin._id}/availability` : null,
-    () => fetchCabinAvailability(cabin._id)
+    cabin?._id ? cabinAvailabilityUrl(cabin._id) : null,
+    fetchCabinAvailability
   );
 
   const todayDate = today(getLocalTimeZone());

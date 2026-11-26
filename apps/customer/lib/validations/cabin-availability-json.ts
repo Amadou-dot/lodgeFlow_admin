@@ -33,18 +33,23 @@ const availabilityError = z.object({
 type CabinAvailabilityResponse = z.infer<typeof cabinAvailabilityResponse>;
 export type CabinAvailabilityRange = z.infer<typeof dateRange>;
 
+export function cabinAvailabilityUrl(cabinId: string): string {
+  return `/api/cabins/${cabinId}/availability`;
+}
+
 export async function fetchCabinAvailability(
-  cabinId: string
+  url: string
 ): Promise<CabinAvailabilityResponse> {
-  const response = await fetch(`/api/cabins/${cabinId}/availability`);
+  const response = await fetch(url);
   if (!response.ok)
     throw new Error(`Failed to fetch availability (HTTP ${response.status})`);
 
   const body: unknown = await response.json().catch(() => undefined);
   const result = cabinAvailabilityResponse.safeParse(body);
+  const requestedId = /^\/api\/cabins\/([^/]+)\/availability$/.exec(url)?.[1];
   if (
     result.success &&
-    result.data.data.cabinId.toLowerCase() === cabinId.toLowerCase()
+    result.data.data.cabinId.toLowerCase() === requestedId?.toLowerCase()
   ) {
     return result.data;
   }
