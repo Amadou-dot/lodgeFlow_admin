@@ -241,6 +241,13 @@ test('a malformed committed receipt acknowledgement retries the same reference a
     });
   });
   await act(async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ error: 'Amount exceeds balance' }, { status: 409 })
+    );
+    await expect(result.current.payment.mutateAsync(payment)).rejects.toThrow(
+      'Amount exceeds balance'
+    );
+    expect(stored.size).toBe(0);
     await expect(result.current.payment.mutateAsync(payment)).rejects.toThrow(
       'Failed to record payment'
     );
