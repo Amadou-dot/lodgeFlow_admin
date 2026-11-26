@@ -94,7 +94,7 @@ const bookingFields = z.object({
   paymentMethod: z.enum(PAYMENT_METHODS).nullish(),
   extras: bookingExtrasJsonSchema.nullish(),
   observations: z.string().nullish(),
-  specialRequests: z.array(z.string()).nullish(),
+  specialRequests: z.array(z.string().nullable()).nullish(),
   depositPaid: z.boolean().nullish(),
   depositAmount: z.number().nullish(),
   stripePaymentIntentId: z.string().nullish(),

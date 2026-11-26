@@ -47,7 +47,9 @@ export default function BookingMainContent({
 
       <NotesCard
         observations={booking.observations ?? undefined}
-        specialRequests={booking.specialRequests ?? undefined}
+        specialRequests={booking.specialRequests?.filter(
+          request => request !== null
+        )}
         cancellationReason={booking.cancellationReason ?? undefined}
       />
     </div>

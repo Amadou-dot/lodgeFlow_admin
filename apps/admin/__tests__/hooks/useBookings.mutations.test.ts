@@ -3,6 +3,8 @@ import { createElement, type ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { addToast } from '@heroui/toast';
+import { bookingDetailResponse } from '@/lib/validations/booking-json';
+import type { AdminBooking } from '@/types/booking-read';
 import type { CreateBookingInput } from '@/types/api';
 import {
   useCheckInBooking,
@@ -68,7 +70,7 @@ function hooks() {
     checkIn: useCheckInBooking(),
     checkOut: useCheckOutBooking(),
     confirm: useConfirmBooking(),
-    payment: useRecordPayment(),
+    payment: useRecordPayment({ booking: row, onReconciled: jest.fn() }),
   };
 }
 function setup() {
@@ -244,9 +246,9 @@ test('a malformed committed receipt acknowledgement retries the same reference a
     fetchMock.mockResolvedValueOnce(
       Response.json({ error: 'Amount exceeds balance' }, { status: 409 })
     );
-    await expect(result.current.payment.mutateAsync(payment)).rejects.toThrow(
-      'Amount exceeds balance'
-    );
+    await expect(
+      result.current.payment.mutateAsync({ ...payment, amountPaid: 11 })
+    ).rejects.toThrow('Amount exceeds balance');
     expect(stored.size).toBe(0);
     await expect(result.current.payment.mutateAsync(payment)).rejects.toThrow(
       'Failed to record payment'
@@ -266,3 +268,83 @@ test('a malformed committed receipt acknowledgement retries the same reference a
   for (const key of related)
     expect(invalidated).toHaveBeenCalledWith({ queryKey: [key] });
 });
+
+test.each([
+  { first: 60, next: 40 },
+  { first: 40, next: 40 },
+])(
+  'a verified receipt retires an ambiguous $first attempt before the next $next payment',
+  async ({ first, next }) => {
+    const onReconciled = jest.fn();
+    const initialBooking: AdminBooking = { ...row, remainingAmount: 100 };
+    const { result, rerender } = renderHook(
+      ({ booking }: { booking: AdminBooking }) =>
+        useRecordPayment({ booking, onReconciled }),
+      { wrapper, initialProps: { booking: initialBooking } }
+    );
+    const receipts: NonNullable<AdminBooking['payments']> = [];
+    const ids: string[] = [];
+    fetchMock.mockImplementation(async (_url, init) => {
+      const { recordPayment } = JSON.parse(String(init?.body));
+      ids.push(recordPayment.receiptId);
+      const existing = receipts.find(r => r.id === recordPayment.receiptId);
+      if (
+        existing &&
+        (existing.amount !== recordPayment.amountPaid ||
+          existing.method !== recordPayment.paymentMethod)
+      )
+        return Response.json(
+          { error: 'Payment reference already exists with different details' },
+          { status: 409 }
+        );
+      if (!existing)
+        receipts.push({
+          id: recordPayment.receiptId,
+          amount: recordPayment.amountPaid,
+          method: recordPayment.paymentMethod,
+          receivedAt: row.checkInDate,
+        });
+      return Response.json({
+        success: true,
+        data: ids.length === 1 ? null : { ...row, payments: receipts },
+      });
+    });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ ...payment, amountPaid: first })
+      ).rejects.toThrow('Failed to record payment');
+    });
+    const receipt = receipts[0];
+    const refresh = (payments: AdminBooking['payments']) => {
+      const { data: booking } = bookingDetailResponse.parse({
+        success: true,
+        data: { ...row, remainingAmount: 100 - first, payments },
+      });
+      rerender({ booking });
+    };
+    for (const evidence of [
+      null,
+      [],
+      [{ ...receipt, id: 'other' }],
+      [{ ...receipt, amount: first + 1 }],
+      [{ ...receipt, method: 'cash' as const }],
+    ]) {
+      refresh(evidence);
+      expect(onReconciled).not.toHaveBeenCalled();
+    }
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({ ...payment, amountPaid: first + 1 })
+      ).rejects.toThrow('confirm the previous payment');
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    refresh([receipt]);
+    expect(onReconciled).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.mutateAsync({ ...payment, amountPaid: next });
+    });
+    expect(receipts.map(r => r.amount)).toEqual([first, next]);
+    expect(new Set(ids).size).toBe(2);
+  }
+);

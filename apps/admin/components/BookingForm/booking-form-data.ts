@@ -20,7 +20,8 @@ export const initializeBookingForm = (
       hasEarlyCheckIn: booking.extras?.hasEarlyCheckIn || false,
       hasLateCheckOut: booking.extras?.hasLateCheckOut || false,
       observations: booking.observations || '',
-      specialRequests: booking.specialRequests || [],
+      specialRequests:
+        booking.specialRequests?.filter(request => request !== null) ?? [],
       paymentMethod: booking.paymentMethod || '',
       isPaid: booking.isPaid === true,
       depositPaid: booking.depositPaid === true,
