@@ -65,6 +65,19 @@ export const formatCurrency = (
   });
 };
 
+export function formatSettingsCurrency(
+  amount: number,
+  currency: string | null | undefined
+): string {
+  if (!currency || /^[a-z]{3}$/i.test(currency)) {
+    return formatCurrency(amount, currency ?? undefined);
+  }
+
+  // Legacy Settings can contain a code Intl cannot format.
+  const value = majorAmount(amount, { precision: 'preserve', sign: 'signed' });
+  return `${value} ${currency}`;
+}
+
 export async function isImageUrl(url: string | undefined): Promise<boolean> {
   if (typeof url !== 'string') return false;
 

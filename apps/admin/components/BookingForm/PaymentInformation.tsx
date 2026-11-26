@@ -3,7 +3,7 @@ import { Select, SelectItem } from '@heroui/select';
 import { BookingFormFieldProps, PriceBreakdown } from './types';
 import type { Settings } from '@/types';
 import type { SharedSelection } from '@heroui/system';
-import { formatMajorAmount, majorAmount } from '@lodgeflow/database/money';
+import { formatSettingsCurrency } from '@/utils/utilityFunctions';
 
 interface PaymentInformationProps extends BookingFormFieldProps {
   hasSavedPaymentMethod?: boolean;
@@ -52,14 +52,10 @@ export default function PaymentInformation({
         {settings?.requireDeposit && (
           <p>
             Required deposit:{' '}
-            {formatMajorAmount({
-              amount: majorAmount(priceBreakdown.depositAmount, {
-                precision: 'preserve',
-                sign: 'signed',
-              }),
-              locale: 'en-US',
-              currency: settings.currency ?? undefined,
-            })}
+            {formatSettingsCurrency(
+              priceBreakdown.depositAmount,
+              settings.currency
+            )}
           </p>
         )}
         <p className='text-sm text-default-500'>

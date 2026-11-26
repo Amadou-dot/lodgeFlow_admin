@@ -5,6 +5,7 @@ import { GET, PUT, POST } from '@/app/api/settings/route';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { logger } from '@/lib/logger';
+import { formatSettingsCurrency } from '@/utils/utilityFunctions';
 import { settingsSuccessResponseSchema } from '@/lib/validations/settings-json';
 
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
@@ -126,6 +127,26 @@ test('GET preserves legacy nulls, precision and sparse metadata from storage', a
     },
   });
   expect(body).not.toHaveProperty('data.singleton');
+});
+
+test('GET and sparse PUT preserve a model-valid legacy currency code', async () => {
+  const settings = await Settings.create({ currency: 'A1!' });
+  const get = await expectSettingsResponse(await GET(), settings);
+  const { data } = settingsSuccessResponseSchema.parse(get);
+  expect(data.currency).toBe('A1!');
+  expect(formatSettingsCurrency(12.075, data.currency)).toBe('12.075 A1!');
+
+  const response = await PUT(
+    new NextRequest('https://admin.test/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ breakfastPrice: 12.075 }),
+    })
+  );
+  const stored = await Settings.findOne().orFail();
+  const put = await expectSettingsResponse(response, stored);
+  expect(put).toHaveProperty('data.currency', 'A1!');
+  expect(stored.currency).toBe('A1!');
+  expect(stored.breakfastPrice).toBe(12.075);
 });
 
 test('first read creates defaults and returns their full JSON', async () => {

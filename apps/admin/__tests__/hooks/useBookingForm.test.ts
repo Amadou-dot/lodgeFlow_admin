@@ -3,6 +3,7 @@ import { useBookingEditForm, useBookingForm } from '@/hooks/useBookingForm';
 import { createBookingSchema } from '@/lib/validations/booking';
 import type { Cabin, Settings } from '@/types';
 import type { AdminBooking } from '@/types/booking-read';
+import { legacyCurrencySettings } from '../setup/settings-fixture';
 const mockCabins: Cabin[] = [
   {
     _id: '507f1f77bcf86cd799439011',
@@ -146,6 +147,14 @@ test('preview formatting keeps Settings currency, signed amounts, and the USD fa
   mockSettings = undefined;
   rerender();
   expect(result.current.formatCurrency(1.005)).toBe('$1.01');
+});
+
+test('preview formatting keeps a signed fractional amount and the accepted legacy currency code', () => {
+  mockSettings = legacyCurrencySettings;
+  const { result } = renderHook(() => useBookingForm());
+
+  expect(result.current.formatCurrency(-1234.567)).toBe('-1234.567 A1!');
+  expect(() => result.current.formatCurrency(Infinity)).toThrow();
 });
 
 test('negative guest drafts preserve the preview and validation until the value is corrected', () => {

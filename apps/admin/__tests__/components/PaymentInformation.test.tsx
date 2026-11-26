@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import PaymentInformation from '@/components/BookingForm/PaymentInformation';
+import { legacyCurrencySettings } from '../setup/settings-fixture';
 import type {
   BookingFormData,
   PriceBreakdown,
@@ -38,6 +39,7 @@ const priceBreakdown: PriceBreakdown = {
 test.each([
   ['EUR', 'Required deposit: €1,234.50'],
   ['JPY', 'Required deposit: ¥1,235'],
+  [null, 'Required deposit: $1,234.50'],
 ])(
   'deposit display preserves currency-specific precision for %s',
   (currency, text) => {
@@ -52,6 +54,18 @@ test.each([
     expect(screen.getByText(text)).toBeInTheDocument();
   }
 );
+
+test('deposit display preserves the amount and the accepted legacy currency code', () => {
+  render(
+    <PaymentInformation
+      formData={formData}
+      onInputChange={jest.fn()}
+      priceBreakdown={priceBreakdown}
+      settings={legacyCurrencySettings}
+    />
+  );
+  expect(screen.getByText('Required deposit: 1234.5 A1!')).toBeInTheDocument();
+});
 
 test('does not display a deposit when Settings does not require one', () => {
   render(

@@ -1,4 +1,5 @@
 import type { AppSettings } from '@/types';
+import { settingsSuccessResponseSchema } from '@/lib/validations/settings-json';
 
 export const settings = {
   _id: '66ecbf94495f2679035c9687',
@@ -36,3 +37,8 @@ export const settings = {
     checkInReminders: true,
   },
 } satisfies AppSettings;
+
+export const legacyCurrencySettings = settingsSuccessResponseSchema.parse({
+  success: true,
+  data: { ...settings, currency: 'A1!' },
+}).data;
