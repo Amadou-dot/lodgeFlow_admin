@@ -10,7 +10,8 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "ci:check": "pnpm format:check && pnpm -r exec eslint . && pnpm -r test",
+    "check:syntax": "node --test scripts/refactoring/syntax.test.cjs && node scripts/refactoring/inventory.cjs --check",
+    "ci:check": "pnpm format:check && pnpm check:syntax && pnpm -r exec eslint . && pnpm -r test",
     "pre-commit": "lint-staged",
     "prepare": "husky",
     "test:http": "node --test scripts/http-smoke/assert-http.test.mjs && pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/run.mjs"

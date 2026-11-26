@@ -1,1193 +1,932 @@
 {
-  "reviewedAt": "2026-10-07",
-  "baseCommit": "4d3590b485b8129f23f2c8a6e29a65b9fa07a82b",
-  "state": "Phase 1-2 review checkpoint",
   "baseline": "inventory-candidates.json",
-  "scope": "apps/admin, apps/customer, packages/database; JS/TS runtime, scripts and tests; excludes declarations, generated files, dependencies and ignored output",
-  "method": "TypeScript syntax-tree review: explicit any, chained as unknown casts, adjacent explicit same-primitive positionals, string/date or string/number unions, optional-null property signatures, Document interface inheritance, Record cast element access. Semantic validation/error/operation checks are described in inventory.md.",
-  "filesScanned": 655,
-  "sourceDigestSha256": "a36c8f35be09a28ce23f576f34ff38f1fe29cf66867fc6a6316078851c9b4b69",
+  "sourceScope": "Tracked ts, tsx, js, jsx, mjs, cjs in apps/admin, apps/customer and packages/database. Excludes .d.ts and node_modules, .next, dist, build, coverage and generated directories.",
+  "digestMethod": "SHA-256 over git ls-files order: path, NUL, working-tree file bytes, NUL.",
+  "filesScanned": 763,
+  "sourceDigestSha256": "e6ecbb0f4cf0689e145846404d0c56d0cf11e1d26d13044f5a3df90829f8f208",
   "counts": {
-    "any": 81,
-    "document-interface": 9,
+    "any": 0,
+    "double-cast": 0,
+    "same-type-positionals": 1,
     "mixed-representation": 3,
-    "optional-null": 36,
-    "same-type-positionals": 1
+    "optional-null": 88,
+    "document-interface": 9,
+    "record-index": 0
   },
-  "runtimeAny": 0,
-  "doubleCasts": 0,
-  "runtimeSamePrimitivePositionals": 0,
-  "typedRecordIndexCasts": 0,
+  "workspaceO01": {
+    "files": 778,
+    "explicitAny": 0,
+    "chainedUnknownAssertions": 0
+  },
   "findings": [
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "capturedMutationConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
-      "line": 8,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
-      "line": 57,
-      "rule": "any",
-      "symbol": "bookingInput",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.mutations.test.ts",
-      "line": 168,
-      "rule": "any",
-      "symbol": "update",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.test.ts",
-      "line": 10,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.test.ts",
-      "line": 10,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.test.ts",
-      "line": 10,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useBookings.test.ts",
-      "line": 18,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
-      "line": 6,
-      "rule": "any",
-      "symbol": "capturedConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
-      "line": 12,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
-      "line": 12,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
-      "line": 12,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
-      "line": 21,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useCustomers.test.ts",
-      "line": 136,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useData.test.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "capturedQueryConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useData.test.ts",
-      "line": 5,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
     {
       "file": "apps/admin/__tests__/hooks/useDetailPageMemory.test.ts",
       "line": 14,
+      "column": 38,
       "rule": "same-type-positionals",
-      "symbol": "<module>",
-      "phase": "2",
-      "status": "reviewed external signature exception",
-      "nextAction": "Keep the Web Storage setItem(key, value) mock signature aligned with the browser API; no internal domain operation accepts these positionals."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "capturedQueryConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
-      "line": 3,
-      "rule": "any",
-      "symbol": "capturedMutationConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
-      "line": 9,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useDining.test.ts",
-      "line": 19,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "capturedQueryConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
-      "line": 3,
-      "rule": "any",
-      "symbol": "capturedMutationConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
-      "line": 9,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useExperiences.test.ts",
-      "line": 19,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.mutations.test.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "capturedMutationConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.mutations.test.ts",
-      "line": 5,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 7,
-      "rule": "any",
-      "symbol": "capturedConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 13,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 13,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 13,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 22,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 71,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useSettings.test.ts",
-      "line": 90,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useStats.test.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "capturedQueryConfig",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useStats.test.ts",
-      "line": 5,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/hooks/useURLFilters.test.ts",
-      "line": 143,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/api/bookings-stats.test.ts",
-      "line": 26,
-      "rule": "any",
-      "symbol": "createTestBooking",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/api/dining.test.ts",
-      "line": 11,
-      "rule": "any",
-      "symbol": "body",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/api/dining.test.ts",
-      "line": 20,
-      "rule": "any",
-      "symbol": "validDiningPayload",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
-      "line": 6,
-      "rule": "any",
-      "symbol": "createTestCabin",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
-      "line": 23,
-      "rule": "any",
-      "symbol": "createBookingData",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
-      "line": 384,
-      "rule": "any",
-      "symbol": "compoundIndex",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/booking.test.ts",
-      "line": 394,
-      "rule": "any",
-      "symbol": "statusIndex",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
-      "line": 3,
-      "rule": "any",
-      "symbol": "createCabinData",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
-      "line": 226,
-      "rule": "any",
-      "symbol": "idx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
-      "line": 232,
-      "rule": "any",
-      "symbol": "idx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/cabin.test.ts",
-      "line": 238,
-      "rule": "any",
-      "symbol": "textIdx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
-      "line": 3,
-      "rule": "any",
-      "symbol": "createDiningData",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
-      "line": 261,
-      "rule": "any",
-      "symbol": "idx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
-      "line": 268,
-      "rule": "any",
-      "symbol": "idx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
-      "line": 274,
-      "rule": "any",
-      "symbol": "idx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/dining.test.ts",
-      "line": 280,
-      "rule": "any",
-      "symbol": "idx",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/integration/models/experience.test.ts",
-      "line": 3,
-      "rule": "any",
-      "symbol": "createExperienceData",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/factories.ts",
-      "line": 5,
-      "rule": "any",
-      "symbol": "createCabinInput",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/factories.ts",
-      "line": 20,
-      "rule": "any",
-      "symbol": "createBookingInput",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/factories.ts",
-      "line": 74,
-      "rule": "any",
-      "symbol": "createDiningInput",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/factories.ts",
-      "line": 94,
-      "rule": "any",
-      "symbol": "createExperienceInput",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/factories.ts",
-      "line": 110,
-      "rule": "any",
-      "symbol": "createSettingsInput",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/factories.ts",
-      "line": 130,
-      "rule": "any",
-      "symbol": "createMockClerkUser",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/globalSetup.ts",
-      "line": 7,
-      "rule": "any",
-      "symbol": "globalSetup",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/setup/globalTeardown.ts",
-      "line": 2,
-      "rule": "any",
-      "symbol": "mongod",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
-      "line": 172,
-      "rule": "any",
-      "symbol": "result",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
-      "line": 186,
-      "rule": "any",
-      "symbol": "result",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
-      "line": 196,
-      "rule": "any",
-      "symbol": "result",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
-      "line": 206,
-      "rule": "any",
-      "symbol": "result",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/api-utils.test.ts",
-      "line": 218,
-      "rule": "any",
-      "symbol": "response",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.batch.test.ts",
-      "line": 8,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.batch.test.ts",
-      "line": 9,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.batch.test.ts",
-      "line": 29,
-      "rule": "any",
-      "symbol": "clerkUser",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 10,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 27,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 28,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 29,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 30,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 61,
-      "rule": "any",
-      "symbol": "clerkUser",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/clerk-users.redis-cache.test.ts",
-      "line": 85,
-      "rule": "any",
-      "symbol": "redisEntry",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
-      "line": 14,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
-      "line": 14,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
-      "line": 16,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
-      "line": 18,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
-    },
-    {
-      "file": "apps/admin/__tests__/unit/lib/rate-limit.test.ts",
-      "line": 18,
-      "rule": "any",
-      "symbol": "<module>",
-      "phase": "6",
-      "status": "open: O01 test infrastructure",
-      "nextAction": "Replace the generic test mock or model-test fixture with a checked dependency shape during Phase 6; retain existing behavioral assertions and add targeted strict compilation."
+      "owner": "<module>",
+      "syntax": "value: string",
+      "disposition": "Web Storage.setItem(key, value) mock implements the browser signature; useDetailPageMemory tests read the same sessionStorage entry."
     },
     {
       "file": "apps/admin/hooks/useURLFilters.ts",
       "line": 7,
+      "column": 20,
       "rule": "mixed-representation",
-      "symbol": "FilterValue",
-      "phase": "1",
-      "status": "reviewed heterogeneous-value exception",
-      "nextAction": "Keep URL-storable primitive values or display text/numbers heterogeneous. These values are not alternative representations of a date, identifier or monetary unit."
+      "owner": "FilterValue",
+      "syntax": "string | number | boolean | undefined",
+      "disposition": "URL filter state serializes text, numeric pagination and flag values to search parameters; useURLFilters.test.ts verifies query changes."
     },
     {
       "file": "apps/admin/types/index.ts",
-      "line": 73,
+      "line": 66,
+      "column": 20,
       "rule": "mixed-representation",
-      "symbol": "FilterValue",
-      "phase": "1",
-      "status": "reviewed heterogeneous-value exception",
-      "nextAction": "Keep URL-storable primitive values or display text/numbers heterogeneous. These values are not alternative representations of a date, identifier or monetary unit."
+      "owner": "FilterValue",
+      "syntax": "string | number | boolean | undefined",
+      "disposition": "URL filter state serializes text, numeric pagination and flag values to search parameters; useURLFilters.test.ts verifies query changes."
+    },
+    {
+      "file": "apps/customer/__tests__/api/payment-webhook-diagnostics.test.ts",
+      "line": 83,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "expectSafeDiagnostic",
+      "syntax": "age",
+      "disposition": "The webhook diagnostic test defaults omitted age to zero; explicit null asserts an unavailable or unparsable signature timestamp."
+    },
+    {
+      "file": "apps/customer/components/ui/PricingGrid.tsx",
+      "line": 14,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "PricingItem",
+      "syntax": "includes",
+      "disposition": "PricingGrid maps a present catalog inclusions list into list items. Missing and explicit null lists both omit the section."
+    },
+    {
+      "file": "apps/customer/components/ui/PricingGrid.tsx",
+      "line": 17,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "PricingItem",
+      "syntax": "available",
+      "disposition": "PricingGrid uses the catalog availability list only when present; sparse listings and explicitly null days remain renderable."
+    },
+    {
+      "file": "apps/customer/components/ui/PricingGrid.tsx",
+      "line": 21,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "PricingItem",
+      "syntax": "isPopular",
+      "disposition": "PricingGrid shows the popular badge and shadow for a positive catalog flag; both missing and explicit null suppress it."
     },
     {
       "file": "apps/customer/components/ui/StatsGrid.tsx",
       "line": 4,
+      "column": 10,
       "rule": "mixed-representation",
-      "symbol": "value",
-      "phase": "1",
-      "status": "reviewed heterogeneous-value exception",
-      "nextAction": "Keep URL-storable primitive values or display text/numbers heterogeneous. These values are not alternative representations of a date, identifier or monetary unit."
+      "owner": "StatCardProps",
+      "syntax": "string | number",
+      "disposition": "StatsGrid renders either an already formatted label or a numeric count in the same value cell."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 20,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "__v",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "__v",
+      "disposition": "Version is optional on historic lean rows; preserve explicit null on the wire without creating a version."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 32,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "payments",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "payments",
+      "disposition": "Preserve legacy receipt/refund payments as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 38,
+      "column": 9,
       "rule": "optional-null",
-      "symbol": "paymentIntentId",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "paymentIntentId",
+      "disposition": "Preserve legacy receipt/refund paymentIntentId as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 39,
+      "column": 9,
       "rule": "optional-null",
-      "symbol": "refundedAmount",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "refundedAmount",
+      "disposition": "Preserve legacy receipt/refund refundedAmount as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 43,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "checkoutToken",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "checkoutToken",
+      "disposition": "Retain historical checkout/payment metadata checkoutToken on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 44,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "checkoutAmount",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "checkoutAmount",
+      "disposition": "Retain historical checkout/payment metadata checkoutAmount on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 45,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "checkoutTotalPrice",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "checkoutTotalPrice",
+      "disposition": "Retain historical checkout/payment metadata checkoutTotalPrice on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 46,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "checkoutCurrency",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "checkoutCurrency",
+      "disposition": "Retain historical checkout/payment metadata checkoutCurrency on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 47,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "paymentMethod",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "paymentMethod",
+      "disposition": "Retain historical checkout/payment metadata paymentMethod on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 48,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "extras",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "extras",
+      "disposition": "Booking JSON retains omitted, null and populated extras. Booking editor fixtures verify untouched extras are omitted from PATCH."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 60,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "observations",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "observations",
+      "disposition": "Legacy notes preserve explicit null and sparse omission in the booking read DTO; editor normalization stays local."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 64,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "stripePaymentIntentId",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "stripePaymentIntentId",
+      "disposition": "Retain historical checkout/payment metadata stripePaymentIntentId on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 65,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "stripeSessionId",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "stripeSessionId",
+      "disposition": "Retain historical checkout/payment metadata stripeSessionId on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 66,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "paidAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "paidAt",
+      "disposition": "Booking JSON converts present paidAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 67,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "cancelledAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "cancelledAt",
+      "disposition": "Booking JSON converts present cancelledAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 68,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "cancellationReason",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "cancellationReason",
+      "disposition": "Keep stored optional cancellation text including explicit null in confirmation/history JSON; the booking page conditionally displays a present reason."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 70,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "refundAmount",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "refundAmount",
+      "disposition": "Preserve legacy receipt/refund refundAmount as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 71,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "refundRequestedAmount",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "refundRequestedAmount",
+      "disposition": "Preserve legacy receipt/refund refundRequestedAmount as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 72,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "cancellationRefunds",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "cancellationRefunds",
+      "disposition": "Preserve legacy receipt/refund cancellationRefunds as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 73,
+      "column": 50,
       "rule": "optional-null",
-      "symbol": "refundId",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "refundId",
+      "disposition": "Preserve legacy receipt/refund refundId as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 75,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "refundedAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "refundedAt",
+      "disposition": "Booking JSON converts present refundedAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 76,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "paymentConfirmationSentAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "paymentConfirmationSentAt",
+      "disposition": "Booking JSON converts present paymentConfirmationSentAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 78,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "checkInTime",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "checkInTime",
+      "disposition": "Booking JSON converts present checkInTime Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 79,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "checkOutTime",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "checkOutTime",
+      "disposition": "Booking JSON converts present checkOutTime Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 80,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "createdAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "createdAt",
+      "disposition": "Booking JSON converts present createdAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 81,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "updatedAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadFields",
+      "syntax": "updatedAt",
+      "disposition": "Booking JSON converts present updatedAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
       "file": "packages/database/src/booking-json.ts",
       "line": 139,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "payments",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "BookingReadSource",
+      "syntax": "payments",
+      "disposition": "Booking receipt source can be absent, null or a list with Date-valued receivedAt; serializeBookingDetail converts the dates only for a real array."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 16,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "bedrooms",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinSummary",
+      "syntax": "bedrooms",
+      "disposition": "CabinSummary.bedrooms — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 17,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "bathrooms",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinSummary",
+      "syntax": "bathrooms",
+      "disposition": "CabinSummary.bathrooms — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 18,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "size",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinSummary",
+      "syntax": "size",
+      "disposition": "CabinSummary.size — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 19,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "minNights",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinSummary",
+      "syntax": "minNights",
+      "disposition": "CabinSummary.minNights — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/cabin-json.ts",
+      "line": 26,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "CabinDetail",
+      "syntax": "extraGuestFee",
+      "disposition": "CabinDetail.extraGuestFee — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 28,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "createdAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinDetail",
+      "syntax": "createdAt",
+      "disposition": "CabinDetail.createdAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 29,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "updatedAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinDetail",
+      "syntax": "updatedAt",
+      "disposition": "CabinDetail.updatedAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 30,
+      "column": 3,
       "rule": "optional-null",
-      "symbol": "__v",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinDetail",
+      "syntax": "__v",
+      "disposition": "CabinDetail.__v — sparse database rows can omit version and hydrated legacy rows can store null. See admin integration/api/cabin-json.test.ts."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 39,
+      "column": 28,
       "rule": "optional-null",
-      "symbol": "createdAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinDetailSource",
+      "syntax": "createdAt",
+      "disposition": "Preserve missing/null createdAt in the Mongo source; the CabinDetail serializer converts present Date values to ISO text."
     },
     {
       "file": "packages/database/src/cabin-json.ts",
       "line": 39,
+      "column": 53,
       "rule": "optional-null",
-      "symbol": "updatedAt",
-      "phase": "1",
-      "status": "reviewed legacy transport exception",
-      "nextAction": "Preserve the verified wire distinction between sparse omission and explicit null. Normalize only at internal editor boundaries; do not change stored values or public response JSON."
+      "owner": "CabinDetailSource",
+      "syntax": "updatedAt",
+      "disposition": "Preserve missing/null updatedAt in the Mongo source; the CabinDetail serializer converts present Date values to ISO text."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 20,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "BeverageJson",
+      "syntax": "description",
+      "disposition": "Dining embedded beverage description is optional in lean rows, and hydrated rows can carry explicit null; dining-json.test.ts exercises the embedded beverage serializer and IDs."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 21,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "BeverageJson",
+      "syntax": "price",
+      "disposition": "Dining embedded beverage price is optional in lean rows, and hydrated rows can carry explicit null; dining-json.test.ts exercises the embedded beverage serializer and IDs."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 22,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "BeverageJson",
+      "syntax": "alcoholContent",
+      "disposition": "Dining embedded beverage alcoholContent is optional in lean rows, and hydrated rows can carry explicit null; dining-json.test.ts exercises the embedded beverage serializer and IDs."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 28,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "minPeople",
+      "disposition": "DiningJson.minPeople — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 29,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "subCategory",
+      "disposition": "DiningJson.subCategory — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 30,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "gallery",
+      "disposition": "DiningJson.gallery — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 31,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "ingredients",
+      "disposition": "DiningJson.ingredients — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 32,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "allergens",
+      "disposition": "DiningJson.allergens — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 33,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "dietary",
+      "disposition": "DiningJson.dietary — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 34,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "beverages",
+      "disposition": "DiningJson.beverages — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 35,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "includes",
+      "disposition": "DiningJson.includes — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 36,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "duration",
+      "disposition": "DiningJson.duration — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 37,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "location",
+      "disposition": "DiningJson.location — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 38,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "specialRequirements",
+      "disposition": "DiningJson.specialRequirements — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 39,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "isPopular",
+      "disposition": "DiningJson.isPopular — retain absent/null separately from either boolean; listing and UI eligibility keep their own rules. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 40,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "isAvailable",
+      "disposition": "DiningJson.isAvailable — retain absent/null separately from either boolean; listing and UI eligibility keep their own rules. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 41,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "seasonality",
+      "disposition": "DiningJson.seasonality — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 42,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "tags",
+      "disposition": "DiningJson.tags — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 43,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "rating",
+      "disposition": "DiningJson.rating — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 44,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "reviewCount",
+      "disposition": "DiningJson.reviewCount — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 45,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "createdAt",
+      "disposition": "DiningJson.createdAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 46,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "updatedAt",
+      "disposition": "DiningJson.updatedAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 47,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJson",
+      "syntax": "__v",
+      "disposition": "DiningJson.__v — sparse database rows can omit version and hydrated legacy rows can store null. See admin integration/api/dining-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 56,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJsonSource",
+      "syntax": "createdAt",
+      "disposition": "Preserve missing/null createdAt in the Mongo source; the DiningJson serializer converts present Date values to ISO text."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 57,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJsonSource",
+      "syntax": "updatedAt",
+      "disposition": "Preserve missing/null updatedAt in the Mongo source; the DiningJson serializer converts present Date values to ISO text."
+    },
+    {
+      "file": "packages/database/src/dining-json.ts",
+      "line": 58,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "DiningJsonSource",
+      "syntax": "beverages",
+      "disposition": "Preserve missing, null and populated embedded beverage arrays while converting each present ObjectId."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 19,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "longDescription",
+      "disposition": "ExperienceJson.longDescription — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 20,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "gallery",
+      "disposition": "ExperienceJson.gallery — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 21,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "includes",
+      "disposition": "ExperienceJson.includes — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 22,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "available",
+      "disposition": "ExperienceJson.available — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 23,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "isPopular",
+      "disposition": "ExperienceJson.isPopular — retain absent/null separately from either boolean; listing and UI eligibility keep their own rules. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 24,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "maxParticipants",
+      "disposition": "ExperienceJson.maxParticipants — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 25,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "minAge",
+      "disposition": "ExperienceJson.minAge — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 26,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "requirements",
+      "disposition": "ExperienceJson.requirements — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 27,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "location",
+      "disposition": "ExperienceJson.location — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 28,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "highlights",
+      "disposition": "ExperienceJson.highlights — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 29,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "whatToBring",
+      "disposition": "ExperienceJson.whatToBring — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 30,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "cancellationPolicy",
+      "disposition": "ExperienceJson.cancellationPolicy — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 31,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "seasonality",
+      "disposition": "ExperienceJson.seasonality — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 32,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "tags",
+      "disposition": "ExperienceJson.tags — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 33,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "rating",
+      "disposition": "ExperienceJson.rating — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 34,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "reviewCount",
+      "disposition": "ExperienceJson.reviewCount — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 35,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "createdAt",
+      "disposition": "ExperienceJson.createdAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 36,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "updatedAt",
+      "disposition": "ExperienceJson.updatedAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 37,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJson",
+      "syntax": "__v",
+      "disposition": "ExperienceJson.__v — sparse database rows can omit version and hydrated legacy rows can store null. See admin integration/api/experience-json.test.ts."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 46,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJsonSource",
+      "syntax": "createdAt",
+      "disposition": "Preserve missing/null createdAt in the Mongo source; the ExperienceJson serializer converts present Date values to ISO text."
+    },
+    {
+      "file": "packages/database/src/experience-json.ts",
+      "line": 47,
+      "column": 3,
+      "rule": "optional-null",
+      "owner": "ExperienceJsonSource",
+      "syntax": "updatedAt",
+      "disposition": "Preserve missing/null updatedAt in the Mongo source; the ExperienceJson serializer converts present Date values to ISO text."
     },
     {
       "file": "packages/database/src/models/AuditLog.ts",
-      "line": 20,
+      "line": 11,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "IAuditLog",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "IAuditLog",
+      "syntax": "IAuditLog",
+      "disposition": "Mongoose model interface for organization-scoped append-only before/after audit documents; staff reads serialize audit entries."
     },
     {
       "file": "packages/database/src/models/Booking.ts",
       "line": 6,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "IBooking",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "IBooking",
+      "syntax": "IBooking",
+      "disposition": "Mongoose model interface for hydrated booking validation, receipt updates and optimistic save retries; booking-json owns customer transport."
     },
     {
       "file": "packages/database/src/models/Cabin.ts",
       "line": 5,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "ICabin",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "ICabin",
+      "syntax": "ICabin",
+      "disposition": "Mongoose model interface for catalog validation, document virtuals and writes; cabin-json serializes IDs, dates and virtuals."
     },
     {
       "file": "packages/database/src/models/CabinBookingLock.ts",
       "line": 8,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "ICabinBookingLock",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "ICabinBookingLock",
+      "syntax": "ICabinBookingLock",
+      "disposition": "Mongoose model interface for private token-aware lock documents; withCabinBookingLock exposes the critical section."
     },
     {
       "file": "packages/database/src/models/DiningReservation.ts",
       "line": 8,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "IDiningReservation",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "IDiningReservation",
+      "syntax": "IDiningReservation",
+      "disposition": "Mongoose model interface for hydrated reservation status, capacity and receipt writes inside transactions; reservation reads use projections."
     },
     {
       "file": "packages/database/src/models/ExperienceBooking.ts",
       "line": 8,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "IExperienceBooking",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "IExperienceBooking",
+      "syntax": "IExperienceBooking",
+      "disposition": "Mongoose model interface for hydrated experience capacity and payment writes; reservation reads use separate JSON fields."
     },
     {
       "file": "packages/database/src/models/ProcessedStripeEvent.ts",
       "line": 3,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "IProcessedStripeEvent",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "IProcessedStripeEvent",
+      "syntax": "IProcessedStripeEvent",
+      "disposition": "Mongoose model interface for durable unique Stripe event IDs queried by the signed handler; the provider acknowledgement contains only received."
     },
     {
       "file": "packages/database/src/models/Settings.ts",
       "line": 4,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "ISettings",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "ISettings",
+      "syntax": "ISettings",
+      "disposition": "Mongoose model interface for stored settings and document validation; settings-json-schema validates both apps’ HTTP reads."
     },
     {
       "file": "packages/database/src/models/StaffAccess.ts",
       "line": 5,
+      "column": 18,
       "rule": "document-interface",
-      "symbol": "IStaffAccess",
-      "phase": "1",
-      "status": "reviewed boundary exception",
-      "nextAction": "Keep hydrated document methods inside persistence. Serializable projections are used by route/UI consumers; model inheritance is not a JSON contract."
+      "owner": "IStaffAccess",
+      "syntax": "IStaffAccess",
+      "disposition": "Mongoose model interface for trusted role/membership writes; staff-audit-json validates staff data passed to the browser."
     }
   ]
 }

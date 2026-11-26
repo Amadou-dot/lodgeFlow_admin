@@ -191,16 +191,20 @@ export function readReservationInboxResponse(response: Response) {
   });
 }
 
-export function readCalendarResponse({
+const schemasByKind: {
+  [K in CalendarKind]: z.ZodType<CalendarJson<K>, CalendarJson<K>>;
+} = calendarJsonSchemas;
+
+export function readCalendarResponse<K extends CalendarKind>({
   response,
   kind,
 }: {
   response: Response;
-  kind: CalendarKind;
+  kind: K;
 }) {
-  return readResponse<CalendarJson>({
+  return readResponse<CalendarJson<K>>({
     response,
-    schema: calendarJsonSchemas[kind],
+    schema: schemasByKind[kind],
     fallback: 'Unable to load calendar',
   });
 }

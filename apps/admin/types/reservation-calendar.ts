@@ -21,9 +21,6 @@ export type CalendarUsage = z.infer<typeof diningUsageSchema>;
 
 type CalendarSchemas = typeof calendarJsonSchemas;
 export type CalendarKind = keyof CalendarSchemas;
-export type CabinCalendarJson = z.infer<CalendarSchemas['cabins']>;
-export type DiningCalendarJson = z.infer<CalendarSchemas['dining']>;
-export type ExperienceCalendarJson = z.infer<CalendarSchemas['experiences']>;
-export type CalendarJson =
-  | (CabinCalendarJson & { usage?: never })
-  | ((DiningCalendarJson | ExperienceCalendarJson) & { reservations?: never });
+export type CalendarJson<K extends CalendarKind = CalendarKind> = z.infer<
+  CalendarSchemas[K]
+>;

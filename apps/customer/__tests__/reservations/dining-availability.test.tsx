@@ -1,3 +1,5 @@
+import { ProviderContext } from '@heroui/system';
+import userEvent from '@testing-library/user-event';
 import {
   fireEvent,
   render,
@@ -86,7 +88,12 @@ test('unlimited capacity with a null time stays available after selecting a day'
     policy: 'unlimited',
   };
   reply({ success: true, data });
-  render(<DiningReservationForm dining={dining} />, { wrapper });
+  render(
+    <ProviderContext value={{ disableAnimation: true }}>
+      <DiningReservationForm dining={dining} />
+    </ProviderContext>,
+    { wrapper }
+  );
   expect(fetchMock).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Pick dining date' }));
 
@@ -98,6 +105,14 @@ test('unlimited capacity with a null time stays available after selecting a day'
   expect(fetchMock).toHaveBeenCalledWith(
     `/api/dining/${diningId}/availability?date=2040-06-01`
   );
+  reply({ success: true, data: { ...data, time } });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: /Select Time/ }));
+  await user.click(await screen.findByRole('option', { name: time }));
+  expect(await screen.findByText('Available')).toBeVisible();
+  expect(
+    client.getQueryData(['dining-availability', diningId, date, time])
+  ).toEqual({ ...data, time });
   expect(screen.getByRole('button', { name: 'Reserve Now' })).toBeEnabled();
 });
 

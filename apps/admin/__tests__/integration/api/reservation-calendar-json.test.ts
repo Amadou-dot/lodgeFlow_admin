@@ -492,6 +492,7 @@ test('capacity response parsing preserves additive fields within resources and u
   const f = await fixtures();
   const response = await diningCalendar(request());
   const body = await readCalendarResponse({ response, kind: 'dining' });
+  expect(body.usage.map(item => item.used)).toEqual([2]);
   const expanded = {
     ...body,
     resources: [
@@ -518,6 +519,7 @@ test('capacity response parsing preserves additive fields within resources and u
         note: null,
       },
     ],
+    reservations: { external: true },
     calendarVersion: 2,
   };
   expect(

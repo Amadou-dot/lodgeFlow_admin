@@ -1,0 +1,117 @@
+const { createRequire } = require('node:module');
+const ts = createRequire(require.resolve('../../apps/admin/package.json'))(
+  'typescript'
+);
+
+const isAssertion = node =>
+  ts.isAsExpression(node) || ts.isTypeAssertionExpression(node);
+function bareType(node) {
+  while (node && ts.isParenthesizedTypeNode(node)) node = node.type;
+  return node;
+}
+function bareExpression(node) {
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  return node;
+}
+
+function scanSyntax(file, text) {
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const findings = [];
+  const seen = new Set();
+  function add(node, rule) {
+    const { line, character } = source.getLineAndCharacterOfPosition(
+      node.getStart(source)
+    );
+    let owner = node.parent;
+    while (
+      owner &&
+      !(
+        ts.isInterfaceDeclaration(owner) ||
+        ts.isTypeAliasDeclaration(owner) ||
+        ts.isFunctionDeclaration(owner) ||
+        ts.isVariableDeclaration(owner)
+      )
+    )
+      owner = owner.parent;
+    findings.push({
+      file,
+      line: line + 1,
+      column: character + 1,
+      rule,
+      owner: owner?.name?.getText(source) ?? '<module>',
+      syntax: node.getText(source),
+    });
+  }
+  function visit(node) {
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (node.kind === ts.SyntaxKind.AnyKeyword) add(node, 'any');
+    if (isAssertion(node)) {
+      const inner = bareExpression(node.expression);
+      if (
+        isAssertion(inner) &&
+        bareType(inner.type).kind === ts.SyntaxKind.UnknownKeyword
+      )
+        add(node, 'double-cast');
+    }
+    if (node.parameters) {
+      const primitives = [
+        ts.SyntaxKind.StringKeyword,
+        ts.SyntaxKind.NumberKeyword,
+        ts.SyntaxKind.BooleanKeyword,
+      ];
+      for (let i = 1; i < node.parameters.length; i++) {
+        const left = node.parameters[i - 1];
+        const right = node.parameters[i];
+        const kind = bareType(left.type)?.kind;
+        if (primitives.includes(kind) && bareType(right.type)?.kind === kind)
+          add(right, 'same-type-positionals');
+      }
+    }
+    if (ts.isUnionTypeNode(node)) {
+      const types = node.types.map(type => bareType(type).getText(source));
+      if (
+        types.includes('string') &&
+        (types.includes('number') || types.includes('Date'))
+      )
+        add(node, 'mixed-representation');
+    }
+    if (
+      ts.isPropertySignature(node) &&
+      node.questionToken &&
+      bareType(node.type) &&
+      ts.isUnionTypeNode(bareType(node.type)) &&
+      bareType(node.type).types.some(
+        type => bareType(type).getText(source) === 'null'
+      )
+    )
+      add(node.name, 'optional-null');
+    if (
+      ts.isInterfaceDeclaration(node) &&
+      node.heritageClauses?.some(clause =>
+        clause.types.some(type =>
+          ['Document', 'mongoose.Document'].includes(
+            type.expression.getText(source)
+          )
+        )
+      )
+    )
+      add(node.name, 'document-interface');
+    if (ts.isElementAccessExpression(node)) {
+      const target = bareExpression(node.expression);
+      if (
+        isAssertion(target) &&
+        /^Record\s*<\s*string\s*,\s*unknown\s*>$/.test(
+          bareType(target.type).getText(source)
+        )
+      )
+        add(node, 'record-index');
+    }
+    for (const doc of node.jsDoc ?? []) visit(doc);
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  return findings;
+}
+
+module.exports = { scanSyntax };

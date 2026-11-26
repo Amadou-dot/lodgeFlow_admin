@@ -5,12 +5,37 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { addToast } from '@heroui/toast';
+import type * as bookingHooks from '@/hooks/useBooking';
+import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
 import type { BookingHistoryItem } from '@/types/booking-read';
 import BookingsPage from '@/app/bookings/page';
 import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 
+jest.mock('@heroui/toast', () => ({ addToast: jest.fn() }));
 const mockCancelBooking = jest.fn();
 const mockUpdateBooking = jest.fn();
+type UpdateHook = (
+  id: string | undefined
+) => Pick<
+  ReturnType<typeof bookingHooks.useUpdateBooking>,
+  'mutateAsync' | 'isPending'
+>;
+type CancelHook = (
+  id: string | undefined
+) => Pick<
+  ReturnType<typeof bookingHooks.useCancelBooking>,
+  'mutateAsync' | 'isPending'
+>;
+const mockUpdateHook = jest.fn<
+  ReturnType<UpdateHook>,
+  Parameters<UpdateHook>
+>();
+const mockCancelHook = jest.fn<
+  ReturnType<CancelHook>,
+  Parameters<CancelHook>
+>();
 let mockBookings: BookingHistoryItem[];
 let mockAuth = {
   isLoaded: true,
@@ -96,14 +121,8 @@ jest.mock('@/hooks/useBooking', () => ({
     isLoading: false,
     error: null,
   }),
-  useCancelBooking: () => ({
-    mutateAsync: mockCancelBooking,
-    isPending: false,
-  }),
-  useUpdateBooking: () => ({
-    mutateAsync: mockUpdateBooking,
-    isPending: false,
-  }),
+  useCancelBooking: (id: string | undefined) => mockCancelHook(id),
+  useUpdateBooking: (id: string | undefined) => mockUpdateHook(id),
 }));
 jest.mock('@/hooks/useDiningReservation', () => ({
   useDiningReservationHistory: () => ({
@@ -134,6 +153,14 @@ beforeEach(() => {
     userId: 'user_customer',
     sessionId: 'session-one',
   };
+  mockUpdateHook.mockImplementation(() => ({
+    mutateAsync: mockUpdateBooking,
+    isPending: false,
+  }));
+  mockCancelHook.mockImplementation(() => ({
+    mutateAsync: mockCancelBooking,
+    isPending: false,
+  }));
   mockUpdateBooking.mockReset();
   mockBookings = [mockBooking];
 });
@@ -392,3 +419,51 @@ it('keeps a valid sparse booking payable in history', () => {
   render(<BookingsPage />);
   expect(screen.getByRole('button', { name: 'Pay' })).toBeInTheDocument();
 });
+
+it.each(['Edit', 'Cancel'] as const)(
+  'keeps the %s dialog open after an unreadable write acknowledgement',
+  async action => {
+    const actual =
+      jest.requireActual<typeof bookingHooks>('@/hooks/useBooking');
+    mockUpdateHook.mockImplementation(actual.useUpdateBooking);
+    mockCancelHook.mockImplementation(actual.useCancelBooking);
+    jest.mocked(addToast).mockClear();
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(new FetchResponse('{', { status: 200 }));
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <BookingsPage />
+      </QueryClientProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: action }));
+    if (action === 'Edit')
+      fireEvent.change(screen.getByRole('spinbutton'), {
+        target: { value: '3' },
+      });
+    const submit = action === 'Edit' ? 'Update Booking' : 'Cancel Booking';
+    fireEvent.click(screen.getByRole('button', { name: submit }));
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Error', color: 'danger' })
+      )
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/bookings/' + mockBooking._id,
+      expect.objectContaining({
+        method: action === 'Edit' ? 'PATCH' : 'DELETE',
+      })
+    );
+    expect(invalidated).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: submit })).toBeInTheDocument();
+    if (action === 'Edit')
+      expect(screen.getByRole('spinbutton')).toHaveValue(3);
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'success' })
+    );
+  }
+);

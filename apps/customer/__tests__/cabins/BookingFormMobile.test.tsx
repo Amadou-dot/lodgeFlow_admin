@@ -92,6 +92,10 @@ beforeEach(() => {
   (useRouter as jest.Mock).mockReturnValue({ push: jest.fn() });
 });
 
+afterEach(() => {
+  global.fetch = originalFetch;
+});
+
 describe('BookingForm - responsive DateRangePicker', () => {
   it('uses visibleMonths=1 on mobile', () => {
     (useIsMobile as jest.Mock).mockReturnValue(true);

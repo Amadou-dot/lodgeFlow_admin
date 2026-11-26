@@ -3516,6 +3516,69 @@ try {
       status: 200,
     });
     assert.deepEqual(availabilityRange.data.fullyBookedDates, []);
+    // Compatibility range and collection GETs have no first-party reader.
+    // Use distinct creation times so an accidental unsorted query cannot pass.
+    const fixture = (day, status, owner, created, time) => ({
+      [resource.kind]: resource.listing._id,
+      [resource.countKey]: 2,
+      totalPrice: 50,
+      [resource.kind === 'dining' ? 'time' : 'timeSlot']: time,
+      customer: owner,
+      status,
+      date: new Date('2031-01-' + day + 'T12:00:00Z'),
+      createdAt: new Date(created),
+    });
+    const owner = 'smoke_customer';
+    const rows = await resource.model.create([
+      fixture('03', 'confirmed', owner, '2031-01-01', '18:00'),
+      fixture('03', 'confirmed', owner, '2031-01-03', '19:00'),
+      fixture('04', 'confirmed', 'other_guest', '2031-01-04', '18:00'),
+      fixture('04', 'cancelled', owner, '2031-01-05', '19:00'),
+      ...(resource.kind === 'dining'
+        ? [fixture('04', 'no-show', owner, '2031-01-06', '18:00')]
+        : []),
+    ]);
+    const range = await request({
+      origin: customer,
+      route: availabilityPath + '?startDate=2031-01-03&endDate=2031-01-05',
+      status: 200,
+    });
+    assert.deepEqual(range, {
+      success: true,
+      data: {
+        ...(resource.kind === 'dining'
+          ? {
+              diningId: String(resource.listing._id),
+              maxPeople: 4,
+              servingTime: { start: '17:00', end: '21:00' },
+            }
+          : {
+              experienceId: String(resource.listing._id),
+              maxParticipants: 4,
+              availableDays: ['Monday'],
+            }),
+        fullyBookedDates: ['2031-01-03'],
+        queryRange: { start: '2031-01-03', end: '2031-01-05' },
+      },
+    });
+    const filtered = await request({
+      origin: customer,
+      route: resource.route + '?status=confirmed',
+      identity: 'customer',
+      status: 200,
+    });
+    assert.ok(
+      filtered.data.every(
+        row => row.customer === owner && row.status === 'confirmed'
+      )
+    );
+    assert.deepEqual(
+      filtered.data
+        .filter(row => row[resource.kind]?._id === String(resource.listing._id))
+        .map(row => row._id),
+      [String(rows[1]._id), String(rows[0]._id)]
+    );
+    await resource.model.deleteMany({ _id: { $in: rows.map(row => row._id) } });
     assert.equal(
       availabilityRange.data.queryRange.end,
       new Date(Date.parse('2030-07-01') + 180 * 86400000)

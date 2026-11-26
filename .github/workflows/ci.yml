@@ -43,6 +43,10 @@ jobs:
       - name: Lint
         run: pnpm --filter @lodgeflow/${{ matrix.app }} exec eslint .
 
+      - name: Check test and script syntax
+        if: matrix.app == 'admin'
+        run: pnpm check:syntax
+
       - name: Type check admin tests and scripts
         if: matrix.app == 'admin'
         run: pnpm --filter @lodgeflow/admin check:types:test-scripts
