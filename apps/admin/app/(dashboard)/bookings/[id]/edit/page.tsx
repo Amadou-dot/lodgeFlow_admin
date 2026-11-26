@@ -160,6 +160,9 @@ function BookingEditor({
                   showPayment={true}
                   showPricing={true}
                   excludeBookingId={booking._id}
+                  preserveExistingPricing={
+                    bookingFormHook.preserveExistingPricing
+                  }
                 />
 
                 {/* Form Actions */}

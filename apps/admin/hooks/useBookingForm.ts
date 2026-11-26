@@ -19,13 +19,18 @@ import {
   buildBookingCreateInput,
   buildBookingUpdateInput,
   initializeBookingForm,
+  pricingInputsChanged,
 } from '@/components/BookingForm/booking-form-data';
 
 export type { BookingFormData, PriceBreakdown };
 
 type BookingCustomerSource =
   | { kind: 'create' }
-  | { kind: 'booking'; customer: BookingCustomerOption | null };
+  | {
+      kind: 'booking';
+      customer: BookingCustomerOption | null;
+      initial: BookingFormData;
+    };
 
 function useBookingFormDraft({
   initialize,
@@ -277,6 +282,10 @@ function useBookingFormDraft({
     }));
   }, []);
 
+  const preserveExistingPricing =
+    customerSource.kind === 'booking' &&
+    !pricingInputsChanged({ formData, initial: customerSource.initial });
+
   // Validation - memoized with dependencies
   const validateForm = useCallback((): string[] => {
     const errors: string[] = [];
@@ -294,6 +303,7 @@ function useBookingFormDraft({
     }
     if (formData.numGuests < 1)
       errors.push('Number of guests must be at least 1');
+    if (preserveExistingPricing) return errors;
     if (selectedCabin) {
       const maxGuests = settings
         ? Math.min(selectedCabin.capacity, settings.maxGuestsPerBooking)
@@ -318,7 +328,7 @@ function useBookingFormDraft({
     }
 
     return errors;
-  }, [formData, selectedCabin, settings, numNights]);
+  }, [formData, selectedCabin, settings, numNights, preserveExistingPricing]);
 
   // Utility functions - memoized
   const formatCurrency = useCallback(
@@ -333,6 +343,8 @@ function useBookingFormDraft({
     formData,
     specialRequestInput,
     priceBreakdown,
+
+    preserveExistingPricing,
 
     // Derived values
     selectedCabin,
@@ -378,7 +390,11 @@ export function useBookingEditForm(booking: AdminBooking) {
   const [initialFormData] = useState(() => initializeBookingForm(booking));
   const draft = useBookingFormDraft({
     initialize: () => initialFormData,
-    customerSource: { kind: 'booking', customer: booking.customer },
+    customerSource: {
+      kind: 'booking',
+      customer: booking.customer,
+      initial: initialFormData,
+    },
   });
 
   return {
@@ -387,7 +403,7 @@ export function useBookingEditForm(booking: AdminBooking) {
       buildBookingUpdateInput({
         booking,
         formData: draft.formData,
-        initialStay: initialFormData,
+        initial: initialFormData,
       }),
   };
 }

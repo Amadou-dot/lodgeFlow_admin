@@ -55,11 +55,12 @@ export default function SettingsAmenitiesSection({
             <Input
               label='Parking Fee'
               type='number'
+              step='any'
               value={formData.parkingFee?.toString() || ''}
               onChange={e =>
                 onInputChange({
                   field: 'parkingFee',
-                  value: parseInt(e.target.value) || 0,
+                  value: e.target.valueAsNumber || 0,
                 })
               }
               startContent='$'

@@ -98,6 +98,17 @@ test('form selections produce an accepted request without forged pricing or paym
   expect(request.extras).not.toHaveProperty('breakfastPrice');
 });
 
+test('creation omits a blank observation and initially absent payment method', () => {
+  const { result } = renderHook(() => useBookingForm());
+  act(() => {
+    result.current.handleInputChange('checkInDate', '2040-01-01');
+    result.current.handleInputChange('checkOutDate', '2040-01-03');
+  });
+  const json = JSON.parse(JSON.stringify(result.current.buildBookingData()));
+  expect(json).not.toHaveProperty('paymentMethod');
+  expect(json).not.toHaveProperty('observations');
+});
+
 test('preview preserves fractional cabin arithmetic and rounds only the deposit to whole major units', () => {
   mockSettings = settings;
   const { result } = renderHook(() => useBookingForm());

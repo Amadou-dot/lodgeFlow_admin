@@ -81,24 +81,73 @@ export function buildBookingCreateInput(
   };
 }
 
+const extraChoices = [
+  'hasBreakfast',
+  'hasPets',
+  'hasParking',
+  'hasEarlyCheckIn',
+  'hasLateCheckOut',
+] as const;
+
+type BookingDraftComparison = {
+  formData: BookingFormData;
+  initial: BookingFormData;
+};
+
+function stayChanged({ formData, initial }: BookingDraftComparison) {
+  return (
+    formData.checkInDate !== initial.checkInDate ||
+    formData.checkOutDate !== initial.checkOutDate
+  );
+}
+
+export function pricingInputsChanged(draft: BookingDraftComparison) {
+  const { formData, initial } = draft;
+  return (
+    stayChanged(draft) ||
+    formData.cabin !== initial.cabin ||
+    formData.numGuests !== initial.numGuests ||
+    extraChoices.some(field => formData[field] !== initial[field])
+  );
+}
+
 export function buildBookingUpdateInput({
   booking,
   formData,
-  initialStay,
-}: {
-  booking: Pick<AdminBooking, '_id' | 'status'>;
-  formData: BookingFormData;
-  initialStay: BookingStay;
-}): UpdateBookingInput {
-  // The date picker holds calendar days. Omitting the untouched pair preserves
-  // stored timestamps, including stays that were saved with non-midnight times.
-  const stayChanged =
-    formData.checkInDate !== initialStay.checkInDate ||
-    formData.checkOutDate !== initialStay.checkOutDate;
-  return {
-    _id: booking._id,
-    status: booking.status,
-    ...bookingValues(formData),
-    ...(stayChanged ? stayDates(formData) : {}),
-  };
+  initial,
+}: BookingDraftComparison & { booking: AdminBooking }): UpdateBookingInput {
+  const update: UpdateBookingInput = { _id: booking._id };
+  if (stayChanged({ formData, initial }))
+    Object.assign(update, stayDates(formData));
+  if (formData.cabin !== initial.cabin) update.cabin = formData.cabin;
+  // The saved selection follows detail refreshes; only an explicit replacement differs.
+  if (formData.customer !== booking.customer?.id)
+    update.customer = formData.customer;
+  if (formData.numGuests !== initial.numGuests)
+    update.numGuests = formData.numGuests;
+  if (
+    formData.paymentMethod &&
+    formData.paymentMethod !== initial.paymentMethod
+  )
+    update.paymentMethod = formData.paymentMethod;
+  if (formData.observations !== initial.observations)
+    update.observations = formData.observations;
+  if (
+    formData.specialRequests.length !== initial.specialRequests.length ||
+    formData.specialRequests.some(
+      (request, index) => request !== initial.specialRequests[index]
+    )
+  )
+    update.specialRequests = formData.specialRequests;
+  if (extraChoices.some(field => formData[field] !== initial[field])) {
+    // The PUT schema defaults missing choices to false, so merge unedited flags
+    // from the most recent detail when any one choice needs to be written.
+    const extras = bookingValues(formData).extras;
+    for (const field of extraChoices) {
+      if (formData[field] === initial[field])
+        extras[field] = booking.extras?.[field] ?? false;
+    }
+    update.extras = extras;
+  }
+  return update;
 }

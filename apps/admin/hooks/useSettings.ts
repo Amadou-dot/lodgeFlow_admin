@@ -5,10 +5,19 @@ import { useMutation } from '@tanstack/react-query';
 import type { AppSettings } from '@/types';
 import type { UpdateSettingsInput } from '@/lib/validations/settings';
 
+export class SettingsAccessError extends Error {
+  constructor() {
+    super('Failed to fetch settings');
+    Object.setPrototypeOf(this, SettingsAccessError.prototype);
+  }
+}
+
 // Fetcher function for SWR
 const fetcher = (url: string) =>
   fetch(url)
     .then(res => {
+      if (res.status === 401 || res.status === 403)
+        throw new SettingsAccessError();
       if (!res.ok) {
         throw new Error('Failed to fetch settings');
       }

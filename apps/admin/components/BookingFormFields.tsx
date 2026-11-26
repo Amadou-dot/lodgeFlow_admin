@@ -84,6 +84,7 @@ interface BookingFormFieldsProps {
 
   // Edit mode
   excludeBookingId?: string;
+  preserveExistingPricing?: boolean;
 }
 
 export default function BookingFormFields({
@@ -108,6 +109,7 @@ export default function BookingFormFields({
   showPayment = true,
   showPricing = true,
   excludeBookingId,
+  preserveExistingPricing,
 }: BookingFormFieldsProps) {
   return (
     <div className='space-y-6'>
@@ -156,6 +158,7 @@ export default function BookingFormFields({
             selectedCabin={selectedCabin}
             numNights={numNights}
             excludeBookingId={excludeBookingId}
+            preserveExistingPricing={preserveExistingPricing}
             maxGuestsPerBooking={settings?.maxGuestsPerBooking}
           />
         </CardBody>
@@ -183,6 +186,7 @@ export default function BookingFormFields({
       {/* Payment Information */}
       {showPayment && (
         <PaymentInformation
+          isEditing={Boolean(excludeBookingId)}
           formData={formData}
           onInputChange={handleInputChange}
           settings={settings}

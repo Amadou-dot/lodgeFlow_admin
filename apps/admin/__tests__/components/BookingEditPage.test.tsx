@@ -2,7 +2,8 @@ import BookingEditPage from '@/app/(dashboard)/bookings/[id]/edit/page';
 import BookingForm from '@/components/BookingForm';
 import type { UpdateBookingInput } from '@/types/api';
 import type { AdminBooking } from '@/types/booking-read';
-import type { Cabin, Customer } from '@/types';
+import { settings } from '../setup/settings-fixture';
+import type { AppSettings, Cabin, Customer } from '@/types';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -72,6 +73,7 @@ let mockBooking: AdminBooking | undefined;
 let mockIsLoading: boolean;
 let mockError: Error | undefined;
 let mockCustomers: Customer[];
+let mockRules: AppSettings | undefined;
 const mockUpdate = jest.fn<Promise<void>, [UpdateBookingInput]>();
 const mockSearchCustomers = jest.fn<Promise<void>, [string]>();
 
@@ -81,7 +83,7 @@ jest.mock('react', () => ({
   use: (params: Promise<{ id: string }> & { value: { id: string } }) =>
     params.value,
 }));
-jest.mock('@heroui/date-picker', () => ({ DateRangePicker: () => null }));
+
 jest.mock('@/hooks/useBookings', () => ({
   useBooking: () => ({
     data: mockBooking,
@@ -95,7 +97,7 @@ jest.mock('@/hooks/useCabins', () => ({
   useCabins: () => ({ data: [cabin] }),
 }));
 jest.mock('@/hooks/useSettings', () => ({
-  useSettings: () => ({ data: undefined }),
+  useSettings: () => ({ data: mockRules }),
 }));
 jest.mock('@/hooks/useInfiniteCustomers', () => ({
   useInfiniteCustomers: () => ({
@@ -117,6 +119,7 @@ beforeEach(() => {
   mockIsLoading = true;
   mockError = undefined;
   mockCustomers = [otherCustomer];
+  mockRules = undefined;
   mockUpdate.mockReset().mockResolvedValue(undefined);
   mockSearchCustomers.mockReset().mockResolvedValue(undefined);
 });
@@ -186,20 +189,7 @@ test('saves a notes-only draft for a known guest outside the first page and keep
   await waitFor(() =>
     expect(mockUpdate).toHaveBeenCalledWith({
       _id: firstBooking._id,
-      cabin: cabin._id,
-      customer: savedCustomer.id,
-      status: 'confirmed',
-      numGuests: 2,
-      paymentMethod: 'cash',
-      observations: 'Saved observations',
       specialRequests: ['Extra blankets', 'Extra towels'],
-      extras: {
-        hasBreakfast: false,
-        hasPets: false,
-        hasParking: false,
-        hasEarlyCheckIn: false,
-        hasLateCheckOut: false,
-      },
     })
   );
 });
@@ -260,16 +250,7 @@ test('discards the prior record draft and mounts only the matching detail after 
   );
 
   await user.click(screen.getByRole('button', { name: 'Update Booking' }));
-  await waitFor(() =>
-    expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        _id: nextId,
-        customer: otherCustomer.id,
-        status: 'unconfirmed',
-        numGuests: 3,
-      })
-    )
-  );
+  await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith({ _id: nextId }));
 
   mockBooking = firstBooking;
   rerender(<BookingEditPage params={route(firstBooking._id)} />);
@@ -354,7 +335,7 @@ test.each([
     await user.click(screen.getByRole('button', { name: 'Update Booking' }));
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     const body = mockUpdate.mock.calls[0][0];
-    expect(body.customer).toBe(savedCustomer.id);
+    expect(body).not.toHaveProperty('customer');
     expect(body.specialRequests).toEqual(['Extra blankets', 'Keep my draft']);
     expect(body).not.toHaveProperty('checkInDate');
     expect(body).not.toHaveProperty('checkOutDate');
@@ -454,4 +435,101 @@ test('recognizes a valid uppercase route ID for the resolved booking', () => {
   expect(
     screen.getByRole('button', { name: 'Update Booking' })
   ).toBeInTheDocument();
+});
+
+test.each([
+  { label: 'paid checked-out stay', year: '2020', minNights: 1, maxGuests: 4 },
+  {
+    label: 'shorter than the current minimum',
+    year: '2040',
+    minNights: 4,
+    maxGuests: 4,
+  },
+  {
+    label: 'above the current guest limit',
+    year: '2040',
+    minNights: 1,
+    maxGuests: 1,
+  },
+])(
+  'clears observations for a $label through the actual picker and submit button',
+  async ({ year, minNights, maxGuests }) => {
+    const user = userEvent.setup();
+    mockIsLoading = false;
+    mockBooking = {
+      ...firstBooking,
+      status: year === '2020' ? 'checked-out' : 'confirmed',
+      checkInDate: year + '-01-07T12:34:56.789Z',
+      checkOutDate: year + '-01-10T13:57:24.680Z',
+    };
+    mockRules = {
+      ...settings,
+      minBookingLength: minNights,
+      maxGuestsPerBooking: maxGuests,
+      maxBookingLength: 30,
+    };
+    render(<BookingEditPage params={route(firstBooking._id)} />);
+    await user.clear(screen.getByRole('textbox', { name: 'Observations' }));
+    await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+    expect(mockUpdate).toHaveBeenCalledWith({
+      _id: firstBooking._id,
+      observations: '',
+    });
+    expect(
+      screen.getByRole('group', { name: 'Stay Duration' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: /Include Breakfast/ }));
+    await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  }
+);
+
+test('submits a cleared note without reverting a refreshed guest count, status, payment method or extras', async () => {
+  const user = userEvent.setup();
+  mockBooking = firstBooking;
+  mockIsLoading = false;
+  const params = route(firstBooking._id);
+  const view = render(<BookingEditPage params={params} />);
+  const payment = screen.getByRole('button', { name: /Payment Method/ });
+  await user.click(payment);
+  await user.click(await screen.findByRole('option', { name: 'Cash' }));
+  expect(payment).toHaveTextContent('Cash');
+  await user.clear(screen.getByRole('textbox', { name: 'Observations' }));
+  mockBooking = {
+    ...firstBooking,
+    status: 'cancelled',
+    numGuests: 3,
+    paymentMethod: 'card',
+    extras: {
+      hasParking: true,
+      parkingFee: 0,
+      hasBreakfast: false,
+      breakfastPrice: 0,
+      hasPets: false,
+      petFee: 0,
+      hasEarlyCheckIn: false,
+      earlyCheckInFee: 0,
+      hasLateCheckOut: false,
+      lateCheckOutFee: 0,
+    },
+  };
+  view.rerender(<BookingEditPage params={params} />);
+  await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+  expect(mockUpdate).toHaveBeenCalledWith({
+    _id: firstBooking._id,
+    observations: '',
+  });
+  await user.click(screen.getByRole('switch', { name: /Include Breakfast/ }));
+  await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+  expect(mockUpdate).toHaveBeenLastCalledWith({
+    _id: firstBooking._id,
+    observations: '',
+    extras: {
+      hasParking: true,
+      hasBreakfast: true,
+      hasPets: false,
+      hasLateCheckOut: false,
+      hasEarlyCheckIn: false,
+    },
+  });
 });

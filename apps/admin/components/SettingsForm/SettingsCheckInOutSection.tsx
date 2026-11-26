@@ -41,11 +41,12 @@ export default function SettingsCheckInOutSection({
           <Input
             label='Early Check-in Fee'
             type='number'
+            step='any'
             value={formData.earlyCheckInFee?.toString() || ''}
             onChange={e =>
               onInputChange({
                 field: 'earlyCheckInFee',
-                value: parseInt(e.target.value) || 0,
+                value: e.target.valueAsNumber || 0,
               })
             }
             startContent='$'
@@ -54,11 +55,12 @@ export default function SettingsCheckInOutSection({
           <Input
             label='Late Check-out Fee'
             type='number'
+            step='any'
             value={formData.lateCheckOutFee?.toString() || ''}
             onChange={e =>
               onInputChange({
                 field: 'lateCheckOutFee',
-                value: parseInt(e.target.value) || 0,
+                value: e.target.valueAsNumber || 0,
               })
             }
             startContent='$'

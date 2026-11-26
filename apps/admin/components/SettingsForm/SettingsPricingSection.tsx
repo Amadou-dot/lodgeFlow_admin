@@ -24,11 +24,12 @@ export default function SettingsPricingSection({
           <Input
             label='Breakfast Price'
             type='number'
+            step='any'
             value={formData.breakfastPrice?.toString() || ''}
             onChange={e =>
               onInputChange({
                 field: 'breakfastPrice',
-                value: parseInt(e.target.value) || 0,
+                value: e.target.valueAsNumber || 0,
               })
             }
             startContent='$'
@@ -38,11 +39,12 @@ export default function SettingsPricingSection({
           <Input
             label='Pet Fee'
             type='number'
+            step='any'
             value={formData.petFee?.toString() || ''}
             onChange={e =>
               onInputChange({
                 field: 'petFee',
-                value: parseInt(e.target.value) || 0,
+                value: e.target.valueAsNumber || 0,
               })
             }
             startContent='$'
@@ -73,11 +75,12 @@ export default function SettingsPricingSection({
             <Input
               label='Deposit Percentage'
               type='number'
+              step='any'
               value={formData.depositPercentage?.toString() || ''}
               onChange={e =>
                 onInputChange({
                   field: 'depositPercentage',
-                  value: parseInt(e.target.value) || 0,
+                  value: e.target.valueAsNumber || 0,
                 })
               }
               endContent='%'

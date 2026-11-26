@@ -644,12 +644,12 @@ describe('Bookings API Routes', () => {
         booking: { ...booking.toObject(), cabin },
         customer: editorCustomer,
       });
-      const initialStay = initializeBookingForm(detail);
+      const initial = initializeBookingForm(detail);
       const body = buildBookingUpdateInput({
         booking: detail,
-        initialStay,
+        initial,
         formData: {
-          ...initialStay,
+          ...initial,
           specialRequests: ['Extra blankets', 'Extra towels'],
         },
       });
@@ -684,6 +684,127 @@ describe('Bookings API Routes', () => {
       });
     });
 
+    it('preserves a later staff guest/extras reprice when a stale draft submits a note', async () => {
+      const cabin = await createTestCabin({ price: 200, extraGuestFee: 20 });
+      const booking = await createTestBooking(cabin._id, {
+        ...legacyStay,
+        numGuests: 1,
+      });
+      const initial = initializeBookingForm(
+        serializeAdminBooking({
+          booking: { ...booking.toObject(), cabin },
+          customer: editorCustomer,
+        })
+      );
+      const updated = await PUT(
+        createRequest('/api/bookings', {
+          method: 'PUT',
+          body: {
+            _id: booking._id.toString(),
+            numGuests: 3,
+            extras: { hasBreakfast: true },
+          },
+        })
+      );
+      expect(updated.status).toBe(200);
+      const before = await Booking.findById(booking._id).orFail().lean();
+      const latest = serializeAdminBooking({
+        booking: { ...before, cabin },
+        customer: editorCustomer,
+      });
+      const body = buildBookingUpdateInput({
+        booking: latest,
+        initial,
+        formData: { ...initial, observations: 'Extra pillows' },
+      });
+      const response = await PUT(
+        createRequest('/api/bookings', { method: 'PUT', body })
+      );
+      expect(response.status).toBe(200);
+      expect(await Booking.findById(booking._id).lean()).toMatchObject({
+        observations: 'Extra pillows',
+        checkInDate: legacyStay.checkInDate,
+        checkOutDate: legacyStay.checkOutDate,
+        numGuests: 3,
+        extras: { hasBreakfast: true, breakfastPrice: 135 },
+        totalPrice: 855,
+        depositAmount: 214,
+        amountPaid: 0,
+        remainingAmount: 855,
+        payments: [],
+      });
+      expect(body).toEqual({ _id: latest._id, observations: 'Extra pillows' });
+    });
+
+    it('clears a note from a stale draft without changing a subsequently refunded booking', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id, {
+        ...legacyStay,
+        isPaid: true,
+        observations: 'Old note',
+      });
+      const initial = initializeBookingForm(
+        serializeAdminBooking({
+          booking: { ...booking.toObject(), cabin },
+          customer: editorCustomer,
+        })
+      );
+      const refundedAt = new Date('2040-01-04T11:12:13.000Z');
+      const cancellation = await PUT(
+        createRequest('/api/bookings', {
+          method: 'PUT',
+          body: {
+            _id: booking._id.toString(),
+            status: 'cancelled',
+            refundStatus: 'partial',
+            refundAmount: 100,
+            refundedAt: refundedAt.toISOString(),
+          },
+        })
+      );
+      expect(cancellation.status).toBe(200);
+      const before = await Booking.findById(booking._id).orFail().lean();
+      expect(before).toMatchObject({
+        status: 'cancelled',
+        refundStatus: 'partial',
+        refundAmount: 100,
+        refundedAt,
+        observations: 'Old note',
+      });
+      const detail = serializeAdminBooking({
+        booking: { ...before, cabin },
+        customer: editorCustomer,
+      });
+      const body = buildBookingUpdateInput({
+        booking: detail,
+        initial,
+        formData: { ...initial, observations: '' },
+      });
+      const response = await PUT(
+        createRequest('/api/bookings', { method: 'PUT', body })
+      );
+      expect(response.status).toBe(200);
+      const after = await Booking.findById(booking._id).orFail().lean();
+      expect(after).toMatchObject({
+        observations: '',
+        status: 'cancelled',
+        refundStatus: 'partial',
+        refundAmount: 100,
+        refundedAt,
+        cancelledAt: before.cancelledAt,
+        payments: before.payments,
+        amountPaid: before.amountPaid,
+        remainingAmount: before.remainingAmount,
+        totalPrice: before.totalPrice,
+        depositAmount: before.depositAmount,
+        numGuests: before.numGuests,
+        extras: before.extras,
+        checkInDate: legacyStay.checkInDate,
+        checkOutDate: legacyStay.checkOutDate,
+      });
+      expect(body).toEqual({ _id: detail._id, observations: '' });
+    });
+
     it.each([
       { state: 'a receipt', isPaid: true, checkoutPending: false },
       { state: 'active checkout', isPaid: false, checkoutPending: true },
@@ -712,11 +833,11 @@ describe('Bookings API Routes', () => {
           booking: { ...booking.toObject(), cabin },
           customer: editorCustomer,
         });
-        const initialStay = initializeBookingForm(detail);
+        const initial = initializeBookingForm(detail);
         const body = buildBookingUpdateInput({
           booking: detail,
-          initialStay,
-          formData: { ...initialStay, checkOutDate: '2040-01-11' },
+          initial,
+          formData: { ...initial, checkOutDate: '2040-01-11' },
         });
         expect(body).toMatchObject({
           checkInDate: '2040-01-07T00:00:00.000Z',
@@ -1080,11 +1201,11 @@ describe('Bookings API Routes', () => {
           booking: { ...booking.toObject(), cabin },
           customer: editorCustomer,
         });
-        const initialStay = initializeBookingForm(detail);
+        const initial = initializeBookingForm(detail);
         const body = buildBookingUpdateInput({
           booking: detail,
-          initialStay,
-          formData: { ...initialStay, numGuests: 3, hasBreakfast: true },
+          initial,
+          formData: { ...initial, numGuests: 3, hasBreakfast: true },
         });
 
         const response = await PUT(
