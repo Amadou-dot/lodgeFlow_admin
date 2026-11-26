@@ -39,11 +39,11 @@
 
 **Interfaces:** Consume `UpdateSettingsInput` from the existing Settings validation module. The update hook accepts that request shape and returns `AppSettings`. Build a new sparse payload from editable revisioned changes. Successful saves adopt the returned full DTO as the baseline, while retaining changes newer than the submitted revision.
 
-- [ ] Add a failing realistic form regression: edit breakfast price on a read DTO containing metadata, singleton, fullAddress and untouched null contactInfo; the submitted body must be exactly the changed editable field and pass the real update schema.
-- [ ] Pin existing failure/retry/discard and save/reset pending-edit/revert behavior; assert the next save carries the retained edit, and the response rather than the submitted snapshot becomes the server baseline.
-- [ ] Implement the typed sparse request boundary and migrate the only PUT hook caller. Preserve deep equality, revision tracking, min/max state validation, cache refresh and reset behavior.
-- [ ] Run Settings component/hooks/cache/validation tests and relevant route tests; run admin types and strict compilation of changed tests. Record RED and GREEN evidence. Format only touched files.
-- [ ] Update this plan's task checklist and commit the bounded change. Report files, test commands/results, caveats and commit.
+- [x] Add a failing realistic form regression: edit breakfast price on a read DTO containing metadata, singleton, fullAddress and untouched null contactInfo; the submitted body must be exactly the changed editable field and pass the real update schema.
+- [x] Pin existing failure/retry/discard and save/reset pending-edit/revert behavior; assert the next save carries the retained edit, and the response rather than the submitted snapshot becomes the server baseline.
+- [x] Implement the typed sparse request boundary and migrate the only PUT hook caller. Preserve deep equality, revision tracking, min/max state validation, cache refresh and reset behavior.
+- [x] Run Settings component/hooks/cache/validation tests and relevant route tests; run admin types and strict compilation of changed tests. Record RED and GREEN evidence. Format only touched files.
+- [x] Update this plan's task checklist and commit the bounded change. Report files, test commands/results, caveats and commit.
 
 ### Task 2: Keep cabin stay labels on the intended calendar date
 
@@ -73,7 +73,7 @@
 
 ### Task 4: Make existing mobile Dining and Calendar controls reachable
 
-**Ownership:** Dining add/edit modal layout and Calendar header/row styles, their focused interaction tests and the documented disposable responsive fixture. Exact paths and evidence are in `/tmp/lodgeflow-phase4-mobile-audit.md`. Toast investigation is read-only unless a reproduced defect identifies a narrow correction; seek a controller ruling before adding source scope.
+**Ownership:** Dining add/edit modal layout and Calendar header/row styles, their focused interaction tests and the documented disposable responsive fixture. Exact paths and evidence are in `/tmp/lodgeflow-phase4-mobile-audit.md`. Toast investigation is read-only unless a reproduced defect identifies a narrow correction; seek a controller ruling before adding source scope. The user clarified the reported missing notification occurred in Zen responsive simulation at iPhone/Samsung screen sizes, with the action forgotten; a physical-device keyboard failure was not reported.
 
 **Interfaces:** Keep HeroUI's modal shell and one vertical scroll owner. Constrain the mobile Dining modal to the available visual viewport, not a competing static viewport height. Calendar's Listing header and row header use consistent mobile positioning while preserving desktop sticky behavior and occupancy/date semantics.
 
@@ -83,14 +83,27 @@
 - [ ] Run affected component tests and admin types; use browser measurements/screenshots for the CSS behavior instead of tests that merely mirror class strings.
 - [ ] Format touched files and commit with responsive verification limits explicitly recorded.
 
-### Task 5: Reconcile Phase 4 evidence and remaining acceptance
+### Task 5: Keep checkout failures safe and pin booking edit eligibility
 
-**Ownership:** `docs/refactoring/phase-4-browser-review.md`, `phase-4-browser-fixes-plan.md`, `phase-4-ui-state.md`, `plan.md`, `inventory.md`, this continuation plan, and any focused eligible-booking/non-JSON payment-error regression required by a confirmed gap. No production data/provider writes and no browser automation framework.
+**Ownership:** `apps/customer/hooks/usePayment.ts`, `apps/customer/lib/open-reservation-checkout.ts`, one browser-safe `apps/customer/lib/validations/checkout-response.ts`, focused checkout/confirmation tests, and narrow existing HTTP smoke booking-edit assertions. The controller owns plan and ledger changes. No changes to server checkout generation, provider operations, booking policy, history UI eligibility, amounts or stored dates.
 
-**Interfaces:** Consume Tasks 1–4 reports and the accepted #202 delivery. Preserve dated original browser findings as historical evidence, record each implemented fix and actual checks, and keep genuine hosted/device/payment acceptance gaps explicit.
+**Context:** The read-only audit reproduced raw parser errors for both checkout entry points on text/HTML/empty responses and a TypeError for JSON null. Cabin checkout also treated a 200 response with no URL as success and invalidated its caches. Controlled actual customer PATCH tests established the existing eligible/blocked edit matrix. Evidence is in `/tmp/lodgeflow-phase4-payment-audit.md`, with the disposable probe paths it lists.
+
+**Interfaces:** Parse unknown JSON once through a small shared checkout response reader. Return the existing `{ url: string }` only for HTTP OK, literal success, and a usable absolute HTTP(S) URL; preserve the exact accepted URL text and additive success fields. Characterize observed provider/local fixture URLs before enforcing URL checks. No new hostname allowlist or provider URL rewriting. Keep known nonempty string API errors verbatim and operation fallbacks: cabin `Failed to create checkout session`, reservation `Unable to start checkout`. Cabin invalidations and reservation navigation happen only after validated success. Use named options for the reader's arguments.
+
+- [ ] Add RED cases for 404 text, 200 HTML, empty 401, null/primitives, missing/wrong/unsafe URL, false/nonliteral success, malformed errors, and non-2xx success-looking responses. Keep structured 401/409 messages and existing valid checkout URLs working.
+- [ ] Implement the shared reader and migrate both entry points. Verify exact existing POST routes/bodies, retry, success invalidations, displayed fallback, and navigation for both reservation kinds. Preserve creation forms' existing payment-required handling.
+- [ ] Promote the missing owner PATCH cases into the existing disposable HTTP gate: confirmed unpaid guest/extras edits preserve status and exact non-midnight dates, recalculate totals/deposit/balance and add no receipts; partial-receipt and active-checkout states return exact 409 without writes. Reuse existing fixtures at the appropriate sequential stages or add isolated records; do not disturb other checkout assumptions or change eligibility.
+- [ ] Run focused customer checkout, confirmation, mutation-cache, route suites and app types; run the affected HTTP gate with disposable services and controlled providers. Record RED/GREEN and explicit hosted-browser limits, format touched files and commit.
+
+### Task 6: Reconcile Phase 4 evidence and remaining acceptance
+
+**Ownership:** `docs/refactoring/phase-4-browser-review.md`, `phase-4-browser-fixes-plan.md`, `phase-4-ui-state.md`, `plan.md`, `inventory.md`, and this continuation plan. Documentation only. No production data/provider writes and no browser automation framework.
+
+**Interfaces:** Consume Tasks 1–5 reports and the accepted #202 delivery. Preserve dated original browser findings as historical evidence, record each implemented fix and actual checks, and keep genuine hosted/device/payment acceptance gaps explicit.
 
 - [ ] Record #202 user acceptance and b190f44 base, and update stale statements that no browser retest occurred.
-- [ ] Verify existing regression/HTTP coverage for allowed guest edits on unpaid records with no active checkout, and denial on paid/pending-checkout records. Reproduce any actual uncovered failure before proposing a code correction; preserve accounting policy.
-- [ ] Inspect signed-out/non-JSON checkout error handling with controlled fetch responses. If a real raw parser error remains, obtain a controller ruling for a bounded safe-error fix with a failing regression and unchanged success/provider behavior.
-- [ ] Reconcile toast and native/mobile/booking/payment verification limits. Do not label Phase 4 complete solely because code/tests pass.
-- [ ] Update documentation with paths/results and remaining Phase 6 work; run formatting/path checks and commit. The controller then performs the whole-plan review and continues the separately scoped Phase 6 plan.
+- [ ] Record the existing guest/extras edit eligibility, exact guard outcomes and controlled checkout response correction. Distinguish the API's confirmed/unconfirmed allowance from the unchanged history UI eligibility.
+- [ ] Reconcile the real provider toast fixture and native/mobile/booking/payment verification limits. Normal Chromium toast visibility passes; consume the follow-up Zen/Gecko responsive evidence. Pinch viewport and modal accessibility observations are separate. The original failing action is unknown; do not describe the responsive-emulation report as a native iPhone keyboard report. Do not label Phase 4 complete solely because code/tests pass.
+- [ ] Replace ephemeral audit pointers in the tracked plan with durable source/test/finding references where possible; retain actual local evidence paths in the task report. Record exact commands/results and update remaining Phase 6 overlap so its checkout task consumes this implemented boundary.
+- [ ] Update documentation with remaining acceptance and Phase 6 work, run formatting/path checks and commit. The controller then performs the whole-plan review and continues the separately scoped Phase 6 plan.
