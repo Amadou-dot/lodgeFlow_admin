@@ -296,6 +296,8 @@ Task 20 review corrected nested JSDoc assertion detection and optional-null disp
 
 The remaining six gates in the table were run at `14e72c0`. The apps, packages, HTTP and catalog fixtures, manifests, lockfile, workspace and CI configuration have an empty diff from that source to `8ccf5e3`. The seven-fixture count in the table belongs to the original run. The review fix changed root tooling outside the three source roots, so the 763-file digest is unchanged.
 
+The next scoped review corrected two cases at `50a849126067a0392ac69f0986798fbfdb1daba6`. The scanner checks that the effective JSDoc type tag belongs to the expression itself. The refresh fixture runs Git and the inventory command in a temporary repository with isolated Git configuration and index selection. At this source `pnpm check:syntax` passed 18 cases and checked 147 tracked files. `pnpm ci:check` passed all 3,531 package tests, formatting, lint and the expanded guard. The refreshed snapshot was byte-identical with zero decisions pending. The strict admin project retains its passing result at `8ccf5e3`; the six package, application, HTTP and build gates above retain their results at `14e72c0`. Their inputs have an empty diff to `50a8491`.
+
 [CI configuration and throwaway build key](../../.github/workflows/ci.yml) · [HTTP fixture](../../scripts/http-smoke/run.mjs) · [Production catalog fixture](../../scripts/http-smoke/catalog-freshness.mjs) · [Hosted and native acceptance](phase-4-browser-review.md)
 
 ## Appendix: O01 baseline and ownership
