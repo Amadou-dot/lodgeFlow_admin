@@ -92,6 +92,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   global.fetch = originalFetch;
+  jest.useRealTimers();
 });
 test('staff initial load failure is retryable and clears errors while preserving own access restriction', async () => {
   fetchMock
@@ -251,14 +252,18 @@ test('inbox retry keeps page/limit filters and clears a failed load', async () =
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 test.each([
-  [legacyCurrencySettings.currency, '10 A1!'],
-  ['JPY', '¥10'],
-  [null, '$10.00'],
+  [legacyCurrencySettings.currency, 10, '10 A1!'],
+  [legacyCurrencySettings.currency, -12.075, '-12.075 A1!'],
+  ['JPY', 10, '¥10'],
+  [null, 10, '$10.00'],
+  [null, -12.075, '-$12.08'],
 ])(
-  'inbox renders a reservation in Settings currency %s',
-  async (currency, displayed) => {
+  'inbox renders a reservation in Settings currency %s with total %s',
+  async (currency, totalPrice, displayed) => {
     mockSettings = { ...legacyCurrencySettings, currency };
-    fetchMock.mockResolvedValueOnce(ok(inbox));
+    fetchMock.mockResolvedValueOnce(
+      ok({ ...inbox, rows: [{ ...inbox.rows[0], totalPrice }] })
+    );
     render(<ReservationsPage />);
 
     expect(await screen.findByText(displayed)).toBeInTheDocument();
@@ -266,6 +271,33 @@ test.each([
   }
 );
 
+test('inbox keeps other rows visible when a stored amount cannot be formatted', async () => {
+  fetchMock.mockResolvedValueOnce(
+    ok({
+      ...inbox,
+      total: 2,
+      rows: [
+        { ...inbox.rows[0], totalPrice: Number.MAX_SAFE_INTEGER },
+        {
+          ...inbox.rows[0],
+          _id: '507f1f77bcf86cd799439016',
+          resourceName: 'Breakfast',
+        },
+      ],
+    })
+  );
+  render(<ReservationsPage />);
+
+  const supper = (await screen.findByRole('link', { name: 'Supper' })).closest(
+    'tr'
+  );
+  expect(supper).toHaveTextContent('Amount unavailable');
+  expect(supper).toHaveTextContent('Balance due');
+  expect(
+    screen.getByRole('link', { name: 'Breakfast' }).closest('tr')
+  ).toHaveTextContent('$10.00');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
 test('changing inbox filters aborts and ignores a late response for the previous filters', async () => {
   let finish: (value: ReturnType<typeof ok>) => void = () => {
     throw new Error('not started');
@@ -338,9 +370,14 @@ test('inbox retries a malformed envelope and accepts an empty page', async () =>
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
+function renderCalendar() {
+  jest.useFakeTimers({ now: new Date('2040-01-15T12:00:00.000Z') });
+  render(<CalendarPage />);
+}
+
 const calendarWindow = {
   start: '2040-01-01T00:00:00.000Z',
-  end: '2040-01-03T00:00:00.000Z',
+  end: '2040-02-01T00:00:00.000Z',
 };
 const cabinId = '507f1f77bcf86cd799439013';
 const bookingId = '507f1f77bcf86cd799439014';
@@ -418,7 +455,7 @@ test.each([
       fetchMock
         .mockResolvedValueOnce(ok(cabinMonth))
         .mockResolvedValueOnce(ok(payload));
-    render(<CalendarPage />);
+    renderCalendar();
     if (view !== 'cabins') {
       await screen.findByText('Creek cabin');
       fireEvent.change(screen.getByLabelText('View'), {
@@ -437,7 +474,7 @@ test.each([
 
 test('calendar preserves checkout-day availability in the UTC window', async () => {
   fetchMock.mockResolvedValueOnce(ok(cabinMonth));
-  render(<CalendarPage />);
+  renderCalendar();
 
   expect(
     await screen.findByRole('link', { name: 'confirmed' })
@@ -468,14 +505,14 @@ test.each([
           }),
       })
       .mockResolvedValueOnce(ok(diningMonth));
-    render(<CalendarPage />);
+    renderCalendar();
     await act(async () => {});
     fireEvent.change(screen.getByLabelText('View'), {
       target: { value: 'dining' },
     });
 
     expect(await screen.findByText('Dinner')).toBeInTheDocument();
-    expect(screen.getAllByText('0 booked')).toHaveLength(2);
+    expect(screen.getAllByText('0 booked')).toHaveLength(31);
     expect(
       screen.getByText('Unavailable for new bookings')
     ).toBeInTheDocument();
@@ -498,5 +535,27 @@ test.each([
     expect(screen.getByText('Dinner')).toBeInTheDocument();
     expect(screen.queryByText('Creek cabin')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  }
+);
+
+test.each([
+  [
+    'a different month',
+    { start: '2040-02-01T00:00:00.000Z', end: '2040-03-01T00:00:00.000Z' },
+  ],
+  ['a shifted start', { start: '2040-01-01T01:00:00.000Z' }],
+  ['a shifted end', { end: '2040-02-01T01:00:00.000Z' }],
+])(
+  'calendar rejects %s for the selected January window',
+  async (_name, range) => {
+    fetchMock.mockResolvedValueOnce(ok({ ...cabinMonth, ...range }));
+    renderCalendar();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load calendar'
+    );
+    expect(
+      screen.queryByRole('table', { name: 'Occupancy calendar' })
+    ).not.toBeInTheDocument();
   }
 );

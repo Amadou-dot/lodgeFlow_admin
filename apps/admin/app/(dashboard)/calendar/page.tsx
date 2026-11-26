@@ -30,20 +30,21 @@ export default function CalendarPage() {
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   });
   const [kind, setKind] = useState<CalendarKind>('cabins');
+  const start = month.toISOString();
   const end = new Date(
     Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1)
-  );
-  const params = new URLSearchParams({
-    start: month.toISOString(),
-    end: end.toISOString(),
-  });
+  ).toISOString();
+  const params = new URLSearchParams({ start, end });
   const endpoint = `/api/calendar/${kind}?${params}`;
   const request = useCallback(
     async (signal: AbortSignal) => {
       const response = await fetch(endpoint, { signal, cache: 'no-store' });
-      return readCalendarResponse({ response, kind });
+      const data = await readCalendarResponse({ response, kind });
+      if (data.start !== start || data.end !== end)
+        throw new Error('Unable to load calendar');
+      return data;
     },
-    [endpoint, kind]
+    [endpoint, kind, start, end]
   );
   const { state } = useResourceLoad({ resourceKey: endpoint, request });
   const data = state.data;
