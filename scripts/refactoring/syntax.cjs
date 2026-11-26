@@ -21,8 +21,12 @@ function assertedType(node) {
   if (
     ts.isParenthesizedExpression(node) &&
     node.flags & ts.NodeFlags.JavaScriptFile
-  )
-    return ts.getJSDocTypeTag(node)?.typeExpression?.type;
+  ) {
+    // The effective tag can belong to an enclosing declaration. Only an
+    // annotation on these parentheses makes this expression a cast.
+    const tag = ts.getJSDocTypeTag(node);
+    if (tag?.parent.parent === node) return tag.typeExpression?.type;
+  }
 }
 
 function bareType(node) {
