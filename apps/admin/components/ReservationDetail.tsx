@@ -44,18 +44,29 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
   const [action, setAction] = useState<
     { kind: 'idle' } | { kind: 'saving' } | { kind: 'error'; message: string }
   >({ kind: 'idle' });
+  const [readDenied, setReadDenied] = useState(false);
   const request = useCallback(
     async (signal: AbortSignal): Promise<ReservationData> => {
       const response = await fetch(endpoint, { cache: 'no-store', signal });
-      return readReservationDetail(response, kind);
+      if (!signal.aborted && [401, 403, 404].includes(response.status)) {
+        setReadDenied(true);
+        setNextStatus('');
+        setAction({ kind: 'idle' });
+      }
+      return readReservationDetail(response, { kind, reservationId: id });
     },
-    [endpoint, kind]
+    [endpoint, kind, id]
   );
   const { state, reload: load } = useResourceLoad({
     resourceKey: endpoint,
     request,
   });
-  const data = state.data;
+  // Keep previously denied content hidden during retries until the loader
+  // publishes a current, authorized detail.
+  useEffect(() => {
+    if (state.kind === 'ready') setReadDenied(false);
+  }, [state]);
+  const data = readDenied ? undefined : state.data;
   const validDraft = !!data && isStatusAllowed({ data, status: nextStatus });
   useEffect(() => {
     if (data)
@@ -83,7 +94,11 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
           expectedStatus: data.reservation.status,
         }),
       });
-      await readReservationStatus(response, kind);
+      await readReservationStatus(response, {
+        kind,
+        reservationId: id,
+        status: submittedStatus,
+      });
       await load();
       setNextStatus(current => (current === submittedStatus ? '' : current));
       setAction({ kind: 'idle' });
@@ -159,6 +174,7 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
           <ReservationPayments
             key={endpoint}
             kind={kind}
+            reservationId={id}
             endpoint={endpoint}
             payment={data.payment}
             currency={data.currency}

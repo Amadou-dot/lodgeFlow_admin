@@ -3,11 +3,14 @@ import { useRef, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import {
   readReservationPayment,
+  receiptConfirmation,
+  type ReservationData,
+  ReservationRequestRejected,
+  type ReservationTransaction,
   type ReservationKind,
   type ReservationPaymentFields,
   type PaymentSummary,
 } from '@/lib/validations/reservation-operations-json';
-import type { ReservationReceiptJson } from '@lodgeflow/database/reservation-json';
 import {
   cents,
   centsToMajor,
@@ -16,9 +19,22 @@ import {
   majorToCents,
   MoneyError,
 } from '@lodgeflow/database/money';
+type Draft = Pick<ReservationTransaction, 'type' | 'method' | 'reference'> & {
+  amount: string;
+};
+type Attempt = {
+  transaction: ReservationTransaction;
+  body: string;
+  draft: Draft;
+};
+type ActionState =
+  | { kind: 'idle' | 'busy' }
+  | { kind: 'error'; message: string }
+  | { kind: 'uncertain'; attempt: Attempt; message: string };
 export function ReservationPayments({
   kind,
   endpoint,
+  reservationId,
   payment,
   currency,
   receipts,
@@ -29,22 +45,24 @@ export function ReservationPayments({
 }: ReservationPaymentFields & {
   kind: ReservationKind;
   endpoint: string;
+  reservationId: string;
   payment: PaymentSummary;
   currency: string | null;
   status: string | null;
-  reload: () => Promise<void>;
+  reload: () => Promise<ReservationData | undefined>;
 }) {
   const canManage = usePermission('bookings:manage');
   const canRefund = usePermission('refunds:issue');
-  const [type, setType] = useState<'payment' | 'refund'>('payment');
-  const [method, setMethod] =
-    useState<ReservationReceiptJson['method']>('cash');
-  const [amount, setAmount] = useState('');
-  const [reference, setReference] = useState('');
-  const [state, setState] = useState<
-    { kind: 'idle' } | { kind: 'busy' } | { kind: 'error'; message: string }
-  >({ kind: 'idle' });
-  const request = useRef<{ body: string; id: string }>();
+  const [draft, setDraft] = useState<Draft>({
+    type: 'payment',
+    method: 'cash',
+    amount: '',
+    reference: '',
+  });
+  const { type, method, amount, reference } = draft;
+  const [state, setState] = useState<ActionState>({ kind: 'idle' });
+  const request = useRef<Attempt>();
+  const sending = useRef(false);
   const currencyCode = currency || 'USD';
   function format(value: number) {
     const amount = cents(value);
@@ -69,6 +87,7 @@ export function ReservationPayments({
         }
       : undefined;
   async function submit(retry?: NonNullable<typeof retryDetails>) {
+    if (sending.current || state.kind === 'uncertain') return;
     let transaction;
     try {
       if (!retry && !/^\d+(\.\d{1,2})?$/.test(amount)) {
@@ -104,36 +123,85 @@ export function ReservationPayments({
       return;
     }
     const body = JSON.stringify(transaction);
-    if (request.current?.body !== body)
-      request.current = {
-        body,
-        id: retry ? retry.token : crypto.randomUUID(),
-      };
+    const id =
+      request.current?.body === body
+        ? request.current.transaction.id
+        : retry
+          ? retry.token
+          : crypto.randomUUID();
+    const attempt = { body, transaction: { ...transaction, id }, draft };
+    request.current = attempt;
+    await send(attempt, 'submit');
+  }
+  async function send(attempt: Attempt, action: 'submit' | 'replay') {
+    if (sending.current) return;
+    sending.current = true;
     setState({ kind: 'busy' });
+    let acknowledged = false;
     try {
       const response = await fetch(`${endpoint}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...transaction, id: request.current!.id }),
+        body: JSON.stringify(attempt.transaction),
       });
       await readReservationPayment(response, {
         kind,
-        method: transaction.method,
+        reservationId,
+        transaction: attempt.transaction,
       });
-      await reload();
-      request.current = undefined;
-      setAmount('');
-      setReference('');
-      setState({ kind: 'idle' });
+      acknowledged = true;
+      if (!(await reload())) throw new Error('Unable to refresh reservation');
+      complete(attempt);
     } catch (error) {
-      setState({
-        kind: 'error',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Unable to record transaction',
-      });
+      const message =
+        error instanceof Error ? error.message : 'Unable to record transaction';
+      if (!acknowledged && error instanceof ReservationRequestRejected) {
+        // Stripe settlement can report a rule error after the provider accepted
+        // the refund. Inspect the current detail before releasing a changed draft.
+        if (
+          attempt.transaction.method === 'stripe' &&
+          [400, 404, 409].includes(error.status)
+        ) {
+          const detail = await reload().catch(() => undefined);
+          if (detail) {
+            const reservation = detail.reservation;
+            const known = receiptConfirmation(
+              reservation.receipts,
+              attempt.transaction
+            );
+            if (known === 'confirmed') {
+              complete(attempt);
+              return;
+            }
+            const operation = reservation.stripeRefund;
+            if (
+              action === 'submit' &&
+              known === 'missing' &&
+              (operation?.token !== attempt.transaction.id ||
+                operation.status === 'failed')
+            ) {
+              setState({ kind: 'error', message });
+              return;
+            }
+          }
+        } else if (action === 'submit') {
+          setState({ kind: 'error', message });
+          return;
+        }
+      }
+      setState({ kind: 'uncertain', attempt, message });
+    } finally {
+      sending.current = false;
     }
+  }
+  function complete(attempt: Attempt) {
+    request.current = undefined;
+    setDraft(current =>
+      current === attempt.draft
+        ? { ...current, amount: '', reference: '' }
+        : current
+    );
+    setState({ kind: 'idle' });
   }
   const pending = checkout?.pending || stripeRefund?.status === 'pending';
   return (
@@ -164,7 +232,7 @@ export function ReservationPayments({
       {stripeRefund?.status === 'pending' && (
         <div>
           <p>Online refund is pending.</p>
-          {canRefund && retryDetails && (
+          {canRefund && retryDetails && state.kind !== 'uncertain' && (
             <button
               disabled={state.kind === 'busy'}
               onClick={() => void submit(retryDetails)}
@@ -181,11 +249,28 @@ export function ReservationPayments({
           refund.
         </p>
       )}
-      {state.kind === 'error' && (
+      {(state.kind === 'error' || state.kind === 'uncertain') && (
         <p role='alert' className='text-danger'>
           {state.message}
         </p>
       )}
+      {state.kind === 'uncertain' &&
+        canManage &&
+        (state.attempt.transaction.type === 'payment' || canRefund) && (
+          <div>
+            <p>
+              Retry the original transaction to confirm its outcome before
+              submitting another. Your edits will be kept.
+            </p>
+            <button
+              type='button'
+              className='underline'
+              onClick={() => void send(state.attempt, 'replay')}
+            >
+              Retry original transaction
+            </button>
+          </div>
+        )}
       {canManage && !payment.legacyPaid && !pending && (
         <form
           className='space-y-3'
@@ -200,8 +285,13 @@ export function ReservationPayments({
               className='block border rounded p-2 bg-background'
               value={type}
               onChange={e => {
-                setType(e.target.value as 'payment' | 'refund');
-                setMethod('cash');
+                const value = e.target.value;
+                if (value === 'payment' || value === 'refund')
+                  setDraft(current => ({
+                    ...current,
+                    type: value,
+                    method: 'cash',
+                  }));
               }}
             >
               <option value='payment'>Record payment received</option>
@@ -213,9 +303,16 @@ export function ReservationPayments({
             <select
               className='block border rounded p-2 bg-background'
               value={method}
-              onChange={e =>
-                setMethod(e.target.value as ReservationReceiptJson['method'])
-              }
+              onChange={e => {
+                const value = e.target.value;
+                if (
+                  value === 'cash' ||
+                  value === 'bank_transfer' ||
+                  value === 'card' ||
+                  value === 'stripe'
+                )
+                  setDraft(current => ({ ...current, method: value }));
+              }}
             >
               <option value='cash'>Cash</option>
               <option value='bank_transfer'>Bank transfer</option>
@@ -232,7 +329,10 @@ export function ReservationPayments({
               inputMode='decimal'
               required
               value={amount}
-              onChange={e => setAmount(e.target.value)}
+              onChange={e => {
+                const value = e.target.value;
+                setDraft(current => ({ ...current, amount: value }));
+              }}
             />
           </label>
           <label className='block'>
@@ -242,7 +342,10 @@ export function ReservationPayments({
               maxLength={200}
               required={method !== 'cash' || type === 'refund'}
               value={reference}
-              onChange={e => setReference(e.target.value)}
+              onChange={e => {
+                const value = e.target.value;
+                setDraft(current => ({ ...current, reference: value }));
+              }}
             />
           </label>
           <p className='text-sm'>
@@ -254,6 +357,7 @@ export function ReservationPayments({
             className='rounded bg-primary text-primary-foreground px-4 py-2 disabled:opacity-40'
             disabled={
               state.kind === 'busy' ||
+              state.kind === 'uncertain' ||
               (type === 'payment'
                 ? payment.balanceCents <= 0 ||
                   status === 'cancelled' ||

@@ -29,7 +29,7 @@ export function useResourceLoad<T>({
     state: { kind: 'loading', data: undefined },
   });
   const reload = useCallback(async () => {
-    if (!context.active) return;
+    if (!context.active) return undefined;
     context.controller?.abort();
     const controller = new AbortController();
     context.controller = controller;
@@ -47,9 +47,11 @@ export function useResourceLoad<T>({
     }));
     try {
       const data = await request(controller.signal);
-      if (current()) setStored({ context, state: { kind: 'ready', data } });
+      if (!current()) return undefined;
+      setStored({ context, state: { kind: 'ready', data } });
+      return data;
     } catch (error) {
-      if (!current()) return;
+      if (!current()) return undefined;
       const message =
         error instanceof Error ? error.message : 'Unable to load data';
       setStored(previous => ({

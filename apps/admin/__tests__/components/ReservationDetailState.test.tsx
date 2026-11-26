@@ -74,7 +74,7 @@ test('preserves status request and refreshes only after success; failed save kee
       })
     )
     .mockResolvedValueOnce(response(payload('Ada')));
-  render(<ReservationDetail kind='dining' id='one' />);
+  render(<ReservationDetail kind='dining' id='507f1f77bcf86cd799439011' />);
   await screen.findByText('Ada');
   fireEvent.change(screen.getByLabelText('Change status'), {
     target: { value: 'completed' },
@@ -94,7 +94,7 @@ test('preserves status request and refreshes only after success; failed save kee
   fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
   expect(fetchMock.mock.calls[1]).toEqual([
-    '/api/dining-reservations/one',
+    '/api/dining-reservations/507f1f77bcf86cd799439011',
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -114,7 +114,7 @@ test('retries a failed initial load and clears the old error', async () => {
   fetchMock
     .mockRejectedValueOnce(new Error('Offline'))
     .mockResolvedValueOnce(response(payload('Retry Guest')));
-  render(<ReservationDetail kind='dining' id='one' />);
+  render(<ReservationDetail kind='dining' id='507f1f77bcf86cd799439011' />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Offline');
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   await screen.findByText('Retry Guest');
@@ -136,7 +136,7 @@ test('a resource change hides old data and ignores the previous late load', asyn
       response({
         ...payload('Current Guest'),
         reservation: {
-          _id: '507f1f77bcf86cd799439011',
+          _id: '507f1f77bcf86cd799439013',
           customer: 'customer',
           experience: null,
           date: '2040-01-01T00:00:00.000Z',
@@ -147,8 +147,12 @@ test('a resource change hides old data and ignores the previous late load', asyn
         },
       })
     );
-  const { rerender } = render(<ReservationDetail kind='dining' id='one' />);
-  rerender(<ReservationDetail kind='experience' id='two' />);
+  const { rerender } = render(
+    <ReservationDetail kind='dining' id='507f1f77bcf86cd799439011' />
+  );
+  rerender(
+    <ReservationDetail kind='experience' id='507f1f77bcf86cd799439013' />
+  );
   await screen.findByText('Current Guest');
   await act(async () => {
     finish(response(payload('Old Guest')));
@@ -159,7 +163,7 @@ test('a resource change hides old data and ignores the previous late load', asyn
 
 test('payment refresh preserves the independently edited status draft', async () => {
   fetchMock.mockResolvedValue(response(payload('Ada')));
-  render(<ReservationDetail kind='dining' id='one' />);
+  render(<ReservationDetail kind='dining' id='507f1f77bcf86cd799439011' />);
   await screen.findByText('Ada');
   fireEvent.change(screen.getByLabelText('Change status'), {
     target: { value: 'completed' },
@@ -216,7 +220,7 @@ test.each([
     fetchMock
       .mockResolvedValueOnce(response(payload('Ada')))
       .mockResolvedValueOnce(response(updated));
-    render(<ReservationDetail kind='dining' id='one' />);
+    render(<ReservationDetail kind='dining' id='507f1f77bcf86cd799439011' />);
     await screen.findByText('Ada');
     fireEvent.change(screen.getByLabelText('Change status'), {
       target: { value: 'cancelled' },
@@ -234,9 +238,57 @@ test.each([
 
 test('rejects a detail from the other reservation kind before rendering the guest', async () => {
   fetchMock.mockResolvedValue(response(payload('Wrong guest')));
-  render(<ReservationDetail kind='experience' id='two' />);
+  render(<ReservationDetail kind='experience' id='507f1f77bcf86cd799439013' />);
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Unable to load reservation'
   );
   expect(screen.queryByText('Wrong guest')).not.toBeInTheDocument();
 });
+
+test('same-kind detail from a different reservation cannot populate the view', async () => {
+  fetchMock.mockResolvedValue(response(payload('Wrong guest')));
+  render(<ReservationDetail kind='dining' id='507f1f77bcf86cd799439013' />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Unable to load reservation'
+  );
+  expect(screen.queryByText('Wrong guest')).not.toBeInTheDocument();
+});
+test.each([
+  {
+    reason: 'another reservation',
+    id: '507f1f77bcf86cd799439013',
+    status: 'completed',
+  },
+  {
+    reason: 'the old status',
+    id: '507f1f77bcf86cd799439011',
+    status: 'confirmed',
+  },
+])(
+  'retains the draft when a valid status acknowledgement describes $reason',
+  async ({ id, status }) => {
+    const initial = payload('Ada');
+    fetchMock
+      .mockResolvedValueOnce(response(initial))
+      .mockResolvedValueOnce(
+        response({
+          ...initial.reservation,
+          _id: id,
+          status,
+          dining: '507f1f77bcf86cd799439012',
+        })
+      )
+      .mockResolvedValue(response(initial));
+    render(<ReservationDetail kind='dining' id={initial.reservation._id} />);
+    await screen.findByText('Ada');
+    fireEvent.change(screen.getByLabelText('Change status'), {
+      target: { value: 'completed' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to update status'
+    );
+    expect(screen.getByLabelText('Change status')).toHaveValue('completed');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  }
+);
