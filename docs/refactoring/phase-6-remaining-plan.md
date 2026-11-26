@@ -61,9 +61,9 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interface** Protect an existing persisted payment method from an unsupported clear operation. An edit that started without a saved method must be able to return its unsaved choice to blank and omit `paymentMethod` on an unrelated save. Preserve creation's optional selection, the saved-Cash reselection regression, sparse request intent and all accounting/status/date behavior. Do not change the request schema to add a clear operation.
 
-- [ ] Add a real-control failing regression for both absent and explicit-null saved methods: select a method, undo it, edit a note and save. Assert visible blank selection and omission of `paymentMethod`; the unrelated note remains the only edited field.
-- [ ] Narrow the selection guard to the persisted-method case with the smallest prop/handler change. Keep a real saved method visible on reselection and preserve creation behavior.
-- [ ] Run the focused editor/payment control/form hook suites, app and inherited strict changed-test types, read-only lint and touched-file format checks. Verify no server/accounting change, commit and report the correction for independent review.
+- [x] Add a real-control failing regression for both absent and explicit-null saved methods: select a method, undo it, edit a note and save. Assert visible blank selection and omission of `paymentMethod`; the unrelated note remains the only edited field.
+- [x] Narrow the selection guard to the persisted-method case with the smallest prop/handler change. Keep a real saved method visible on reselection and preserve creation behavior.
+- [x] Run the focused editor/payment control/form hook suites, app and inherited strict changed-test types, read-only lint and touched-file format checks. Verify no server/accounting change, commit and report the correction for independent review.
 
 ### Task 1: Admin customer detail, create, update and delete
 
