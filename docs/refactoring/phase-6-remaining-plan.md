@@ -292,6 +292,10 @@ All eight local gates exited 0 at source `14e72c04c28d04776591ea997264e6ed581363
 | `pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/catalog-freshness.mjs` | Production customer build reflected the replacement cabin and returned 404 for the removed detail. |
 | `pnpm build` | Workspace package builds passed with CI’s throwaway Clerk publishable key and no app-local environment files. |
 
+Task 20 review corrected nested JSDoc assertion detection and optional-null disposition identity at `8ccf5e308e2f98f8072e3f74e971dbd71bde2682`. At that commit, `pnpm check:syntax` passed 14 cases and found zero prohibited nodes in 147 files. `pnpm ci:check` passed those cases and all 3,531 package tests; `pnpm --filter @lodgeflow/admin check:types:test-scripts` also passed. The first updated refresh reopened the 88 optional-null fields. Their original source files and field locations matched, and review of the full normalized declarations retained their recorded dispositions. A repeat refresh produced byte-identical JSON and zero pending decisions.
+
+The remaining six gates in the table were run at `14e72c0`. The apps, packages, HTTP and catalog fixtures, manifests, lockfile, workspace and CI configuration have an empty diff from that source to `8ccf5e3`. The seven-fixture count in the table belongs to the original run. The review fix changed root tooling outside the three source roots, so the 763-file digest is unchanged.
+
 [CI configuration and throwaway build key](../../.github/workflows/ci.yml) · [HTTP fixture](../../scripts/http-smoke/run.mjs) · [Production catalog fixture](../../scripts/http-smoke/catalog-freshness.mjs) · [Hosted and native acceptance](phase-4-browser-review.md)
 
 ## Appendix: O01 baseline and ownership
