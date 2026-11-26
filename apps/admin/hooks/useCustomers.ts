@@ -15,11 +15,13 @@ import type {
   CustomerWithStats,
   CustomerPaginationMeta,
 } from '@/types';
-import type { ApiAcknowledgement } from '@/types/api-response';
-import type {
-  CustomerResponse,
-  CustomerMutationResponse,
-} from '@/types/customer-responses';
+import type { CustomerJson } from '@/types/customer-json';
+import {
+  customerDeleteSuccessResponseSchema,
+  customerMutationErrorSchema,
+  isCustomerDetailSuccessResponse,
+  isCustomerMutationSuccessResponse,
+} from '@/lib/validations/customer-responses';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import useSWR, { useSWRConfig } from 'swr';
 
@@ -98,24 +100,49 @@ export const useCustomers = (filters: CustomersFilters = {}) => {
   };
 };
 
+async function readCustomerResponseJson(
+  response: Response,
+  fallback: string
+): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(fallback);
+  }
+}
+
+function customerMutationError(value: unknown, fallback: string): Error {
+  const parsed = customerMutationErrorSchema.safeParse(value);
+  return new Error(parsed.success ? parsed.data.error : fallback);
+}
+
+async function readCustomerMutation(
+  response: Response,
+  fallback: string
+): Promise<CustomerJson> {
+  const result = await readCustomerResponseJson(response, fallback);
+  if (response.ok && isCustomerMutationSuccessResponse(result)) {
+    return result.data;
+  }
+
+  throw customerMutationError(result, fallback);
+}
+
+async function fetchCustomer(url: string): Promise<CustomerWithStats> {
+  const fallback = 'Failed to fetch customer';
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(fallback);
+
+  const result = await readCustomerResponseJson(response, fallback);
+  if (!isCustomerDetailSuccessResponse(result)) throw new Error(fallback);
+  return result.data;
+}
+
 // Fetch single customer
 export const useCustomer = (id: string) => {
   const { data, error, isLoading, mutate } = useSWR<CustomerWithStats>(
     id ? `/api/customers/${id}` : null,
-    (url: string): Promise<CustomerWithStats> =>
-      fetch(url)
-        .then(res => {
-          if (!res.ok) {
-            throw new Error('Failed to fetch customer');
-          }
-          return res.json();
-        })
-        .then((result: CustomerResponse) => {
-          if (result.success) {
-            return result.data;
-          }
-          throw new Error('Failed to fetch customer');
-        }),
+    fetchCustomer,
     {
       revalidateOnFocus: false,
     }
@@ -132,10 +159,10 @@ export const useCustomer = (id: string) => {
 // Create customer
 export const useCreateCustomer = () => {
   const refreshCustomerCaches = useRefreshCustomerCaches();
-  return useMutation<Customer, Error, CreateCustomerInput>({
+  return useMutation<CustomerJson, Error, CreateCustomerInput>({
     mutationFn: async (
       customerData: CreateCustomerInput
-    ): Promise<Customer> => {
+    ): Promise<CustomerJson> => {
       const response = await fetch('/api/customers', {
         method: 'POST',
         headers: {
@@ -144,22 +171,7 @@ export const useCreateCustomer = () => {
         body: JSON.stringify(customerData),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create customer');
-      }
-
-      const result: CustomerMutationResponse = await response.json();
-      if (result.success && result.data) {
-        return result.data;
-      }
-      throw new Error(
-        (typeof result === 'object' &&
-          result !== null &&
-          'error' in result &&
-          result.error) ||
-          'Failed to create customer'
-      );
+      return readCustomerMutation(response, 'Failed to create customer');
     },
     onSuccess: () => refreshCustomerCaches({ dashboard: 'overview' }),
   });
@@ -168,10 +180,14 @@ export const useCreateCustomer = () => {
 // Update customer
 export const useUpdateCustomer = () => {
   const refreshCustomerCaches = useRefreshCustomerCaches();
-  return useMutation<Customer, Error, UpdateCustomerRequest & { id: string }>({
+  return useMutation<
+    CustomerJson,
+    Error,
+    UpdateCustomerRequest & { id: string }
+  >({
     mutationFn: async (
       customerData: UpdateCustomerRequest & { id: string }
-    ): Promise<Customer> => {
+    ): Promise<CustomerJson> => {
       const response = await fetch(`/api/customers/${customerData.id}`, {
         method: 'PUT',
         headers: {
@@ -180,22 +196,7 @@ export const useUpdateCustomer = () => {
         body: JSON.stringify(customerData),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update customer');
-      }
-
-      const result: CustomerMutationResponse = await response.json();
-      if (result.success && result.data) {
-        return result.data;
-      }
-      throw new Error(
-        (typeof result === 'object' &&
-          result !== null &&
-          'error' in result &&
-          result.error) ||
-          'Failed to update customer'
-      );
+      return readCustomerMutation(response, 'Failed to update customer');
     },
     onSuccess: () =>
       refreshCustomerCaches({
@@ -208,22 +209,21 @@ export const useUpdateCustomer = () => {
 // Delete customer
 export const useDeleteCustomer = () => {
   const refreshCustomerCaches = useRefreshCustomerCaches();
-  return useMutation<{ success: boolean }, Error, string>({
-    mutationFn: async (id: string): Promise<{ success: boolean }> => {
+  return useMutation<{ success: true }, Error, string>({
+    mutationFn: async (id: string): Promise<{ success: true }> => {
       const response = await fetch(`/api/customers/${id}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete customer');
-      }
-
-      const result: ApiAcknowledgement = await response.json();
-      if (result.success) {
+      const fallback = 'Failed to delete customer';
+      const result = await readCustomerResponseJson(response, fallback);
+      if (
+        response.ok &&
+        customerDeleteSuccessResponseSchema.safeParse(result).success
+      ) {
         return { success: true };
       }
-      throw new Error(result.error || 'Failed to delete customer');
+      throw customerMutationError(result, fallback);
     },
     onSuccess: () => refreshCustomerCaches({ dashboard: 'both' }),
   });
