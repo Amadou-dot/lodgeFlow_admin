@@ -1,5 +1,6 @@
 'use client';
 
+import { CreateAttemptRecovery } from './CreateAttemptRecovery';
 import {
   useCreateAttempt,
   missingCreatedDetail,
@@ -64,7 +65,7 @@ export default function DiningReservationForm({
   const { user } = useUser();
   const router = useRouter();
   const createAttempt = useCreateAttempt(dining._id);
-  const createReservation = useCreateDiningReservation();
+  const createReservation = useCreateDiningReservation(dining._id);
 
   const [date, setDate] = useState<CalendarDate | null>(null);
   const [time, setTime] = useState('');
@@ -154,13 +155,14 @@ export default function DiningReservationForm({
         });
         return;
       }
+      const confirmationUrl = `/dining/confirmation/${result.data._id}`;
+      attempt.confirmed(confirmationUrl);
       addToast({
         title: 'Reservation Created!',
         description: 'Your dining reservation has been submitted.',
         color: 'success',
       });
 
-      const confirmationUrl = `/dining/confirmation/${result.data._id}`;
       if (result.data.totalPrice > 0 && !result.data.isPaid) {
         try {
           await openReservationCheckout({
@@ -328,7 +330,7 @@ export default function DiningReservationForm({
           </div>
         </div>
 
-        {createAttempt.notice && <p role='status'>{createAttempt.notice}</p>}
+        <CreateAttemptRecovery recovery={createAttempt.recovery} />
         {/* Submit Button */}
         <Button
           className='w-full'

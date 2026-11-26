@@ -1,3 +1,4 @@
+import { useCustomerWriteScope } from './useCustomerWriteScope';
 import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { readResponse } from '@/lib/validations/read-response';
 import {
@@ -18,13 +19,18 @@ import type { CreateDiningReservationData } from '@/types';
 /**
  * Hook to create a new dining reservation
  */
-export const useCreateDiningReservation = () => {
-  const { userId } = useAuth();
+export const useCreateDiningReservation = (listingId: string) => {
+  const scope = useCustomerWriteScope([listingId]);
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: scope.meta,
     retry: false,
-    mutationFn: async (reservationData: CreateDiningReservationData) => {
+    mutationFn: async (
+      reservationData: CreateDiningReservationData,
+      context
+    ) => {
+      const userId = scope.customerIdFor(context, reservationData.diningId);
       const request = fetch('/api/dining-reservations', {
         body: JSON.stringify(reservationData),
         headers: { 'Content-Type': 'application/json' },
@@ -119,12 +125,16 @@ export const useDiningReservationById = (
 /**
  * Hook to cancel a dining reservation
  */
-export const useCancelDiningReservation = () => {
-  const { userId } = useAuth();
+export const useCancelDiningReservation = (
+  reservationIds: readonly string[]
+) => {
+  const scope = useCustomerWriteScope(reservationIds);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (reservationId: string) => {
+    meta: scope.meta,
+    mutationFn: async (reservationId: string, context) => {
+      const userId = scope.customerIdFor(context, reservationId);
       const request = fetch(`/api/dining-reservations/${reservationId}`, {
         method: 'DELETE',
       });

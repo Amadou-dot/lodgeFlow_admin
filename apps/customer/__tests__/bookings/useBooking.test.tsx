@@ -70,6 +70,9 @@ describe('useCreateBooking', () => {
       }),
       cabin: null,
       id: '507f1f77bcf86cd7994390ab',
+      checkInDate: '2025-02-01T00:00:00.000Z',
+      checkOutDate: '2025-02-05T00:00:00.000Z',
+      numNights: 4,
     } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -80,17 +83,20 @@ describe('useCreateBooking', () => {
 
     const queryClient = createTestQueryClient();
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useCreateBooking(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => useCreateBooking('507f1f77bcf86cd799439011'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
 
     const response = await result.current.mutateAsync({
-      cabinId: 'cabin-1',
-      checkInDate: '2025-02-01T00:00:00.000Z',
+      cabinId: '507f1f77bcf86cd799439011',
+      checkInDate: '2025-01-31T17:00:00-07:00',
       checkOutDate: '2025-02-05T00:00:00.000Z',
       numGuests: 2,
       observations: 'Test booking',
@@ -100,8 +106,8 @@ describe('useCreateBooking', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        cabinId: 'cabin-1',
-        checkInDate: '2025-02-01T00:00:00.000Z',
+        cabinId: '507f1f77bcf86cd799439011',
+        checkInDate: '2025-01-31T17:00:00-07:00',
         checkOutDate: '2025-02-05T00:00:00.000Z',
         numGuests: 2,
         observations: 'Test booking',
@@ -125,17 +131,20 @@ describe('useCreateBooking', () => {
 
     const queryClient = createTestQueryClient();
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useCreateBooking(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => useCreateBooking('507f1f77bcf86cd799439011'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
 
     await expect(
       result.current.mutateAsync({
-        cabinId: 'cabin-1',
+        cabinId: '507f1f77bcf86cd799439011',
         checkInDate: '2025-02-01T00:00:00.000Z',
         checkOutDate: '2025-02-05T00:00:00.000Z',
         numGuests: 2,
@@ -297,13 +306,16 @@ describe('useUpdateBooking', () => {
 
     const queryClient = createTestQueryClient();
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useUpdateBooking(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => useUpdateBooking('507f1f77bcf86cd7994390ab'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
 
     const response = await result.current.mutateAsync({
       bookingId: '507f1f77bcf86cd7994390ab',
@@ -333,13 +345,16 @@ describe('useUpdateBooking', () => {
 
     const queryClient = createTestQueryClient();
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useUpdateBooking(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => useUpdateBooking('507f1f77bcf86cd7994390ab'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
 
     await expect(
       result.current.mutateAsync({
@@ -358,13 +373,16 @@ describe('useUpdateBooking', () => {
 
     const queryClient = createTestQueryClient();
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useUpdateBooking(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => useUpdateBooking('507f1f77bcf86cd7994390ab'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
 
     await expect(
       result.current.mutateAsync({
@@ -416,13 +434,16 @@ describe('useCancelBooking', () => {
 
     const queryClient = createTestQueryClient();
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useCancelBooking(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => useCancelBooking('507f1f77bcf86cd7994390ab'),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
 
     const response = await result.current.mutateAsync({
       bookingId: '507f1f77bcf86cd7994390ab',
@@ -452,7 +473,10 @@ describe('useCancelBooking', () => {
       json: async () => ({ error: 'Cannot cancel confirmed booking' }),
     });
 
-    const { result } = renderHook(() => useCancelBooking(), { wrapper });
+    const { result } = renderHook(
+      () => useCancelBooking('507f1f77bcf86cd7994390ab'),
+      { wrapper }
+    );
 
     await expect(
       result.current.mutateAsync({ bookingId: '507f1f77bcf86cd7994390ab' })
@@ -465,7 +489,10 @@ describe('useCancelBooking', () => {
       json: async () => ({}),
     });
 
-    const { result } = renderHook(() => useCancelBooking(), { wrapper });
+    const { result } = renderHook(
+      () => useCancelBooking('507f1f77bcf86cd7994390ab'),
+      { wrapper }
+    );
 
     await expect(
       result.current.mutateAsync({ bookingId: '507f1f77bcf86cd7994390ab' })
@@ -563,3 +590,45 @@ describe('malformed successful reads', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });
+
+test.each([
+  {
+    checkInDate: '2030-01-01T00:00:00.000Z',
+    checkOutDate: '2030-01-03T00:00:00.000Z',
+  },
+  { checkInDate: '2025-02-01T00:00:00.001Z' },
+  { checkOutDate: '2025-02-04T00:00:00.000Z' },
+  { numGuests: 3 },
+])(
+  'rejects a direct cabin create response for another stay or party %#',
+  async mismatch => {
+    const id = '507f1f77bcf86cd7994390ab';
+    const request = {
+      cabinId: id,
+      checkInDate: '2025-02-01T00:00:00.000Z',
+      checkOutDate: '2025-02-05T00:00:00.000Z',
+      numGuests: 2,
+    };
+    const data = {
+      ...historyBooking({ id, status: 'unconfirmed' }),
+      id,
+      checkInDate: request.checkInDate,
+      checkOutDate: request.checkOutDate,
+      ...mismatch,
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ success: true, data }),
+    });
+    const client = createTestQueryClient();
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useCreateBooking(id), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await expect(result.current.mutateAsync(request)).rejects.toThrow();
+    expect(invalidated).not.toHaveBeenCalled();
+  }
+);

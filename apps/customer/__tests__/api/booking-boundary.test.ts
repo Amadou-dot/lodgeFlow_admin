@@ -151,7 +151,7 @@ test.each(['create', 'update'] as const)(
       status: action === 'create' ? 201 : 200,
       schema:
         action === 'create'
-          ? createdBookingResult({ customerId: 'customer', cabinId: id })
+          ? createdBookingResult({ customerId: 'customer', selection: create })
           : updatedBookingResult({ customerId: 'customer', id, updates }),
       fallback: 'Invalid booking',
     });

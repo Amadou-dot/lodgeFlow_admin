@@ -5,15 +5,34 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  onlineManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { parseDate, type CalendarDate } from '@internationalized/date';
 import { addToast } from '@heroui/toast';
 import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
 import DiningReservationForm from '@/components/DiningReservationForm';
 import ExperienceBookingForm from '@/components/ExperienceBookingForm';
 import BookingForm from '@/components/BookingForm';
+import BookingsPage from '@/app/bookings/page';
 import type { Dining, Experience } from '@/types';
 
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+  }: {
+    href: string;
+    children: React.ReactNode;
+  }) => (
+    <a data-client-navigation href={href}>
+      {children}
+    </a>
+  ),
+}));
 const mockPush = jest.fn();
 let mockUser = 'guest';
 let mockSession = 'session';
@@ -174,14 +193,15 @@ async function mount(
     defaultOptions: { queries: { retry: false } },
   });
   const invalidated = jest.spyOn(client, 'invalidateQueries');
+  let listingId = listing;
   const ui = () => (
     <QueryClientProvider client={client}>
       {kind === 'dining' ? (
-        <DiningReservationForm dining={dining} />
+        <DiningReservationForm dining={{ ...dining, _id: listingId }} />
       ) : kind === 'experience' ? (
-        <ExperienceBookingForm experience={experience} />
+        <ExperienceBookingForm experience={{ ...experience, _id: listingId }} />
       ) : (
-        <BookingForm cabin={cabin} userData={userData} />
+        <BookingForm cabin={{ ...cabin, _id: listingId }} userData={userData} />
       )}
     </QueryClientProvider>
   );
@@ -206,7 +226,12 @@ async function mount(
     checkoutPost,
     invalidated,
     draft,
-    rerender: () => mounted.rerender(ui()),
+    client,
+    unmount: mounted.unmount,
+    rerender: (replacement?: string) => {
+      listingId = replacement ?? listingId;
+      mounted.rerender(ui());
+    },
   };
 }
 beforeEach(() => {
@@ -256,6 +281,14 @@ for (const kind of ['dining', 'experience', 'cabin'] as const) {
         expect.objectContaining({ color: 'success' })
       );
       expect(result.draft).toHaveValue('Quiet please');
+      const history = screen.getByRole('link', {
+        name: 'Load current bookings',
+      });
+      expect(history).toHaveAttribute('href', '/bookings');
+      expect(history).not.toHaveAttribute('data-client-navigation');
+      expect(
+        screen.queryByRole('link', { name: 'View confirmation' })
+      ).not.toBeInTheDocument();
       expect(result.invalidated).not.toHaveBeenCalled();
       expect(result.button).toBeDisabled();
       await act(async () => {
@@ -294,6 +327,9 @@ for (const kind of ['dining', 'experience', 'cabin'] as const) {
       await waitFor(() =>
         expect(mockPush).toHaveBeenCalledWith(paths[kind][1] + id)
       );
+      expect(
+        screen.getByRole('link', { name: 'View confirmation' })
+      ).toHaveAttribute('href', paths[kind][1] + id);
       expect(result.button).toBeDisabled();
       await act(async () => {
         result.press();
@@ -371,6 +407,9 @@ for (const kind of ['dining', 'experience'] as const) {
         )
       );
       expect(mockPush).toHaveBeenCalledWith(paths[kind][1] + id);
+      expect(
+        screen.getByRole('link', { name: 'View confirmation' })
+      ).toHaveAttribute('href', paths[kind][1] + id);
       expect(result.button).toBeDisabled();
       await act(async () => {
         result.press();
@@ -405,3 +444,113 @@ test.each(['dining', 'experience'] as const)(
     );
   }
 );
+
+for (const kind of ['cabin', 'dining', 'experience'] as const) {
+  test.each(['unchanged', 'new listing', 'new session', 'unmounted'] as const)(
+    kind + ' form queued offline and then %s',
+    async change => {
+      const result = await mount(kind, async () => reply(record(kind)));
+      onlineManager.setOnline(false);
+      try {
+        result.press();
+        await waitFor(() =>
+          expect(
+            result.client
+              .getMutationCache()
+              .getAll()
+              .filter(m => m.state.isPaused)
+          ).toHaveLength(1)
+        );
+        expect(result.createPost).not.toHaveBeenCalled();
+        if (change === 'new listing')
+          result.rerender('507f1f77bcf86cd7994390ee');
+        if (change === 'new session') {
+          mockSession = 'new-session';
+          result.rerender();
+        }
+        if (change === 'unmounted') result.unmount();
+        await act(async () => {
+          onlineManager.setOnline(true);
+          await result.client.resumePausedMutations();
+        });
+        if (change === 'unchanged') {
+          expect(result.createPost).toHaveBeenCalledTimes(1);
+          expect(mockPush).toHaveBeenCalledWith(paths[kind][1] + id);
+          expect(
+            screen.getByRole('link', { name: 'View confirmation' })
+          ).toHaveAttribute('href', paths[kind][1] + id);
+        } else {
+          expect(result.createPost).not.toHaveBeenCalled();
+          expect(result.checkoutPost).not.toHaveBeenCalled();
+          expect(result.invalidated).not.toHaveBeenCalled();
+          expect(mockPush).not.toHaveBeenCalled();
+          expect(
+            screen.queryByRole('link', { name: 'View confirmation' })
+          ).not.toBeInTheDocument();
+        }
+      } finally {
+        onlineManager.setOnline(true);
+        result.client.clear();
+      }
+    }
+  );
+}
+
+test('manual history recovery starts fresh unfiltered reads for the signed-in session', async () => {
+  const result = await mount(
+    'experience',
+    async () => new FetchResponse('{', { status: 201 })
+  );
+  const prefixes = [
+    'bookings-history',
+    'dining-reservations-history',
+    'experience-bookings-history',
+  ];
+  const keys = prefixes.map(prefix => [
+    prefix,
+    undefined,
+    mockUser,
+    mockSession,
+  ]);
+  for (const key of keys) result.client.setQueryData(key, []);
+  result.press();
+  const link = await screen.findByRole('link', {
+    name: 'Load current bookings',
+  });
+  expect(link).not.toHaveAttribute('data-client-navigation');
+  expect(link).toHaveAttribute('href', '/bookings');
+  expect(result.invalidated).not.toHaveBeenCalled();
+  expect(mockPush).not.toHaveBeenCalled();
+  const historyPaths = [
+    '/api/bookings/history',
+    '/api/dining-reservations/history',
+    '/api/experience-bookings/history',
+  ];
+  for (const path of historyPaths)
+    expect(fetch).not.toHaveBeenCalledWith(path, expect.anything());
+  // jsdom does not perform document navigation. Mount the link destination
+  // with a fresh provider, as a full document load does in the application.
+  result.unmount();
+  const fresh = new QueryClient({
+    defaultOptions: { queries: { staleTime: 300000, retry: false } },
+  });
+  jest
+    .mocked(fetch)
+    .mockImplementation(async () =>
+      FetchResponse.json({ success: true, data: [] })
+    );
+  render(
+    <QueryClientProvider client={fresh}>
+      <BookingsPage />
+    </QueryClientProvider>
+  );
+  await waitFor(() =>
+    keys.forEach(key => expect(fresh.getQueryData(key)).toEqual([]))
+  );
+  for (const path of historyPaths)
+    expect(fetch).toHaveBeenCalledWith(path, {
+      signal: expect.any(AbortSignal),
+    });
+  expect(result.createPost).toHaveBeenCalledTimes(1);
+  expect(mockPush).not.toHaveBeenCalled();
+});
