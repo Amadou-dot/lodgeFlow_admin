@@ -57,3 +57,13 @@ test.each([
     expect(screen.queryByText(/Local guide/)).not.toBeInTheDocument();
   }
 );
+
+test('detail renders only the usable images in a legacy gallery', async () => {
+  mockExperience = {
+    ...fixture,
+    gallery: [null, '/images/trail.jpg', ''],
+  };
+  render(<ExperiencePage params={Promise.resolve({ id: fixture._id })} />);
+  expect(await screen.findByText('Forest walk')).toBeInTheDocument();
+  expect(screen.getAllByAltText(/Forest walk gallery/)).toHaveLength(1);
+});

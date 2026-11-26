@@ -1,40 +1,8 @@
-// Mock @tanstack/react-query before imports
-let capturedQueryConfig: any = null;
-let capturedMutationConfig: any = null;
-
-const mockInvalidateQueries = jest.fn();
-const mockQueryClient = { invalidateQueries: mockInvalidateQueries };
-
-jest.mock('@tanstack/react-query', () => ({
-  useQuery: jest.fn((config: any) => {
-    capturedQueryConfig = config;
-    return {
-      data: undefined,
-      error: undefined,
-      isLoading: true,
-      isFetching: false,
-      refetch: jest.fn(),
-    };
-  }),
-  useMutation: jest.fn((config: any) => {
-    capturedMutationConfig = config;
-    return {
-      mutate: jest.fn(),
-      mutateAsync: jest.fn(),
-      isPending: false,
-      isError: false,
-      isSuccess: false,
-      reset: jest.fn(),
-    };
-  }),
-  useQueryClient: jest.fn(() => mockQueryClient),
-}));
-
-jest.mock('@heroui/toast', () => ({
-  addToast: jest.fn(),
-}));
-
+import { createElement, type ReactNode } from 'react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { addToast } from '@heroui/toast';
+import type { Experience, ExperienceFilters } from '@/types';
 import {
   useExperiences,
   useCreateExperience,
@@ -42,273 +10,309 @@ import {
   useDeleteExperience,
 } from '@/hooks/useExperiences';
 
+const fetchMock = jest.fn();
+const originalFetch = global.fetch;
+let client: QueryClient;
+const experience: Experience = {
+  _id: '507f1f77bcf86cd799439011',
+  name: 'Forest walk',
+  description: 'Explore the forest with a local guide',
+  price: 25,
+  duration: '2 hours',
+  difficulty: 'Easy',
+  category: 'Nature',
+  image: 'https://example.invalid/walk.jpg',
+  gallery: [],
+  includes: ['Guide'],
+  available: ['Monday'],
+  ctaText: 'Book now',
+  isPopular: false,
+  requirements: [],
+  highlights: [],
+  whatToBring: [],
+  tags: [],
+  reviewCount: 0,
+};
+const createInput = { name: 'New item', price: 35 };
+const updateInput = { _id: experience._id, name: 'Renamed' };
+
+function response({ body, ok = true }: { body: unknown; ok?: boolean }) {
+  return { ok, json: async () => body } satisfies Pick<Response, 'ok' | 'json'>;
+}
+
+function wrapper({ children }: { children: ReactNode }) {
+  return createElement(QueryClientProvider, { client }, children);
+}
+
 beforeEach(() => {
-  capturedQueryConfig = null;
-  capturedMutationConfig = null;
   jest.clearAllMocks();
-  (global.fetch as jest.Mock) = jest.fn();
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: [experience] } })
+  );
+  global.fetch = fetchMock;
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+});
+
+afterEach(() => {
+  client.clear();
+  global.fetch = originalFetch;
+  jest.restoreAllMocks();
 });
 
 describe('useExperiences', () => {
-  it('uses experiences query key with filters', () => {
-    const filters = {
-      category: 'outdoor',
-      difficulty: 'Easy',
-    } satisfies NonNullable<Parameters<typeof useExperiences>[0]>;
-    useExperiences(filters);
-
-    expect(capturedQueryConfig.queryKey).toEqual(['experiences', filters]);
+  test.each<[ExperienceFilters, string]>([
+    [{}, '?'],
+    [
+      {
+        category: 'outdoor',
+        difficulty: 'Challenging',
+        search: 'pine & lake',
+        sortBy: 'price',
+        sortOrder: 'desc',
+      },
+      '?search=pine+%26+lake&category=outdoor&difficulty=Challenging&sortBy=price&sortOrder=desc',
+    ],
+  ])('uses the same query keys and URLs for %j', async (filters, query) => {
+    const { result } = renderHook(() => useExperiences(filters), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith(`/api/experiences${query}`);
+    expect(client.getQueryData(['experiences', filters])).toEqual([experience]);
   });
 
-  it('uses empty filters by default', () => {
-    useExperiences();
-
-    expect(capturedQueryConfig.queryKey).toEqual(['experiences', {}]);
+  test('retains bare lists, legacy nulls and additive fields in the cache', async () => {
+    const legacy = {
+      ...experience,
+      price: 12.345,
+      image: '/local-image.webp',
+      location: null,
+      rating: null,
+      __v: null,
+      updatedAt: '+010000-01-01T00:00:00.000Z',
+      additive: { imported: true },
+      gallery: null,
+      tags: ['', null, 'Local'],
+      includes: null,
+      available: [],
+      isPopular: null,
+      maxParticipants: 4.5,
+      longDescription: '',
+    };
+    fetchMock.mockResolvedValue(response({ body: [legacy] }));
+    const { result } = renderHook(() => useExperiences(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.getQueryData(['experiences', {}])).toEqual([legacy]);
   });
 
-  it('builds URL with search filter', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useExperiences({ search: 'hiking' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('search=hiking');
-  });
-
-  it('builds URL with category filter', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useExperiences({ category: 'outdoor' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('category=outdoor');
-  });
-
-  it('builds URL with difficulty filter', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useExperiences({ difficulty: 'Challenging' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('difficulty=Challenging');
-  });
-
-  it('builds URL with sort params', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: [] }),
-    });
-
-    useExperiences({ sortBy: 'price', sortOrder: 'desc' });
-    await capturedQueryConfig.queryFn();
-
-    const fetchUrl = (global.fetch as jest.Mock).mock.calls[0][0];
-    expect(fetchUrl).toContain('sortBy=price');
-    expect(fetchUrl).toContain('sortOrder=desc');
-  });
-
-  it('returns data from success response', async () => {
-    const mockExperiences = [{ _id: '1', name: 'Mountain Hike' }];
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: mockExperiences }),
-    });
-
-    useExperiences();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result).toEqual(mockExperiences);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useExperiences();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch experiences'
+  test.each([
+    { ...experience, difficulty: 'other' },
+    { ...experience, ctaText: '' },
+    { ...experience, includes: [false] },
+    { ...experience, price: '25' },
+    { ...experience, price: Infinity },
+    { ...experience, createdAt: '2026-02-30T00:00:00.000Z' },
+  ])('rejects a malformed row before it reaches the cache', async invalid => {
+    fetchMock.mockResolvedValue(
+      response({ body: { success: true, data: [experience, invalid] } })
     );
+    const { result } = renderHook(() => useExperiences(), { wrapper });
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.error?.message).toBe('Failed to fetch experiences');
+    expect(client.getQueryData(['experiences', {}])).toBeUndefined();
   });
+
+  test.each([true, false])(
+    'uses the list error for invalid responses (HTTP success=%p)',
+    async ok => {
+      fetchMock.mockResolvedValue(
+        response({ ok, body: { success: false, error: 'Unavailable' } })
+      );
+      const { result } = renderHook(() => useExperiences(), { wrapper });
+      await waitFor(() => expect(result.current.isFetching).toBe(false));
+      expect(result.current.error?.message).toBe('Failed to fetch experiences');
+    }
+  );
 });
 
-describe('useCreateExperience', () => {
-  it('sends POST to /api/experiences', async () => {
-    const newExp = { name: 'Kayaking', price: 75 };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({ success: true, data: { _id: '1', ...newExp } }),
-    });
-
-    useCreateExperience();
-    await capturedMutationConfig.mutationFn(newExp);
-
-    expect(global.fetch).toHaveBeenCalledWith(
+describe('experience mutations', () => {
+  function useMutations() {
+    const create = useCreateExperience();
+    const update = useUpdateExperience();
+    const remove = useDeleteExperience();
+    return {
+      create: () => create.mutateAsync(createInput),
+      update: () => update.mutateAsync(updateInput),
+      remove: () => remove.mutateAsync(experience._id),
+    };
+  }
+  const actions = [
+    [
+      'create',
+      'POST',
       '/api/experiences',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify(newExp),
+      createInput,
+      'Experience created successfully',
+    ],
+    [
+      'update',
+      'PUT',
+      `/api/experiences/${experience._id}`,
+      updateInput,
+      'Experience updated successfully',
+    ],
+    ['remove', 'DELETE', `/api/experiences/${experience._id}`, undefined, ''],
+  ] as const;
+
+  test.each(actions)(
+    'keeps the %s request, return value and success effects',
+    async (action, method, url, input, message) => {
+      const data =
+        action === 'remove'
+          ? null
+          : { ...experience, name: 'Saved', reservationVersion: 0 };
+      const envelope = {
+        success: true,
+        data,
+        message: 'Saved',
+        additive: true,
+      };
+      fetchMock.mockResolvedValue(response({ body: envelope }));
+      const invalidate = jest.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(useMutations, { wrapper });
+      await act(async () => {
+        await expect(result.current[action]()).resolves.toEqual(
+          action === 'remove' ? envelope : data
+        );
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        url,
+        expect.objectContaining({ method })
+      );
+      if (input)
+        expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toEqual(
+          input
+        );
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['experiences'] });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ['experience-stats'],
+      });
+      if (message) {
+        expect(addToast).toHaveBeenCalledWith(
+          expect.objectContaining({ color: 'success', description: message })
+        );
+      } else {
+        expect(addToast).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  test.each(['create', 'update'] as const)(
+    'retains the bare item fallback for %s',
+    async action => {
+      fetchMock.mockResolvedValue(response({ body: experience }));
+      const { result } = renderHook(useMutations, { wrapper });
+      await act(async () => {
+        await expect(result.current[action]()).resolves.toEqual(experience);
+      });
+    }
+  );
+
+  test.each([
+    ['create', { success: true, data: { _id: experience._id } }, 'create'],
+    ['create', { success: true, data: null }, 'create'],
+    ['update', { ...experience, price: '25' }, 'update'],
+    ['update', { ...experience, success: false, error: 'Denied' }, 'update'],
+    ['remove', { success: true }, 'delete'],
+    ['remove', { success: true, data: {} }, 'delete'],
+    ['remove', { success: false, data: null }, 'delete'],
+  ] as const)(
+    'rejects malformed %s before success effects (%j)',
+    async (action, body, verb) => {
+      fetchMock.mockResolvedValue(response({ body }));
+      const invalidate = jest.spyOn(client, 'invalidateQueries');
+      const { result } = renderHook(useMutations, { wrapper });
+      await act(async () => {
+        await expect(result.current[action]()).rejects.toThrow(
+          `Failed to ${verb} experience`
+        );
+      });
+      expect(invalidate).not.toHaveBeenCalled();
+      expect(addToast).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(actions)('uses the server error for failed %s', async action => {
+    fetchMock.mockResolvedValue(
+      response({
+        ok: false,
+        body: {
+          success: false,
+          error: 'Validation failed',
+          message: 'Check the form',
+        },
       })
     );
+    const { result } = renderHook(useMutations, { wrapper });
+    await act(async () => {
+      await expect(result.current[action]()).rejects.toThrow(
+        'Validation failed'
+      );
+    });
+    if (action === 'remove') {
+      expect(addToast).not.toHaveBeenCalled();
+    } else {
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          color: 'danger',
+          description: 'Check the form',
+        })
+      );
+    }
   });
 
-  it('invalidates experiences and experience-stats on success', () => {
-    useCreateExperience();
-    capturedMutationConfig.onSuccess();
+  test.each([
+    ['create', 'create'],
+    ['update', 'update'],
+    ['remove', 'delete'],
+  ] as const)(
+    'uses resource-specific fallback for an unstructured %s error',
+    async (action, verb) => {
+      fetchMock.mockResolvedValue(response({ ok: false, body: null }));
+      const { result } = renderHook(useMutations, { wrapper });
+      await act(async () => {
+        await expect(result.current[action]()).rejects.toThrow(
+          `Failed to ${verb} experience`
+        );
+      });
+    }
+  );
 
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['experiences'],
+  test('selects editable fields from an update before posting', async () => {
+    const item = {
+      ...updateInput,
+      createdAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
+      __v: 3,
+      reservationVersion: 5,
+    };
+    fetchMock.mockResolvedValue(
+      response({ body: { success: true, data: experience } })
+    );
+    const { result } = renderHook(useUpdateExperience, { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(item);
     });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['experience-stats'],
-    });
-  });
-
-  it('shows success toast on creation', () => {
-    useCreateExperience();
-    capturedMutationConfig.onSuccess();
-
-    expect(addToast).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/experiences/${experience._id}`,
       expect.objectContaining({
-        color: 'success',
-        description: 'Experience created successfully',
+        method: 'PUT',
+        body: JSON.stringify({
+          name: 'Renamed',
+          _id: experience._id,
+        }),
       })
     );
-  });
-
-  it('shows error toast and throws on failure', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: 'Missing required fields' }),
-    });
-
-    useCreateExperience();
-
-    await expect(
-      capturedMutationConfig.mutationFn({ name: 'Bad' })
-    ).rejects.toThrow('Missing required fields');
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({ color: 'danger' })
-    );
-  });
-});
-
-describe('useUpdateExperience', () => {
-  it('sends PUT request with experience id', async () => {
-    const updated = { _id: 'exp123', name: 'Updated Hike', price: 100 };
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true, data: updated }),
-    });
-
-    useUpdateExperience();
-    await capturedMutationConfig.mutationFn(updated);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/experiences/exp123',
-      expect.objectContaining({ method: 'PUT' })
-    );
-  });
-
-  it('invalidates queries on success', () => {
-    useUpdateExperience();
-    capturedMutationConfig.onSuccess();
-
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['experiences'],
-    });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['experience-stats'],
-    });
-  });
-
-  it('shows success toast on update', () => {
-    useUpdateExperience();
-    capturedMutationConfig.onSuccess();
-
-    expect(addToast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        color: 'success',
-        description: 'Experience updated successfully',
-      })
-    );
-  });
-});
-
-describe('useDeleteExperience', () => {
-  it('sends DELETE request with id', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: true }),
-    });
-
-    useDeleteExperience();
-    await capturedMutationConfig.mutationFn('exp123');
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/experiences/exp123',
-      expect.objectContaining({ method: 'DELETE' })
-    );
-  });
-
-  it('throws on error response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: false,
-      json: () => Promise.resolve({ error: 'Cannot delete' }),
-    });
-
-    useDeleteExperience();
-
-    await expect(capturedMutationConfig.mutationFn('exp123')).rejects.toThrow(
-      'Cannot delete'
-    );
-  });
-
-  it('invalidates queries on success', () => {
-    useDeleteExperience();
-    capturedMutationConfig.onSuccess();
-
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['experiences'],
-    });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['experience-stats'],
-    });
-  });
-});
-
-it('selects editable fields from a catalog DTO before updating', async () => {
-  const item = {
-    _id: '507f1f77bcf86cd799439011',
-    name: 'Renamed',
-    createdAt: '2020-01-01T00:00:00.000Z',
-    updatedAt: '2020-01-01T00:00:00.000Z',
-    __v: 3,
-    reservationVersion: 5,
-  };
-  const response = {
-    ok: true,
-    json: async () => ({ success: true, data: item }),
-  } satisfies Pick<Response, 'ok' | 'json'>;
-  global.fetch = jest.fn().mockResolvedValue(response);
-  useUpdateExperience();
-  await capturedMutationConfig.mutationFn(item);
-  const call = jest.mocked(global.fetch).mock.calls[0];
-  expect(JSON.parse(String(call[1]?.body))).toEqual({
-    _id: item._id,
-    name: item.name,
   });
 });

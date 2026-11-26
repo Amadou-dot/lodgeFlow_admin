@@ -11,16 +11,15 @@ interface PricingItem {
   originalPrice?: number;
   duration?: string;
   description: string;
-  includes?: string[];
+  includes?: (string | null)[] | null;
   difficulty?: string;
   category?: string;
-  available?: string[];
+  available?: (string | null)[] | null;
   maxGuests?: number;
   ctaText?: string;
   ctaHref?: string;
-  isPopular?: boolean;
+  isPopular?: boolean | null;
   image?: string;
-  gallery?: string[];
 }
 
 interface PricingGridProps {

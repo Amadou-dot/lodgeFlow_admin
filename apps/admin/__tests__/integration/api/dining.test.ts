@@ -8,7 +8,10 @@ import { GET, POST, PUT } from '@/app/api/dining/route';
 import { GET as getById, PUT as updateById } from '@/app/api/dining/[id]/route';
 import Dining from '@lodgeflow/database/models/Dining';
 
-function createRequest(url: string, options?: { method?: string; body?: any }) {
+function createRequest(
+  url: string,
+  options?: { method?: string; body?: unknown }
+) {
   const init: ConstructorParameters<typeof NextRequest>[1] = {
     method: options?.method || 'GET',
   };
@@ -19,7 +22,7 @@ function createRequest(url: string, options?: { method?: string; body?: any }) {
   return new NextRequest(new URL(url, 'http://localhost:3000'), init);
 }
 
-function validDiningPayload(overrides: Record<string, any> = {}) {
+function validDiningPayload(overrides: Record<string, unknown> = {}) {
   return {
     name: 'Continental Breakfast',
     description:

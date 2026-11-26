@@ -1,6 +1,7 @@
 'use client';
 
 import { usePermission } from '@/components/AuthGuard';
+import { diningEditableFields } from '@/lib/requests/catalog';
 
 import type {
   CreateDiningInput,
@@ -58,9 +59,12 @@ export const DiningModal = ({
     if (isSaving) return;
     try {
       if (mode === 'create') {
-        await onCreateSubmit(data);
+        await onCreateSubmit(diningEditableFields(data));
       } else if (mode === 'edit' && dining?._id) {
-        await onUpdateSubmit({ ...data, _id: dining._id });
+        await onUpdateSubmit({
+          ...diningEditableFields(data),
+          _id: dining._id,
+        });
       }
       onClose();
     } catch (error) {

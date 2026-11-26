@@ -1,6 +1,7 @@
 'use client';
 
 import { usePermission } from '@/components/AuthGuard';
+import { experienceEditableFields } from '@/lib/requests/catalog';
 
 import type { UpdateExperienceInput } from '@/lib/validations/experience';
 import type { Experience } from '@/types';
@@ -63,7 +64,7 @@ export const ExperienceModal = ({
     if (!experience?._id || isUpdating) return;
     try {
       await onUpdateSubmit({
-        ...updatedExperience,
+        ...experienceEditableFields(updatedExperience),
         _id: experience._id,
       });
       onClose();

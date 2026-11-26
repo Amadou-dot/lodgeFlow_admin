@@ -1,7 +1,9 @@
 import { render, screen } from '@/__tests__/shared/test-utils';
 import DiningPage from '@/app/dining/page';
+import DiningDetailPage from '@/app/dining/[id]/page';
 import type { Dining } from '@/types';
 const mockDining = jest.fn();
+const mockDiningItem = jest.fn();
 jest.mock('@/hooks/useDining', () => ({
   useDining: (...args: unknown[]) => mockDining(...args),
 }));
@@ -34,4 +36,20 @@ test('keeps default name ordering, meal grouping and the first menu reservation 
     '/dining/507f1f77bcf86cd799439012/reserve'
   );
   expect(mockDining).toHaveBeenCalledWith({ search: undefined });
+});
+
+jest.mock('@/hooks/useDiningItem', () => ({
+  useDiningItem: (id: string) => mockDiningItem(id),
+}));
+test('detail renders only the usable images in a legacy gallery', async () => {
+  mockDiningItem.mockReturnValue({
+    data: {
+      ...dish,
+      image: '/images/soup.jpg',
+      gallery: ['', null, '/images/vegetables.jpg'],
+    },
+  });
+  render(<DiningDetailPage params={Promise.resolve({ id: dish._id })} />);
+  expect(await screen.findByText('Zucchini Soup')).toBeInTheDocument();
+  expect(screen.getAllByAltText(/Zucchini Soup gallery/)).toHaveLength(1);
 });

@@ -1,3 +1,9 @@
+import {
+  catalogDeleteResponseSchema,
+  diningListResponseSchema,
+  diningResponseSchema,
+  readCatalogResponse,
+} from '@/lib/validations/catalog-json';
 import { diningEditableFields } from '@/lib/requests/catalog';
 import type {
   CreateDiningInput,
@@ -23,11 +29,11 @@ export function useDining(filters: DiningFilters = {}) {
     queryKey: ['dining', filters],
     queryFn: async () => {
       const response = await fetch(`/api/dining?${queryParams.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch dining items');
-      }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCatalogResponse({
+        response,
+        schema: diningListResponseSchema,
+        fallback: 'Failed to fetch dining items',
+      });
     },
   });
 }
@@ -45,14 +51,12 @@ export function useCreateDining() {
         body: JSON.stringify(diningEditableFields(dining)),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        displayToast(error.message || 'Failed to create dining item', 'error');
-        throw new Error(error.error || 'Failed to create dining item');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCatalogResponse({
+        response,
+        schema: diningResponseSchema,
+        fallback: 'Failed to create dining item',
+        failure: message => displayToast(message, 'error'),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dining'] });
@@ -78,14 +82,12 @@ export function useUpdateDining() {
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        displayToast(error.message || 'Failed to update dining item', 'error');
-        throw new Error(error.error || 'Failed to update dining item');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCatalogResponse({
+        response,
+        schema: diningResponseSchema,
+        fallback: 'Failed to update dining item',
+        failure: message => displayToast(message, 'error'),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dining'] });
@@ -104,13 +106,12 @@ export function useDeleteDining() {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete dining item');
-      }
-
-      const result = await response.json();
-      return result.success ? result : result;
+      return readCatalogResponse({
+        response,
+        schema: catalogDeleteResponseSchema,
+        fallback: 'Failed to delete dining item',
+        failure: 'server-error',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dining'] });

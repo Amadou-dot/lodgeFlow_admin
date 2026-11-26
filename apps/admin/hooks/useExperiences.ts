@@ -1,3 +1,9 @@
+import {
+  catalogDeleteResponseSchema,
+  experienceListResponseSchema,
+  experienceResponseSchema,
+  readCatalogResponse,
+} from '@/lib/validations/catalog-json';
 import { experienceEditableFields } from '@/lib/requests/catalog';
 import type {
   CreateExperienceInput,
@@ -22,11 +28,11 @@ export function useExperiences(filters: ExperienceFilters = {}) {
       const response = await fetch(
         `/api/experiences?${queryParams.toString()}`
       );
-      if (!response.ok) {
-        throw new Error('Failed to fetch experiences');
-      }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCatalogResponse({
+        response,
+        schema: experienceListResponseSchema,
+        fallback: 'Failed to fetch experiences',
+      });
     },
   });
 }
@@ -44,14 +50,12 @@ export function useCreateExperience() {
         body: JSON.stringify(experienceEditableFields(experience)),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        displayToast(error.message || 'Failed to create experience', 'error');
-        throw new Error(error.error || 'Failed to create experience');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCatalogResponse({
+        response,
+        schema: experienceResponseSchema,
+        fallback: 'Failed to create experience',
+        failure: message => displayToast(message, 'error'),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['experiences'] });
@@ -77,14 +81,12 @@ export function useUpdateExperience() {
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        displayToast(error.message || 'Failed to update experience', 'error');
-        throw new Error(error.error || 'Failed to update experience');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCatalogResponse({
+        response,
+        schema: experienceResponseSchema,
+        fallback: 'Failed to update experience',
+        failure: message => displayToast(message, 'error'),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['experiences'] });
@@ -103,13 +105,12 @@ export function useDeleteExperience() {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete experience');
-      }
-
-      const result = await response.json();
-      return result.success ? result : result;
+      return readCatalogResponse({
+        response,
+        schema: catalogDeleteResponseSchema,
+        fallback: 'Failed to delete experience',
+        failure: 'server-error',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['experiences'] });

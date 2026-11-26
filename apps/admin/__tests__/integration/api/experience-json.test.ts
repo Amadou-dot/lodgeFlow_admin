@@ -1,8 +1,13 @@
+import {
+  catalogDeleteResponseSchema,
+  experienceListResponseSchema,
+  experienceResponseSchema,
+} from '@/lib/validations/catalog-json';
 import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
 import { Experience } from '@lodgeflow/database';
 import { GET, POST } from '@/app/api/experiences/route';
-import { GET as getById, PUT } from '@/app/api/experiences/[id]/route';
+import { DELETE, GET as getById, PUT } from '@/app/api/experiences/[id]/route';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 
@@ -61,10 +66,14 @@ test('list/detail return full saved JSON with IDs, timestamps and version', asyn
   const expected = json(await Experience.findById(item._id));
   const list = await GET(request());
   expect(list.status).toBe(200);
-  expect(await list.json()).toEqual({ success: true, data: [expected] });
+  const listBody: unknown = await list.json();
+  expect(listBody).toEqual({ success: true, data: [expected] });
+  expect(experienceListResponseSchema.parse(listBody)).toEqual([expected]);
   const detail = await getById(request(), params(String(item._id)));
   expect(detail.status).toBe(200);
-  expect(await detail.json()).toEqual({ success: true, data: expected });
+  const detailBody: unknown = await detail.json();
+  expect(detailBody).toEqual({ success: true, data: expected });
+  expect(experienceResponseSchema.parse(detailBody)).toEqual(expected);
   expect(expected).not.toHaveProperty('reservationVersion');
 });
 
@@ -73,7 +82,7 @@ test('retains hydrated defaults, sparse omissions and explicit legacy nulls', as
   await Experience.collection.insertOne({
     _id: id,
     name: payload.name,
-    price: 0,
+    price: 12.345,
     duration: payload.duration,
     difficulty: 'Easy',
     category: 'Nature',
@@ -83,19 +92,30 @@ test('retains hydrated defaults, sparse omissions and explicit legacy nulls', as
     gallery: null,
     rating: null,
     location: null,
+    updatedAt: new Date('+010000-01-01T00:00:00.000Z'),
+    __v: null,
+    tags: ['', null, 'Local'],
     minAge: null,
+    available: null,
   });
   const expected = json(await Experience.findById(id));
   const response = await getById(request(), params(String(id)));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ success: true, data: expected });
+  const detailBody: unknown = await response.json();
+  expect(detailBody).toEqual({ success: true, data: expected });
+  expect(experienceResponseSchema.parse(detailBody)).toEqual(expected);
   expect(expected).toMatchObject({
     gallery: null,
     rating: null,
     location: null,
     minAge: null,
+    updatedAt: '+010000-01-01T00:00:00.000Z',
+    __v: null,
+    price: 12.345,
+    tags: ['', null, 'Local'],
     isPopular: false,
     includes: [],
+    available: null,
   });
   expect(expected).not.toHaveProperty('createdAt');
 });
@@ -106,7 +126,9 @@ test('creation retains selected reservationVersion and defaults', async () => {
   const stored = await Experience.findOne({ name: payload.name }).select(
     '+reservationVersion'
   );
-  expect(await response.json()).toEqual({ success: true, data: json(stored) });
+  const body: unknown = await response.json();
+  expect(body).toEqual({ success: true, data: json(stored) });
+  expect(experienceResponseSchema.parse(body)).toEqual(json(stored));
 });
 
 test('update preserves omitted fields and exact saved JSON', async () => {
@@ -123,7 +145,9 @@ test('update preserves omitted fields and exact saved JSON', async () => {
     price: 25,
     maxParticipants: 4,
   });
-  expect(await response.json()).toEqual({ success: true, data: json(stored) });
+  const body: unknown = await response.json();
+  expect(body).toEqual({ success: true, data: json(stored) });
+  expect(experienceResponseSchema.parse(body)).toEqual(json(stored));
 });
 
 test.each(['list', 'detail'])(
@@ -144,3 +168,17 @@ test.each(['list', 'detail'])(
     });
   }
 );
+
+test('deletion returns an explicit null success envelope', async () => {
+  const item = await Experience.create(payload);
+  const id = String(item._id);
+  const response = await DELETE(request({ method: 'DELETE' }), params(id));
+  expect(response.status).toBe(200);
+  const body: unknown = await response.json();
+  expect(catalogDeleteResponseSchema.parse(body)).toEqual({
+    success: true,
+    data: null,
+    message: 'Experience deleted successfully',
+  });
+  expect(await Experience.findById(id)).toBeNull();
+});

@@ -61,6 +61,10 @@ export default function ExperiencePage({ params }: { params: Params }) {
     );
   }
 
+  const gallery = experience.gallery?.filter((image): image is string =>
+    Boolean(image)
+  );
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy':
@@ -235,14 +239,14 @@ export default function ExperiencePage({ params }: { params: Params }) {
           )}
 
           {/* Gallery */}
-          {experience.gallery && experience.gallery.length > 0 && (
+          {gallery && gallery.length > 0 && (
             <Card>
               <CardHeader>
                 <h3 className='text-xl font-bold'>Gallery</h3>
               </CardHeader>
               <CardBody>
                 <div className='grid grid-cols-2 md:grid-cols-3 gap-4'>
-                  {experience.gallery.map((image, index) => (
+                  {gallery.map((image, index) => (
                     <div
                       key={index}
                       className='relative h-32 rounded-lg overflow-hidden'
