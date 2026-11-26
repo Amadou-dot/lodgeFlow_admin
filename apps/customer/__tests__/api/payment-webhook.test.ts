@@ -142,6 +142,78 @@ it.each(['true', 'false'])(
   }
 );
 
+it('expires only the matching pending cabin quote and acknowledges repeat delivery once', async () => {
+  const pending = {
+    _id: 'booking',
+    checkoutToken: 'current',
+    checkoutPending: true,
+    stripeSessionId: 'cs_current',
+    __v: 4,
+  };
+  const booking: {
+    _id: string;
+    checkoutToken: string;
+    checkoutPending: boolean;
+    stripeSessionId?: string;
+    __v: number;
+  } = { ...pending };
+  const processed = new Set<string>();
+  (ProcessedStripeEvent.exists as jest.Mock).mockImplementation(({ eventId }) =>
+    processed.has(eventId)
+  );
+  (ProcessedStripeEvent.updateOne as jest.Mock).mockImplementation(
+    ({ eventId }) => processed.add(eventId)
+  );
+  (Booking.updateOne as jest.Mock).mockImplementation((filter, update) => {
+    expect(filter).toEqual({
+      _id: pending._id,
+      checkoutToken: expect.any(String),
+      checkoutPending: true,
+    });
+    expect(update).toEqual({
+      $set: { checkoutPending: false },
+      $unset: { stripeSessionId: 1 },
+      $inc: { __v: 1 },
+    });
+    if (
+      filter.checkoutToken === booking.checkoutToken &&
+      filter.checkoutPending === booking.checkoutPending
+    ) {
+      booking.checkoutPending = update.$set.checkoutPending;
+      delete booking.stripeSessionId;
+      booking.__v += update.$inc.__v;
+    }
+  });
+  const expired = (token: string) => ({
+    id: 'evt_expired_' + token,
+    type: 'checkout.session.expired',
+    data: {
+      object: {
+        id: 'cs_' + token,
+        metadata: { bookingId: pending._id, quoteToken: token },
+      },
+    },
+  });
+  expect((await POST(signedRequest(expired('old')))).status).toBe(200);
+  expect(Booking.updateOne).toHaveBeenLastCalledWith(
+    { _id: pending._id, checkoutToken: 'old', checkoutPending: true },
+    expect.anything()
+  );
+  expect(booking).toEqual(pending);
+  expect((await POST(signedRequest(expired('current')))).status).toBe(200);
+  const cleared = {
+    _id: pending._id,
+    checkoutToken: 'current',
+    checkoutPending: false,
+    __v: 5,
+  };
+  expect(booking).toEqual(cleared);
+  expect((await POST(signedRequest(expired('current')))).status).toBe(200);
+  expect(Booking.updateOne).toHaveBeenCalledTimes(2);
+  expect(ProcessedStripeEvent.updateOne).toHaveBeenCalledTimes(2);
+  expect(booking).toEqual(cleared);
+});
+
 it('does not repeat email delivery for processed events or unchanged receipts', async () => {
   (ProcessedStripeEvent.exists as jest.Mock).mockResolvedValueOnce({
     eventId: paidEvent.id,

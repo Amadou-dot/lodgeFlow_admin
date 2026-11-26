@@ -1,3 +1,5 @@
+import { ProviderContext } from '@heroui/system';
+import userEvent from '@testing-library/user-event';
 import {
   act,
   fireEvent,
@@ -53,15 +55,29 @@ jest.mock('@heroui/ripple', () => ({
 jest.mock('@heroui/toast', () => ({ addToast: jest.fn() }));
 jest.mock('@/hooks/useSettings', () => ({ useSettings: () => ({}) }));
 jest.mock('@heroui/date-picker', () => ({
-  DatePicker: ({ onChange }: { onChange: (date: CalendarDate) => void }) => (
-    <button onClick={() => onChange(parseDate('2040-02-01'))}>Pick day</button>
-  ),
-  DateRangePicker: ({
+  DatePicker: ({
+    value,
     onChange,
   }: {
+    value: CalendarDate | null;
+    onChange: (date: CalendarDate) => void;
+  }) => (
+    <button
+      data-selection={value?.toString()}
+      onClick={() => onChange(parseDate('2040-02-01'))}
+    >
+      Pick day
+    </button>
+  ),
+  DateRangePicker: ({
+    value,
+    onChange,
+  }: {
+    value: { start: CalendarDate; end: CalendarDate } | null;
     onChange: (range: { start: CalendarDate; end: CalendarDate }) => void;
   }) => (
     <button
+      data-selection={value && [value.start, value.end].join('/')}
       type='button'
       onClick={() =>
         onChange({
@@ -86,7 +102,7 @@ const dining = {
   type: 'menu',
   mealType: 'dinner',
   category: 'regular',
-  maxPeople: 0,
+  maxPeople: 4,
   servingTime,
 } satisfies Dining;
 const experience = {
@@ -159,7 +175,8 @@ function deferred<T>() {
 async function mount(
   kind: Kind,
   create: () => Promise<Response>,
-  checkout?: () => Promise<Response>
+  checkout?: () => Promise<Response>,
+  chooseDraft = false
 ) {
   const [createPath, , label] = paths[kind];
   const createPost = jest.fn(create);
@@ -196,23 +213,51 @@ async function mount(
   let listingId = listing;
   const ui = () => (
     <QueryClientProvider client={client}>
-      {kind === 'dining' ? (
-        <DiningReservationForm dining={{ ...dining, _id: listingId }} />
-      ) : kind === 'experience' ? (
-        <ExperienceBookingForm experience={{ ...experience, _id: listingId }} />
-      ) : (
-        <BookingForm cabin={{ ...cabin, _id: listingId }} userData={userData} />
-      )}
+      <ProviderContext value={{ disableAnimation: true }}>
+        {kind === 'dining' ? (
+          <DiningReservationForm dining={{ ...dining, _id: listingId }} />
+        ) : kind === 'experience' ? (
+          <ExperienceBookingForm
+            experience={{ ...experience, _id: listingId }}
+          />
+        ) : (
+          <BookingForm
+            cabin={{ ...cabin, _id: listingId }}
+            userData={userData}
+          />
+        )}
+      </ProviderContext>
     </QueryClientProvider>
   );
   const mounted = render(ui());
   fireEvent.click(screen.getByRole('button', { name: 'Pick day' }));
-  if (kind !== 'experience') {
+  const user = userEvent.setup();
+  if (kind === 'dining' && chooseDraft) {
+    await user.click(screen.getByRole('button', { name: /Select Time/ }));
+    await user.click(await screen.findByRole('option', { name: '17:00' }));
+  } else if (kind !== 'experience') {
     const select = mounted.container.querySelector('select');
     if (!select) throw new Error('Missing selection');
     fireEvent.change(select, {
       target: { value: kind === 'dining' ? '17:00' : '2' },
     });
+  }
+  if (chooseDraft) {
+    if (kind === 'cabin') {
+      fireEvent.click(screen.getByRole('checkbox', { name: /add breakfast/ }));
+    } else {
+      fireEvent.change(screen.getByRole('spinbutton'), {
+        target: { value: '3' },
+      });
+      if (kind === 'dining') {
+        await user.click(
+          screen.getByRole('button', { name: /Table Preference/ })
+        );
+        await user.click(
+          await screen.findByRole('option', { name: 'Outdoor' })
+        );
+      }
+    }
   }
   const draft = screen.getByRole('textbox', { name: /Special Requests/ });
   fireEvent.change(draft, { target: { value: 'Quiet please' } });
@@ -253,34 +298,60 @@ for (const kind of ['dining', 'experience', 'cabin'] as const) {
   ])(
     kind + ' retains the draft and prevents repeat create after %s',
     async failure => {
-      const result = await mount(kind, async () => {
-        if (failure === 'contradictory rejection')
-          return FetchResponse.json(
-            { success: false, data: record(kind), error: 'Unavailable' },
-            { status: 409 }
-          );
-        if (failure === 'unreadable rejection')
-          return new FetchResponse('{', { status: 409 });
-        if (failure === 'different owner')
-          return reply({ ...record(kind), customer: 'other' });
-        if (failure === 'unexpected success status')
-          return FetchResponse.json({ success: true, data: record(kind) });
-        if (failure === 'network interruption') throw new TypeError('network');
-        if (failure === 'unreadable body')
-          return new FetchResponse('{', { status: 201 });
-        if (failure === 'server failure')
-          return FetchResponse.json(
-            { success: false, error: 'Failed to create' },
-            { status: 500 }
-          );
-        return FetchResponse.json({ success: true }, { status: 201 });
-      });
+      const result = await mount(
+        kind,
+        async () => {
+          if (failure === 'contradictory rejection')
+            return FetchResponse.json(
+              { success: false, data: record(kind), error: 'Unavailable' },
+              { status: 409 }
+            );
+          if (failure === 'unreadable rejection')
+            return new FetchResponse('{', { status: 409 });
+          if (failure === 'different owner')
+            return reply({ ...record(kind), customer: 'other' });
+          if (failure === 'unexpected success status')
+            return FetchResponse.json({ success: true, data: record(kind) });
+          if (failure === 'network interruption')
+            throw new TypeError('network');
+          if (failure === 'unreadable body')
+            return new FetchResponse('{', { status: 201 });
+          if (failure === 'server failure')
+            return FetchResponse.json(
+              { success: false, error: 'Failed to create' },
+              { status: 500 }
+            );
+          return FetchResponse.json({ success: true }, { status: 201 });
+        },
+        undefined,
+        failure === 'unreadable body'
+      );
       result.press();
       await waitFor(() => expect(addToast).toHaveBeenCalled());
       expect(addToast).not.toHaveBeenCalledWith(
         expect.objectContaining({ color: 'success' })
       );
       expect(result.draft).toHaveValue('Quiet please');
+      if (failure === 'unreadable body') {
+        expect(
+          screen.getByRole('button', { name: 'Pick day' })
+        ).toHaveAttribute(
+          'data-selection',
+          kind === 'cabin' ? '2040-02-01/2040-02-02' : '2040-02-01'
+        );
+        if (kind === 'cabin') {
+          expect(screen.getByDisplayValue(/2 guests/i)).toBeInTheDocument();
+          expect(
+            screen.getByRole('checkbox', { name: /add breakfast/ })
+          ).toBeChecked();
+        } else {
+          expect(screen.getByRole('spinbutton')).toHaveValue(3);
+          if (kind === 'dining') {
+            expect(screen.getByDisplayValue('17:00')).toBeInTheDocument();
+            expect(screen.getByDisplayValue(/outdoor/i)).toBeInTheDocument();
+          }
+        }
+      }
       const history = screen.getByRole('link', {
         name: 'Load current bookings',
       });
@@ -406,6 +477,12 @@ for (const kind of ['dining', 'experience'] as const) {
           FetchResponse.json({ error: 'Unavailable' }, { status: 409 })
         )
       );
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Payment still required',
+          color: 'warning',
+        })
+      );
       expect(mockPush).toHaveBeenCalledWith(paths[kind][1] + id);
       expect(
         screen.getByRole('link', { name: 'View confirmation' })
@@ -419,6 +496,36 @@ for (const kind of ['dining', 'experience'] as const) {
     }
   );
 }
+
+test.each(['dining', 'experience'] as const)(
+  '%s ignores a valid checkout URL delivered after the creating session retires',
+  async kind => {
+    const pending = deferred<Response>();
+    const result = await mount(
+      kind,
+      async () => reply(record(kind, 25)),
+      () => pending.promise
+    );
+    result.press();
+    await waitFor(() => expect(result.checkoutPost).toHaveBeenCalledTimes(1));
+    const originalUrl = window.location.href;
+    mockSession = 'replacement';
+    result.rerender();
+    await act(async () =>
+      pending.resolve(
+        FetchResponse.json({
+          success: true,
+          data: { url: originalUrl + '#checkout' },
+        })
+      )
+    );
+    expect(window.location.href).toBe(originalUrl);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'warning' })
+    );
+  }
+);
 
 test.each(['dining', 'experience'] as const)(
   '%s suppresses late checkout recovery after session replacement',

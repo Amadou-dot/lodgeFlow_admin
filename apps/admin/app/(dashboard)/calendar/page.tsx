@@ -39,15 +39,25 @@ export default function CalendarPage() {
   const request = useCallback(
     async (signal: AbortSignal) => {
       const response = await fetch(endpoint, { signal, cache: 'no-store' });
-      const data = await readCalendarResponse({ response, kind });
-      if (data.start !== start || data.end !== end)
+      const calendar =
+        kind === 'cabins'
+          ? ({
+              kind,
+              data: await readCalendarResponse({ response, kind }),
+            } as const)
+          : ({
+              kind,
+              data: await readCalendarResponse({ response, kind }),
+            } as const);
+      if (calendar.data.start !== start || calendar.data.end !== end)
         throw new Error('Unable to load calendar');
-      return data;
+      return calendar;
     },
     [endpoint, kind, start, end]
   );
   const { state } = useResourceLoad({ resourceKey: endpoint, request });
-  const data = state.data;
+  const calendar = state.data;
+  const data = calendar?.data;
   const error = state.kind === 'error' ? state.message : '';
   const loading = state.kind === 'loading';
   const move = (offset: number) =>
@@ -65,9 +75,9 @@ export default function CalendarPage() {
     )
       days.push(new Date(day).toISOString().slice(0, 10));
   function cabinCells(resource: Resource) {
-    const stays = (data?.reservations ?? []).filter(
-      stay => stay.cabin === resource._id
-    );
+    const stays = (
+      calendar?.kind === 'cabins' ? calendar.data.reservations : []
+    ).filter(stay => stay.cabin === resource._id);
     const cells = [];
     for (let index = 0; index < days.length;) {
       const day = days[index];
@@ -112,7 +122,9 @@ export default function CalendarPage() {
     return cells;
   }
   function capacityCell(resource: Resource, day: string) {
-    const usage: CalendarUsage[] = (data?.usage ?? []).filter(
+    const usage: CalendarUsage[] = (
+      calendar && calendar.kind !== 'cabins' ? calendar.data.usage : []
+    ).filter(
       item => item._id.resourceId === resource._id && item._id.date === day
     );
     const type = kind === 'dining' ? 'dining' : 'experience';

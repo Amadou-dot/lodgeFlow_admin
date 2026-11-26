@@ -15,7 +15,7 @@
     "check:types": "tsx scripts/check-types.ts",
     "check:types:test-scripts": "tsc --noEmit --project tsconfig.test-scripts.json",
     "seed": "tsx scripts/seed.ts",
-    "test": "jest",
+    "test": "node --import tsx --test __tests__/setup/factory-defaults.test.ts && jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest --selectProjects unit",

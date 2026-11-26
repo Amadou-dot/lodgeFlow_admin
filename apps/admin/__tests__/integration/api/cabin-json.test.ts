@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
 import { AuditLog, Cabin } from '@lodgeflow/database';
-import { GET, POST, PUT } from '@/app/api/cabins/route';
+import { DELETE, GET, POST, PUT } from '@/app/api/cabins/route';
 import {
   DELETE as deleteById,
   GET as getById,
@@ -189,20 +189,43 @@ test('list and detail keep model-valid nulls, blank amenity members and fraction
   expect(cabinResponseSchema.parse(detailBody)).toEqual(expected);
 });
 
-test('deleting by ID returns an explicit null and the existing message', async () => {
-  const cabin = await Cabin.create(payload);
-  const id = String(cabin._id);
-  const response = await deleteById(request({ method: 'DELETE' }), params(id));
-  expect(response.status).toBe(200);
-  const body: unknown = await response.json();
-  expect(body).toEqual({
-    success: true,
-    data: null,
-    message: 'Cabin deleted successfully',
-  });
-  expect(cabinDeleteResponseSchema.parse(body)).toEqual(body);
-  expect(await Cabin.findById(id)).toBeNull();
-});
+test.each(['collection', 'detail'])(
+  'deleting via %s returns explicit null and records the deletion',
+  async endpoint => {
+    const cabin = await Cabin.create(payload);
+    const id = String(cabin._id);
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      LODGEFLOW_STAFF_ORG_ID: 'org_cabin_delete',
+    });
+    const response =
+      endpoint === 'collection'
+        ? await DELETE(
+            request({ path: '/api/cabins?id=' + id, method: 'DELETE' })
+          )
+        : await deleteById(request({ method: 'DELETE' }), params(id));
+    expect(response.status).toBe(200);
+    const body: unknown = await response.json();
+    expect(body).toEqual({
+      success: true,
+      data: null,
+      message: 'Cabin deleted successfully',
+    });
+    expect(cabinDeleteResponseSchema.parse(body)).toEqual(body);
+    expect(await Cabin.findById(id)).toBeNull();
+    const audits = await AuditLog.find({
+      resourceId: id,
+      action: 'cabin.delete',
+    }).lean();
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      actor: 'user_manager',
+      actorRole: 'manager',
+      before: { name: payload.name },
+      after: { name: null },
+    });
+  }
+);
 
 test('preserves list sorting, explicit status and conflicting legacy filter precedence', async () => {
   await Cabin.create(payload);

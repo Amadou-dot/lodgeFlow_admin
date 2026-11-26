@@ -160,6 +160,12 @@ test.each([
         );
         await expect(submit()).rejects.toThrow();
       }
+      if (action === 'create') {
+        fetchMock.mockResolvedValueOnce(
+          new Response('gateway', { status: 502 })
+        );
+        await expect(submit()).rejects.toThrow(/^Failed to create booking$/);
+      }
       fetchMock.mockResolvedValueOnce(new Response('gateway'));
       await expect(submit()).rejects.toThrow(/Failed to/);
       fetchMock.mockResolvedValueOnce(
@@ -184,7 +190,11 @@ test.each([
       expect(invalidated).toHaveBeenCalledWith({ queryKey: [key] });
     if (action === 'update') {
       expect(addToast).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'Update failed', color: 'danger' })
+        expect.objectContaining({
+          title: 'Update failed',
+          description: 'Booking rejected',
+          color: 'danger',
+        })
       );
       expect(addToast).toHaveBeenCalledWith(
         expect.objectContaining({ title: 'Booking updated', color: 'success' })
@@ -268,7 +278,10 @@ test('a malformed committed receipt acknowledgement retries the same reference a
   });
   expect(fetchMock).toHaveBeenCalledWith(
     '/api/bookings/' + id,
-    expect.objectContaining({ method: 'PATCH' })
+    expect.objectContaining({
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+    })
   );
   for (const key of related)
     expect(invalidated).toHaveBeenCalledWith({ queryKey: [key] });
