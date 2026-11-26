@@ -11,11 +11,14 @@ import type { StaffMemberJson } from '@/types/staff-audit';
 import type { ReservationInboxJson } from '@/types/reservation-calendar';
 import ReservationsPage from '@/app/(dashboard)/reservations/page';
 import StaffPage from '@/app/(dashboard)/staff/page';
+import type { AppSettings } from '@/types';
+import { legacyCurrencySettings } from '../setup/settings-fixture';
 jest.mock('@/components/AuthGuard', () => ({
   useStaffAccess: () => ({ userId: 'self' }),
 }));
+let mockSettings: AppSettings | undefined;
 jest.mock('@/hooks/useSettings', () => ({
-  useSettings: () => ({ data: undefined }),
+  useSettings: () => ({ data: mockSettings }),
 }));
 jest.mock('@/components/OperationsPage', () => {
   const actual = jest.requireActual<
@@ -81,6 +84,7 @@ function ok(data: unknown) {
   return { ok: true, json: async () => ({ success: true, data }) };
 }
 beforeEach(() => {
+  mockSettings = undefined;
   fetchMock.mockReset();
   global.fetch = fetchMock;
 });
@@ -146,6 +150,22 @@ test('inbox retry keeps page/limit filters and clears a failed load', async () =
   expect(String(fetchMock.mock.calls[1][0])).toBe(url);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+test.each([
+  [legacyCurrencySettings.currency, '10 A1!'],
+  ['JPY', '¥10'],
+  [null, '$10.00'],
+])(
+  'inbox renders a reservation in Settings currency %s',
+  async (currency, displayed) => {
+    mockSettings = { ...legacyCurrencySettings, currency };
+    fetchMock.mockResolvedValueOnce(ok(inbox));
+    render(<ReservationsPage />);
+
+    expect(await screen.findByText(displayed)).toBeInTheDocument();
+    expect(screen.getByText('Balance due')).toBeInTheDocument();
+  }
+);
+
 test('changing inbox filters aborts and ignores a late response for the previous filters', async () => {
   let finish: (value: ReturnType<typeof ok>) => void = () => {
     throw new Error('not started');

@@ -4,7 +4,7 @@ import { useSettings } from '@/hooks/useSettings';
 import type { AdminBooking } from '@/types/booking-read';
 import {
   calcNumNights,
-  formatCurrency as formatCurrencyAmount,
+  formatSettingsCurrency,
 } from '@/utils/utilityFunctions';
 import { majorAmount, roundMajorAmount } from '@lodgeflow/database/money';
 import { useInfiniteScroll } from '@heroui/use-infinite-scroll';
@@ -332,7 +332,7 @@ function useBookingFormDraft({
   // Utility functions - memoized
   const formatCurrency = useCallback(
     (amount: number) => {
-      return formatCurrencyAmount(amount, settings?.currency || 'USD');
+      return formatSettingsCurrency(amount, settings?.currency);
     },
     [settings?.currency]
   );

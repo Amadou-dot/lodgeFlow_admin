@@ -18,7 +18,7 @@ import {
   TableRow,
   TableCell,
 } from '@heroui/table';
-import { formatCurrency } from '@/utils/utilityFunctions';
+import { formatSettingsCurrency } from '@/utils/utilityFunctions';
 import { getStatusColor } from '@/utils/bookingUtils';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -206,9 +206,9 @@ export default function ReservationsPage() {
                         </Chip>
                       </TableCell>
                       <TableCell className='p-3 whitespace-nowrap'>
-                        {formatCurrency(
+                        {formatSettingsCurrency(
                           row.totalPrice,
-                          settings?.currency ?? undefined
+                          settings?.currency
                         )}
                         <div className='mt-1'>
                           <Chip
