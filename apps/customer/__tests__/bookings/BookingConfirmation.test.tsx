@@ -4,13 +4,6 @@ import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 import type { BookingDetail } from '@/types/booking-read';
 
-jest.mock('@/hooks/usePayment', () => ({
-  useCreateCheckoutSession: () => ({
-    isPending: false,
-    mutateAsync: jest.fn(),
-  }),
-}));
-
 function bookingFixture(overrides: Partial<BookingDetail> = {}): BookingDetail {
   return {
     _id: '507f1f77bcf86cd799439011',

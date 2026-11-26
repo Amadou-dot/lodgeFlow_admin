@@ -18,6 +18,12 @@ let mockUserId = 'guest';
 let mockLoaded = true;
 let mockSignedIn = true;
 jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({
+    isLoaded: mockLoaded,
+    isSignedIn: mockSignedIn,
+    userId: mockSignedIn ? mockUserId : null,
+    sessionId: mockSignedIn ? 'session' : null,
+  }),
   useUser: () => ({
     user: mockSignedIn
       ? {
