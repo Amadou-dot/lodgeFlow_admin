@@ -52,7 +52,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "expectSafeDiagnostic",
-      "syntax": "age",
+      "syntax": "age?: number | null;",
       "disposition": "The webhook diagnostic test defaults omitted age to zero; explicit null asserts an unavailable or unparsable signature timestamp."
     },
     {
@@ -61,7 +61,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "PricingItem",
-      "syntax": "includes",
+      "syntax": "includes?: (string | null)[] | null;",
       "disposition": "PricingGrid maps a present catalog inclusions list into list items. Missing and explicit null lists both omit the section."
     },
     {
@@ -70,7 +70,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "PricingItem",
-      "syntax": "available",
+      "syntax": "available?: (string | null)[] | null;",
       "disposition": "PricingGrid uses the catalog availability list only when present; sparse listings and explicitly null days remain renderable."
     },
     {
@@ -79,7 +79,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "PricingItem",
-      "syntax": "isPopular",
+      "syntax": "isPopular?: boolean | null;",
       "disposition": "PricingGrid shows the popular badge and shadow for a positive catalog flag; both missing and explicit null suppress it."
     },
     {
@@ -97,7 +97,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "__v",
+      "syntax": "__v?: number | null;",
       "disposition": "Version is optional on historic lean rows; preserve explicit null on the wire without creating a version."
     },
     {
@@ -106,7 +106,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "payments",
+      "syntax": "payments?: {\n    id: string;\n    amount: number;\n    method: (typeof PAYMENT_METHODS)[number];\n    receivedAt: string;\n    paymentIntentId?: string | null;\n    refundedAmount?: number | null;\n}[] | null;",
       "disposition": "Preserve legacy receipt/refund payments as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -115,7 +115,7 @@
       "column": 9,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "paymentIntentId",
+      "syntax": "paymentIntentId?: string | null;",
       "disposition": "Preserve legacy receipt/refund paymentIntentId as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -124,7 +124,7 @@
       "column": 9,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "refundedAmount",
+      "syntax": "refundedAmount?: number | null;",
       "disposition": "Preserve legacy receipt/refund refundedAmount as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -133,7 +133,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "checkoutToken",
+      "syntax": "checkoutToken?: string | null;",
       "disposition": "Retain historical checkout/payment metadata checkoutToken on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -142,7 +142,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "checkoutAmount",
+      "syntax": "checkoutAmount?: number | null;",
       "disposition": "Retain historical checkout/payment metadata checkoutAmount on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -151,7 +151,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "checkoutTotalPrice",
+      "syntax": "checkoutTotalPrice?: number | null;",
       "disposition": "Retain historical checkout/payment metadata checkoutTotalPrice on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -160,7 +160,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "checkoutCurrency",
+      "syntax": "checkoutCurrency?: string | null;",
       "disposition": "Retain historical checkout/payment metadata checkoutCurrency on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -169,7 +169,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "paymentMethod",
+      "syntax": "paymentMethod?: (typeof PAYMENT_METHODS)[number] | null;",
       "disposition": "Retain historical checkout/payment metadata paymentMethod on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -178,7 +178,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "extras",
+      "syntax": "extras?: {\n    hasBreakfast: boolean;\n    breakfastPrice: number;\n    hasPets: boolean;\n    petFee: number;\n    hasParking: boolean;\n    parkingFee: number;\n    hasEarlyCheckIn: boolean;\n    earlyCheckInFee: number;\n    hasLateCheckOut: boolean;\n    lateCheckOutFee: number;\n} | null;",
       "disposition": "Booking JSON retains omitted, null and populated extras. Booking editor fixtures verify untouched extras are omitted from PATCH."
     },
     {
@@ -187,7 +187,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "observations",
+      "syntax": "observations?: string | null;",
       "disposition": "Legacy notes preserve explicit null and sparse omission in the booking read DTO; editor normalization stays local."
     },
     {
@@ -196,7 +196,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "stripePaymentIntentId",
+      "syntax": "stripePaymentIntentId?: string | null;",
       "disposition": "Retain historical checkout/payment metadata stripePaymentIntentId on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -205,7 +205,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "stripeSessionId",
+      "syntax": "stripeSessionId?: string | null;",
       "disposition": "Retain historical checkout/payment metadata stripeSessionId on serialized booking reads. Omitted fields and explicit null represent different JSON, without deriving an active checkout or new receipt."
     },
     {
@@ -214,7 +214,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "paidAt",
+      "syntax": "paidAt?: string | null;",
       "disposition": "Booking JSON converts present paidAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -223,7 +223,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "cancelledAt",
+      "syntax": "cancelledAt?: string | null;",
       "disposition": "Booking JSON converts present cancelledAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -232,7 +232,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "cancellationReason",
+      "syntax": "cancellationReason?: string | null;",
       "disposition": "Keep stored optional cancellation text including explicit null in confirmation/history JSON; the booking page conditionally displays a present reason."
     },
     {
@@ -241,7 +241,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "refundAmount",
+      "syntax": "refundAmount?: number | null;",
       "disposition": "Preserve legacy receipt/refund refundAmount as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -250,7 +250,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "refundRequestedAmount",
+      "syntax": "refundRequestedAmount?: number | null;",
       "disposition": "Preserve legacy receipt/refund refundRequestedAmount as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -259,7 +259,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "cancellationRefunds",
+      "syntax": "cancellationRefunds?: {\n    paymentIntentId: string;\n    amount: number;\n    refundId?: string | null;\n}[] | null;",
       "disposition": "Preserve legacy receipt/refund cancellationRefunds as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -268,7 +268,7 @@
       "column": 50,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "refundId",
+      "syntax": "refundId?: string | null;",
       "disposition": "Preserve legacy receipt/refund refundId as missing or explicit null. booking-json serializes the stored ledger and payment-status.test.ts/booking-read.test.ts cover sparse accounting responses."
     },
     {
@@ -277,7 +277,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "refundedAt",
+      "syntax": "refundedAt?: string | null;",
       "disposition": "Booking JSON converts present refundedAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -286,7 +286,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "paymentConfirmationSentAt",
+      "syntax": "paymentConfirmationSentAt?: string | null;",
       "disposition": "Booking JSON converts present paymentConfirmationSentAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -295,7 +295,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "checkInTime",
+      "syntax": "checkInTime?: string | null;",
       "disposition": "Booking JSON converts present checkInTime Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -304,7 +304,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "checkOutTime",
+      "syntax": "checkOutTime?: string | null;",
       "disposition": "Booking JSON converts present checkOutTime Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -313,7 +313,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: string | null;",
       "disposition": "Booking JSON converts present createdAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -322,7 +322,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadFields",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: string | null;",
       "disposition": "Booking JSON converts present updatedAt Date values to ISO timestamps and preserves null and missing fields. Booking history/detail and payment-status fixtures exercise this adapter."
     },
     {
@@ -331,7 +331,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BookingReadSource",
-      "syntax": "payments",
+      "syntax": "payments?: (Omit<NonNullable<BookingReadFields[\"payments\"]>[number], \"receivedAt\"> & {\n    receivedAt: Date;\n})[] | null;",
       "disposition": "Booking receipt source can be absent, null or a list with Date-valued receivedAt; serializeBookingDetail converts the dates only for a real array."
     },
     {
@@ -340,7 +340,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinSummary",
-      "syntax": "bedrooms",
+      "syntax": "bedrooms?: number | null;",
       "disposition": "CabinSummary.bedrooms — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -349,7 +349,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinSummary",
-      "syntax": "bathrooms",
+      "syntax": "bathrooms?: number | null;",
       "disposition": "CabinSummary.bathrooms — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -358,7 +358,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinSummary",
-      "syntax": "size",
+      "syntax": "size?: number | null;",
       "disposition": "CabinSummary.size — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -367,7 +367,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinSummary",
-      "syntax": "minNights",
+      "syntax": "minNights?: number | null;",
       "disposition": "CabinSummary.minNights — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -376,7 +376,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinDetail",
-      "syntax": "extraGuestFee",
+      "syntax": "extraGuestFee?: number | null;",
       "disposition": "CabinDetail.extraGuestFee — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -385,7 +385,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinDetail",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: string | null;",
       "disposition": "CabinDetail.createdAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -394,7 +394,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinDetail",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: string | null;",
       "disposition": "CabinDetail.updatedAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -403,7 +403,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "CabinDetail",
-      "syntax": "__v",
+      "syntax": "__v?: number | null;",
       "disposition": "CabinDetail.__v — sparse database rows can omit version and hydrated legacy rows can store null. See admin integration/api/cabin-json.test.ts."
     },
     {
@@ -412,7 +412,7 @@
       "column": 28,
       "rule": "optional-null",
       "owner": "CabinDetailSource",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: Date | null;",
       "disposition": "Preserve missing/null createdAt in the Mongo source; the CabinDetail serializer converts present Date values to ISO text."
     },
     {
@@ -421,7 +421,7 @@
       "column": 53,
       "rule": "optional-null",
       "owner": "CabinDetailSource",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: Date | null;",
       "disposition": "Preserve missing/null updatedAt in the Mongo source; the CabinDetail serializer converts present Date values to ISO text."
     },
     {
@@ -430,7 +430,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BeverageJson",
-      "syntax": "description",
+      "syntax": "description?: string | null;",
       "disposition": "Dining embedded beverage description is optional in lean rows, and hydrated rows can carry explicit null; dining-json.test.ts exercises the embedded beverage serializer and IDs."
     },
     {
@@ -439,7 +439,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BeverageJson",
-      "syntax": "price",
+      "syntax": "price?: number | null;",
       "disposition": "Dining embedded beverage price is optional in lean rows, and hydrated rows can carry explicit null; dining-json.test.ts exercises the embedded beverage serializer and IDs."
     },
     {
@@ -448,7 +448,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "BeverageJson",
-      "syntax": "alcoholContent",
+      "syntax": "alcoholContent?: number | null;",
       "disposition": "Dining embedded beverage alcoholContent is optional in lean rows, and hydrated rows can carry explicit null; dining-json.test.ts exercises the embedded beverage serializer and IDs."
     },
     {
@@ -457,7 +457,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "minPeople",
+      "syntax": "minPeople?: number | null;",
       "disposition": "DiningJson.minPeople — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -466,7 +466,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "subCategory",
+      "syntax": "subCategory?: string | null;",
       "disposition": "DiningJson.subCategory — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -475,7 +475,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "gallery",
+      "syntax": "gallery?: (string | null)[] | null;",
       "disposition": "DiningJson.gallery — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -484,7 +484,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "ingredients",
+      "syntax": "ingredients?: (string | null)[] | null;",
       "disposition": "DiningJson.ingredients — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -493,7 +493,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "allergens",
+      "syntax": "allergens?: (string | null)[] | null;",
       "disposition": "DiningJson.allergens — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -502,7 +502,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "dietary",
+      "syntax": "dietary?: (DietaryOption | null)[] | null;",
       "disposition": "DiningJson.dietary — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -511,7 +511,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "beverages",
+      "syntax": "beverages?: BeverageJson[] | null;",
       "disposition": "DiningJson.beverages — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -520,7 +520,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "includes",
+      "syntax": "includes?: (string | null)[] | null;",
       "disposition": "DiningJson.includes — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -529,7 +529,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "duration",
+      "syntax": "duration?: string | null;",
       "disposition": "DiningJson.duration — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -538,7 +538,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "location",
+      "syntax": "location?: string | null;",
       "disposition": "DiningJson.location — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -547,7 +547,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "specialRequirements",
+      "syntax": "specialRequirements?: (string | null)[] | null;",
       "disposition": "DiningJson.specialRequirements — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -556,7 +556,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "isPopular",
+      "syntax": "isPopular?: boolean | null;",
       "disposition": "DiningJson.isPopular — retain absent/null separately from either boolean; listing and UI eligibility keep their own rules. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -565,7 +565,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "isAvailable",
+      "syntax": "isAvailable?: boolean | null;",
       "disposition": "DiningJson.isAvailable — retain absent/null separately from either boolean; listing and UI eligibility keep their own rules. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -574,7 +574,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "seasonality",
+      "syntax": "seasonality?: string | null;",
       "disposition": "DiningJson.seasonality — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -583,7 +583,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "tags",
+      "syntax": "tags?: (string | null)[] | null;",
       "disposition": "DiningJson.tags — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -592,7 +592,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "rating",
+      "syntax": "rating?: number | null;",
       "disposition": "DiningJson.rating — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -601,7 +601,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "reviewCount",
+      "syntax": "reviewCount?: number | null;",
       "disposition": "DiningJson.reviewCount — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -610,7 +610,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: string | null;",
       "disposition": "DiningJson.createdAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -619,7 +619,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: string | null;",
       "disposition": "DiningJson.updatedAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -628,7 +628,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJson",
-      "syntax": "__v",
+      "syntax": "__v?: number | null;",
       "disposition": "DiningJson.__v — sparse database rows can omit version and hydrated legacy rows can store null. See admin integration/api/dining-json.test.ts."
     },
     {
@@ -637,7 +637,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJsonSource",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: Date | null;",
       "disposition": "Preserve missing/null createdAt in the Mongo source; the DiningJson serializer converts present Date values to ISO text."
     },
     {
@@ -646,7 +646,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJsonSource",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: Date | null;",
       "disposition": "Preserve missing/null updatedAt in the Mongo source; the DiningJson serializer converts present Date values to ISO text."
     },
     {
@@ -655,7 +655,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "DiningJsonSource",
-      "syntax": "beverages",
+      "syntax": "beverages?: (Omit<BeverageJson, \"_id\"> & {\n    _id?: Types.ObjectId;\n})[] | null;",
       "disposition": "Preserve missing, null and populated embedded beverage arrays while converting each present ObjectId."
     },
     {
@@ -664,7 +664,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "longDescription",
+      "syntax": "longDescription?: string | null;",
       "disposition": "ExperienceJson.longDescription — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -673,7 +673,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "gallery",
+      "syntax": "gallery?: (string | null)[] | null;",
       "disposition": "ExperienceJson.gallery — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -682,7 +682,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "includes",
+      "syntax": "includes?: (string | null)[] | null;",
       "disposition": "ExperienceJson.includes — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -691,7 +691,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "available",
+      "syntax": "available?: (string | null)[] | null;",
       "disposition": "ExperienceJson.available — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -700,7 +700,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "isPopular",
+      "syntax": "isPopular?: boolean | null;",
       "disposition": "ExperienceJson.isPopular — retain absent/null separately from either boolean; listing and UI eligibility keep their own rules. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -709,7 +709,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "maxParticipants",
+      "syntax": "maxParticipants?: number | null;",
       "disposition": "ExperienceJson.maxParticipants — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -718,7 +718,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "minAge",
+      "syntax": "minAge?: number | null;",
       "disposition": "ExperienceJson.minAge — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -727,7 +727,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "requirements",
+      "syntax": "requirements?: (string | null)[] | null;",
       "disposition": "ExperienceJson.requirements — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -736,7 +736,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "location",
+      "syntax": "location?: string | null;",
       "disposition": "ExperienceJson.location — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -745,7 +745,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "highlights",
+      "syntax": "highlights?: (string | null)[] | null;",
       "disposition": "ExperienceJson.highlights — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -754,7 +754,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "whatToBring",
+      "syntax": "whatToBring?: (string | null)[] | null;",
       "disposition": "ExperienceJson.whatToBring — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -763,7 +763,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "cancellationPolicy",
+      "syntax": "cancellationPolicy?: string | null;",
       "disposition": "ExperienceJson.cancellationPolicy — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -772,7 +772,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "seasonality",
+      "syntax": "seasonality?: string | null;",
       "disposition": "ExperienceJson.seasonality — retain omitted optional descriptive text and explicit stored null when exposing catalog JSON. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -781,7 +781,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "tags",
+      "syntax": "tags?: (string | null)[] | null;",
       "disposition": "ExperienceJson.tags — list absence, a null list and present array members are distinct wire values; keep stored catalog data intact. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -790,7 +790,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "rating",
+      "syntax": "rating?: number | null;",
       "disposition": "ExperienceJson.rating — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -799,7 +799,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "reviewCount",
+      "syntax": "reviewCount?: number | null;",
       "disposition": "ExperienceJson.reviewCount — preserve a stored number, explicit null or missing field on reads; writes apply their own validation. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -808,7 +808,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: string | null;",
       "disposition": "ExperienceJson.createdAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -817,7 +817,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: string | null;",
       "disposition": "ExperienceJson.updatedAt — present dates serialize to ISO, explicit null stays null, absent dates stay omitted. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -826,7 +826,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJson",
-      "syntax": "__v",
+      "syntax": "__v?: number | null;",
       "disposition": "ExperienceJson.__v — sparse database rows can omit version and hydrated legacy rows can store null. See admin integration/api/experience-json.test.ts."
     },
     {
@@ -835,7 +835,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJsonSource",
-      "syntax": "createdAt",
+      "syntax": "createdAt?: Date | null;",
       "disposition": "Preserve missing/null createdAt in the Mongo source; the ExperienceJson serializer converts present Date values to ISO text."
     },
     {
@@ -844,7 +844,7 @@
       "column": 3,
       "rule": "optional-null",
       "owner": "ExperienceJsonSource",
-      "syntax": "updatedAt",
+      "syntax": "updatedAt?: Date | null;",
       "disposition": "Preserve missing/null updatedAt in the Mongo source; the ExperienceJson serializer converts present Date values to ISO text."
     },
     {
