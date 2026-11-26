@@ -244,6 +244,7 @@ describe('dining item mutations', () => {
     ['create', { success: true, data: { _id: dining._id } }, 'create'],
     ['create', { success: true, data: null }, 'create'],
     ['update', { ...dining, price: '25' }, 'update'],
+    ['update', { ...dining, _id: '507f1f77bcf86cd799439012' }, 'update'],
     ['update', { ...dining, success: false, error: 'Denied' }, 'update'],
     ['remove', { success: true }, 'delete'],
     ['remove', { success: true, data: {} }, 'delete'],
@@ -356,5 +357,19 @@ describe('dining item mutations', () => {
         }),
       })
     );
+  });
+});
+
+test('PUT accepts case-equivalent Mongo IDs', async () => {
+  const id = '507f1f77bcf86cd7994390ab';
+  const saved = { ...dining, _id: id, id };
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: saved } })
+  );
+  const { result } = renderHook(useUpdateDining, { wrapper });
+  await act(async () => {
+    await expect(
+      result.current.mutateAsync({ _id: id.toUpperCase() })
+    ).resolves.toEqual(saved);
   });
 });

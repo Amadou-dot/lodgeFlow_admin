@@ -233,3 +233,27 @@ describe('useCustomer', () => {
     expect(mockUseSWR.mock.calls[0]?.[2]?.revalidateOnFocus).toBe(false);
   });
 });
+
+test('customer detail validates the exact Clerk ID in the invoked SWR key', async () => {
+  useCustomer('other');
+  const [, fetcher] = mockUseSWR.mock.calls[0] ?? [];
+  if (typeof fetcher !== 'function')
+    throw new Error('Expected customer detail fetcher');
+  const key = '/api/customers/' + customerDetailFixture.id;
+  jest
+    .mocked(global.fetch)
+    .mockResolvedValueOnce(
+      Response.json({ success: true, data: customerDetailFixture })
+    );
+  await expect(fetcher(key)).resolves.toEqual(customerDetailFixture);
+  jest.mocked(global.fetch).mockResolvedValueOnce(
+    Response.json({
+      success: true,
+      data: {
+        ...customerDetailFixture,
+        id: customerDetailFixture.id.toUpperCase(),
+      },
+    })
+  );
+  await expect(fetcher(key)).rejects.toThrow('Failed to fetch customer');
+});

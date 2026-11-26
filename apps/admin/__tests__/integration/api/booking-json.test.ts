@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { formatBookingAmount } from '@/utils/bookingUtils';
 import { Types } from 'mongoose';
 import { Booking, Cabin } from '@lodgeflow/database';
 import { GET } from '@/app/api/bookings/route';
@@ -304,4 +305,22 @@ test('by-email validates the actual lean result, its stored-only sparse fields a
     { $unset: { extras: '' } }
   );
   expect(await read()).not.toHaveProperty('extras');
+});
+
+test('the detail producer retains a validated large historical cabin price and its ordinary total', async () => {
+  const { booking, cabin } = await fixture();
+  booking.cabinPrice = 1e100;
+  booking.totalPrice = 120;
+  await booking.save();
+  await Cabin.deleteOne({ _id: cabin._id });
+  const response = await getById(request(), params(String(booking._id)));
+  expect(response.status).toBe(200);
+  const { data } = bookingDetailResponse.parse(await response.json());
+  expect(data).toMatchObject({
+    cabin: null,
+    cabinPrice: 1e100,
+    totalPrice: 120,
+  });
+  expect(formatBookingAmount(data.cabinPrice)).toBe('Unavailable');
+  expect(formatBookingAmount(data.totalPrice)).toBe('$120.00');
 });

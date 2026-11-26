@@ -164,11 +164,18 @@ it('reads sparse stored history and hydrated detail from the two GET handlers', 
   });
   expect(history.data[0]).not.toHaveProperty('status');
   expect(history.data[0].cabin).not.toHaveProperty('images');
-  expect(decodeBookingHistory(history)).toBe(history.data);
+  expect(decodeBookingHistory({ userId: common.customer })(history)).toBe(
+    history.data
+  );
   expect(
     decodeBookingDetail(requestedId)({ success: true, data: history.data[0] })
   ).toBeUndefined();
   const extras = { ...history.data[0].extras, future: 'retained' };
   const rows = [{ ...history.data[0], extras }];
-  expect(decodeBookingHistory({ success: true, data: rows })).toBe(rows);
+  expect(
+    decodeBookingHistory({ userId: common.customer })({
+      success: true,
+      data: rows,
+    })
+  ).toBe(rows);
 });

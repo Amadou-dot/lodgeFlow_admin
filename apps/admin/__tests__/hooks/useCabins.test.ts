@@ -208,6 +208,14 @@ describe('cabin mutation contracts', () => {
     { action: 'create', body: { success: true, data: { _id: cabin._id } } },
     { action: 'update', body: { ...cabin, id: '507f1f77bcf86cd799439012' } },
     { action: 'update', body: { ...cabin, capacity: '4' } },
+    {
+      action: 'update',
+      body: {
+        ...cabin,
+        _id: '507f1f77bcf86cd799439012',
+        id: '507f1f77bcf86cd799439012',
+      },
+    },
     { action: 'remove', body: { success: true } },
     { action: 'remove', body: { success: true, data: {} } },
     {
@@ -548,3 +556,17 @@ test.each(['delete', 'discount'] as const)(
     ]);
   }
 );
+
+test('PUT accepts case-equivalent Mongo IDs', async () => {
+  const id = '507f1f77bcf86cd7994390ab';
+  const saved = { ...cabin, _id: id, id };
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: saved } })
+  );
+  const { result } = renderHook(useUpdateCabin, { wrapper });
+  await act(async () => {
+    await expect(
+      result.current.mutateAsync({ _id: id.toUpperCase() })
+    ).resolves.toEqual(saved);
+  });
+});

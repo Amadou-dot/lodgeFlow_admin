@@ -136,6 +136,10 @@ describe('useCreateCustomer', () => {
 describe('useUpdateCustomer', () => {
   it.each([
     { body: false, error: 'Failed to update customer' },
+    {
+      body: { success: true, data: { ...customerJson, id: 'USER_1' } },
+      error: 'Failed to update customer',
+    },
     { body: 'unexpected', error: 'Failed to update customer' },
     { body: { success: true }, error: 'Failed to update customer' },
     { body: { success: true, data: null }, error: 'Failed to update customer' },

@@ -83,7 +83,9 @@ export function useUpdateExperience() {
 
       return readCatalogResponse({
         response,
-        schema: experienceResponseSchema,
+        schema: experienceResponseSchema.refine(
+          row => row._id.toLowerCase() === experience._id.toLowerCase()
+        ),
         fallback: 'Failed to update experience',
         failure: message => displayToast(message, 'error'),
       });

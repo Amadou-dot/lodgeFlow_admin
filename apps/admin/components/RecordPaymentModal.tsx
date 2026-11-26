@@ -45,6 +45,16 @@ interface RecordPaymentModalProps {
   guestName: string;
 }
 
+function storedAmount(value: number | null) {
+  if (value === null) return null;
+  try {
+    return majorAmount(value, { precision: 'preserve' });
+  } catch (error) {
+    if (error instanceof MoneyError) return null;
+    throw error;
+  }
+}
+
 function parsePaymentAmount({
   value,
   remainingAmount,
@@ -95,14 +105,11 @@ export default function RecordPaymentModal({
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const total = majorAmount(totalAmount, { precision: 'preserve' });
-  const remaining =
-    remainingAmount == null
-      ? null
-      : majorAmount(remainingAmount, { precision: 'preserve' });
+  const total = storedAmount(totalAmount);
+  const remaining = storedAmount(remainingAmount);
   const half = remaining === null ? null : halfPaymentAmount(remaining);
   const parsedAmount =
-    remaining === null
+    remaining === null || total === null
       ? undefined
       : parsePaymentAmount({
           value: amountPaid,
@@ -168,7 +175,9 @@ export default function RecordPaymentModal({
               <div className='flex justify-between items-center mb-2'>
                 <span className='text-sm text-default-600'>Total Amount:</span>
                 <span className='font-semibold'>
-                  ${majorToFixed({ amount: total })}
+                  {total === null
+                    ? 'Unavailable'
+                    : `$${majorToFixed({ amount: total })}`}
                 </span>
               </div>
               <div className='flex justify-between items-center'>
@@ -242,7 +251,7 @@ export default function RecordPaymentModal({
               type='number'
               step='0.01'
               min='0'
-              max={remainingAmount ?? undefined}
+              max={remaining ?? undefined}
               isRequired
             />
 

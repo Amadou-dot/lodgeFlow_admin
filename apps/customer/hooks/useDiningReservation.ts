@@ -73,7 +73,7 @@ export const useDiningReservationHistory = (status?: string) => {
 
       return readResponse(
         response,
-        decodeDiningHistory,
+        decodeDiningHistory({ userId, status }),
         'Failed to fetch dining reservation history'
       );
     },

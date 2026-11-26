@@ -48,15 +48,17 @@ type Resource = (typeof resources)[number];
 function historyResponse({
   resource,
   owner,
+  revision,
 }: {
   resource: Resource;
   owner: string;
+  revision?: number;
 }) {
   const common = {
     _id: '507f1f77bcf86cd799439011',
     customer: owner,
+    totalPrice: revision ?? 20,
     status: 'confirmed' as const,
-    totalPrice: 20,
     isPaid: false,
   };
   const row =
@@ -98,6 +100,7 @@ function Probe({ resource }: { resource: Resource }) {
       {query.data?.map(record => (
         <p key={record._id}>
           {record.customer}-{resource.kind}
+          {record.totalPrice === 20 ? '' : `-${record.totalPrice}`}
         </p>
       ))}
     </div>
@@ -213,27 +216,70 @@ test.each(resources)(
         });
       })
       .mockResolvedValueOnce(
-        historyResponse({ resource, owner: 'new-session' })
+        historyResponse({ resource, owner: 'alice', revision: 21 })
       )
-      .mockResolvedValueOnce(historyResponse({ resource, owner: 'refreshed' }));
+      .mockResolvedValueOnce(
+        historyResponse({ resource, owner: 'alice', revision: 23 })
+      );
     const view = setup(resource);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     mockAuth = { ...mockAuth, sessionId: 'alice-new-session' };
     view.rerender();
-    await screen.findByText(`new-session-${resource.kind}`);
+    await screen.findByText(`alice-${resource.kind}-21`);
     expect(oldSignal?.aborted).toBe(true);
     await act(async () =>
-      finishOld(historyResponse({ resource, owner: 'old-session' }))
+      finishOld(historyResponse({ resource, owner: 'alice', revision: 22 }))
     );
     expect(
-      screen.queryByText(`old-session-${resource.kind}`)
+      screen.queryByText(`alice-${resource.kind}-22`)
     ).not.toBeInTheDocument();
     await act(async () => {
       await view.client.invalidateQueries({ queryKey: [resource.key] });
     });
-    await screen.findByText(`refreshed-${resource.kind}`);
+    await screen.findByText(`alice-${resource.kind}-23`);
     expect(
       view.client.getQueriesData({ queryKey: [resource.key] })
     ).toHaveLength(1);
   }
 );
+
+describe.each(resources)('$kind history contents', resource => {
+  test.each([
+    'foreign',
+    'mixed owner',
+    'wrong status',
+    'mixed status',
+    'empty',
+  ] as const)(
+    'validates %s against the requested owner and filter',
+    async scenario => {
+      const response = historyResponse({ resource, owner: 'alice' });
+      const {
+        data: [alice],
+      } = await response.json();
+      const bad = scenario.includes('status')
+        ? { ...alice, status: 'cancelled' }
+        : { ...alice, customer: 'bob' };
+      const data =
+        scenario === 'empty'
+          ? []
+          : scenario.startsWith('mixed')
+            ? [alice, bad]
+            : [bad];
+      mockFetch.mockResolvedValue({
+        ...response,
+        json: async () => ({ success: true, data }),
+      });
+      const { client } = setup(resource);
+      const key = [resource.key, 'confirmed', 'alice', 'alice-session'];
+      await waitFor(() =>
+        expect(client.getQueryState(key)?.status).toBe(
+          scenario === 'empty' ? 'success' : 'error'
+        )
+      );
+      expect(client.getQueryData(key)).toEqual(
+        scenario === 'empty' ? [] : undefined
+      );
+    }
+  );
+});

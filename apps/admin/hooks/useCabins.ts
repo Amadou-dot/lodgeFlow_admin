@@ -147,7 +147,9 @@ export function useUpdateCabin() {
 
       return readMutation({
         response,
-        schema: cabinResponseSchema,
+        schema: cabinResponseSchema.refine(
+          row => row._id.toLowerCase() === cabin._id.toLowerCase()
+        ),
         fallback: 'Failed to update cabin',
         showErrorToast: true,
       });

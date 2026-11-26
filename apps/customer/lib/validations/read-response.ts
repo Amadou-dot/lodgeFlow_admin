@@ -41,3 +41,26 @@ export function forDetailId<T extends { _id: string; id: string }>(
     )
   );
 }
+
+interface HistoryRequest {
+  userId: string | null | undefined;
+  status?: string;
+}
+
+export function forCustomerHistory<
+  T extends { customer: string; status?: unknown },
+>(item: z.ZodType<T, T>) {
+  const decode = decodeSuccess(z.array(item));
+  return ({ userId, status }: HistoryRequest) =>
+    (value: unknown) => {
+      if (!userId) return undefined;
+      const rows = decode(value);
+      if (
+        rows?.every(
+          row => row.customer === userId && (!status || row.status === status)
+        )
+      )
+        return rows;
+      return undefined;
+    };
+}

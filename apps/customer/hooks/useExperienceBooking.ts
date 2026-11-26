@@ -68,7 +68,7 @@ export const useExperienceBookingHistory = (status?: string) => {
 
       return readResponse(
         response,
-        decodeExperienceHistory,
+        decodeExperienceHistory({ userId, status }),
         'Failed to fetch experience booking history'
       );
     },

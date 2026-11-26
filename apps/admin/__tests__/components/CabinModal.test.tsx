@@ -213,3 +213,51 @@ test('ignores a late image validation from the previous URL', async () => {
     screen.queryByRole('img', { name: /preview/i })
   ).not.toBeInTheDocument();
 });
+
+test('explicitly setting null fees to zero and emptying a null gallery updates only that cabin', async () => {
+  const editor = (id: string) => (
+    <CabinModal
+      {...mutationProps}
+      isOpen
+      onClose={jest.fn()}
+      cabin={{
+        ...cabin,
+        _id: id,
+        id,
+        discount: null,
+        extraGuestFee: null,
+        images: null,
+      }}
+      mode='edit'
+    />
+  );
+  const view = render(editor(cabin._id));
+  for (const label of ['Enter discount', 'Per guest above base']) {
+    const field = await screen.findByPlaceholderText(label);
+    fireEvent.change(field, { target: { value: '5' } });
+    fireEvent.change(field, { target: { value: '0' } });
+  }
+  fireEvent.change(screen.getByPlaceholderText('Add image URL'), {
+    target: { value: 'https://example.invalid/gallery.jpg' },
+  });
+  fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+  fireEvent.click(await screen.findByRole('button', { name: '×' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+  expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+    discount: 0,
+    extraGuestFee: 0,
+    images: [],
+  });
+  view.rerender(editor('507f1f77bcf86cd799439012'));
+  fireEvent.change(screen.getByDisplayValue(cabin.name), {
+    target: { value: 'Another cabin' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+  await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(2));
+  const next = mockUpdate.mock.calls[1][0];
+  expect(next.name).toBe('Another cabin');
+  expect(next.discount).toBeUndefined();
+  expect(next.extraGuestFee).toBeUndefined();
+  expect(next.images).toBeUndefined();
+});

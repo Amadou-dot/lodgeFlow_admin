@@ -1,3 +1,4 @@
+import { MoneyError } from '@lodgeflow/database/money';
 import { formatCurrency } from './utilityFunctions';
 import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import type { AdminBooking } from '@/types/booking-read';
@@ -107,5 +108,11 @@ export const getStatusLabel = (status: string | null | undefined) => {
 };
 
 export function formatBookingAmount(amount: number | null | undefined) {
-  return amount == null ? 'Unavailable' : formatCurrency(amount);
+  if (amount == null) return 'Unavailable';
+  try {
+    return formatCurrency(amount);
+  } catch (error) {
+    if (error instanceof MoneyError) return 'Unavailable';
+    throw error;
+  }
 }
