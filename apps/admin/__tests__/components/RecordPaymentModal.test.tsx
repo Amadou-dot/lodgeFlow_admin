@@ -1,4 +1,11 @@
+/** @jest-environment ./__tests__/setup/fetch-jsdom.cjs */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { addToast } from '@heroui/toast';
+import { patchBookingSchema } from '@/lib/validations/booking';
+import { bookingDetailResponse } from '@/lib/validations/booking-json';
+import type { AdminBooking } from '@/types/booking-read';
+import QuickActionsCard from '@/components/BookingDetails/QuickActionsCard';
 import RecordPaymentModal from '@/components/RecordPaymentModal';
 
 async function show(remainingAmount: number | null = 10.01) {
@@ -147,3 +154,153 @@ test('an unavailable balance disables receipt actions without losing the same-bo
     })
   );
 });
+
+jest.unmock('swr');
+jest.mock('@/hooks/useCabins', () => ({
+  useCabin: () => ({ data: null, isLoading: false }),
+}));
+jest.mock('@/hooks/usePrintBooking', () => ({ usePrintBooking: () => ({}) }));
+jest.mock('@/hooks/useSendEmail', () => ({
+  useSendConfirmationEmail: () => ({}),
+}));
+
+test.each(['detail refresh', 'explicit original retry'] as const)(
+  'a second cash draft survives an ambiguous first payment and %s',
+  async recovery => {
+    jest.mocked(addToast).mockClear();
+    const id = '507f1f77bcf86cd799439011';
+    const date = '2040-06-01T00:00:00.000Z';
+    const { data: booking } = bookingDetailResponse.parse({
+      success: true,
+      data: {
+        _id: id,
+        id,
+        customer: null,
+        guest: null,
+        cabin: null,
+        checkInDate: date,
+        checkOutDate: '2040-06-02T00:00:00.000Z',
+        numGuests: 1,
+        numNights: 1,
+        cabinPrice: 100,
+        totalPrice: 100,
+        remainingAmount: 100,
+        status: 'confirmed',
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+    const receipts = new Map<
+      string,
+      NonNullable<AdminBooking['payments']>[number]
+    >();
+    const originalFetch = global.fetch;
+    const requests: { receiptId: string; notes: string }[] = [];
+    const savedNotes: string[] = [];
+    const detail = () =>
+      bookingDetailResponse.parse({
+        success: true,
+        data: {
+          ...booking,
+          payments: Array.from(receipts.values()),
+          remainingAmount: 100 - 40 * receipts.size,
+        },
+      });
+    global.fetch = jest.fn(async (_url, init) => {
+      const { recordPayment: p } = patchBookingSchema.parse(
+        JSON.parse(String(init?.body))
+      );
+      if (!p?.receiptId || !p.notes)
+        throw new Error('Expected a receipt ID and envelope note');
+      requests.push({ receiptId: p.receiptId, notes: p.notes });
+      const first = requests.length === 1;
+      if (
+        !receipts.has(p.receiptId) &&
+        (!first || recovery === 'detail refresh')
+      ) {
+        receipts.set(p.receiptId, {
+          id: p.receiptId,
+          amount: p.amountPaid,
+          method: p.paymentMethod,
+          receivedAt: date,
+        });
+        savedNotes.push(p.notes);
+      }
+      return Response.json(first ? { success: true, data: null } : detail());
+    });
+    function card(current: AdminBooking) {
+      return (
+        <QueryClientProvider client={client}>
+          <QuickActionsCard
+            booking={current}
+            onCheckIn={jest.fn()}
+            onCheckOut={jest.fn()}
+            actionLoading={null}
+          />
+        </QueryClientProvider>
+      );
+    }
+    const submit = () => screen.getByRole('button', { name: 'Record Payment' });
+    async function openDraft(note: string) {
+      fireEvent.click(submit());
+      fireEvent.click(screen.getByRole('button', { name: /Payment Method/ }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Cash' }));
+      fireEvent.change(
+        screen.getByRole('spinbutton', { name: /Amount Paid/ }),
+        { target: { value: '40' } }
+      );
+      fireEvent.change(screen.getByLabelText('Payment Notes (Optional)'), {
+        target: { value: note },
+      });
+    }
+    const view = render(card(booking));
+    try {
+      await openDraft('First envelope');
+      fireEvent.click(submit());
+      await waitFor(() =>
+        expect(addToast).toHaveBeenCalledWith(
+          expect.objectContaining({ color: 'danger' })
+        )
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await openDraft('Second envelope');
+      expect(submit()).toBeDisabled();
+      fireEvent.click(submit());
+      expect(requests).toHaveLength(1);
+      expect(addToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Payment recorded successfully',
+        })
+      );
+      if (recovery === 'detail refresh') view.rerender(card(detail().data));
+      else {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Retry previous payment' })
+        );
+        await waitFor(() =>
+          expect(requests).toEqual([requests[0], requests[0]])
+        );
+      }
+      await waitFor(() => expect(submit()).toBeEnabled());
+      expect(screen.getByLabelText('Payment Notes (Optional)')).toHaveValue(
+        'Second envelope'
+      );
+      expect(receipts.size).toBe(1);
+      fireEvent.click(submit());
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(new Set(requests.map(p => p.receiptId)).size).toBe(2);
+      expect(savedNotes).toEqual(['First envelope', 'Second envelope']);
+      expect(addToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Payment recorded successfully',
+        })
+      );
+    } finally {
+      view.unmount();
+      client.clear();
+      global.fetch = originalFetch;
+    }
+  }
+);

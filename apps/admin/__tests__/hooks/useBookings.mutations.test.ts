@@ -32,6 +32,7 @@ const row = {
   cabinPrice: 100,
   totalPrice: 100.125,
 };
+const dialogId = Symbol('payment dialog');
 const create: CreateBookingInput = {
   customer: customer.id,
   cabin: id,
@@ -70,7 +71,11 @@ function hooks() {
     checkIn: useCheckInBooking(),
     checkOut: useCheckOutBooking(),
     confirm: useConfirmBooking(),
-    payment: useRecordPayment({ booking: row, onReconciled: jest.fn() }),
+    payment: useRecordPayment({
+      booking: row,
+      dialogId,
+      onReconciled: jest.fn(),
+    }),
   };
 }
 function setup() {
@@ -279,7 +284,7 @@ test.each([
     const initialBooking: AdminBooking = { ...row, remainingAmount: 100 };
     const { result, rerender } = renderHook(
       ({ booking }: { booking: AdminBooking }) =>
-        useRecordPayment({ booking, onReconciled }),
+        useRecordPayment({ booking, dialogId, onReconciled }),
       { wrapper, initialProps: { booking: initialBooking } }
     );
     const receipts: NonNullable<AdminBooking['payments']> = [];
@@ -348,3 +353,29 @@ test.each([
     expect(new Set(ids).size).toBe(2);
   }
 );
+
+test('a fresh dialog cannot replay even a byte-identical prior draft as a new payment', async () => {
+  const { result, rerender } = renderHook(
+    ({ dialogId }: { dialogId: symbol }) =>
+      useRecordPayment({ booking: row, dialogId, onReconciled: jest.fn() }),
+    { wrapper, initialProps: { dialogId } }
+  );
+  fetchMock.mockResolvedValueOnce(Response.json({ success: true, data: null }));
+  await act(async () => {
+    await expect(result.current.mutateAsync(payment)).rejects.toThrow(
+      'Failed to record payment'
+    );
+  });
+  rerender({ dialogId: Symbol('second dialog') });
+  await act(async () => {
+    await expect(result.current.mutateAsync(payment)).rejects.toThrow(
+      'confirm the previous payment'
+    );
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(result.current.previousPayment).toEqual({
+    amount: payment.amountPaid,
+    method: payment.paymentMethod,
+    notes: payment.notes,
+  });
+});
