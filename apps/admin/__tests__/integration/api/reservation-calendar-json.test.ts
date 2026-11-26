@@ -276,12 +276,19 @@ test('calendar preserves UTC midnight normalization and same-day rejection', asy
       'https://admin.test?start=2030-06-01T02:00:00Z&end=2030-06-02T10:00:00Z'
     )
   );
-  expect((await response.json()).data).toEqual({
+  const expected = {
     resources: [],
     reservations: [],
     start: '2030-06-01T00:00:00.000Z',
     end: '2030-06-02T00:00:00.000Z',
+  };
+  expect(await response.clone().json()).toEqual({
+    success: true,
+    data: expected,
   });
+  expect(await readCalendarResponse({ response, kind: 'cabins' })).toEqual(
+    expected
+  );
   jest.clearAllMocks();
   const denied = await cabins(
     new Request(
@@ -592,4 +599,25 @@ test('inbox retains the null end-date fallback for a sparse cabin row', async ()
   expect(await readReservationInboxResponse(response)).toMatchObject({
     rows: [{ type: 'cabin', endDate: null, time: null }],
   });
+});
+
+test('inbox route and reader preserve finite stored prices beyond the safe cents range', async () => {
+  const { dining } = await fixtures();
+  const totalPrice = Number.MAX_SAFE_INTEGER;
+  const reservation = await DiningReservation.create({
+    dining: dining._id,
+    customer: 'missing_guest',
+    date: start,
+    time: '21:00',
+    numGuests: 2,
+    totalPrice,
+  });
+  const response = await inbox(
+    new Request('https://admin.test/api/reservations?type=dining')
+  );
+  const body = await response.clone().json();
+  const data = await readReservationInboxResponse(response);
+  expect(data).toEqual(body.data);
+  expect(data.rows.map(row => row.totalPrice)).toEqual([40, totalPrice]);
+  expect(data.rows[1]._id).toBe(String(reservation._id));
 });

@@ -18,6 +18,7 @@ import {
   TableRow,
   TableCell,
 } from '@heroui/table';
+import { MoneyError } from '@lodgeflow/database/money';
 import { formatSettingsCurrency } from '@/utils/utilityFunctions';
 import { getStatusColor } from '@/utils/bookingUtils';
 import Link from 'next/link';
@@ -32,6 +33,18 @@ import {
   utcDate,
 } from '@/lib/reservation-options';
 import { readReservationInboxResponse } from '@/lib/validations/reservation-calendar-json';
+function formatReservationAmount(
+  amount: number,
+  currency: string | null | undefined
+): string {
+  try {
+    return formatSettingsCurrency(amount, currency);
+  } catch (error) {
+    if (error instanceof MoneyError) return 'Amount unavailable';
+    throw error;
+  }
+}
+
 export default function ReservationsPage() {
   const search = useSearchParams();
   const [filters, setFilters] = useState({
@@ -198,7 +211,7 @@ export default function ReservationsPage() {
                         </Chip>
                       </TableCell>
                       <TableCell className='p-3 whitespace-nowrap'>
-                        {formatSettingsCurrency(
+                        {formatReservationAmount(
                           row.totalPrice,
                           settings?.currency
                         )}
