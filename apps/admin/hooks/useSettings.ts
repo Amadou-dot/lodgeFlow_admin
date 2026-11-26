@@ -4,6 +4,11 @@ import useSWR, { useSWRConfig } from 'swr';
 import { useMutation } from '@tanstack/react-query';
 import type { AppSettings } from '@/types';
 import type { UpdateSettingsInput } from '@/lib/validations/settings';
+import {
+  settingsFailureSchema,
+  settingsSuccessResponseSchema,
+  settingsUpdateHttpFailureSchema,
+} from '@/lib/validations/settings-json';
 
 export class SettingsAccessError extends Error {
   constructor() {
@@ -12,45 +17,51 @@ export class SettingsAccessError extends Error {
   }
 }
 
-// Fetcher function for SWR
-const fetcher = (url: string) =>
-  fetch(url)
-    .then(res => {
-      if (res.status === 401 || res.status === 403)
-        throw new SettingsAccessError();
-      if (!res.ok) {
-        throw new Error('Failed to fetch settings');
-      }
-      return res.json();
-    })
-    .then(result => {
-      // Handle new API response format
-      if (result.success) {
-        return result.data;
-      }
-      throw new Error(result.error || 'Failed to fetch settings');
-    });
+async function readSettingsResponse(
+  response: Response,
+  action: 'fetch' | 'update' | 'reset'
+): Promise<AppSettings> {
+  const fallback = `Failed to ${action} settings`;
+  if (!response.ok && action !== 'update') throw new Error(fallback);
 
-// Fetch app settings using SWR
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(fallback);
+  }
+
+  if (response.ok) {
+    const result = settingsSuccessResponseSchema.safeParse(body);
+    if (result.success) return result.data.data;
+  }
+
+  const failure = response.ok
+    ? settingsFailureSchema.safeParse(body)
+    : settingsUpdateHttpFailureSchema.safeParse(body);
+  throw new Error(failure.success ? failure.data.error : fallback);
+}
+
+async function fetchSettings(url: string): Promise<AppSettings> {
+  const response = await fetch(url);
+  if (response.status === 401 || response.status === 403)
+    throw new SettingsAccessError();
+  return readSettingsResponse(response, 'fetch');
+}
+
 export const useSettings = () => {
-  const { data, error, isLoading, mutate } = useSWR<AppSettings>(
+  const { data, error, isLoading, mutate } = useSWR<AppSettings, Error>(
     '/api/settings',
-    fetcher,
+    fetchSettings,
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000, // Dedupe requests within 30 seconds
     }
   );
 
-  return {
-    data,
-    error,
-    isLoading,
-    mutate, // For manual revalidation
-  };
+  return { data, error, isLoading, mutate };
 };
 
-// Update settings
 export const useUpdateSettings = () => {
   const { mutate } = useSWRConfig();
   return useMutation({
@@ -60,17 +71,7 @@ export const useUpdateSettings = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(changes),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update settings');
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        return result.data;
-      }
-      throw new Error(result.error || 'Failed to update settings');
+      return readSettingsResponse(response, 'update');
     },
     onSuccess: () => {
       void mutate('/api/settings').catch(() => {});
@@ -78,23 +79,12 @@ export const useUpdateSettings = () => {
   });
 };
 
-// Reset settings to defaults
 export const useResetSettings = () => {
   const { mutate } = useSWRConfig();
   return useMutation({
     mutationFn: async (): Promise<AppSettings> => {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to reset settings');
-      }
-      const result = await response.json();
-      if (result.success) {
-        return result.data;
-      }
-      throw new Error(result.error || 'Failed to reset settings');
+      const response = await fetch('/api/settings', { method: 'POST' });
+      return readSettingsResponse(response, 'reset');
     },
     onSuccess: () => {
       void mutate('/api/settings').catch(() => {});

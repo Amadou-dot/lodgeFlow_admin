@@ -27,14 +27,10 @@ import {
   useSettings,
   useUpdateSettings,
 } from '@/hooks/useSettings';
-import type {
-  AppSettings,
-  Customer,
-  CustomerWithStats,
-  PopulatedBooking,
-} from '@/types';
+import type { Customer, CustomerWithStats, PopulatedBooking } from '@/types';
 
 import { customerDetailFixture } from '../setup/customer-json';
+import { settings } from '../setup/settings-fixture';
 
 jest.unmock('swr');
 
@@ -125,40 +121,6 @@ const customerDetail = (name: string): CustomerWithStats => ({
   ...customer(name),
   recentBookings: [],
 });
-const settings: AppSettings = {
-  _id: 'settings',
-  id: 'settings',
-  singleton: 'global',
-  fullAddress: '',
-  minBookingLength: 1,
-  maxBookingLength: 30,
-  maxGuestsPerBooking: 8,
-  breakfastPrice: 2,
-  checkInTime: '15:00',
-  checkOutTime: '11:00',
-  cancellationPolicy: 'moderate',
-  requireDeposit: true,
-  depositPercentage: 50,
-  allowPets: true,
-  petFee: 2,
-  smokingAllowed: false,
-  earlyCheckInFee: 3,
-  lateCheckOutFee: 4,
-  wifiIncluded: true,
-  parkingIncluded: false,
-  parkingFee: 1,
-  currency: 'EUR',
-  timezone: 'UTC',
-  businessHours: { open: '09:00', close: '17:00', daysOpen: [] },
-  notifications: {
-    emailEnabled: true,
-    smsEnabled: false,
-    bookingConfirmation: true,
-    paymentReminders: true,
-    checkInReminders: true,
-  },
-};
-
 beforeEach(() => {
   fetchMock.mockReset();
   global.fetch = fetchMock;
@@ -822,3 +784,43 @@ test('settings update and reset refresh the mounted read; failed update does not
     expect(result.current.read.error?.message).toBe('Failed to fetch settings')
   );
 });
+
+test.each(['PUT', 'POST'])(
+  'invalid %s Settings JSON does not invalidate the mounted read',
+  async method => {
+    fetchMock.mockResolvedValueOnce(
+      response({ success: true, data: settings })
+    );
+    const { result } = renderHook(
+      () => ({
+        read: useSettings(),
+        update: useUpdateSettings(),
+        reset: useResetSettings(),
+      }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.read.data).toEqual(settings));
+
+    fetchMock.mockResolvedValueOnce(
+      response({
+        success: true,
+        data: { ...settings, minBookingLength: 3, notifications: [] },
+      })
+    );
+    await act(async () => {
+      const write =
+        method === 'PUT'
+          ? result.current.update.mutateAsync({ minBookingLength: 3 })
+          : result.current.reset.mutateAsync();
+      await expect(write).rejects.toThrow(
+        method === 'PUT'
+          ? 'Failed to update settings'
+          : 'Failed to reset settings'
+      );
+    });
+    expect(
+      fetchMock.mock.calls.map(([, init]) => init?.method ?? 'GET')
+    ).toEqual(['GET', method]);
+    expect(result.current.read.data).toEqual(settings);
+  }
+);

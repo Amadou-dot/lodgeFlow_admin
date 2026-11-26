@@ -58,7 +58,7 @@ export default function PaymentInformation({
                 sign: 'signed',
               }),
               locale: 'en-US',
-              currency: settings.currency,
+              currency: settings.currency ?? undefined,
             })}
           </p>
         )}

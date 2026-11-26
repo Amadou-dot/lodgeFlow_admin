@@ -1,3 +1,4 @@
+/** @jest-environment ./__tests__/setup/fetch-jsdom.cjs */
 import '@testing-library/jest-dom';
 import { createElement } from 'react';
 import {
@@ -8,6 +9,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+jest.unmock('swr');
 import { AuthGuard } from '@/components/AuthGuard';
 import { SettingsAccessError } from '@/hooks/useSettings';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -27,6 +31,11 @@ type ConfirmOptions = Parameters<
 >[0];
 const mockUpdate = jest.fn<Promise<AppSettings>, [UpdateSettingsInput]>();
 const mockReset = jest.fn<Promise<AppSettings>, []>();
+const mockMutation = () => ({ mutateAsync: mockUpdate, isPending: false });
+let mockUseUpdate: () => {
+  mutateAsync: (changes: UpdateSettingsInput) => Promise<AppSettings>;
+  isPending: boolean;
+} = mockMutation;
 const mockShowConfirm = jest.fn<void, [ConfirmOptions]>();
 
 let mockReadSettings: AppSettings | undefined;
@@ -57,7 +66,7 @@ jest.mock('@/hooks/useSettings', () => ({
     isLoading: false,
     mutate: mockRefresh,
   }),
-  useUpdateSettings: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useUpdateSettings: () => mockUseUpdate(),
   useResetSettings: () => ({ mutateAsync: mockReset, isPending: false }),
 }));
 jest.mock('@/hooks/useConfirmDialog', () => ({
@@ -69,6 +78,7 @@ jest.mock('@/hooks/useConfirmDialog', () => ({
 
 beforeEach(() => {
   mockUpdate.mockReset();
+  mockUseUpdate = mockMutation;
   mockReset.mockReset();
   mockShowConfirm.mockReset();
   mockReadSettings = settings;
@@ -79,9 +89,7 @@ beforeEach(() => {
 
 test('saves only the edited breakfast price from a legacy Settings response', async () => {
   // GET can return explicit null for untouched legacy contact information.
-  const readSettings: AppSettings = JSON.parse(
-    JSON.stringify({ ...settings, contactInfo: null })
-  );
+  const readSettings: AppSettings = { ...settings, contactInfo: null };
   mockUpdate.mockImplementation(async changes => {
     const body: unknown = JSON.parse(JSON.stringify(changes));
     const updated = updateSettingsSchema.parse(
@@ -104,6 +112,63 @@ test('saves only the edited breakfast price from a legacy Settings response', as
 
   await waitFor(() => expect(onSettingsUpdate).toHaveBeenCalledTimes(1));
   expect(mockUpdate).toHaveBeenCalledWith({ breakfastPrice: 15 });
+});
+
+test('a malformed PUT success keeps the editable draft for a sparse retry', async () => {
+  mockUseUpdate = jest.requireActual<typeof import('@/hooks/useSettings')>(
+    '@/hooks/useSettings'
+  ).useUpdateSettings;
+  const fetchMock = jest.mocked(global.fetch);
+  fetchMock.mockReset();
+  fetchMock
+    .mockResolvedValueOnce(
+      Response.json({
+        success: true,
+        data: { ...settings, breakfastPrice: 30, notifications: [] },
+        error: 'private detail',
+      })
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        success: true,
+        data: { ...settings, breakfastPrice: 12.075 },
+      })
+    );
+  const client = new QueryClient({
+    defaultOptions: { mutations: { retry: false } },
+  });
+  const onSettingsUpdate = jest.fn();
+  const view = render(
+    <QueryClientProvider client={client}>
+      <SettingsForm
+        settings={{ ...settings, contactInfo: null }}
+        onSettingsUpdate={onSettingsUpdate}
+      />
+    </QueryClientProvider>
+  );
+  try {
+    const field = screen.getByLabelText('Breakfast Price');
+    fireEvent.change(field, { target: { value: '12.075' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    expect(
+      await screen.findByText('Failed to update settings')
+    ).toHaveAttribute('role', 'alert');
+    expect(field).toHaveValue(12.075);
+    expect(onSettingsUpdate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Save Changes'));
+    await waitFor(() => expect(onSettingsUpdate).toHaveBeenCalledTimes(1));
+
+    expect(fetchMock.mock.calls.map(([, init]) => init?.body)).toEqual([
+      '{"breakfastPrice":12.075}',
+      '{"breakfastPrice":12.075}',
+    ]);
+    expect(screen.getByText('Save Changes')).toBeDisabled();
+  } finally {
+    view.unmount();
+    client.clear();
+    fetchMock.mockReset();
+  }
 });
 
 test('reselecting the current cancellation policy leaves Save disabled', async () => {

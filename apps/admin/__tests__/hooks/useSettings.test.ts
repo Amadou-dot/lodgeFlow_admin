@@ -1,96 +1,106 @@
-import useSWR from 'swr';
+/** @jest-environment ./__tests__/setup/fetch-jsdom.cjs */
+import { createElement, type ReactNode } from 'react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { SWRConfig } from 'swr';
+import { SettingsAccessError, useSettings } from '@/hooks/useSettings';
+import { settings } from '../setup/settings-fixture';
 
-const mockUseSWR = useSWR as jest.MockedFunction<typeof useSWR>;
+jest.unmock('swr');
 
-// Capture SWR args
-let capturedKey: string | null = null;
-let capturedConfig: any = null;
+const fetchMock = jest.mocked(global.fetch);
 
-beforeEach(() => {
-  capturedKey = null;
-  capturedConfig = null;
+function wrapper({ children }: { children: ReactNode }) {
+  return createElement(
+    SWRConfig,
+    { value: { provider: () => new Map(), shouldRetryOnError: false } },
+    children
+  );
+}
 
-  mockUseSWR.mockImplementation((key: any, _fetcher: any, config: any) => {
-    capturedKey = key;
-    capturedConfig = config;
-    return {
-      data: undefined,
-      error: undefined,
-      isLoading: true,
-      mutate: jest.fn(),
-      isValidating: false,
-    } as any;
-  });
+beforeEach(() => fetchMock.mockReset());
+
+test('GET preserves sparse values, virtuals and additive nested fields', async () => {
+  const { createdAt, updatedAt, __v, singleton, ...sparse } = settings;
+  const legacy = {
+    ...sparse,
+    breakfastPrice: 12.075,
+    depositPercentage: 22.125,
+    timezone: 'America/Denver',
+    businessHours: { open: '8:30', close: '17:00', daysOpen: ['Monday'] },
+    notifications: { ...settings.notifications, futureNotification: true },
+    contactInfo: null,
+  };
+  fetchMock.mockResolvedValue(Response.json({ success: true, data: legacy }));
+
+  const { result } = renderHook(useSettings, { wrapper });
+  expect(result.current.isLoading).toBe(true);
+  expect(result.current.data).toBeUndefined();
+
+  await waitFor(() => expect(result.current.data).toEqual(legacy));
+  expect(result.current.isLoading).toBe(false);
+  expect(fetchMock).toHaveBeenCalledWith('/api/settings');
 });
 
-// Import after mocking
-import { useSettings } from '@/hooks/useSettings';
+test.each([401, 403])('GET reports typed denial on HTTP %s', async status => {
+  fetchMock.mockResolvedValue(
+    new Response('private provider text', { status })
+  );
+  const { result } = renderHook(useSettings, { wrapper });
+  await waitFor(() =>
+    expect(result.current.error).toBeInstanceOf(SettingsAccessError)
+  );
+  expect(result.current.error?.message).toBe('Failed to fetch settings');
+  expect(result.current.data).toBeUndefined();
+});
 
-describe('useSettings', () => {
-  it('calls useSWR with /api/settings key', () => {
-    useSettings();
+test.each([
+  [
+    'invalid notification flag',
+    () =>
+      Response.json({
+        success: true,
+        data: {
+          ...settings,
+          notifications: { ...settings.notifications, smsEnabled: 'false' },
+        },
+        error: 'private detail',
+      }),
+  ],
+  [
+    'truthy success marker',
+    () =>
+      Response.json({
+        success: 'yes',
+        data: settings,
+        error: 'private detail',
+      }),
+  ],
+  ['non-JSON body', () => new Response('private detail')],
+])(
+  'a refresh with %s reports a safe error and retains the last valid value',
+  async (_name, invalidResponse) => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ success: true, data: settings })
+    );
+    const { result } = renderHook(useSettings, { wrapper });
+    await waitFor(() => expect(result.current.data).toEqual(settings));
 
-    expect(capturedKey).toBe('/api/settings');
-  });
-
-  it('disables revalidation on focus', () => {
-    useSettings();
-
-    expect(capturedConfig?.revalidateOnFocus).toBe(false);
-  });
-
-  it('sets deduping interval to 30 seconds', () => {
-    useSettings();
-
-    expect(capturedConfig?.dedupingInterval).toBe(30000);
-  });
-
-  it('returns data, error, isLoading, and mutate', () => {
-    const result = useSettings();
-
-    expect(result).toHaveProperty('data');
-    expect(result).toHaveProperty('error');
-    expect(result).toHaveProperty('isLoading');
-    expect(result).toHaveProperty('mutate');
-  });
-
-  it('returns loading state initially', () => {
-    const result = useSettings();
-
-    expect(result.isLoading).toBe(true);
-    expect(result.data).toBeUndefined();
-  });
-
-  it('returns data when SWR resolves', () => {
-    mockUseSWR.mockReturnValue({
-      data: { minBookingLength: 1, maxBookingLength: 30 },
-      error: undefined,
-      isLoading: false,
-      mutate: jest.fn(),
-      isValidating: false,
-    } as any);
-
-    const result = useSettings();
-
-    expect(result.isLoading).toBe(false);
-    expect(result.data).toEqual({
-      minBookingLength: 1,
-      maxBookingLength: 30,
+    fetchMock.mockResolvedValueOnce(invalidResponse());
+    await act(async () => {
+      await result.current.mutate();
     });
-  });
+    expect(result.current.error?.message).toBe('Failed to fetch settings');
+    expect(result.current.data).toEqual(settings);
+  }
+);
 
-  it('returns error when SWR fails', () => {
-    const error = new Error('Failed to fetch');
-    mockUseSWR.mockReturnValue({
-      data: undefined,
-      error,
-      isLoading: false,
-      mutate: jest.fn(),
-      isValidating: false,
-    } as any);
-
-    const result = useSettings();
-
-    expect(result.error).toBe(error);
-  });
+test('GET retains the specified API failure message', async () => {
+  fetchMock.mockResolvedValue(
+    Response.json({ success: false, error: 'Settings unavailable' })
+  );
+  const { result } = renderHook(useSettings, { wrapper });
+  await waitFor(() =>
+    expect(result.current.error?.message).toBe('Settings unavailable')
+  );
+  expect(result.current.data).toBeUndefined();
 });

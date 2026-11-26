@@ -297,7 +297,8 @@ export function CabinHouseRulesSection() {
                 <p className='font-semibold'>Cancellation Policy</p>
                 <p className='text-sm text-default-500'>
                   {settings
-                    ? cancellationPolicyText[settings.cancellationPolicy]
+                    ? settings.cancellationPolicy &&
+                      cancellationPolicyText[settings.cancellationPolicy]
                     : 'Free cancellation up to 48 hours before check-in'}
                 </p>
               </div>

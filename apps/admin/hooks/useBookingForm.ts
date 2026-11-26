@@ -190,18 +190,18 @@ function useBookingFormDraft({
         ? (formData.numGuests - 1) * cabinExtraGuestFee * numNights
         : 0;
 
-    const petFee = formData.hasPets ? settings.petFee * numNights : 0;
+    const petFee = formData.hasPets ? (settings.petFee ?? 0) * numNights : 0;
 
     const parkingFee =
       formData.hasParking && !settings.parkingIncluded
-        ? settings.parkingFee * numNights
+        ? (settings.parkingFee ?? 0) * numNights
         : 0;
 
     const earlyCheckInFee = formData.hasEarlyCheckIn
-      ? settings.earlyCheckInFee
+      ? (settings.earlyCheckInFee ?? 0)
       : 0;
     const lateCheckOutFee = formData.hasLateCheckOut
-      ? settings.lateCheckOutFee
+      ? (settings.lateCheckOutFee ?? 0)
       : 0;
 
     const extrasPrice =

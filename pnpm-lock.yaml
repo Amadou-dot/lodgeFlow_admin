@@ -602,6 +602,9 @@ importers:
       mongoose:
         specifier: ^8.21.0
         version: 8.24.1(supports-color@8.1.1)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.2

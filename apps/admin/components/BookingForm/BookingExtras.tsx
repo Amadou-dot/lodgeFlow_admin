@@ -34,7 +34,7 @@ export default function BookingExtras({
               isSelected={formData.hasPets}
               onValueChange={checked => onInputChange('hasPets', checked)}
             >
-              Pets ({formatCurrency(settings.petFee)}/night)
+              Pets ({formatCurrency(settings.petFee ?? 0)}/night)
             </Switch>
           )}
 
