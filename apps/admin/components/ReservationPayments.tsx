@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { usePermission } from './AuthGuard';
+import { reservationReceiptSchema } from '@/lib/validations/reservation-payment';
 import {
   readReservationPayment,
   receiptConfirmation,
@@ -124,12 +125,18 @@ export function ReservationPayments({
     }
     const body = JSON.stringify(transaction);
     const id =
-      request.current?.body === body
+      retry?.token ??
+      (request.current?.body === body
         ? request.current.transaction.id
-        : retry
-          ? retry.token
-          : crypto.randomUUID();
-    const attempt = { body, transaction: { ...transaction, id }, draft };
+        : crypto.randomUUID());
+    const proposed = { ...transaction, id };
+    const checked = reservationReceiptSchema.safeParse(proposed);
+    if (!checked.success) {
+      setState({ kind: 'error', message: checked.error.issues[0].message });
+      return;
+    }
+    // The server trims the reference. Keep the original body for exact replay.
+    const attempt = { body, transaction: proposed, draft };
     request.current = attempt;
     await send(attempt, 'submit');
   }
