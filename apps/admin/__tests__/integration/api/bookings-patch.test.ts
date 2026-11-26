@@ -113,8 +113,6 @@ describe('PATCH /api/bookings/[id]', () => {
           amountPaid: 300,
         },
       });
-      const body = await response.json();
-
       expect(response.status).toBe(409);
       const unchanged = await Booking.findById(booking._id);
       expect(unchanged?.amountPaid).toBe(0);

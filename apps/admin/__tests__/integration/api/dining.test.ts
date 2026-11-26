@@ -9,7 +9,9 @@ import { GET as getById, PUT as updateById } from '@/app/api/dining/[id]/route';
 import Dining from '@lodgeflow/database/models/Dining';
 
 function createRequest(url: string, options?: { method?: string; body?: any }) {
-  const init: RequestInit = { method: options?.method || 'GET' };
+  const init: ConstructorParameters<typeof NextRequest>[1] = {
+    method: options?.method || 'GET',
+  };
   if (options?.body) {
     init.body = JSON.stringify(options.body);
     init.headers = { 'Content-Type': 'application/json' };

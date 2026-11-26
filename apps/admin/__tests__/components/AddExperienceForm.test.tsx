@@ -1,16 +1,30 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AddExperienceForm from '@/components/AddExperienceForm';
+import type { FormData, FormProps } from '@/components/AddExperienceForm/types';
+
+const emptyForm: FormData = {
+  name: '',
+  title: '',
+  description: '',
+  category: '',
+  duration: '',
+  price: 0,
+  capacity: 0,
+  location: '',
+};
 
 describe('AddExperienceForm', () => {
-  const mockSetFormData = jest.fn();
+  const mockSetFormData = jest.fn<void, Parameters<FormProps['setFormData']>>();
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('renders all accordion sections', () => {
-    render(<AddExperienceForm formData={{}} setFormData={mockSetFormData} />);
+    render(
+      <AddExperienceForm formData={emptyForm} setFormData={mockSetFormData} />
+    );
 
     expect(screen.getByText('Basic Information')).toBeInTheDocument();
     expect(screen.getByText('Media & Visuals')).toBeInTheDocument();
@@ -20,14 +34,18 @@ describe('AddExperienceForm', () => {
   });
 
   it('renders expand/collapse controls', () => {
-    render(<AddExperienceForm formData={{}} setFormData={mockSetFormData} />);
+    render(
+      <AddExperienceForm formData={emptyForm} setFormData={mockSetFormData} />
+    );
 
     expect(screen.getByText('Expand all')).toBeInTheDocument();
     expect(screen.getByText('Collapse all')).toBeInTheDocument();
   });
 
   it('shows the Basic Information fields expanded by default', () => {
-    render(<AddExperienceForm formData={{}} setFormData={mockSetFormData} />);
+    render(
+      <AddExperienceForm formData={emptyForm} setFormData={mockSetFormData} />
+    );
 
     expect(screen.getByLabelText('Experience Title')).toBeInTheDocument();
     // HeroUI Select renders a hidden native <select> plus a visible trigger,
@@ -41,16 +59,23 @@ describe('AddExperienceForm', () => {
   });
 
   it('calls setFormData with an updater when a text input changes', () => {
-    render(<AddExperienceForm formData={{}} setFormData={mockSetFormData} />);
+    render(
+      <AddExperienceForm formData={emptyForm} setFormData={mockSetFormData} />
+    );
 
     fireEvent.change(screen.getByLabelText('Experience Title'), {
       target: { value: 'Test Experience' },
     });
 
     expect(mockSetFormData).toHaveBeenCalledTimes(1);
-    const updater = mockSetFormData.mock.calls[0][0];
-    expect(updater({ price: 50 })).toEqual({
-      price: 50,
+    const [updater] = mockSetFormData.mock.calls[0];
+    if (typeof updater !== 'function') {
+      throw new Error('Expected a form data updater');
+    }
+
+    const previousForm = { ...emptyForm, price: 50 };
+    expect(updater(previousForm)).toEqual({
+      ...previousForm,
       title: 'Test Experience',
     });
   });
@@ -59,6 +84,7 @@ describe('AddExperienceForm', () => {
     render(
       <AddExperienceForm
         formData={{
+          ...emptyForm,
           title: 'Mountain Hiking',
           price: 100,
           category: 'Adventure',
@@ -74,7 +100,9 @@ describe('AddExperienceForm', () => {
   });
 
   it('renders the difficulty options', () => {
-    render(<AddExperienceForm formData={{}} setFormData={mockSetFormData} />);
+    render(
+      <AddExperienceForm formData={emptyForm} setFormData={mockSetFormData} />
+    );
 
     const nativeSelect = screen
       .getAllByLabelText('Difficulty Level')
