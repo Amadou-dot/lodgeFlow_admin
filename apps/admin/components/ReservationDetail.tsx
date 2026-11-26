@@ -1,28 +1,18 @@
 'use client';
+import { ReservationPayments } from './ReservationPayments';
 import {
-  ReservationPayments,
-  type PaymentSummary,
-} from './ReservationPayments';
-import type {
-  DiningReservationDetail,
-  ExperienceReservationDetail,
-} from '@lodgeflow/database/reservation-json';
+  readReservationDetail,
+  readReservationStatus,
+  type ReservationData,
+} from '@/lib/validations/reservation-operations-json';
 import Link from 'next/link';
 import { useResourceLoad } from '@/hooks/useResourceLoad';
 import { useCallback, useEffect, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import { utcDate } from '@/lib/reservation-options';
-type Reservation = DiningReservationDetail | ExperienceReservationDetail;
 interface ReservationDetailProps {
   kind: 'dining' | 'experience';
   id: string;
-}
-interface ReservationData {
-  reservation: Reservation;
-  customerName: string;
-  allowedStatuses: string[];
-  payment: PaymentSummary;
-  currency: string;
 }
 function isStatusAllowed({
   data,
@@ -32,7 +22,7 @@ function isStatusAllowed({
   status: string;
 }) {
   return (
-    data.allowedStatuses.includes(status) &&
+    data.allowedStatuses.some(allowed => allowed === status) &&
     (status !== 'cancelled' ||
       !(
         data.payment.legacyPaid ||
@@ -57,12 +47,9 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
   const request = useCallback(
     async (signal: AbortSignal): Promise<ReservationData> => {
       const response = await fetch(endpoint, { cache: 'no-store', signal });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || 'Unable to load reservation');
-      return result.data;
+      return readReservationDetail(response, kind);
     },
-    [endpoint]
+    [endpoint, kind]
   );
   const { state, reload: load } = useResourceLoad({
     resourceKey: endpoint,
@@ -96,9 +83,7 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
           expectedStatus: data.reservation.status,
         }),
       });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || 'Unable to update status');
+      await readReservationStatus(response, kind);
       await load();
       setNextStatus(current => (current === submittedStatus ? '' : current));
       setAction({ kind: 'idle' });
@@ -111,9 +96,13 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
   }
   const reservation = data?.reservation;
   const dining =
-    reservation && 'dining' in reservation ? reservation : undefined;
+    kind === 'dining' && reservation && 'dining' in reservation
+      ? reservation
+      : undefined;
   const experience =
-    reservation && 'experience' in reservation ? reservation : undefined;
+    kind === 'experience' && reservation && 'experience' in reservation
+      ? reservation
+      : undefined;
   return (
     <section className='space-y-6 max-w-3xl'>
       <Link href='/reservations' className='text-primary underline'>
@@ -169,6 +158,7 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
           {experience?.observations && <p>Notes: {experience?.observations}</p>}
           <ReservationPayments
             key={endpoint}
+            kind={kind}
             endpoint={endpoint}
             payment={data.payment}
             currency={data.currency}

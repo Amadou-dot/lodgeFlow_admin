@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react';
 import { ReservationDetail } from '@/components/ReservationDetail';
 import type { DiningReservationDetail } from '@lodgeflow/database/reservation-json';
-import type { PaymentSummary } from '@/components/ReservationPayments';
+import type { PaymentSummary } from '@/lib/validations/reservation-operations-json';
 
 jest.mock('@/components/AuthGuard', () => ({ usePermission: () => true }));
 jest.mock('@/components/ReservationPayments', () => ({
@@ -29,10 +29,10 @@ const payment: PaymentSummary = {
 };
 function payload(customerName: string) {
   const reservation: DiningReservationDetail = {
-    _id: customerName,
+    _id: '507f1f77bcf86cd799439011',
     customer: 'customer',
     dining: null,
-    date: '2040-01-01T00:00:00Z',
+    date: '2040-01-01T00:00:00.000Z',
     time: '18:00',
     numGuests: 2,
     status: 'confirmed',
@@ -42,13 +42,13 @@ function payload(customerName: string) {
   return {
     reservation,
     customerName,
-    allowedStatuses: ['seated', 'cancelled'],
+    allowedStatuses: ['completed', 'cancelled'],
     currency: 'USD',
     payment,
   };
 }
-function response(data: ReturnType<typeof payload>) {
-  return { ok: true, json: async () => ({ data }) };
+function response(data: unknown) {
+  return { ok: true, json: async () => ({ success: true, data }) };
 }
 beforeEach(() => {
   fetchMock.mockReset();
@@ -65,25 +65,43 @@ test('preserves status request and refreshes only after success; failed save kee
       ok: false,
       json: async () => ({ error: 'Status changed' }),
     })
-    .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    .mockResolvedValueOnce(response({ status: 'completed' }))
+    .mockResolvedValueOnce(
+      response({
+        ...payload('Ada').reservation,
+        dining: '507f1f77bcf86cd799439012',
+        status: 'completed',
+      })
+    )
     .mockResolvedValueOnce(response(payload('Ada')));
   render(<ReservationDetail kind='dining' id='one' />);
   await screen.findByText('Ada');
   fireEvent.change(screen.getByLabelText('Change status'), {
-    target: { value: 'seated' },
+    target: { value: 'completed' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Status changed');
-  expect(screen.getByLabelText('Change status')).toHaveValue('seated');
+  expect(screen.getByLabelText('Change status')).toHaveValue('completed');
   expect(fetchMock).toHaveBeenCalledTimes(2);
   fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+  await waitFor(() =>
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Unable to update status'
+    )
+  );
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(screen.getByLabelText('Change status')).toHaveValue('completed');
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
   expect(fetchMock.mock.calls[1]).toEqual([
     '/api/dining-reservations/one',
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'seated', expectedStatus: 'confirmed' }),
+      body: JSON.stringify({
+        status: 'completed',
+        expectedStatus: 'confirmed',
+      }),
     },
   ]);
   await waitFor(() =>
@@ -114,7 +132,21 @@ test('a resource change hides old data and ignores the previous late load', asyn
           finish = resolve;
         })
     )
-    .mockResolvedValueOnce(response(payload('Current Guest')));
+    .mockResolvedValueOnce(
+      response({
+        ...payload('Current Guest'),
+        reservation: {
+          _id: '507f1f77bcf86cd799439011',
+          customer: 'customer',
+          experience: null,
+          date: '2040-01-01T00:00:00.000Z',
+          numParticipants: 2,
+          status: 'confirmed',
+          totalPrice: 10,
+          isPaid: false,
+        },
+      })
+    );
   const { rerender } = render(<ReservationDetail kind='dining' id='one' />);
   rerender(<ReservationDetail kind='experience' id='two' />);
   await screen.findByText('Current Guest');
@@ -130,12 +162,12 @@ test('payment refresh preserves the independently edited status draft', async ()
   render(<ReservationDetail kind='dining' id='one' />);
   await screen.findByText('Ada');
   fireEvent.change(screen.getByLabelText('Change status'), {
-    target: { value: 'seated' },
+    target: { value: 'completed' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Refresh payments' }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   await act(async () => {});
-  expect(screen.getByLabelText('Change status')).toHaveValue('seated');
+  expect(screen.getByLabelText('Change status')).toHaveValue('completed');
 });
 
 test.each([
@@ -152,7 +184,7 @@ test.each([
         token: 'checkout',
         amountCents: 1000,
         currency: 'usd',
-        createdAt: '2040-01-01T00:00:00Z',
+        createdAt: '2040-01-01T00:00:00.000Z',
         pending: true,
       };
     },
@@ -165,7 +197,7 @@ test.each([
         amountCents: 100,
         reference: '',
         actor: 'staff',
-        createdAt: '2040-01-01T00:00:00Z',
+        createdAt: '2040-01-01T00:00:00.000Z',
         status: 'pending',
       };
     },
@@ -173,7 +205,7 @@ test.each([
   {
     name: 'removed allowed status',
     update: (data: ReturnType<typeof payload>) => {
-      data.allowedStatuses = ['seated'];
+      data.allowedStatuses = ['completed'];
     },
   },
 ])(
@@ -199,3 +231,12 @@ test.each([
     expect(fetchMock).toHaveBeenCalledTimes(2);
   }
 );
+
+test('rejects a detail from the other reservation kind before rendering the guest', async () => {
+  fetchMock.mockResolvedValue(response(payload('Wrong guest')));
+  render(<ReservationDetail kind='experience' id='two' />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Unable to load reservation'
+  );
+  expect(screen.queryByText('Wrong guest')).not.toBeInTheDocument();
+});
