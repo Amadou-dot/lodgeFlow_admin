@@ -191,6 +191,45 @@ it('limits recent activity to four rows and keeps singular and plural stay label
   ]);
 });
 
+it.each([
+  [
+    'overview',
+    useOverview,
+    { bookings: 0, revenue: 0, customers: 0, cancellations: 0 },
+  ],
+  [
+    'activity',
+    useActivities,
+    [
+      {
+        id: 'b1',
+        name: 'John Doe',
+        status: 'confirmed',
+        stayDuration: '3 nights',
+      },
+    ],
+  ],
+  ['duration', useDurationData, []],
+] as const)(
+  'derives %s from a dashboard with an expanded-year stay',
+  async (_key, hook, expected) => {
+    mockDashboard({
+      ...emptyDashboard,
+      recentActivity: [
+        {
+          ...firstActivity,
+          checkInDate: '+010000-01-02T00:00:00.000Z',
+          checkOutDate: '+010000-01-05T00:00:00.000Z',
+        },
+      ],
+    });
+
+    hook();
+
+    await expect(query().queryFn()).resolves.toEqual(expected);
+  }
+);
+
 it('returns bare sales rows and retains additive fields', async () => {
   const salesData = [
     {
@@ -284,13 +323,17 @@ it('validates the whole dashboard before deriving overview', async () => {
   );
 });
 
-it('rejects invalid dates before formatting a recent stay', async () => {
+it.each([
+  'invalid-date',
+  '2024-03-01T00:00:00Z',
+  '+010000-02-30T00:00:00.000Z',
+])('rejects noncanonical or invalid stay timestamp %s', async checkOutDate => {
   mockFetch.mockResolvedValue(
     Response.json({
       success: true,
       data: {
         ...emptyDashboard,
-        recentActivity: [{ ...firstActivity, checkOutDate: 'invalid-date' }],
+        recentActivity: [{ ...firstActivity, checkOutDate }],
       },
     })
   );

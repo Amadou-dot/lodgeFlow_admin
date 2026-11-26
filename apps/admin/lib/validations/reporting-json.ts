@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-const timestamp = z.iso.datetime();
+// Dashboard activity uses Date.toISOString(), which also emits signed six-digit years.
+const timestamp = z.string().refine(value => {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString() === value;
+});
 
 export const dashboardJsonSchema = z.object({
   overview: z.object({
