@@ -4,11 +4,11 @@
 
 **Goal:** Finish the reproducible remaining Phase 4 functional fixes while preserving the established refactor contracts.
 
-**Architecture:** Keep the current Next.js, HeroUI, Clerk and cache architecture. Project editable Settings requests, format stay dates at display boundaries, initialize booking forms from loaded records, and constrain existing mobile layouts. This is a continuation of the authorized refactor plan, not a redesign.
+**Architecture** Keep the current Next.js, HeroUI, Clerk and cache architecture. Project editable Settings requests, format stay dates at display boundaries, initialize booking forms from loaded records, and constrain existing mobile layouts. Validate the existing checkout response before client side effects.
 
 **Tech Stack:** Node 22, pnpm 11.17.0, TypeScript, Next.js 16, React 18, HeroUI v2, SWR/TanStack Query, Jest, MongoDB/Mongoose.
 
-**Spec:** `AGENTS.md`, `docs/refactoring/plan.md` and `docs/refactoring/phase-4-browser-review.md`; user authorized remaining slices on 2026-11-25 after accepting and merging #202.
+**Spec** [Agent guide](../../AGENTS.md), [milestone plan](plan.md) and [browser findings](phase-4-browser-review.md). The user authorized the remaining slices on 2026-11-25 after accepting #202 and confirming logout → Back prompts for sign-in. The continuation begins at `b190f44f504db36c0b5a1d0666e366749391dd04`, which includes merge `28bedb6fa0f73df78ff3001d9e8d11ab728f8f18` and the safe Stripe diagnostics. [Diagnostics](../stripe-webhook-diagnostics.md) [PR delivery record](phase-4-browser-fixes-plan.md#delivery-and-browser-scope-2026-11-25)
 
 ## Global Constraints
 
@@ -35,7 +35,7 @@
 
 **Ownership:** `apps/admin/components/SettingsForm.tsx`, relevant handler types beneath `components/SettingsForm/`, `apps/admin/hooks/useSettings.ts`, focused Settings form/mutation tests. Add a small app-local typed adapter only if needed; do not change the database model, serializer, route permission, server allowlist or response envelope.
 
-**Context:** `/tmp/lodgeflow-phase4-contract-audit.md` section 1 contains the verified full path. The form currently sends its entire AppSettings read DTO, which the strict PUT schema rejects for `singleton`/`fullAddress`; untouched `contactInfo:null` is another incompatible read representation.
+**Context** The original form sent its entire AppSettings read DTO. The strict PUT schema rejected `singleton` and `fullAddress`. Untouched `contactInfo: null` was another incompatible read representation. [Original finding](phase-4-browser-review.md#settings-requestresponse-mismatch) [Form regression](../../apps/admin/__tests__/components/SettingsForm.test.tsx)
 
 **Interfaces:** Consume `UpdateSettingsInput` from the existing Settings validation module. The update hook accepts that request shape and returns `AppSettings`. Build a new sparse payload from editable revisioned changes. Successful saves adopt the returned full DTO as the baseline, while retaining changes newer than the submitted revision.
 
@@ -49,7 +49,7 @@
 
 **Ownership:** New `apps/admin/lib/booking-stay-date.ts`; `apps/admin/utils/bookingUtils.ts`; `components/BookingDetails/BookingStatusDates.tsx`; `components/BookingDetails/BookingPDFTemplate.tsx`; `app/(dashboard)/guests/[id]/page.tsx`; `components/EmailTemplates.tsx`; focused date/booking/print/email tests. Do not change calendar occupancy, forms' wire dates, relative status wording, stored dates, calculations or actual event renderers.
 
-**Context:** `/tmp/lodgeflow-phase4-contract-audit.md` section 2 inventories all relevant consumers. Existing editor/calendar/inbox consumers already use UTC date keys. Other absolute stay labels format UTC-midnight values in the viewer timezone and display the previous day in Denver.
+**Context** The editor, Calendar and inbox already used UTC date keys. Other absolute stay labels previously formatted UTC-midnight values in the viewer timezone and displayed the preceding day in Denver. [Original finding](phase-4-browser-review.md#stay-dates-and-pdf-entry-point) [Date regressions](../../apps/admin/__tests__/unit/utils/bookingUtils.test.ts)
 
 **Interfaces:** Export `formatBookingStayDate({ date, style })`, accepting only the serialized string and a small union of the existing presentation variants. Use a fixed en-US/UTC calendar formatter and preserve each caller's existing month/day padding and malformed-date fallback. Apply only to planned stay labels. Admin booking confirmation email shares the label formatter for canonical ISO calendar dates and explicitly zoned ISO instants. Its existing permissive input boundary retains prior native local formatting for offset-free date-times and non-ISO legacy forms, without changing accepted inputs or sending behavior.
 
@@ -61,9 +61,9 @@
 
 ### Task 3: Preserve booking edit initialization and selected customer
 
-**Ownership:** Admin booking edit page, `hooks/useBookingForm.ts`, `components/BookingForm/booking-form-data.ts`, customer selection and directly related form types/callers/tests, focused existing admin PUT integration tests, and a verified correction entry in `phase-4-ui-state.md`. Determine exact files from `/tmp/lodgeflow-phase4-mobile-audit.md`; no server request-schema, domain or payment-policy changes.
+**Ownership:** Admin booking edit page, `hooks/useBookingForm.ts`, `components/BookingForm/booking-form-data.ts`, customer selection and directly related form types/callers/tests, focused existing admin PUT integration tests, and a verified correction entry in `phase-4-ui-state.md`. [Editor page](<../../apps/admin/app/(dashboard)/bookings/[id]/edit/page.tsx>) [Form payload builder](../../apps/admin/components/BookingForm/booking-form-data.ts)
 
-**Context:** `/tmp/lodgeflow-admin-legacy-date-audit.md` additionally reproduces a false paid-booking repricing conflict: the current editor rewrites untouched legacy stay timestamps to midnight during a notes-only edit. The existing PUT schema and `UpdateBookingInput` already permit omitted dates. Retaining one legacy endpoint when moving the other changes the existing Denver stay-length calculation, so avoid that mixed-endpoint change.
+**Context** The previous editor rewrote untouched legacy stay timestamps to midnight during a notes-only edit and incorrectly triggered paid-booking repricing protection. The existing PUT schema and `UpdateBookingInput` permit omitting both dates. Retaining one legacy endpoint when moving the other can change the Denver stay-length calculation. [Actual PUT regression](../../apps/admin/__tests__/integration/api/bookings.test.ts)
 
 **Interfaces:** Mount the loaded edit form keyed by booking ID after the resolved DTO matches the current route ID (`keepPreviousData` can retain a different record). Same-record revalidation preserves its draft and initialization baseline, including through failed refresh and recovery while the existing error page remains visible. Accepted uppercase ObjectId routes match canonical serialized IDs without changing transport behavior. A selected customer with known identity remains an option even if absent from the first twenty/search results; deduplicate by the Clerk ID. Missing/deleted customer references remain explicit, including an automatic saved selection whose profile becomes unresolved during a same-record refresh; cached list data cannot silently restore it. Recovery, deliberate valid replacement and intentional clearing preserve their respective draft semantics. Never infer the missing profile's cause, invent an identity or change server eligibility.
 
@@ -77,13 +77,13 @@ For an edit, omit both stay-date fields when the complete selected calendar rang
 
 ### Task 4: Restore mobile control reachability and modal toast accessibility
 
-**Ownership:** Dining add/edit/view modal layout, Calendar header/row styles, admin `app/providers.tsx` and a small app-local toast portal component if needed, focused interaction checks and disposable responsive fixtures. Customer providers, dependencies and shared package structure are outside this task. Exact paths and evidence are in `/tmp/lodgeflow-phase4-mobile-audit.md`. Toast visual investigation remains separate from the confirmed modal accessibility defect described below. The user clarified the reported missing notification occurred in Zen responsive simulation at iPhone/Samsung screen sizes, with the action forgotten; a physical-device keyboard failure was not reported.
+**Ownership:** Dining add/edit/view modal layout, Calendar header/row styles, admin `app/providers.tsx` and a small app-local toast portal component if needed, focused interaction checks and disposable responsive fixtures. Customer providers, dependencies and shared package structure are outside this task. The user clarified that the reported missing notification occurred in Zen responsive simulation at iPhone/Samsung screen sizes. The action is unknown. The visual report and the confirmed modal accessibility defect have separate fixture evidence. [Responsive layout and notifications](phase-4-browser-review.md#responsive-layout-and-notifications)
 
 **Interfaces:** Keep HeroUI's modal shell and one vertical scroll owner. Constrain the mobile Dining modal to the available visual viewport, not a competing static viewport height. Calendar's Listing header and row header use consistent mobile positioning while preserving desktop sticky behavior and occupancy/date semantics.
 
-The controller approved a narrow admin-only toast accessibility correction from `/tmp/lodgeflow-toast-ax-audit.md`: render the existing ToastProvider inline on the initial render, then move that same provider configuration directly to `document.body` through React's supported `createPortal` after mount. Keep it within the existing React provider/context tree. A null-until-mounted guard loses early notifications and is not acceptable. The body portal lets the library's existing top-layer marker escape an already aria-hidden root. It intentionally makes toast controls reachable by keyboard while the modal is open. Preserve early/switch/post-mount emissions, styling/theme/context, visual placement, actions/dismissal and modal focus restoration. No new queue, private-marker injection or library upgrade.
+The approved admin toast accessibility correction renders the existing ToastProvider inline on the initial render, then moves that same provider configuration directly to `document.body` with React's `createPortal` after mount. Keep it within the existing React provider/context tree. A null-until-mounted guard loses early notifications and is not acceptable. The body portal lets the library's existing top-layer marker escape an already aria-hidden root. It intentionally makes toast controls reachable by keyboard while the modal is open. Preserve early/switch/post-mount emissions, styling/theme/context, visual placement, actions/dismissal and modal focus restoration. No new queue, private-marker injection or library upgrade.
 
-- [x] Reuse the explorer fixtures to reproduce Dining clipping, Calendar overlap and first-modal-toast AX hiding. Record phone and desktop before/after evidence. Final geometry must come from actual changed component classes and freshly compiled CSS (or real changed components), not the probe's hardcoded hypothetical candidate. Supporting notes: `/tmp/lodgeflow-task4-verification-notes.md`.
+- [x] Reuse the explorer fixtures to reproduce Dining clipping, Calendar overlap and first-modal-toast AX hiding. Record phone and desktop before/after evidence. Final geometry must come from actual changed component classes and freshly compiled CSS (or real changed components), not the probe's hardcoded hypothetical candidate. See the [actual-source geometry results](phase-4-browser-review.md#responsive-layout-and-notifications).
 - [x] Make the narrow layout corrections, without changing fields, validation, mutations, calendar data or redesigning the Reservations table.
 - [x] Verify Dining first fields and final actions through the single body scroller, normal/reduced visible phone viewports and desktop, and the shared view shell. Verify Calendar header/row positions and date/link hit tests after horizontal scroll, with desktop stickiness retained.
 - [x] Verify the real admin toast change in the existing Chromium and Zen fixtures, plus a controlled server-render/hydration check and initial-child-effect/switch/post-mount emissions. Check AX inclusion, background hiding, touch/keyboard action and dismissal, theme/context and modal focus restoration. Record the new keyboard access. If a genuine environment blocker prevents validating this optional portal correction, leave that source correction deferred and document the evidence; complete independent layout work. The unknown original visual toast action stays unverified.
@@ -94,7 +94,7 @@ The controller approved a narrow admin-only toast accessibility correction from 
 
 **Ownership:** `apps/customer/hooks/usePayment.ts`, `apps/customer/lib/open-reservation-checkout.ts`, one browser-safe `apps/customer/lib/validations/checkout-response.ts`, focused checkout/confirmation tests, and narrow existing HTTP smoke booking-edit assertions. The controller owns plan and ledger changes. No changes to server checkout generation, provider operations, booking policy, history UI eligibility, amounts or stored dates.
 
-**Context:** The read-only audit reproduced raw parser errors for both checkout entry points on text/HTML/empty responses and a TypeError for JSON null. Cabin checkout also treated a 200 response with no URL as success and invalidated its caches. Controlled actual customer PATCH tests established the existing eligible/blocked edit matrix. Evidence is in `/tmp/lodgeflow-phase4-payment-audit.md`, with the disposable probe paths it lists.
+**Context:** The read-only audit reproduced raw parser errors for both checkout entry points on text/HTML/empty responses and a TypeError for JSON null. Cabin checkout also treated a 200 response with no URL as success and invalidated its caches. Controlled actual customer PATCH tests established the existing eligible/blocked edit matrix. [Checkout failure fixtures](../../apps/customer/__tests__/shared/checkout-failure-fixtures.ts) [HTTP owner edit regressions](../../scripts/http-smoke/run.mjs) [Recorded outcomes](phase-4-browser-review.md#guestextras-edit-and-checkout-outcomes)
 
 **Interfaces:** Parse unknown JSON once through a small shared checkout response reader. Return the existing `{ url: string }` only for HTTP OK, literal success, and a usable absolute HTTP(S) URL; preserve the exact accepted URL text and additive success fields. Characterize observed provider/local fixture URLs before enforcing URL checks. No new hostname allowlist or provider URL rewriting. Keep known nonempty string API errors verbatim and operation fallbacks: cabin `Failed to create checkout session`, reservation `Unable to start checkout`. Cabin invalidations and reservation navigation happen only after validated success. Use named options for the reader's arguments.
 
@@ -114,3 +114,69 @@ The controller approved a narrow admin-only toast accessibility correction from 
 - [ ] Reconcile the real provider toast fixture and native/mobile/booking/payment verification limits. Normal Chromium toast visibility passes; consume the follow-up Zen/Gecko responsive evidence. Pinch viewport and modal accessibility observations are separate. The original failing action is unknown; do not describe the responsive-emulation report as a native iPhone keyboard report. Do not label Phase 4 complete solely because code/tests pass.
 - [ ] Replace ephemeral audit pointers in the tracked plan with durable source/test/finding references where possible; retain actual local evidence paths in the task report. Record exact commands/results and update remaining Phase 6 overlap so its checkout task consumes this implemented boundary.
 - [ ] Update documentation with remaining acceptance and Phase 6 work, run formatting/path checks and commit. The controller then performs the whole-plan review and continues the separately scoped Phase 6 plan.
+
+## Recorded validation
+
+The continuation baseline at `b190f44f504db36c0b5a1d0666e366749391dd04`
+passed `pnpm install --frozen-lockfile` and all 2,752 package tests
+(admin 1,708, customer 945, database 96 and email 3) with Node 22.23.2
+and pnpm 11.17.0. Commands below use `pnpm` for the pinned local runner.
+Full-suite totals refer to the individual checkpoints named here.
+
+- **Settings (`4f58442`, review correction `3a0d20f`).** `pnpm --filter @lodgeflow/admin test`
+  passed 1,709 tests at the first commit. Focused Jest runs covered the
+  form, hooks, schema and routes. The final scope passed 70 tests across eight
+  suites with admin app and strict changed-test types.
+  [Form regression](../../apps/admin/__tests__/components/SettingsForm.test.tsx)
+- **Stay labels (`1c4a0e9`, final email correction `376d673`).**
+  `pnpm --filter @lodgeflow/admin test` passed 1,721 tests at the first commit.
+  Focused Jest ran in distinct processes with `TZ=America/Denver`, `TZ=UTC` and
+  `TZ=Asia/Tokyo`, passing 69 tests per zone. The Tokyo integration run
+  passed 38 transport/status tests. At the final correction,
+  `pnpm --filter @lodgeflow/admin exec jest --runInBand --runTestsByPath __tests__/unit/api/confirmation-email.test.ts`
+  passed 23 tests in each zone and the strict test compiler check passed.
+- **Booking editor (`1d855bf`, review correction `d70260a`).**
+  The Denver focused Jest run passed 90 tests, including the actual PUT.
+  `pnpm --filter @lodgeflow/admin test --runInBand` passed 1,745 tests at the
+  first commit. The final unresolved-guest correction passed 64 focused
+  tests across seven jsdom suites, admin app types and strict changed-test
+  types. [Editor regression](../../apps/admin/__tests__/components/BookingEditPage.test.tsx)
+  [PUT regression](../../apps/admin/__tests__/integration/api/bookings.test.ts)
+- **Dining, Calendar and toasts (`81fda6c`).**
+  `pnpm --filter @lodgeflow/admin exec jest --selectProjects jsdom --runInBand --runTestsByPath __tests__/components/Providers.test.tsx`
+  passed both cases after one baseline failure.
+  `pnpm --filter @lodgeflow/admin test` passed 1,751 tests across 124 suites.
+  Admin app/strict changed-test types, read-only ESLint and formatting passed.
+  Actual-source Chromium geometry went from 69 failures to zero. Chromium
+  accessibility, Zen responsive modal/interaction and controlled React
+  render/hydration fixtures passed their stated checks.
+- **Checkout and owner PATCH (`510f93d`).** Focused Jest reproduced 71 checkout
+  failures and passed 229 tests across eight suites after the change.
+  `pnpm --filter @lodgeflow/customer test --runInBand` passed 1,052 tests across
+  72 suites. Both app type checks, customer read-only ESLint and touched-file
+  formatting passed. `pnpm test:http` passed with disposable services and
+  controlled providers, including all three new owner PATCH assertions.
+
+[Detailed browser and edit outcomes](phase-4-browser-review.md#remaining-functional-fixes-and-local-evidence-2026-11-25)
+covers the fixture results and separates the open hosted/device checks.
+
+At runtime commit `510f93d`, `pnpm ci:check` passed formatting, read-only lint
+and all 2,902 package tests (admin 1,751, customer 1,052, database 96 and email 3).
+Both app `exec tsc --noEmit --incremental false` checks passed. `pnpm build`
+passed with CI's throwaway public Clerk key and no Stripe/Resend secrets. Both
+app builds recorded the existing Next.js 16 warning about React 18 and the
+admin build recorded the existing Tailwind config module-type warning. The
+isolated `pnpm test:http` result is recorded in the checkout result above.
+Phase 4 browser and payment acceptance remains open.
+
+## Phase 6 handoff
+
+Continue the remaining V03 readers and O01 compiler/test-helper work from the
+reviewed continuation. The Phase 6 checkout task consumes the existing
+[response reader](../../apps/customer/lib/validations/checkout-response.ts) and
+[consumer regression](../../apps/customer/__tests__/bookings/useCreateCheckout.test.tsx).
+Use existing route and HTTP coverage for accepted provider handoffs and retry,
+and extend the reader only for a demonstrated remaining gap. Keep Settings
+response parsing compatible with the sparse writable input, and keep booking
+response readers compatible with stay labels, retained editor drafts and
+calendar positioning. [Milestone Phase 6 gates](plan.md#phase-6--remaining-debt-and-milestone-verification)

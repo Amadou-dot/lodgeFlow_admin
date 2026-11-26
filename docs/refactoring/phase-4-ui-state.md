@@ -5,7 +5,7 @@ of [tracking issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/15
 starting from `9f8b1a8` with Phases 0–3 merged. The user authorized this phase
 and a draft PR; Phase 5 provider-origin work and Phase 6 remain separate.
 
-## Delivery status (reconciled 2026-11-03)
+## Delivery status (reconciled 2026-11-25)
 
 [PR #195](https://github.com/Amadou-dot/lodgeFlow_admin/pull/195) merged on
 2026-10-09 as `d0870e124b866ed9ce10c5c66399707c75532665` after the final review
@@ -20,8 +20,9 @@ browser report now records mixed results and unresolved failures, including
 private history after sign-out, stale cabin links, Settings saves, stay-date
 display, direct PDF and mobile layouts. See the
 [browser findings and triage](phase-4-browser-review.md) for passed checks,
-reproductions and verification limits. Acceptance remains unchecked pending
-fixes and retesting; neither merge nor HTTP smoke satisfies that gate.
+reproductions and verification limits. The later #202 merge carries the user's
+logout → Back retest. The broader browser and payment gate remains open.
+[PR #202 delivery and user retest](phase-4-browser-review.md#pr-202-delivery-and-user-retest)
 
 ## Preserved contracts
 
@@ -225,8 +226,18 @@ boundaries only.
 The [2026-11-05 follow-up](phase-4-browser-fixes-plan.md) implements the approved
 single print/download preview button, history isolation across authentication
 changes and fresh public cabin links. Its 2,743 passing package tests, strict
-types, isolated HTTP, real production catalog regression and clean builds support
-review; hosted browser retesting and the other reported findings remain open.
+types, isolated HTTP, real production catalog regression and clean builds
+preceded the #202 delivery. The user confirmed that Back after logout prompts
+for sign-in. Both production apps were Ready at merge
+`28bedb6fa0f73df78ff3001d9e8d11ab728f8f18`, with passing CI and read-only smoke.
+[Delivery evidence](phase-4-browser-fixes-plan.md#delivery-and-browser-scope-2026-11-25)
+
+The [remaining Phase 4 continuation](phase-4-remaining-plan.md) starts from
+`b190f44f504db36c0b5a1d0666e366749391dd04`. It records the reviewed Settings
+request projection, UTC stay-label display, booking editor/draft corrections,
+Dining and Calendar geometry, modal toast accessibility and checkout response
+boundary. The first browser fixture results and the remaining hosted/device
+checks are recorded in [the browser acceptance record](phase-4-browser-review.md#remaining-functional-fixes-and-local-evidence-2026-11-25).
 
 The unchanged `apps/customer/app/payments/success/page.tsx` displays static payment
 success wording without checking settlement; correcting that page is separate

@@ -42,9 +42,9 @@ Files: `apps/customer/lib/data/cabins.ts`, `apps/customer/app/page.tsx` (its sep
 - Catalog freshness must hold in a production build after records are replaced, not only in Next development mode.
 
 - [x] Run formatting, read-only workspace lint, all package tests, both app types, affected admin-test types, isolated HTTP, frozen install and builds.
-- [x] Review the full slice independently, address the pending-edit test gap and prepare the evidence for a draft PR. Merge remains subject to user review.
+- [x] Review the full slice independently, address the pending-edit test gap and prepare the evidence for a draft PR and user review.
 - [x] Record browser verification limits and the remaining Phase 4 findings explicitly.
-- [ ] Retest the affected flows in the production browsers after reviewed delivery.
+- [ ] Complete remaining browser coverage for account transitions and visual print/PDF. The delivery record below includes the user's logout → Back retest.
 
 ## Local evidence
 
@@ -77,8 +77,22 @@ edit while a new account's edit dialog is open; both fail with the old page and
 pass with the keyed page. Public query caches and prefix invalidation remain
 covered. Evidence logs are under `/tmp/lodgeflow-phase4-browser-evidence` locally.
 
-The fixtures do not establish hosted Clerk cookies/session transitions, native
-Back/bfcache behavior, visual PDF pagination or responsive layout. The three-step
-[browser retest list](phase-4-browser-review.md#approved-follow-up-implemented-for-review-2026-11-05)
-and the remaining Settings/date/mobile findings keep Phase 4 acceptance open.
-Remote CI and deployment evidence belong to the exact pushed PR commit.
+These fixtures cover isolated behavior. The delivery and user retest below add
+production evidence for the scope recorded.
+
+## Delivery and browser scope (2026-11-25)
+
+On 2026-11-25, the user accepted [PR #202](https://github.com/Amadou-dot/lodgeFlow_admin/pull/202)
+and specifically confirmed that Back after logout prompts for sign-in. It merged as
+`28bedb6fa0f73df78ff3001d9e8d11ab728f8f18`. [PR CI run 45123844150, attempt 2](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/45123844150/attempts/2)
+and all five jobs in [post-merge CI run 45724753171](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/45724753171)
+passed. Both production apps were Ready at the merge SHA. Read-only smoke found
+3 current homepage cabin links and 13 current catalog links, zero stale links,
+a 200 current cabin detail and admin sign-in page, and a 307 from the protected
+admin bookings API to sign-in.
+
+The production smoke is read-only. Hosted account switching with pending reads
+or edits, other Back/bfcache sequences, and visual multi-page print/PDF remain
+open. The Settings/date/editor, mobile and checkout corrections are tracked in
+the [continuation](phase-4-remaining-plan.md) with separate local evidence.
+[Phase 4 browser and payment acceptance](phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
