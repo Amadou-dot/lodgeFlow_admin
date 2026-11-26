@@ -1,7 +1,12 @@
+import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useSWR, { SWRConfig } from 'swr';
-import { useCancelBooking, useCreateBooking } from '@/hooks/useBooking';
+import {
+  useCancelBooking,
+  useCreateBooking,
+  useUpdateBooking,
+} from '@/hooks/useBooking';
 import {
   useCancelDiningReservation,
   useCreateDiningReservation,
@@ -12,6 +17,28 @@ import {
 } from '@/hooks/useExperienceBooking';
 import { useCreateCheckoutSession } from '@/hooks/usePayment';
 
+const id = '507f1f77bcf86cd7994390ab';
+const other = '507f1f77bcf86cd7994390cd';
+const cabinDetail = {
+  _id: id,
+  id,
+  customer: 'test-user-id',
+  cabin: null,
+  status: 'unconfirmed',
+  checkInDate: '2030-06-01T00:00:00.000Z',
+  checkOutDate: '2030-06-03T00:00:00.000Z',
+  numGuests: 2,
+  numNights: 2,
+  totalPrice: 50,
+  cabinPrice: 50,
+  specialRequests: [null, 'Extra towels'],
+};
+const refund = {
+  amount: 0,
+  type: 'none',
+  status: 'none',
+  reason: 'No receipts',
+};
 function setup() {
   const client = new QueryClient({
     defaultOptions: {
@@ -47,14 +74,18 @@ test.each(['create', 'cancel'] as const)(
     const keys = [
       ['cabin-availability', 'cabin'],
       ['bookings-history'],
-      ...(action === 'cancel' ? [['booking', 'booking']] : []),
+      ...(action === 'cancel' ? [['booking', id]] : []),
     ];
     seed(client, keys);
     let available = 1;
     const readAvailability = jest.fn(async () => ({ available }));
     jest.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, data: {} }),
+      status: action === 'create' ? 201 : 200,
+      json: async () => ({
+        success: true,
+        data: action === 'create' ? cabinDetail : { booking: null, refund },
+      }),
     } as Response);
     const { result } = renderHook(
       () => ({
@@ -79,7 +110,7 @@ test.each(['create', 'cancel'] as const)(
           checkOutDate: '2030-06-03',
           numGuests: 2,
         });
-      else await result.current.cancel.mutateAsync({ bookingId: 'booking' });
+      else await result.current.cancel.mutateAsync({ bookingId: id });
     });
     expectStale(client, keys);
     await waitFor(() =>
@@ -105,7 +136,8 @@ test.each(['dining', 'experience'] as const)(
     seed(client, keys);
     jest.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, data: {} }),
+      status: 200,
+      json: async () => ({ success: true, data: null }),
     } as Response);
     const { result } = renderHook(
       () => ({
@@ -126,7 +158,8 @@ test('dining creation invalidates existing availability variants', async () => {
   seed(client, keys);
   jest.mocked(fetch).mockResolvedValue({
     ok: true,
-    json: async () => ({ success: true, data: {} }),
+    status: 201,
+    json: async () => ({ success: true, data: null }),
   } as Response);
   const { result } = renderHook(() => useCreateDiningReservation(), {
     wrapper,
@@ -176,7 +209,8 @@ test('failed reservation mutations keep cached data fresh', async () => {
   seed(client, keys);
   jest.mocked(fetch).mockResolvedValue({
     ok: false,
-    json: async () => ({ error: 'Denied' }),
+    status: 401,
+    json: async () => ({ success: false, error: 'Denied' }),
   } as Response);
   const { result } = renderHook(
     () => ({
@@ -221,7 +255,8 @@ test('a failed SWR availability refresh does not reject a committed booking', as
     .mockRejectedValue(new Error('refresh offline'));
   jest.mocked(fetch).mockResolvedValue({
     ok: true,
-    json: async () => ({ success: true, data: {} }),
+    status: 201,
+    json: async () => ({ success: true, data: cabinDetail }),
   } as Response);
   const { result } = renderHook(
     () => ({
@@ -249,4 +284,165 @@ test('a failed SWR availability refresh does not reject a committed booking', as
     expect(result.current.availability.error?.message).toBe('refresh offline')
   );
   expect(result.current.availability.data?.available).toBe(1);
+});
+
+test.each([
+  { name: 'missing reservation data', data: { success: true } },
+  { name: 'false success', data: { success: false, data: null } },
+  { name: 'invalid object', data: { success: true, data: {} } },
+  {
+    name: 'conflicting error',
+    data: { success: true, data: null, error: 'Failure' },
+  },
+  {
+    name: 'non-string message',
+    data: { success: true, data: null, message: 42 },
+  },
+])(
+  'rejects $name without refreshing either reservation history',
+  async ({ data }) => {
+    const { client, wrapper } = setup();
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    jest.mocked(fetch).mockImplementation(async () => FetchResponse.json(data));
+    const { result } = renderHook(
+      () => ({
+        dining: useCancelDiningReservation(),
+        experience: useCancelExperienceBooking(),
+      }),
+      { wrapper }
+    );
+    for (const mutation of Object.values(result.current))
+      await expect(mutation.mutateAsync(id)).rejects.toThrow();
+    expect(invalidated).not.toHaveBeenCalled();
+  }
+);
+test.each(['dining', 'experience'] as const)(
+  '%s cancellation binds both IDs and the owner while preserving re-read status and raw receipts',
+  async kind => {
+    const { client, wrapper } = setup();
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    const data = {
+      _id: id,
+      id,
+      customer: 'test-user-id',
+      date: '2030-06-01T00:00:00.000Z',
+      totalPrice: 50,
+      isPaid: false,
+      status: 'pending',
+      receipts: [
+        {
+          id: 'legacy',
+          type: 'payment',
+          amountCents: 1.5,
+          method: 'cash',
+          reference: '',
+          actor: 'staff',
+          recordedAt: '2030-06-01T00:00:00.000Z',
+          memo: 'keep',
+        },
+      ],
+      ...(kind === 'dining'
+        ? { dining: null, numGuests: 2, time: '17:00' }
+        : { experience: null, numParticipants: 2 }),
+    };
+    const { result } = renderHook(
+      () => ({
+        dining: useCancelDiningReservation(),
+        experience: useCancelExperienceBooking(),
+      }),
+      { wrapper }
+    );
+    for (const invalid of [
+      { ...data, _id: other, id: other },
+      { ...data, id: other },
+      { ...data, customer: 'other' },
+    ]) {
+      jest
+        .mocked(fetch)
+        .mockResolvedValueOnce(
+          FetchResponse.json({ success: true, data: invalid })
+        );
+      await expect(result.current[kind].mutateAsync(id)).rejects.toThrow();
+    }
+    expect(invalidated).not.toHaveBeenCalled();
+    const response = {
+      success: true,
+      message: 'Reservation cancelled successfully',
+      data,
+      addition: 42,
+    };
+    jest.mocked(fetch).mockResolvedValueOnce(FetchResponse.json(response));
+    expect(await result.current[kind].mutateAsync(id.toUpperCase())).toEqual(
+      response
+    );
+    expect(invalidated).toHaveBeenCalled();
+  }
+);
+test.each([
+  { booking: { ...cabinDetail, _id: other, id: other }, refund },
+  { booking: { ...cabinDetail, id: other }, refund },
+  { booking: { ...cabinDetail, customer: 'other' }, refund },
+  { booking: null },
+  { booking: null, refund: { ...refund, type: 'unknown' } },
+  { booking: null, refund: { ...refund, amount: 1.234 } },
+  { booking: null, refund: { ...refund, error: true } },
+  { booking: null, refund: { ...refund, status: 'pending' } },
+  { booking: { ...cabinDetail, refundStatus: 'failed' }, refund },
+])(
+  'rejects a mismatched cabin cancellation or malformed refund %#',
+  async data => {
+    const { client, wrapper } = setup();
+    const invalidated = jest.spyOn(client, 'invalidateQueries');
+    jest
+      .mocked(fetch)
+      .mockResolvedValue(FetchResponse.json({ success: true, data }));
+    const { result } = renderHook(useCancelBooking, { wrapper });
+    await expect(
+      result.current.mutateAsync({ bookingId: id })
+    ).rejects.toThrow();
+    expect(invalidated).not.toHaveBeenCalled();
+  }
+);
+
+test('cabin edits bind the request ID, changes and owner before any invalidation', async () => {
+  const { client, wrapper } = setup();
+  const invalidated = jest.spyOn(client, 'invalidateQueries');
+  const updates = {
+    numGuests: 3,
+    specialRequests: [' Towels '],
+    extras: { hasBreakfast: true },
+  };
+  const data = {
+    ...cabinDetail,
+    numGuests: 3,
+    specialRequests: ['Towels'],
+    extras: { hasBreakfast: true },
+  };
+  const variables = { bookingId: id.toUpperCase(), updates };
+  const { result } = renderHook(useUpdateBooking, { wrapper });
+  for (const invalid of [
+    { ...data, id: other, _id: other },
+    { ...data, id: other },
+    { ...data, customer: 'other' },
+    { ...data, numGuests: 2 },
+    { ...data, specialRequests: ['Other'] },
+    { ...data, extras: null },
+    { ...data, status: 'cancelled' },
+  ]) {
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        FetchResponse.json({ success: true, data: invalid })
+      );
+    await expect(result.current.mutateAsync(variables)).rejects.toThrow();
+  }
+  expect(invalidated).not.toHaveBeenCalled();
+  jest
+    .mocked(fetch)
+    .mockResolvedValueOnce(FetchResponse.json({ success: true, data }));
+  expect(await result.current.mutateAsync(variables)).toEqual({
+    success: true,
+    data,
+  });
+  expect(invalidated).toHaveBeenCalledTimes(2);
 });

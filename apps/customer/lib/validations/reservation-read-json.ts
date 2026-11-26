@@ -9,6 +9,7 @@ import {
   objectId,
 } from '@lodgeflow/database/reservation-read-fields';
 import { DINING_TYPES, MEAL_TYPES } from '@lodgeflow/database/config';
+import { ownedDetail, type MutationTarget } from './mutation-response';
 import { decodeSuccess, forDetailId } from './read-response';
 
 const catalog = z.object({
@@ -53,3 +54,26 @@ const experienceDetail = experience.extend({
 export const decodeDiningDetail = (id: string) => forDetailId(diningDetail, id);
 export const decodeExperienceDetail = (id: string) =>
   forDetailId(experienceDetail, id);
+
+type ReservationWriteTarget = Pick<MutationTarget, 'customerId'> &
+  ({ listingId: string } | { id: string });
+export function diningMutationResult(target: ReservationWriteTarget) {
+  return ownedDetail(diningDetail, target)
+    .refine(
+      row =>
+        !('listingId' in target) ||
+        row.dining === null ||
+        row.dining._id.toLowerCase() === target.listingId.toLowerCase()
+    )
+    .nullable();
+}
+export function experienceMutationResult(target: ReservationWriteTarget) {
+  return ownedDetail(experienceDetail, target)
+    .refine(
+      row =>
+        !('listingId' in target) ||
+        row.experience === null ||
+        row.experience._id.toLowerCase() === target.listingId.toLowerCase()
+    )
+    .nullable();
+}

@@ -1,9 +1,14 @@
 import { readResponse } from '@/lib/validations/read-response';
 import {
+  createdBookingResult,
+  updatedBookingResult,
   decodeBookingHistory,
   decodeBookingDetail,
 } from '@/lib/validations/booking-read-json';
-import { decodeRefundEstimate } from '@/lib/validations/cancellation-json';
+import {
+  cancellationResult,
+  decodeRefundEstimate,
+} from '@/lib/validations/cancellation-json';
 import { useAuth } from '@clerk/nextjs';
 import { useSWRConfig } from 'swr';
 import {
@@ -14,36 +19,37 @@ import type {
   CreateBookingRequest,
   UpdateBookingDetailsInput,
 } from '@/lib/validations/booking';
-import type { BookingDetail } from '@lodgeflow/database/booking-json';
+import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type {
-  ApiResponse,
-  CancellationResponse,
-  RefundEstimateResponse,
-} from '@/types';
+import type { RefundEstimateResponse } from '@/types';
 
 /**
  * Hook to create a new booking
  */
 export const useCreateBooking = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
   const { mutate } = useSWRConfig();
 
   return useMutation({
-    mutationFn: async (
-      bookingData: CreateBookingRequest
-    ): Promise<ApiResponse<BookingDetail>> => {
-      const response = await fetch('/api/bookings', {
+    retry: false,
+    mutationFn: async (bookingData: CreateBookingRequest) => {
+      const request = fetch('/api/bookings', {
         body: JSON.stringify(bookingData),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create booking');
-      }
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 201,
+        schema: createdBookingResult({
+          customerId: userId,
+          cabinId: bookingData.cabinId,
+        }),
+        fallback: 'Failed to create booking',
+      });
     },
     onSuccess: () => {
       // Invalidate React Query cache and revalidate SWR
@@ -125,6 +131,7 @@ export const useBookingById = (
  * Hook to update a booking
  */
 export const useUpdateBooking = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -134,19 +141,23 @@ export const useUpdateBooking = () => {
     }: {
       bookingId: string;
       updates: UpdateBookingDetailsInput;
-    }): Promise<ApiResponse<BookingDetail>> => {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+    }) => {
+      const request = fetch(`/api/bookings/${bookingId}`, {
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },
         method: 'PATCH',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update booking');
-      }
-
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 200,
+        schema: updatedBookingResult({
+          customerId: userId,
+          id: bookingId,
+          updates,
+        }),
+        fallback: 'Failed to update booking',
+      });
     },
     onSuccess: (_, variables) => {
       // Invalidate specific booking and history
@@ -185,6 +196,7 @@ export const useRefundEstimate = (bookingId: string) => {
  * Hook to cancel a booking with refund processing
  */
 export const useCancelBooking = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
   const { mutate } = useSWRConfig();
 
@@ -195,19 +207,19 @@ export const useCancelBooking = () => {
     }: {
       bookingId: string;
       reason?: string;
-    }): Promise<ApiResponse<CancellationResponse>> => {
-      const response = await fetch(`/api/bookings/${bookingId}`, {
+    }) => {
+      const request = fetch(`/api/bookings/${bookingId}`, {
         body: JSON.stringify({ reason }),
         headers: { 'Content-Type': 'application/json' },
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to cancel booking');
-      }
-
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 200,
+        schema: cancellationResult({ customerId: userId, id: bookingId }),
+        fallback: 'Failed to cancel booking',
+      });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({

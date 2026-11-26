@@ -1,5 +1,7 @@
+import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { readResponse } from '@/lib/validations/read-response';
 import {
+  experienceMutationResult,
   decodeExperienceHistory,
   decodeExperienceDetail,
 } from '@/lib/validations/reservation-read-json';
@@ -10,37 +12,33 @@ import {
 } from '@/hooks/useConfirmation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type {
-  ApiResponse,
-  CreateExperienceBookingData,
-  PopulatedExperienceBooking,
-} from '@/types';
+import type { CreateExperienceBookingData } from '@/types';
 
 /**
  * Hook to create a new experience booking
  */
 export const useCreateExperienceBooking = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      bookingData: CreateExperienceBookingData
-    ): Promise<{
-      data: PopulatedExperienceBooking;
-      message?: string;
-      success: boolean;
-    }> => {
-      const response = await fetch('/api/experience-bookings', {
+    retry: false,
+    mutationFn: async (bookingData: CreateExperienceBookingData) => {
+      const request = fetch('/api/experience-bookings', {
         body: JSON.stringify(bookingData),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create experience booking');
-      }
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 201,
+        schema: experienceMutationResult({
+          customerId: userId,
+          listingId: bookingData.experienceId,
+        }),
+        fallback: 'Failed to create experience booking',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['experience-bookings'] });
@@ -117,22 +115,21 @@ export const useExperienceBookingById = (
  * Hook to cancel an experience booking
  */
 export const useCancelExperienceBooking = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      bookingId: string
-    ): Promise<ApiResponse<PopulatedExperienceBooking>> => {
-      const response = await fetch(`/api/experience-bookings/${bookingId}`, {
+    mutationFn: async (bookingId: string) => {
+      const request = fetch(`/api/experience-bookings/${bookingId}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to cancel experience booking');
-      }
-
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 200,
+        schema: experienceMutationResult({ customerId: userId, id: bookingId }),
+        fallback: 'Failed to cancel experience booking',
+      });
     },
     onSuccess: (_, bookingId) => {
       queryClient.invalidateQueries({

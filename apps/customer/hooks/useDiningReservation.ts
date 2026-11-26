@@ -1,5 +1,7 @@
+import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { readResponse } from '@/lib/validations/read-response';
 import {
+  diningMutationResult,
   decodeDiningHistory,
   decodeDiningDetail,
 } from '@/lib/validations/reservation-read-json';
@@ -11,37 +13,33 @@ import {
 import { diningDayAvailabilityResponseSchema } from '@/lib/validations/reservation-availability';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type {
-  ApiResponse,
-  CreateDiningReservationData,
-  PopulatedDiningReservation,
-} from '@/types';
+import type { CreateDiningReservationData } from '@/types';
 
 /**
  * Hook to create a new dining reservation
  */
 export const useCreateDiningReservation = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      reservationData: CreateDiningReservationData
-    ): Promise<{
-      data: PopulatedDiningReservation;
-      message?: string;
-      success: boolean;
-    }> => {
-      const response = await fetch('/api/dining-reservations', {
+    retry: false,
+    mutationFn: async (reservationData: CreateDiningReservationData) => {
+      const request = fetch('/api/dining-reservations', {
         body: JSON.stringify(reservationData),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create dining reservation');
-      }
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 201,
+        schema: diningMutationResult({
+          customerId: userId,
+          listingId: reservationData.diningId,
+        }),
+        fallback: 'Failed to create dining reservation',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dining-reservations'] });
@@ -122,25 +120,21 @@ export const useDiningReservationById = (
  * Hook to cancel a dining reservation
  */
 export const useCancelDiningReservation = () => {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (
-      reservationId: string
-    ): Promise<ApiResponse<PopulatedDiningReservation>> => {
-      const response = await fetch(
-        `/api/dining-reservations/${reservationId}`,
-        {
-          method: 'DELETE',
-        }
-      );
+    mutationFn: async (reservationId: string) => {
+      const request = fetch(`/api/dining-reservations/${reservationId}`, {
+        method: 'DELETE',
+      });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to cancel dining reservation');
-      }
-
-      return response.json();
+      return readMutationResponse({
+        request,
+        status: 200,
+        schema: diningMutationResult({ customerId: userId, id: reservationId }),
+        fallback: 'Failed to cancel dining reservation',
+      });
     },
     onSuccess: (_, reservationId) => {
       queryClient.invalidateQueries({
