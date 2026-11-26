@@ -94,9 +94,9 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** Typed model fixture helpers derived from each accepted model creation shape (plain fixture input, not hydrated `Document`), narrowly documented invalid raw inputs for schema rejection, and one typed instance/value for the global `MongoMemoryReplSet` handoff.
 
-- [ ] Verify current assertions still cover defaults, validation, invalid legacy payload, virtuals and model save behavior; if negatives use casted model fields, express the same invalid source at its raw validation boundary.
-- [ ] Replace 22 listed `any` nodes through typed fixture overrides and lifecycle data. Retain one worker, replica set usage, setup/teardown cleanup and generated document state.
-- [ ] Run `ADMIN '(integration/models/(booking|cabin|dining|experience)|integration/api/(bookings|cabin-json|reservation-json))'` and Task 2 gate. Expected preserved DB/model assertions and zero explicit casts in owned files.
+- [x] Verify current assertions still cover defaults, validation, invalid legacy payload, virtuals and model save behavior; if negatives use casted model fields, express the same invalid source at its raw validation boundary.
+- [x] Replace 22 listed `any` nodes through typed fixture overrides and lifecycle data. Retain one worker, replica set usage, setup/teardown cleanup and generated document state.
+- [x] Run `ADMIN '(integration/models/(booking|cabin|dining|experience)|integration/api/(bookings|cabin-json|reservation-json))'` and Task 2 gate. Expected preserved DB/model assertions and zero explicit casts in owned files.
 
 ### Task 4: Admin server mocks and URL-filter test typing
 
