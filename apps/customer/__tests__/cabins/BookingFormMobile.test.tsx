@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { parseDate, type DateValue } from '@internationalized/date';
 import { SWRConfig } from 'swr';
 import BookingForm from '@/components/BookingForm';
@@ -133,6 +133,71 @@ test('the booking form shows all dates available for a validated empty array', a
   ).toBeInTheDocument();
   expect(cache.get(availabilityUrl)?.data).toEqual(body);
   expect(fetchMock).toHaveBeenCalledWith(availabilityUrl);
+});
+
+test('a queued SWR refresh stays tied to its cabin when the form switches cabins', async () => {
+  const secondCabin = { ...mockCabin, _id: '507f1f77bcf86cd7994390ac' };
+  const secondUrl = '/api/cabins/507f1f77bcf86cd7994390ac/availability';
+  const firstData = {
+    ...calendar,
+    unavailableDates: [{ start: '2030-06-13', end: '2030-06-15' }],
+  };
+  const cached = { success: true, data: firstData };
+  const refreshed = { ...cached, revision: 2 };
+  const second = {
+    success: true,
+    data: { ...calendar, cabinId: secondCabin._id },
+  };
+  const cache = new Map<string, { data?: unknown }>([
+    [availabilityUrl, { data: cached }],
+  ]);
+  const config = { provider: () => cache, shouldRetryOnError: false };
+  fetchMock.mockImplementation(async url => ({
+    ok: true,
+    json: async () => (url === availabilityUrl ? refreshed : second),
+  }));
+  const frames: FrameRequestCallback[] = [];
+  const requestFrame = jest
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation(frame => frames.push(frame));
+
+  try {
+    const view = render(
+      <SWRConfig value={config}>
+        <BookingForm cabin={mockCabin} />
+      </SWRConfig>
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(capturedProps.isDateUnavailable?.(parseDate('2030-06-13'))).toBe(
+      true
+    );
+
+    view.rerender(
+      <SWRConfig value={config}>
+        <BookingForm cabin={secondCabin} />
+      </SWRConfig>
+    );
+    expect(fetchMock.mock.calls).toEqual([[secondUrl]]);
+
+    await act(async () => {
+      frames.splice(0).forEach(frame => frame(0));
+    });
+
+    expect({
+      requests: fetchMock.mock.calls,
+      first: cache.get(availabilityUrl)?.data,
+      second: cache.get(secondUrl)?.data,
+    }).toEqual({
+      requests: [[secondUrl], [availabilityUrl]],
+      first: refreshed,
+      second,
+    });
+    expect(capturedProps.isDateUnavailable?.(parseDate('2030-06-13'))).toBe(
+      false
+    );
+  } finally {
+    requestFrame.mockRestore();
+  }
 });
 
 test('keeps checkout selectable with ordinary and signed-year dates', async () => {
