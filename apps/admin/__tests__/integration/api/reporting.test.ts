@@ -6,6 +6,7 @@ import { GET as sales } from '@/app/api/sales/route';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import { logger } from '@/lib/logger';
+import { createBookingSchema } from '@/lib/validations/booking';
 import {
   bookingAnalyticsJsonSchema,
   dashboardJsonSchema,
@@ -170,6 +171,37 @@ test('dashboard preserves paid-only revenue, cancellation scope, occupancy and s
     { week: expect.any(String), revenue: 200, bookings: 1 },
   ]);
   expect(json(await Booking.find().sort({ _id: 1 }).lean())).toEqual(before);
+});
+
+test('dashboard preserves canonical expanded-year stay timestamps for recent bookings', async () => {
+  const { cabin } = await fixture();
+  const checkInDate = '+010000-01-02T00:00:00.000Z';
+  const checkOutDate = '+010000-01-05T00:00:00.000Z';
+  const booking = await Booking.create({
+    ...createBookingSchema.parse({
+      cabin: cabin._id.toHexString(),
+      customer: 'user_guest',
+      checkInDate,
+      checkOutDate,
+      numGuests: 2,
+    }),
+    numNights: 3,
+    cabinPrice: 300,
+    totalPrice: 300,
+  });
+
+  const data = await readReport({
+    response: await dashboard(),
+    schema: dashboardJsonSchema,
+  });
+
+  expect(data.recentActivity).toContainEqual(
+    expect.objectContaining({
+      id: booking._id.toHexString(),
+      checkInDate,
+      checkOutDate,
+    })
+  );
 });
 
 test('dashboard retains missing-cabin and missing-customer fallbacks', async () => {
