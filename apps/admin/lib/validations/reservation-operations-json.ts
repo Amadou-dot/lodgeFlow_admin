@@ -125,6 +125,28 @@ export type ReservationPaymentFields = Pick<
   'receipts' | 'checkout' | 'stripeRefund'
 >;
 type WriteResult = z.infer<typeof reservationWrite>;
+type Resource = { kind: ReservationKind; reservationId: string };
+export type ReservationTransaction = Pick<
+  z.infer<typeof receipt>,
+  'id' | 'type' | 'method' | 'amountCents'
+> & { reference: string };
+
+export class ReservationRequestRejected extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, ReservationRequestRejected.prototype);
+  }
+}
+
+function matchesReservation(row: { _id: string; id?: string }, id: string) {
+  return (
+    row._id.toLowerCase() === id.toLowerCase() &&
+    (row.id === undefined || row.id.toLowerCase() === row._id.toLowerCase())
+  );
+}
 
 const success = z.object({
   success: z.literal(true),
@@ -132,7 +154,10 @@ const success = z.object({
   message: z.string().optional(),
   error: z.never().optional(),
 });
-const failure = z.object({ error: z.string().min(1) });
+const failure = z.object({
+  error: z.string().min(1),
+  success: z.unknown().optional(),
+});
 function isData<T>(data: unknown, schema: z.ZodType<T, T>): data is T {
   return schema.safeParse(data).success;
 }
@@ -144,6 +169,14 @@ async function read<T>(
   const body: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {
     const result = failure.safeParse(body);
+    // These route responses explicitly reject the request. Transport failures
+    // and server errors can follow a committed write.
+    if (
+      result.success &&
+      result.data.success === false &&
+      [400, 401, 403, 404, 409].includes(response.status)
+    )
+      throw new ReservationRequestRejected(result.data.error, response.status);
     throw new Error(result.success ? result.data.error : fallback);
   }
   const envelope = success.safeParse(body);
@@ -153,34 +186,59 @@ async function read<T>(
   return envelope.data.data;
 }
 
-export function readReservationDetail(
+export async function readReservationDetail(
   response: Response,
-  kind: ReservationKind
+  { kind, reservationId }: Resource
 ) {
-  return read<ReservationData>(
-    response,
-    details[kind],
-    'Unable to load reservation'
-  );
+  const fallback = 'Unable to load reservation';
+  const data = await read<ReservationData>(response, details[kind], fallback);
+  if (!matchesReservation(data.reservation, reservationId))
+    throw new Error(fallback);
+  return data;
 }
-export function readReservationStatus(
+export async function readReservationStatus(
   response: Response,
-  kind: ReservationKind
+  { kind, reservationId, status }: Resource & { status: string }
 ) {
-  return read<WriteResult>(response, writes[kind], 'Unable to update status');
+  const fallback = 'Unable to update status';
+  const row = await read<WriteResult>(response, writes[kind], fallback);
+  if (!matchesReservation(row, reservationId) || row.status !== status)
+    throw new Error(fallback);
+  return row;
 }
-export function readReservationPayment(
+export function receiptConfirmation(
+  receipts: WriteResult['receipts'],
+  transaction: ReservationTransaction
+) {
+  const saved = receipts?.find(row => row.id === transaction.id);
+  if (!saved) return 'missing';
+  return saved.type === transaction.type &&
+    saved.method === transaction.method &&
+    saved.amountCents === transaction.amountCents &&
+    saved.reference === transaction.reference.trim()
+    ? 'confirmed'
+    : 'conflict';
+}
+
+export async function readReservationPayment(
   response: Response,
-  operation: {
-    kind: ReservationKind;
-    method: z.infer<typeof receipt>['method'];
+  {
+    kind,
+    reservationId,
+    transaction,
+  }: Resource & { transaction: ReservationTransaction }
+) {
+  const fallback = 'Unable to record transaction';
+  // The provider acknowledgement only attests a status for this HTTP request.
+  if (transaction.method === 'stripe') {
+    if (transaction.type !== 'refund') throw new Error(fallback);
+    return read(response, refund, fallback);
   }
-) {
-  return operation.method === 'stripe'
-    ? read(response, refund, 'Unable to record transaction')
-    : read<WriteResult>(
-        response,
-        writes[operation.kind],
-        'Unable to record transaction'
-      );
+  const row = await read<WriteResult>(response, writes[kind], fallback);
+  if (
+    !matchesReservation(row, reservationId) ||
+    receiptConfirmation(row.receipts, transaction) !== 'confirmed'
+  )
+    throw new Error(fallback);
+  return row;
 }

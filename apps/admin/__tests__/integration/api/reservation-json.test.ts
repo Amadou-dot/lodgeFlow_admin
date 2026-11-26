@@ -44,6 +44,13 @@ beforeEach(() => {
     role: 'manager',
   });
 });
+const cashReceipt = {
+  id: '780b7330-b62d-4b6e-80cb-7c9f588ce19b',
+  type: 'payment' as const,
+  method: 'cash' as const,
+  amountCents: 100,
+  reference: '',
+};
 async function fixtures() {
   const dining = await Dining.create({
     name: 'Dinner',
@@ -124,7 +131,7 @@ test('staff detail preserves populated documents, receipt/checkout dates, summar
       f.kind === 'dining'
         ? await f.model.findById(f.row._id).populate('dining')
         : await f.model.findById(f.row._id).populate('experience');
-    const parsed = await readReservationDetail(response.clone(), f.kind);
+    const parsed = await readReservationDetail(response.clone(), reference);
     const envelope = await response.json();
     expect(parsed).toEqual(envelope.data);
     expect(envelope).toEqual({
@@ -147,7 +154,7 @@ test('staff detail preserves populated documents, receipt/checkout dates, summar
     await f.listing.deleteMany({});
     const missing = await reservationDetails(reference);
     expect(
-      (await readReservationDetail(missing, f.kind)).reservation
+      (await readReservationDetail(missing, reference)).reservation
     ).toHaveProperty(f.kind, null);
   }
 });
@@ -165,7 +172,11 @@ test('staff status and receipt mutations retain unpopulated JSON and virtual IDs
         }),
       }),
     });
-    const parsedStatus = await readReservationStatus(changed.clone(), f.kind);
+    const parsedStatus = await readReservationStatus(changed.clone(), {
+      kind: f.kind,
+      reservationId,
+      status: 'confirmed',
+    });
     expect(parsedStatus).toHaveProperty('status', 'confirmed');
     expect(await changed.json()).toEqual({
       success: true,
@@ -190,7 +201,8 @@ test('staff status and receipt mutations retain unpopulated JSON and virtual IDs
     );
     const parsedReceipt = await readReservationPayment(paid.clone(), {
       kind: f.kind,
-      method: 'cash',
+      reservationId,
+      transaction: cashReceipt,
     });
     expect(parsedReceipt).toHaveProperty('receipts.0.reference', '');
     expect(await paid.json()).toEqual({
@@ -284,7 +296,10 @@ test.each(['A1!', null])(
         reservationId: String(f.row._id),
       });
       const envelope = await response.clone().json();
-      const detail = await readReservationDetail(response, f.kind);
+      const detail = await readReservationDetail(response, {
+        kind: f.kind,
+        reservationId: String(f.row._id),
+      });
       expect(detail).toEqual(envelope.data);
       expect(detail.currency).toBe(currency);
       expect(detail.payment.legacyPaid).toBe(f.kind === 'dining');
@@ -304,7 +319,7 @@ test.each(['A1!', null])(
         });
         const parsed = await readReservationStatus(
           Response.json({ success: true, data }),
-          f.kind
+          { kind: f.kind, reservationId: String(f.row._id), status: row.status }
         );
         expect(parsed).toEqual(json(row));
         expect(parsed).not.toHaveProperty('receipts');
@@ -317,7 +332,7 @@ test.each(['A1!', null])(
         });
         const parsed = await readReservationStatus(
           Response.json({ success: true, data }),
-          f.kind
+          { kind: f.kind, reservationId: String(f.row._id), status: row.status }
         );
         expect(parsed).toEqual(json(row));
         expect(parsed).not.toHaveProperty('id');
@@ -364,7 +379,7 @@ test('detail retains additive data recursively and checks the amount units befor
   expect(
     await readReservationDetail(
       Response.json({ success: true, data: extended }),
-      f.kind
+      { kind: f.kind, reservationId: String(f.row._id) }
     )
   ).toEqual(extended);
   expect(data.payment.paidCents).toBe(hugeCents);
@@ -378,7 +393,7 @@ test('detail retains additive data recursively and checks the amount units befor
             payment: { ...data.payment, paidCents: amountCents },
           },
         }),
-        f.kind
+        { kind: f.kind, reservationId: String(f.row._id) }
       )
     ).rejects.toThrow('Unable to load reservation');
     await expect(
@@ -393,7 +408,7 @@ test('detail retains additive data recursively and checks the amount units befor
             },
           },
         }),
-        f.kind
+        { kind: f.kind, reservationId: String(f.row._id) }
       )
     ).rejects.toThrow('Unable to load reservation');
   }
@@ -434,7 +449,17 @@ test('refund route returns the provider status and reconciles the same token on 
     );
     expect(response.status).toBe(200);
     expect(
-      await readReservationPayment(response, { kind: f.kind, method: 'stripe' })
+      await readReservationPayment(response, {
+        kind: f.kind,
+        reservationId: String(f.row._id),
+        transaction: {
+          id: token,
+          type: 'refund',
+          method: 'stripe',
+          amountCents: 29,
+          reference: 'Duplicate charge',
+        },
+      })
     ).toEqual({ status });
   }
   expect(mockRefundCreate).toHaveBeenCalledTimes(1);
@@ -470,10 +495,9 @@ test('unchanged status and duplicate receipt keep legacy stored amounts that det
     }),
   });
   expect(changed.status).toBe(200);
-  expect(await readReservationStatus(changed, f.kind)).toHaveProperty(
-    'receipts.1.amountCents',
-    1.5
-  );
+  expect(
+    await readReservationStatus(changed, { ...reference, status: 'pending' })
+  ).toHaveProperty('receipts.1.amountCents', 1.5);
   const duplicate = await reservationPayment(
     new Request('https://admin.test', {
       method: 'POST',
@@ -489,7 +513,10 @@ test('unchanged status and duplicate receipt keep legacy stored amounts that det
   );
   expect(duplicate.status).toBe(200);
   expect(
-    await readReservationPayment(duplicate, { kind: f.kind, method: 'cash' })
+    await readReservationPayment(duplicate, {
+      ...reference,
+      transaction: cashReceipt,
+    })
   ).toHaveProperty('receipts.1.amountCents', 1.5);
 });
 
@@ -505,6 +532,81 @@ test('detail returns sparse stored refund metadata when the amount can be summar
   });
   expect(response.status).toBe(200);
   expect(
-    (await readReservationDetail(response, f.kind)).reservation.stripeRefund
+    (
+      await readReservationDetail(response, {
+        kind: f.kind,
+        reservationId: String(f.row._id),
+      })
+    ).reservation.stripeRefund
   ).toEqual({ amountCents: 29 });
+});
+
+test('binds actual row acknowledgements to the requested ID, submitted status and normalized receipt', async () => {
+  const [f, other] = await fixtures();
+  const resource = {
+    kind: f.kind,
+    reservationId: String(f.row._id).toUpperCase(),
+  };
+  const wrong = { ...resource, reservationId: String(other.row._id) };
+  const detail = await reservationDetails(resource);
+  await expect(readReservationDetail(detail.clone(), wrong)).rejects.toThrow(
+    'Unable to load reservation'
+  );
+  expect((await readReservationDetail(detail, resource)).reservation._id).toBe(
+    String(f.row._id)
+  );
+  const changed = await changeReservationStatus({
+    ...resource,
+    request: new Request('https://admin.test', {
+      method: 'PATCH',
+      body: JSON.stringify({ expectedStatus: 'pending', status: 'confirmed' }),
+    }),
+  });
+  await expect(
+    readReservationStatus(changed.clone(), { ...resource, status: 'pending' })
+  ).rejects.toThrow('Unable to update status');
+  await expect(
+    readReservationStatus(changed.clone(), { ...wrong, status: 'confirmed' })
+  ).rejects.toThrow('Unable to update status');
+  await expect(
+    readReservationStatus(changed.clone(), { ...resource, status: 'confirmed' })
+  ).resolves.toHaveProperty('status', 'confirmed');
+  const transaction = { ...cashReceipt, reference: '  Cash desk  ' };
+  async function post() {
+    return reservationPayment(
+      new Request('https://admin.test', {
+        method: 'POST',
+        body: JSON.stringify(transaction),
+      }),
+      { kind: resource.kind, id: resource.reservationId }
+    );
+  }
+  const first = await post();
+  expect(first.status).toBe(200);
+  await expect(
+    readReservationPayment(changed, { ...resource, transaction })
+  ).rejects.toThrow('Unable to record transaction');
+  await expect(
+    readReservationPayment(first.clone(), { ...wrong, transaction })
+  ).rejects.toThrow('Unable to record transaction');
+  await expect(
+    readReservationPayment(first.clone(), {
+      ...resource,
+      transaction: { ...transaction, reference: 'Other' },
+    })
+  ).rejects.toThrow('Unable to record transaction');
+  await expect(
+    readReservationPayment(first, { ...resource, transaction })
+  ).resolves.toHaveProperty('receipts.0.reference', 'Cash desk');
+  const replay = await post();
+  await expect(
+    readReservationPayment(replay, { ...resource, transaction })
+  ).resolves.toHaveProperty('receipts.0.id', transaction.id);
+  const saved = await DiningReservation.findById(f.row._id).orFail();
+  expect(saved.receipts).toHaveLength(1);
+  expect(saved.receipts[0]).toMatchObject({
+    id: transaction.id,
+    amountCents: 100,
+    reference: 'Cash desk',
+  });
 });
