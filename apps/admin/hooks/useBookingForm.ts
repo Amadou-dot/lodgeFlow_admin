@@ -23,15 +23,45 @@ import {
 
 export type { BookingFormData, PriceBreakdown };
 
+type BookingCustomerSource =
+  | { kind: 'create' }
+  | { kind: 'booking'; customer: BookingCustomerOption | null };
+
 function useBookingFormDraft({
   initialize,
-  initialCustomer,
+  customerSource,
 }: {
   initialize: () => BookingFormData;
-  initialCustomer?: BookingCustomerOption;
+  customerSource: BookingCustomerSource;
 }) {
-  const [formData, setFormData] = useState(initialize);
-  const [retainedCustomer, setRetainedCustomer] = useState(initialCustomer);
+  const [draftData, setFormData] = useState(initialize);
+  const [customerSelection, setCustomerSelection] = useState<'saved' | 'draft'>(
+    customerSource.kind === 'booking' ? 'saved' : 'draft'
+  );
+  const [retainedCustomer, setRetainedCustomer] =
+    useState<BookingCustomerOption>();
+  const savedCustomer =
+    customerSource.kind === 'booking' ? customerSource.customer : undefined;
+  const [lastSavedCustomerId, setLastSavedCustomerId] = useState(
+    savedCustomer?.id
+  );
+  if (savedCustomer && savedCustomer.id !== lastSavedCustomerId) {
+    setLastSavedCustomerId(savedCustomer.id);
+  }
+
+  // A null detail profile leaves its prior ID unresolved, even in cached results.
+  const unresolvedSavedCustomerId =
+    savedCustomer === null ? lastSavedCustomerId : undefined;
+  const selectedCustomerId =
+    customerSelection === 'saved'
+      ? (savedCustomer?.id ?? '')
+      : draftData.customer;
+  const customerId =
+    selectedCustomerId === unresolvedSavedCustomerId ? '' : selectedCustomerId;
+  const formData = useMemo(
+    () => ({ ...draftData, customer: customerId }),
+    [draftData, customerId]
+  );
 
   const [specialRequestInput, setSpecialRequestInput] = useState('');
   // Data fetching hooks
@@ -49,16 +79,31 @@ function useBookingFormDraft({
     customer => customer.id === formData.customer
   );
   // A prefilled ID can resolve when its page first arrives.
-  if (listedCustomer && listedCustomer !== retainedCustomer) {
+  if (
+    customerSelection === 'draft' &&
+    listedCustomer &&
+    listedCustomer !== retainedCustomer
+  ) {
     setRetainedCustomer(listedCustomer);
   }
-  const customers = useMemo(
-    () =>
-      !listedCustomer && retainedCustomer?.id === formData.customer
-        ? [retainedCustomer, ...listedCustomers]
-        : listedCustomers,
-    [listedCustomer, retainedCustomer, formData.customer, listedCustomers]
-  );
+  const selectedProfile =
+    customerSelection === 'saved' ? savedCustomer : retainedCustomer;
+  const customers = useMemo(() => {
+    const options = unresolvedSavedCustomerId
+      ? listedCustomers.filter(
+          customer => customer.id !== unresolvedSavedCustomerId
+        )
+      : listedCustomers;
+    return !listedCustomer && selectedProfile?.id === formData.customer
+      ? [selectedProfile, ...options]
+      : options;
+  }, [
+    listedCustomer,
+    selectedProfile,
+    formData.customer,
+    listedCustomers,
+    unresolvedSavedCustomerId,
+  ]);
 
   // Customer selection state
   const [isCustomerOpen, setIsCustomerOpen] = useState(false);
@@ -208,6 +253,7 @@ function useBookingFormDraft({
 
   const handleCustomerSelection = useCallback(
     (customer: BookingCustomerOption | undefined) => {
+      setCustomerSelection('draft');
       setRetainedCustomer(customer);
       handleInputChange('customer', customer?.id ?? '');
     },
@@ -318,7 +364,10 @@ function useBookingFormDraft({
 }
 
 export function useBookingForm() {
-  const draft = useBookingFormDraft({ initialize: initializeBookingForm });
+  const draft = useBookingFormDraft({
+    initialize: initializeBookingForm,
+    customerSource: { kind: 'create' },
+  });
   return {
     ...draft,
     buildBookingData: () => buildBookingCreateInput(draft.formData),
@@ -329,7 +378,7 @@ export function useBookingEditForm(booking: AdminBooking) {
   const [initialFormData] = useState(() => initializeBookingForm(booking));
   const draft = useBookingFormDraft({
     initialize: () => initialFormData,
-    initialCustomer: booking.customer ?? undefined,
+    customerSource: { kind: 'booking', customer: booking.customer },
   });
 
   return {

@@ -1,4 +1,5 @@
 import BookingEditPage from '@/app/(dashboard)/bookings/[id]/edit/page';
+import BookingForm from '@/components/BookingForm';
 import type { UpdateBookingInput } from '@/types/api';
 import type { AdminBooking } from '@/types/booking-read';
 import type { Cabin, Customer } from '@/types';
@@ -88,6 +89,7 @@ jest.mock('@/hooks/useBookings', () => ({
     error: mockError,
   }),
   useUpdateBooking: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useCreateBooking: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 jest.mock('@/hooks/useCabins', () => ({
   useCabins: () => ({ data: [cabin] }),
@@ -300,6 +302,103 @@ test('keeps a missing guest explicit and requires an intentional replacement', a
   );
 });
 
+test.each([
+  { case: 'outside the list', cached: false },
+  { case: 'in a cached result', cached: true },
+])(
+  'requires resolution when the saved guest becomes missing $case',
+  async ({ cached }) => {
+    const user = userEvent.setup();
+    mockBooking = firstBooking;
+    mockIsLoading = false;
+    if (cached)
+      mockCustomers = [{ ...otherCustomer, ...savedCustomer }, otherCustomer];
+    const params = route(firstBooking._id);
+    const { rerender } = render(<BookingEditPage params={params} />);
+    const customer = screen.getByRole('combobox', { name: 'Select Customer' });
+    expect(customer).toHaveValue('Saved Guest');
+    await user.type(
+      screen.getByPlaceholderText('Add a special request'),
+      'Keep my draft'
+    );
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    mockBooking = { ...firstBooking, customer: null, guest: null };
+    rerender(<BookingEditPage params={params} />);
+    expect(
+      screen.getByText('Update booking details for Unknown Guest')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+    expect({
+      visibleGuest: customer.getAttribute('value'),
+      submittedGuest: mockUpdate.mock.calls[0]?.[0].customer,
+    }).toEqual({ visibleGuest: '', submittedGuest: undefined });
+    expect(screen.getByText('Keep my draft')).toBeInTheDocument();
+
+    await user.click(customer);
+    await user.keyboard('{ArrowDown}');
+    expect(
+      await screen.findByRole('option', { name: /Other Guest/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Saved Guest/ })).toBeNull();
+    await user.keyboard('{Escape}');
+
+    mockBooking = {
+      ...firstBooking,
+      checkOutDate: '2040-01-11T13:57:24.680Z',
+      specialRequests: ['Server notes'],
+    };
+    rerender(<BookingEditPage params={params} />);
+
+    expect(customer).toHaveValue('Saved Guest');
+    await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    const body = mockUpdate.mock.calls[0][0];
+    expect(body.customer).toBe(savedCustomer.id);
+    expect(body.specialRequests).toEqual(['Extra blankets', 'Keep my draft']);
+    expect(body).not.toHaveProperty('checkInDate');
+    expect(body).not.toHaveProperty('checkOutDate');
+  }
+);
+
+test('keeps an intentional clear through a missing guest response and recovery', async () => {
+  const user = userEvent.setup();
+  mockBooking = firstBooking;
+  mockIsLoading = false;
+  const params = route(firstBooking._id);
+  const { rerender } = render(<BookingEditPage params={params} />);
+  const customer = screen.getByRole('combobox', { name: 'Select Customer' });
+  await user.click(screen.getByRole('button', { name: 'Clear customer' }));
+  await user.keyboard('{Escape}');
+  expect(customer).toHaveValue('');
+
+  mockBooking = { ...firstBooking, customer: null, guest: null };
+  rerender(<BookingEditPage params={params} />);
+  expect(customer).toHaveValue('');
+
+  mockBooking = firstBooking;
+  rerender(<BookingEditPage params={params} />);
+  expect(customer).toHaveValue('');
+  await user.click(screen.getByRole('button', { name: 'Update Booking' }));
+  expect(mockUpdate).not.toHaveBeenCalled();
+});
+
+test('keeps a create-prefilled guest once a list result resolves the ID', () => {
+  mockCustomers = [];
+  const prefillData = { customer: otherCustomer.id };
+  const { rerender } = render(<BookingForm prefillData={prefillData} />);
+  const customer = screen.getByRole('combobox', { name: 'Select Customer' });
+  expect(customer).toHaveValue('');
+
+  mockCustomers = [otherCustomer];
+  rerender(<BookingForm prefillData={prefillData} />);
+  expect(customer).toHaveValue('Other Guest');
+
+  mockCustomers = [];
+  rerender(<BookingForm prefillData={prefillData} />);
+  expect(customer).toHaveValue('Other Guest');
+});
+
 test('keeps a replacement selected outside later results and clears it through the customer control', async () => {
   const user = userEvent.setup();
   mockBooking = firstBooking;
@@ -317,6 +416,7 @@ test('keeps a replacement selected outside later results and clears it through t
   expect(customer).toHaveValue('Other Guest');
 
   mockCustomers = [];
+  mockBooking = { ...firstBooking, customer: null, guest: null };
   rerender(<BookingEditPage params={params} />);
   await user.tab();
   expect(customer).toHaveValue('Other Guest');
