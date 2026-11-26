@@ -1,5 +1,6 @@
 'use client';
 
+import type { BookingAnalyticsData } from '@/types/reporting';
 import {
   Area,
   CartesianGrid,
@@ -24,7 +25,7 @@ interface CustomTooltipProps {
 }
 
 interface Props {
-  data?: { date: string; revenue: number; bookings: number }[];
+  data?: BookingAnalyticsData['revenueOverTime'];
   isLoading: boolean;
 }
 

@@ -3,7 +3,6 @@ import { analyticsPeriodSchema } from '@/lib/validations/reporting';
 import type {
   AnalyticsPeriod as Period,
   BookingAnalyticsData,
-  ReportBookingStatus,
 } from '@/types/reporting';
 import {
   createErrorResponse,
@@ -69,6 +68,9 @@ export async function GET(request: NextRequest) {
 
     const dateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
 
+    type RevenueDate = BookingAnalyticsData['revenueOverTime'][number]['date'];
+    type Status = BookingAnalyticsData['statusDistribution'][number]['status'];
+
     const [
       summaryResult,
       cancelledCount,
@@ -118,7 +120,11 @@ export async function GET(request: NextRequest) {
       }),
 
       // 3. Revenue over time
-      Booking.aggregate<{ _id: string; revenue: number; bookings: number }>([
+      Booking.aggregate<{
+        _id: RevenueDate;
+        revenue: number;
+        bookings: number;
+      }>([
         {
           $match: {
             ...dateFilter,
@@ -153,7 +159,7 @@ export async function GET(request: NextRequest) {
       ]),
 
       // 4. Status distribution
-      Booking.aggregate<{ _id: ReportBookingStatus; count: number }>([
+      Booking.aggregate<{ _id: Status; count: number }>([
         { $match: dateFilter },
         {
           $group: {
@@ -220,8 +226,7 @@ export async function GET(request: NextRequest) {
         : 0;
 
     // Fill zero-gaps for revenue over time
-    const filledRevenue: { date: string; revenue: number; bookings: number }[] =
-      [];
+    const filledRevenue: BookingAnalyticsData['revenueOverTime'] = [];
 
     if (getGroupFormat(period) === 'daily' && startDate && days !== null) {
       const totalDays = days;

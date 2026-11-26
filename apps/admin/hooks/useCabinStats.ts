@@ -1,3 +1,7 @@
+import {
+  cabinStatsJsonSchema,
+  parseReportJson,
+} from '@/lib/validations/reporting-json';
 import { useQuery } from '@tanstack/react-query';
 
 import type { CabinStats } from '@/types/catalog-stats';
@@ -7,11 +11,15 @@ export function useCabinStats() {
     queryKey: ['cabin-stats'],
     queryFn: async () => {
       const response = await fetch('/api/cabins/stats');
-      if (!response.ok) {
-        throw new Error('Failed to fetch cabin stats');
-      }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      const errorMessage = 'Failed to fetch cabin stats';
+      if (!response.ok) throw new Error(errorMessage);
+      const value: unknown = await response.json();
+      return parseReportJson({
+        value,
+        schema: cabinStatsJsonSchema,
+        format: 'wrapped-or-bare',
+        errorMessage,
+      });
     },
   });
 }

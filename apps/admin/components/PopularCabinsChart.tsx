@@ -1,5 +1,6 @@
 'use client';
 
+import type { BookingAnalyticsData } from '@/types/reporting';
 import {
   BarChart,
   Bar,
@@ -10,11 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-interface CabinItem {
-  name: string;
-  bookingCount: number;
-  revenue: number;
-}
+type CabinItem = BookingAnalyticsData['popularCabins'][number];
 
 interface TooltipPayloadItem {
   payload: CabinItem;
@@ -27,7 +24,7 @@ interface CustomTooltipProps {
 }
 
 interface Props {
-  data?: CabinItem[];
+  data?: BookingAnalyticsData['popularCabins'];
   isLoading: boolean;
 }
 

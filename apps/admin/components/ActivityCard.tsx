@@ -1,6 +1,9 @@
+import type { DashboardData } from '@/types/reporting';
+
+type ActivityStatus = DashboardData['recentActivity'][number]['status'];
+
 interface Props {
-  status:
-    'unconfirmed' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
+  status: ActivityStatus;
   name: string;
   stayDuration: string;
   bookingId: string;
@@ -28,7 +31,7 @@ export default function ActivityCard({
   const checkOutMutation = useCheckOutBooking();
   const confirmMutation = useConfirmBooking();
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: ActivityStatus) => {
     switch (status) {
       case 'confirmed':
         return 'text-success-600';
@@ -45,7 +48,7 @@ export default function ActivityCard({
     }
   };
 
-  const getActionButton = (status: string) => {
+  const getActionButton = (status: ActivityStatus) => {
     switch (status) {
       case 'unconfirmed':
         return { text: 'Confirm', color: 'primary' as const };

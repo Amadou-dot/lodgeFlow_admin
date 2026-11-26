@@ -1,23 +1,38 @@
-import type { ApiResponse } from '@/types/api-response';
-import type { DashboardData, SalesData } from '@/types/reporting';
+import {
+  dashboardJsonSchema,
+  parseReportJson,
+  salesJsonSchema,
+} from '@/lib/validations/reporting-json';
 import { useQuery } from '@tanstack/react-query';
+
+async function fetchDashboard({
+  httpError,
+  responseError = httpError,
+}: {
+  httpError: string;
+  responseError?: string;
+}) {
+  const response = await fetch('/api/dashboard');
+  if (!response.ok) throw new Error(httpError);
+  const value: unknown = await response.json();
+
+  return parseReportJson({
+    value,
+    schema: dashboardJsonSchema,
+    format: 'wrapped',
+    errorMessage: responseError,
+    useWrappedError: true,
+  });
+}
 
 // Overview/Stats hook - now uses MongoDB dashboard API
 export function useOverview() {
   return useQuery({
     queryKey: ['overview'],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard');
-      if (!response.ok) {
-        throw new Error('Failed to fetch overview data');
-      }
-      const result: ApiResponse<DashboardData> = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch overview data');
-      }
-
-      // Transform the data to match the expected format
-      const { overview } = result.data;
+      const { overview } = await fetchDashboard({
+        httpError: 'Failed to fetch overview data',
+      });
 
       return {
         bookings: overview.totalBookings,
@@ -34,17 +49,10 @@ export function useActivities() {
   return useQuery({
     queryKey: ['activities'],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard');
-      if (!response.ok) {
-        throw new Error('Failed to fetch activities');
-      }
-      const result: ApiResponse<DashboardData> = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch activities data');
-      }
-
-      // Transform recent activity data
-      const { recentActivity } = result.data;
+      const { recentActivity } = await fetchDashboard({
+        httpError: 'Failed to fetch activities',
+        responseError: 'Failed to fetch activities data',
+      });
       return recentActivity.slice(0, 4).map(booking => {
         const checkIn = new Date(booking.checkInDate);
         const checkOut = new Date(booking.checkOutDate);
@@ -72,10 +80,13 @@ export function useSalesData() {
       if (!response.ok) {
         throw new Error('Failed to fetch sales data');
       }
-      const data: SalesData[] = await response.json();
-
-      // Data is already in the correct format from the sales API
-      return data;
+      const value: unknown = await response.json();
+      return parseReportJson({
+        value,
+        schema: salesJsonSchema,
+        format: 'bare',
+        errorMessage: 'Failed to fetch sales data',
+      });
     },
   });
 }
@@ -85,17 +96,12 @@ export function useDurationData() {
   return useQuery({
     queryKey: ['durations'],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard');
-      if (!response.ok) {
-        throw new Error('Failed to fetch duration data');
-      }
-      const result: ApiResponse<DashboardData> = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch duration data');
-      }
+      const { charts } = await fetchDashboard({
+        httpError: 'Failed to fetch duration data',
+      });
 
       // Return pre-computed duration data from dashboard API
-      return result.data.charts.durations || [];
+      return charts.durations || [];
     },
   });
 }

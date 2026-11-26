@@ -1,292 +1,337 @@
-// Mock @tanstack/react-query before imports
-let capturedQueryConfig: any = null;
+/** @jest-environment node */
+import {
+  useActivities,
+  useDurationData,
+  useOverview,
+  useSalesData,
+} from '@/hooks/useData';
+import type { DashboardData, SalesData } from '@/types/reporting';
+
+interface QueryConfig {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<unknown>;
+}
+
+let capturedQueryConfig: QueryConfig | null = null;
+const mockFetch = jest.fn<Promise<Response>, Parameters<typeof fetch>>();
 
 jest.mock('@tanstack/react-query', () => ({
-  useQuery: jest.fn((config: any) => {
+  useQuery: jest.fn((config: QueryConfig) => {
     capturedQueryConfig = config;
-    return {
-      data: undefined,
-      error: undefined,
-      isLoading: true,
-      isFetching: false,
-      refetch: jest.fn(),
-    };
   }),
 }));
+
+function query(): QueryConfig {
+  if (!capturedQueryConfig) throw new Error('Query not initialized');
+  return capturedQueryConfig;
+}
+
+const emptyDashboard: DashboardData = {
+  overview: {
+    totalBookings: 0,
+    totalRevenue: 0,
+    totalCabins: 0,
+    totalCustomers: 0,
+    totalCancellations: 0,
+    occupancyRate: 0,
+    checkInsToday: 0,
+    checkOutsToday: 0,
+  },
+  recentActivity: [],
+  charts: { occupancy: [], revenue: [], durations: [] },
+};
+
+function mockDashboard(data: DashboardData) {
+  mockFetch.mockResolvedValue(Response.json({ success: true, data }));
+}
+
+const firstActivity: DashboardData['recentActivity'][number] = {
+  id: 'b1',
+  customerName: 'John Doe',
+  cabinName: 'Pine',
+  status: 'confirmed',
+  checkInDate: '2024-03-01T00:00:00.000Z',
+  checkOutDate: '2024-03-04T00:00:00.000Z',
+  createdAt: '2024-02-25T00:00:00.000Z',
+  totalPrice: 100,
+};
 
 beforeEach(() => {
   capturedQueryConfig = null;
   jest.clearAllMocks();
-  (global.fetch as jest.Mock) = jest.fn();
+  global.fetch = mockFetch;
+  mockFetch.mockReset();
 });
 
-import {
-  useOverview,
-  useActivities,
-  useSalesData,
-  useDurationData,
-} from '@/hooks/useData';
+it.each([
+  [useOverview, 'overview', '/api/dashboard', 'Failed to fetch overview data'],
+  [useActivities, 'activities', '/api/dashboard', 'Failed to fetch activities'],
+  [useSalesData, 'sales', '/api/sales', 'Failed to fetch sales data'],
+  [
+    useDurationData,
+    'durations',
+    '/api/dashboard',
+    'Failed to fetch duration data',
+  ],
+] as const)(
+  'uses the %s hook key and keeps its HTTP failure message',
+  async (hook, key, url, error) => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 500 }));
 
-describe('useOverview', () => {
-  it('uses overview query key', () => {
-    useOverview();
+    hook();
 
-    expect(capturedQueryConfig.queryKey).toEqual(['overview']);
+    expect(query().queryKey).toEqual([key]);
+    await expect(query().queryFn()).rejects.toThrow(error);
+    expect(mockFetch).toHaveBeenCalledWith(url);
+  }
+);
+
+it('derives overview values from the wrapped dashboard', async () => {
+  mockDashboard({
+    ...emptyDashboard,
+    overview: {
+      ...emptyDashboard.overview,
+      totalBookings: 100,
+      totalRevenue: 50000,
+      totalCustomers: 50,
+      totalCancellations: 5,
+    },
   });
 
-  it('fetches from /api/dashboard', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: true,
-          data: {
-            overview: {
-              totalBookings: 100,
-              totalRevenue: 50000,
-              totalCustomers: 50,
-              totalCancellations: 5,
-            },
-          },
-        }),
-    });
+  useOverview();
 
-    useOverview();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/dashboard');
-    expect(result).toEqual({
-      bookings: 100,
-      revenue: 50000,
-      customers: 50,
-      cancellations: 5,
-    });
-  });
-
-  it('defaults cancellations to 0 when not provided', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: true,
-          data: {
-            overview: {
-              totalBookings: 50,
-              totalRevenue: 25000,
-              totalCustomers: 30,
-            },
-          },
-        }),
-    });
-
-    useOverview();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result.cancellations).toBe(0);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useOverview();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch overview data'
-    );
-  });
-
-  it('throws on unsuccessful result', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: false,
-          error: 'Database error',
-        }),
-    });
-
-    useOverview();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Database error'
-    );
+  await expect(query().queryFn()).resolves.toEqual({
+    bookings: 100,
+    revenue: 50000,
+    customers: 50,
+    cancellations: 5,
   });
 });
 
-describe('useActivities', () => {
-  it('uses activities query key', () => {
-    useActivities();
+it('keeps the legacy cancellation fallback when the field is omitted', async () => {
+  const { totalCancellations: _, ...overview } = emptyDashboard.overview;
+  mockFetch.mockResolvedValue(
+    Response.json({
+      success: true,
+      data: { ...emptyDashboard, overview },
+    })
+  );
 
-    expect(capturedQueryConfig.queryKey).toEqual(['activities']);
+  useOverview();
+
+  await expect(query().queryFn()).resolves.toEqual({
+    bookings: 0,
+    revenue: 0,
+    customers: 0,
+    cancellations: 0,
+  });
+});
+
+it.each([useOverview, useActivities, useDurationData])(
+  '%s rejects a dashboard error envelope from an HTTP 200',
+  async hook => {
+    mockFetch.mockResolvedValue(
+      Response.json({ success: false, error: 'Database error' })
+    );
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toThrow('Database error');
+  }
+);
+
+it('limits recent activity to four rows and keeps singular and plural stay labels', async () => {
+  const secondActivity = {
+    ...firstActivity,
+    id: 'b2',
+    customerName: 'Jane Smith',
+    status: 'checked-in',
+    checkInDate: '2024-03-02T00:00:00.000Z',
+    checkOutDate: '2024-03-03T00:00:00.000Z',
+  } as const;
+  mockDashboard({
+    ...emptyDashboard,
+    recentActivity: [
+      firstActivity,
+      secondActivity,
+      ...Array.from({ length: 4 }, (_, i) => ({
+        ...firstActivity,
+        id: `b${i + 3}`,
+      })),
+    ],
   });
 
-  it('returns formatted activities from dashboard data', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: true,
-          data: {
-            recentActivity: [
-              {
-                id: 'b1',
-                customerName: 'John Doe',
-                status: 'confirmed',
-                checkInDate: '2024-03-01',
-                checkOutDate: '2024-03-04',
-              },
-              {
-                id: 'b2',
-                customerName: 'Jane Smith',
-                status: 'checked-in',
-                checkInDate: '2024-03-02',
-                checkOutDate: '2024-03-03',
-              },
-            ],
-          },
-        }),
-    });
+  useActivities();
 
-    useActivities();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({
+  await expect(query().queryFn()).resolves.toEqual([
+    {
       id: 'b1',
       name: 'John Doe',
       status: 'confirmed',
       stayDuration: '3 nights',
-    });
-    expect(result[1]).toEqual({
+    },
+    {
       id: 'b2',
       name: 'Jane Smith',
       status: 'checked-in',
       stayDuration: '1 night',
-    });
-  });
-
-  it('limits to 4 activities', async () => {
-    const activities = Array.from({ length: 6 }, (_, i) => ({
-      id: `b${i}`,
-      customerName: `Guest ${i}`,
+    },
+    {
+      id: 'b3',
+      name: 'John Doe',
       status: 'confirmed',
-      checkInDate: '2024-03-01',
-      checkOutDate: '2024-03-03',
-    }));
-
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: true,
-          data: { recentActivity: activities },
-        }),
-    });
-
-    useActivities();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result).toHaveLength(4);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useActivities();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch activities'
-    );
-  });
+      stayDuration: '3 nights',
+    },
+    {
+      id: 'b4',
+      name: 'John Doe',
+      status: 'confirmed',
+      stayDuration: '3 nights',
+    },
+  ]);
 });
 
-describe('useSalesData', () => {
-  it('uses sales query key', () => {
-    useSalesData();
+it('returns bare sales rows and retains additive fields', async () => {
+  const salesData = [
+    {
+      date: 'Jan 1',
+      fullDate: '2024-01-01',
+      sales: -12.345,
+      bookings: 0,
+      channel: 'web',
+    },
+  ] satisfies (SalesData & { channel: string })[];
+  mockFetch.mockResolvedValue(Response.json(salesData));
 
-    expect(capturedQueryConfig.queryKey).toEqual(['sales']);
-  });
+  useSalesData();
 
-  it('fetches from /api/sales', async () => {
-    const mockSalesData = [
-      { date: '2024-01', revenue: 5000 },
-      { date: '2024-02', revenue: 6000 },
-    ];
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockSalesData),
-    });
-
-    useSalesData();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/sales');
-    expect(result).toEqual(mockSalesData);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useSalesData();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch sales data'
-    );
-  });
+  await expect(query().queryFn()).resolves.toEqual(salesData);
 });
 
-describe('useDurationData', () => {
-  it('uses durations query key', () => {
-    useDurationData();
+it('rejects a sales row with a string amount', async () => {
+  mockFetch.mockResolvedValue(
+    Response.json([
+      { date: 'Jan 1', fullDate: '2024-01-01', sales: '400', bookings: 3 },
+    ])
+  );
 
-    expect(capturedQueryConfig.queryKey).toEqual(['durations']);
-  });
+  useSalesData();
 
-  it('fetches duration data from dashboard API', async () => {
-    const mockDurations = [
-      { range: '1-3 nights', count: 40 },
-      { range: '4-7 nights', count: 30 },
-    ];
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: true,
-          data: {
-            charts: { durations: mockDurations },
-          },
-        }),
-    });
-
-    useDurationData();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result).toEqual(mockDurations);
-  });
-
-  it('returns empty array when durations not in response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          success: true,
-          data: { charts: {} },
-        }),
-    });
-
-    useDurationData();
-    const result = await capturedQueryConfig.queryFn();
-
-    expect(result).toEqual([]);
-  });
-
-  it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
-
-    useDurationData();
-
-    await expect(capturedQueryConfig.queryFn()).rejects.toThrow(
-      'Failed to fetch duration data'
-    );
-  });
+  await expect(query().queryFn()).rejects.toThrow('Failed to fetch sales data');
 });
+
+it('rejects an unexpected sales envelope', async () => {
+  mockFetch.mockResolvedValue(Response.json({ success: true, data: [] }));
+
+  useSalesData();
+
+  await expect(query().queryFn()).rejects.toThrow('Failed to fetch sales data');
+});
+
+it('keeps precomputed duration rows and their additive fields', async () => {
+  const durations = [
+    { name: '1-2 nights', value: 40, color: '#3b82f6', label: 'Short stays' },
+  ];
+  mockDashboard({
+    ...emptyDashboard,
+    charts: { ...emptyDashboard.charts, durations },
+  });
+
+  useDurationData();
+
+  await expect(query().queryFn()).resolves.toEqual(durations);
+});
+
+it('keeps the empty duration fallback when the field is omitted', async () => {
+  const { durations: _, ...charts } = emptyDashboard.charts;
+  mockFetch.mockResolvedValue(
+    Response.json({
+      success: true,
+      data: { ...emptyDashboard, charts },
+    })
+  );
+
+  useDurationData();
+
+  await expect(query().queryFn()).resolves.toEqual([]);
+});
+
+it('validates the whole dashboard before deriving overview', async () => {
+  mockFetch.mockResolvedValue(
+    Response.json({
+      success: true,
+      data: {
+        ...emptyDashboard,
+        charts: {
+          ...emptyDashboard.charts,
+          occupancy: [
+            {
+              date: '2024-03-01',
+              occupancyRate: '50',
+              totalGuests: 1,
+              totalCapacity: 2,
+            },
+          ],
+        },
+      },
+    })
+  );
+
+  useOverview();
+
+  await expect(query().queryFn()).rejects.toThrow(
+    'Failed to fetch overview data'
+  );
+});
+
+it('rejects invalid dates before formatting a recent stay', async () => {
+  mockFetch.mockResolvedValue(
+    Response.json({
+      success: true,
+      data: {
+        ...emptyDashboard,
+        recentActivity: [{ ...firstActivity, checkOutDate: 'invalid-date' }],
+      },
+    })
+  );
+
+  useActivities();
+
+  await expect(query().queryFn()).rejects.toThrow(
+    'Failed to fetch activities data'
+  );
+});
+
+it('rejects an invalid duration number', async () => {
+  mockFetch.mockResolvedValue(
+    Response.json({
+      success: true,
+      data: {
+        ...emptyDashboard,
+        charts: {
+          ...emptyDashboard.charts,
+          durations: [{ name: '1-2 nights', color: '#3b82f6', value: '40' }],
+        },
+      },
+    })
+  );
+
+  useDurationData();
+
+  await expect(query().queryFn()).rejects.toThrow(
+    'Failed to fetch duration data'
+  );
+});
+
+it.each([useOverview, useActivities, useDurationData, useSalesData])(
+  '%s rejects malformed JSON',
+  async hook => {
+    mockFetch.mockResolvedValue(new Response('{'));
+
+    hook();
+
+    await expect(query().queryFn()).rejects.toMatchObject({
+      name: 'SyntaxError',
+    });
+  }
+);

@@ -1,10 +1,15 @@
-import mongoose from 'mongoose';
+import type { IBooking } from '@lodgeflow/database/models/Booking';
+import type { Types } from 'mongoose';
 
 jest.mock('@lodgeflow/database/mongodb', () =>
   jest.fn().mockResolvedValue(undefined)
 );
 
 import { GET } from '@/app/api/bookings/stats/route';
+import {
+  bookingStatsJsonSchema,
+  parseReportJson,
+} from '@/lib/validations/reporting-json';
 import Booking from '@lodgeflow/database/models/Booking';
 import Cabin from '@lodgeflow/database/models/Cabin';
 
@@ -22,8 +27,10 @@ async function createTestCabin() {
 }
 
 async function createTestBooking(
-  cabinId: mongoose.Types.ObjectId,
-  overrides: Record<string, any> = {}
+  cabinId: Types.ObjectId,
+  overrides: Partial<
+    Pick<IBooking, 'status' | 'checkInDate' | 'checkOutDate'>
+  > = {}
 ) {
   return Booking.create({
     cabin: cabinId,
@@ -38,18 +45,28 @@ async function createTestBooking(
   });
 }
 
+async function readBookingStats() {
+  const response = await GET();
+  expect(response.status).toBe(200);
+  const value: unknown = await response.json();
+
+  return parseReportJson({
+    value,
+    schema: bookingStatsJsonSchema,
+    format: 'wrapped',
+    errorMessage: 'Unexpected booking stats response',
+  });
+}
+
 describe('Booking Stats API', () => {
   describe('GET /api/bookings/stats', () => {
     it('returns all zero stats when no bookings', async () => {
-      const response = await GET();
-      const body = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(body.success).toBe(true);
-      expect(body.data.todayCheckIns).toBe(0);
-      expect(body.data.todayCheckOuts).toBe(0);
-      expect(body.data.checkedIn).toBe(0);
-      expect(body.data.unconfirmed).toBe(0);
+      expect(await readBookingStats()).toEqual({
+        todayCheckIns: 0,
+        todayCheckOuts: 0,
+        checkedIn: 0,
+        unconfirmed: 0,
+      });
     });
 
     it('counts unconfirmed bookings', async () => {
@@ -66,20 +83,18 @@ describe('Booking Stats API', () => {
         checkOutDate: new Date('2027-08-04'),
       });
 
-      const response = await GET();
-      const body = await response.json();
+      const data = await readBookingStats();
 
-      expect(body.data.unconfirmed).toBe(2);
+      expect(data.unconfirmed).toBe(2);
     });
 
     it('counts checked-in bookings', async () => {
       const cabin = await createTestCabin();
       await createTestBooking(cabin._id, { status: 'checked-in' });
 
-      const response = await GET();
-      const body = await response.json();
+      const data = await readBookingStats();
 
-      expect(body.data.checkedIn).toBe(1);
+      expect(data.checkedIn).toBe(1);
     });
 
     it('counts today check-ins', async () => {
@@ -93,10 +108,9 @@ describe('Booking Stats API', () => {
         status: 'confirmed',
       });
 
-      const response = await GET();
-      const body = await response.json();
+      const data = await readBookingStats();
 
-      expect(body.data.todayCheckIns).toBe(1);
+      expect(data.todayCheckIns).toBe(1);
     });
 
     it('excludes cancelled bookings from today check-ins', async () => {
@@ -110,10 +124,9 @@ describe('Booking Stats API', () => {
         status: 'cancelled',
       });
 
-      const response = await GET();
-      const body = await response.json();
+      const data = await readBookingStats();
 
-      expect(body.data.todayCheckIns).toBe(0);
+      expect(data.todayCheckIns).toBe(0);
     });
 
     it('counts today check-outs', async () => {
@@ -128,10 +141,9 @@ describe('Booking Stats API', () => {
         status: 'checked-in',
       });
 
-      const response = await GET();
-      const body = await response.json();
+      const data = await readBookingStats();
 
-      expect(body.data.todayCheckOuts).toBe(1);
+      expect(data.todayCheckOuts).toBe(1);
     });
   });
 });
