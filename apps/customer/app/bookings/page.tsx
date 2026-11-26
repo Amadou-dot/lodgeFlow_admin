@@ -170,7 +170,12 @@ function BookingHistory() {
   };
 
   const confirmUpdateBooking = async () => {
-    if (dialog.kind !== 'edit') return;
+    if (
+      dialog.kind !== 'edit' ||
+      !selectedBooking ||
+      !canModifyBooking(selectedBooking)
+    )
+      return;
     const submittedDialog = dialog;
 
     try {
@@ -204,7 +209,12 @@ function BookingHistory() {
   };
 
   const confirmCancelBooking = async () => {
-    if (dialog.kind !== 'cancel') return;
+    if (
+      dialog.kind !== 'cancel' ||
+      !selectedBooking ||
+      !canCancelBooking(selectedBooking)
+    )
+      return;
     const submittedDialog = dialog;
 
     try {
@@ -329,11 +339,16 @@ function BookingHistory() {
                         <div className='flex items-center gap-2 mt-1 flex-wrap'>
                           <Chip
                             className='w-fit'
-                            color={statusColorMap[booking.status]}
                             size='sm'
                             variant='flat'
+                            color={
+                              booking.status
+                                ? statusColorMap[booking.status]
+                                : 'default'
+                            }
                           >
-                            {booking.status.replace('-', ' ').toUpperCase()}
+                            {booking.status?.replace('-', ' ').toUpperCase() ??
+                              'UNKNOWN'}
                           </Chip>
                           {booking.status === 'cancelled' &&
                             booking.refundStatus &&
@@ -417,6 +432,7 @@ function BookingHistory() {
 
                         {booking.cabin &&
                           !booking.isPaid &&
+                          booking.status != null &&
                           booking.status !== 'cancelled' &&
                           (() => {
                             const amountReceived = booking.amountPaid ?? 0;
@@ -561,11 +577,15 @@ function BookingHistory() {
                           </p>
                           <Chip
                             className='mt-1 w-fit'
-                            color={statusColorMap[booking.status]}
                             size='sm'
                             variant='flat'
+                            color={
+                              booking.status
+                                ? statusColorMap[booking.status]
+                                : 'default'
+                            }
                           >
-                            {booking.status.toUpperCase()}
+                            {booking.status?.toUpperCase() ?? 'UNKNOWN'}
                           </Chip>
                         </div>
                       </CardHeader>
@@ -742,11 +762,17 @@ function BookingHistory() {
                           </p>
                           <Chip
                             className='mt-1 w-fit'
-                            color={statusColorMap[reservation.status]}
                             size='sm'
                             variant='flat'
+                            color={
+                              reservation.status
+                                ? statusColorMap[reservation.status]
+                                : 'default'
+                            }
                           >
-                            {reservation.status.toUpperCase().replace('-', ' ')}
+                            {reservation.status
+                              ?.toUpperCase()
+                              .replace('-', ' ') ?? 'UNKNOWN'}
                           </Chip>
                         </div>
                       </CardHeader>
@@ -887,13 +913,17 @@ function BookingHistory() {
                           </p>
                           <Chip
                             className='mt-2'
-                            color={statusColorMap[selectedBooking.status]}
                             size='sm'
                             variant='flat'
+                            color={
+                              selectedBooking.status
+                                ? statusColorMap[selectedBooking.status]
+                                : 'default'
+                            }
                           >
                             {selectedBooking.status
-                              .replace('-', ' ')
-                              .toUpperCase()}
+                              ?.replace('-', ' ')
+                              .toUpperCase() ?? 'UNKNOWN'}
                           </Chip>
                         </div>
                       </div>
@@ -1178,6 +1208,9 @@ function BookingHistory() {
                 <Button
                   color='danger'
                   isLoading={cancelBooking.isPending}
+                  isDisabled={
+                    !selectedBooking || !canCancelBooking(selectedBooking)
+                  }
                   onPress={confirmCancelBooking}
                 >
                   Cancel Booking
@@ -1248,6 +1281,9 @@ function BookingHistory() {
                 <Button
                   color='primary'
                   isLoading={updateBooking.isPending}
+                  isDisabled={
+                    !selectedBooking || !canModifyBooking(selectedBooking)
+                  }
                   onPress={confirmUpdateBooking}
                 >
                   Update Booking

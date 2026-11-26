@@ -15,10 +15,12 @@ jest.mock('@heroui/card', () => ({
     <div>{children}</div>
   ),
 }));
+const id = '507f1f77bcf86cd7994390ab';
 const common = {
-  _id: 'reservation',
+  id,
+  _id: id,
   customer: 'guest',
-  date: '2030-06-01',
+  date: '2030-06-01T00:00:00.000Z',
   status: 'confirmed',
   totalPrice: 50,
   isPaid: false,
@@ -35,6 +37,24 @@ for (const kind of ['dining', 'experience'] as const) {
             ...common,
             dining: {
               name: 'Dinner',
+              _id: id,
+              description: 'Dinner service',
+              type: 'menu',
+              mealType: 'dinner',
+              category: 'regular',
+              maxPeople: 20,
+              minPeople: 1,
+              gallery: [],
+              ingredients: [],
+              allergens: [],
+              dietary: [],
+              beverages: [],
+              includes: [],
+              specialRequirements: [],
+              tags: [],
+              isPopular: false,
+              isAvailable: true,
+              reviewCount: 0,
               image: '/dining.jpg',
               price: 25,
               servingTime: { start: '12:00', end: '22:00' },
@@ -47,6 +67,20 @@ for (const kind of ['dining', 'experience'] as const) {
             ...common,
             experience: {
               name: 'Hike',
+              _id: id,
+              description: 'Mountain hike',
+              difficulty: 'Easy',
+              category: 'Hiking',
+              ctaText: 'Book',
+              gallery: [],
+              includes: [],
+              available: [],
+              requirements: [],
+              highlights: [],
+              whatToBring: [],
+              tags: [],
+              isPopular: false,
+              reviewCount: 0,
               image: '/hike.jpg',
               price: 25,
               duration: '2 hours',
@@ -59,7 +93,7 @@ for (const kind of ['dining', 'experience'] as const) {
     });
     const Component =
       kind === 'dining' ? DiningConfirmation : ExperienceConfirmation;
-    render(<Component params={Promise.resolve({ id: 'reservation' })} />);
+    render(<Component params={Promise.resolve({ id: id })} />);
     const payment = await screen.findByRole('button', {
       name: 'Pay outstanding balance',
     });
@@ -91,10 +125,30 @@ for (const kind of ['dining', 'experience'] as const) {
     });
     const Component =
       kind === 'dining' ? DiningConfirmation : ExperienceConfirmation;
-    render(<Component params={Promise.resolve({ id: 'reservation' })} />);
+    render(<Component params={Promise.resolve({ id: id })} />);
     expect(await screen.findByText('Removed listing')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Pay outstanding balance' })
     ).toBeInTheDocument();
   });
 }
+
+it.each(['dining', 'experience'] as const)(
+  'displays a nullable %s status without enabling checkout',
+  async kind => {
+    const data =
+      kind === 'dining'
+        ? { ...common, dining: null, time: '19:00', numGuests: 2, status: null }
+        : { ...common, experience: null, numParticipants: 2, status: null };
+    jest
+      .mocked(fetch)
+      .mockResolvedValue(FetchResponse.json({ success: true, data }));
+    const Page =
+      kind === 'dining' ? DiningConfirmation : ExperienceConfirmation;
+    render(<Page params={Promise.resolve({ id })} />);
+    expect(await screen.findByText(/Status: Unknown/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Pay outstanding balance' })
+    ).not.toBeInTheDocument();
+  }
+);

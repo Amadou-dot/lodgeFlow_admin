@@ -1,5 +1,29 @@
 /** @jest-environment node */
+import {
+  decodeBookingHistory,
+  decodeBookingDetail,
+} from '@/lib/validations/booking-read-json';
+import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
+const mockLeanBookings = jest.fn<Promise<unknown[]>, []>();
+const mockDetailBooking = jest.fn<Promise<unknown>, []>();
+jest.mock('@clerk/nextjs/server', () => ({
+  auth: async () => ({ userId: 'user_customer' }),
+}));
+jest.mock('@lodgeflow/database', () => ({
+  ...jest.requireActual<typeof import('@lodgeflow/database')>(
+    '@lodgeflow/database'
+  ),
+  connectDB: jest.fn(),
+  Booking: {
+    find: () => ({
+      populate: () => ({ sort: () => ({ lean: mockLeanBookings }) }),
+    }),
+    findById: () => ({ populate: mockDetailBooking }),
+  },
+}));
+import { GET as historyRoute } from '@/app/api/bookings/history/route';
+import { GET as detailRoute } from '@/app/api/bookings/[id]/route';
 import Booking from '@lodgeflow/database/models/Booking';
 import Cabin, { type ICabin } from '@lodgeflow/database/models/Cabin';
 import {
@@ -86,4 +110,65 @@ describe('booking read serializers', () => {
     });
     expect(json(serializeBookingDetail(populated))).toEqual(json(booking));
   });
+});
+
+it('reads sparse stored history and hydrated detail from the two GET handlers', async () => {
+  const common = {
+    ...sparseBooking,
+    specialRequests: [null, 'Towels'],
+    extras: { hasPets: null },
+    amountPaid: null,
+  };
+  const hydrated = Booking.hydrate({ ...common, status: null });
+  mockDetailBooking.mockResolvedValue(hydrated);
+  const requestedId = id.toHexString().toUpperCase();
+  const detailResponse = await detailRoute(
+    new NextRequest('https://customer.test'),
+    { params: Promise.resolve({ id: requestedId }) }
+  );
+  const detail = await detailResponse.json();
+  expect(detailResponse.status).toBe(200);
+  expect(detail.data).toMatchObject({
+    id: id.toHexString(),
+    status: null,
+    specialRequests: [null, 'Towels'],
+    amountPaid: null,
+    extras: { hasPets: null },
+  });
+  expect(decodeBookingDetail(requestedId)(detail)).toBe(detail.data);
+
+  mockLeanBookings.mockResolvedValue([
+    {
+      ...common,
+      status: undefined,
+      cabin: {
+        _id: cabinId,
+        name: 'Pine',
+        image: '/pine',
+        description: 'Cabin',
+        capacity: 2,
+        price: 1.235,
+      },
+    },
+  ]);
+  const historyResponse = await historyRoute(
+    new NextRequest('https://customer.test')
+  );
+  const history = await historyResponse.json();
+  expect(historyResponse.status).toBe(200);
+  expect(history.data[0]).toMatchObject({
+    specialRequests: [null, 'Towels'],
+    extras: { hasPets: null },
+    amountPaid: null,
+    cabin: { _id: cabinId.toHexString(), price: 1.235 },
+  });
+  expect(history.data[0]).not.toHaveProperty('status');
+  expect(history.data[0].cabin).not.toHaveProperty('images');
+  expect(decodeBookingHistory(history)).toBe(history.data);
+  expect(
+    decodeBookingDetail(requestedId)({ success: true, data: history.data[0] })
+  ).toBeUndefined();
+  const extras = { ...history.data[0].extras, future: 'retained' };
+  const rows = [{ ...history.data[0], extras }];
+  expect(decodeBookingHistory({ success: true, data: rows })).toBe(rows);
 });

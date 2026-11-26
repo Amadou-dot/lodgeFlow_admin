@@ -1,86 +1,25 @@
-import {
-  DINING_RESERVATION_STATUSES,
-  EXPERIENCE_BOOKING_STATUSES,
-  TABLE_PREFERENCES,
-} from '@lodgeflow/database/config';
 import { z } from 'zod';
 import {
   diningJsonSchema,
   experienceJsonSchema,
 } from '@lodgeflow/database/catalog-json-schema';
-import { jsonTimestampSchema as timestamp } from './customer-json';
-
-const objectId = z.string().regex(/^[a-f0-9]{24}$/i);
-const textList = z.array(z.string().nullable()).nullish();
+import {
+  objectId,
+  receipt,
+  checkout,
+  stripeRefund,
+  dining,
+  experience,
+  diningStatus,
+  experienceStatus,
+} from '@lodgeflow/database/reservation-read-fields';
 const positiveCents = z.int().positive();
-const receipt = z.object({
-  id: z.string().min(1),
-  type: z.enum(['payment', 'refund']),
-  amountCents: z.number(),
-  method: z.enum(['cash', 'bank_transfer', 'card', 'stripe']),
-  reference: z.string().nullish(),
-  actor: z.string().min(1),
-  recordedAt: timestamp,
-});
-// Status changes and idempotent receipt acknowledgements can serialize stored
-// records before any balance calculation. Detail GET also computes a summary.
-const checkout = z.object({
-  token: z.string().nullish(),
-  amountCents: z.number().nullish(),
-  currency: z.string().nullish(),
-  createdAt: timestamp.nullish(),
-  sessionId: z.string().nullish(),
-  pending: z.boolean().nullish(),
-});
-const stripeRefund = z.object({
-  token: z.string().nullish(),
-  amountCents: z.number().nullish(),
-  createdAt: timestamp.nullish(),
-  refundId: z.string().nullish(),
-  status: z.enum(['pending', 'succeeded', 'failed']).nullish(),
-  actor: z.string().nullish(),
-  reference: z.string().nullish(),
-});
 const summarizedAmount = { amountCents: positiveCents };
 const detailPayments = {
   receipts: z.array(receipt.extend(summarizedAmount)).nullish(),
   checkout: checkout.extend(summarizedAmount).nullish(),
   stripeRefund: stripeRefund.extend(summarizedAmount).nullish(),
 };
-const common = z.object({
-  _id: objectId,
-  id: objectId.optional(),
-  __v: z.number().nullish(),
-  customer: z.string().min(1),
-  date: timestamp,
-  createdAt: timestamp.nullish(),
-  updatedAt: timestamp.nullish(),
-  totalPrice: z.number(),
-  isPaid: z.boolean().nullable(),
-  stripePaymentIntentId: z.string().nullish(),
-  specialRequests: textList,
-  receipts: z.array(receipt).nullish(),
-  paymentConfirmationSentAt: timestamp.nullish(),
-  checkout: checkout.nullish(),
-  stripeRefund: stripeRefund.nullish(),
-});
-const diningStatus = z.enum(DINING_RESERVATION_STATUSES);
-const experienceStatus = z.enum(EXPERIENCE_BOOKING_STATUSES);
-const dining = common.extend({
-  time: z.string(),
-  numGuests: z.number(),
-  status: diningStatus.nullable(),
-  dietaryRequirements: textList,
-  tablePreference: z.enum(TABLE_PREFERENCES).nullish(),
-  occasion: z.string().nullish(),
-});
-const experience = common.extend({
-  timeSlot: z.string().nullish(),
-  numParticipants: z.number(),
-  status: experienceStatus.nullable(),
-  observations: z.string().nullish(),
-});
-
 const payment = z.object({
   totalCents: z.int().nonnegative(),
   paidCents: z.int().nonnegative(),

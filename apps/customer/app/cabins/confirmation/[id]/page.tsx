@@ -132,7 +132,9 @@ export default function BookingConfirmationPage({
         </p>
         <Chip color='warning' size='lg' variant='flat'>
           Status:{' '}
-          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+          {booking.status
+            ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1)
+            : 'Unknown'}
         </Chip>
       </div>
 
@@ -334,6 +336,7 @@ export default function BookingConfirmationPage({
       {/* Payment Section */}
       {booking.cabin &&
         !booking.isPaid &&
+        booking.status != null &&
         booking.status !== 'cancelled' &&
         (() => {
           const amountReceived = booking.amountPaid ?? 0;

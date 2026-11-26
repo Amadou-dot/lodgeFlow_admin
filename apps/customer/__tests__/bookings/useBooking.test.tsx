@@ -30,8 +30,8 @@ function historyBooking({
   status,
 }: {
   id: string;
-  status: BookingHistoryItem['status'];
-}): BookingHistoryItem {
+  status: NonNullable<BookingHistoryItem['status']>;
+}) {
   return {
     _id: id,
     customer: 'user_customer',
@@ -43,7 +43,7 @@ function historyBooking({
     status,
     cabinPrice: 200,
     totalPrice: 200,
-  };
+  } satisfies BookingHistoryItem;
 }
 
 // Create wrapper for hooks
@@ -152,13 +152,13 @@ describe('useBookingHistory', () => {
 
   it('fetches booking history without status filter', async () => {
     const mockBookings = [
-      historyBooking({ id: '1', status: 'confirmed' }),
-      historyBooking({ id: '2', status: 'checked-in' }),
+      historyBooking({ id: '507f1f77bcf86cd7994390ab', status: 'confirmed' }),
+      historyBooking({ id: '507f1f77bcf86cd7994390ac', status: 'checked-in' }),
     ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ data: mockBookings }),
+      json: async () => ({ success: true, data: mockBookings }),
     });
 
     const { result } = renderHook(() => useBookingHistory(), { wrapper });
@@ -172,11 +172,13 @@ describe('useBookingHistory', () => {
   });
 
   it('fetches booking history with status filter', async () => {
-    const mockBookings = [historyBooking({ id: '1', status: 'confirmed' })];
+    const mockBookings = [
+      historyBooking({ id: '507f1f77bcf86cd7994390ab', status: 'confirmed' }),
+    ];
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ data: mockBookings }),
+      json: async () => ({ success: true, data: mockBookings }),
     });
 
     const { result } = renderHook(() => useBookingHistory('confirmed'), {
@@ -214,23 +216,31 @@ describe('useBookingById', () => {
 
   it('fetches a single booking by ID', async () => {
     const mockBooking = {
-      ...historyBooking({ id: '1', status: 'confirmed' }),
+      ...historyBooking({
+        id: '507f1f77bcf86cd7994390ab',
+        status: 'confirmed',
+      }),
       cabin: null,
-      id: '1',
+      id: '507f1f77bcf86cd7994390ab',
       durationText: '2 nights',
       paymentStatus: 'unpaid',
     } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ data: mockBooking }),
+      json: async () => ({ success: true, data: mockBooking }),
     });
 
-    const { result } = renderHook(() => useBookingById('1'), { wrapper });
+    const { result } = renderHook(
+      () => useBookingById('507f1f77bcf86cd7994390AB'),
+      { wrapper }
+    );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/bookings/1');
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/bookings/507f1f77bcf86cd7994390AB'
+    );
     expect(result.current.data).toEqual(mockBooking);
   });
 
@@ -246,7 +256,10 @@ describe('useBookingById', () => {
       ok: false,
     });
 
-    const { result } = renderHook(() => useBookingById('1'), { wrapper });
+    const { result } = renderHook(
+      () => useBookingById('507f1f77bcf86cd7994390AB'),
+      { wrapper }
+    );
 
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
@@ -500,5 +513,32 @@ describe('useRefundEstimate', () => {
       'Failed to fetch refund estimate'
     );
     expect(result.current.data).toBeUndefined();
+  });
+});
+
+describe('malformed successful reads', () => {
+  it.each([
+    {},
+    { success: true },
+    { success: false, data: [] },
+    { success: true, data: null },
+    { success: true, data: [{}] },
+  ])('rejects invalid history %j', async body => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => body });
+    const { result } = renderHook(() => useBookingHistory(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe(
+      'Failed to fetch booking history'
+    );
+  });
+  it('rejects a malformed refund estimate', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { canCancel: true } }),
+    });
+    const { result } = renderHook(() => useRefundEstimate('1'), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });

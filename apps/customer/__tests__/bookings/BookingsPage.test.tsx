@@ -9,6 +9,7 @@ import type { BookingHistoryItem } from '@/types/booking-read';
 import BookingsPage from '@/app/bookings/page';
 import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 
+const mockCancelBooking = jest.fn();
 const mockUpdateBooking = jest.fn();
 let mockBookings: BookingHistoryItem[];
 let mockAuth = {
@@ -95,7 +96,10 @@ jest.mock('@/hooks/useBooking', () => ({
     isLoading: false,
     error: null,
   }),
-  useCancelBooking: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useCancelBooking: () => ({
+    mutateAsync: mockCancelBooking,
+    isPending: false,
+  }),
   useUpdateBooking: () => ({
     mutateAsync: mockUpdateBooking,
     isPending: false,
@@ -353,4 +357,38 @@ it('preserves selected context and draft when the filtered query no longer conta
   expect(
     screen.getByText(/Update the number of guests for Pine/)
   ).toBeInTheDocument();
+});
+
+it.each(['Edit', 'Cancel'] as const)(
+  'rechecks the current row before submitting %s',
+  action => {
+    const view = render(<BookingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: action }));
+    mockBookings = [
+      { ...mockBooking, status: action === 'Edit' ? null : undefined },
+    ];
+    view.rerender(<BookingsPage />);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: action === 'Edit' ? 'Update Booking' : 'Cancel Booking',
+      })
+    );
+    expect(mockUpdateBooking).not.toHaveBeenCalled();
+    expect(mockCancelBooking).not.toHaveBeenCalled();
+  }
+);
+
+it('shows unknown history and detail status without offering booking actions', () => {
+  mockBookings = [{ ...mockBooking, status: null }];
+  render(<BookingsPage />);
+  expect(
+    screen.queryByRole('button', { name: /^(Pay|Edit|Cancel)$/ })
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
+  expect(screen.getAllByText(/unknown/i)).toHaveLength(2);
+});
+
+it('keeps a valid sparse booking payable in history', () => {
+  render(<BookingsPage />);
+  expect(screen.getByRole('button', { name: 'Pay' })).toBeInTheDocument();
 });

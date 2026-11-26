@@ -8,6 +8,8 @@ jest.mock('@lodgeflow/database', () => ({
   Booking: { findById: () => mockFindBooking() },
   Settings: { findOne: () => mockFindSettings() },
 }));
+import { decodeRefundEstimate } from '@/lib/validations/cancellation-json';
+import Settings from '@lodgeflow/database/models/Settings';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/bookings/[id]/refund-estimate/route';
 import { getCancellationDeadlines } from '@/lib/cancellation';
@@ -150,3 +152,17 @@ it.each([NaN, Infinity, -1, 1.005, Number.MAX_SAFE_INTEGER])(
     });
   }
 );
+
+it('retains the stored null policy and its fallback description', async () => {
+  const settings = Settings.hydrate({ cancellationPolicy: null });
+  await settings.validate();
+  mockFindSettings.mockResolvedValue(settings);
+  const response = await request();
+  const body = await response.json();
+  expect(body.data).toMatchObject({
+    estimate: { policy: null, refundType: 'none' },
+    deadlines: { policy: null },
+    policyDescription: 'Unknown policy',
+  });
+  expect(decodeRefundEstimate(body)).toBe(body.data);
+});

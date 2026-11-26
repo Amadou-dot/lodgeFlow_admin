@@ -1,3 +1,9 @@
+import { readResponse } from '@/lib/validations/read-response';
+import {
+  decodeBookingHistory,
+  decodeBookingDetail,
+} from '@/lib/validations/booking-read-json';
+import { decodeRefundEstimate } from '@/lib/validations/cancellation-json';
 import { useAuth } from '@clerk/nextjs';
 import { useSWRConfig } from 'swr';
 import {
@@ -8,7 +14,7 @@ import type {
   CreateBookingRequest,
   UpdateBookingDetailsInput,
 } from '@/lib/validations/booking';
-import type { BookingHistoryItem, BookingDetail } from '@/types/booking-read';
+import type { BookingDetail } from '@lodgeflow/database/booking-json';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -63,19 +69,18 @@ export const useBookingHistory = (status?: string) => {
   const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   return useQuery({
     enabled: isLoaded && isSignedIn && !!userId && !!sessionId,
-    queryFn: async ({ signal }): Promise<BookingHistoryItem[]> => {
+    queryFn: async ({ signal }) => {
       const url = status
         ? `/api/bookings/history?status=${status}`
         : '/api/bookings/history';
 
       const response = await fetch(url, { signal });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch booking history');
-      }
-
-      const data: ApiResponse<BookingHistoryItem[]> = await response.json();
-      return data.data || [];
+      return readResponse(
+        response,
+        decodeBookingHistory,
+        'Failed to fetch booking history'
+      );
     },
     queryKey: ['bookings-history', status, userId, sessionId],
   });
@@ -92,29 +97,25 @@ export const useBookingById = (
   return useQuery({
     enabled: !!bookingId && options.enabled !== false,
     ...(options.mode === 'confirmation' ? { retry: false } : {}),
-    queryFn: async (context): Promise<BookingDetail | null> => {
+    queryFn: async context => {
+      const decode = decodeBookingDetail(bookingId);
       if (options.mode === 'confirmation') {
         const { signal } = context;
-        return fetchConfirmationDetail<BookingDetail>({
+        return fetchConfirmationDetail({
+          decode,
+          signal,
           url: `/api/bookings/${bookingId}`,
           loadError: 'Failed to load booking',
           notFoundError: 'Booking not found',
           statusError: 'Failed to load booking',
           onUnavailable: () => {
-            if (!signal.aborted)
-              queryClient.setQueryData(['booking', bookingId], null);
+            queryClient.setQueryData(['booking', bookingId], null);
           },
         });
       }
 
       const response = await fetch(`/api/bookings/${bookingId}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch booking');
-      }
-
-      const data: ApiResponse<BookingDetail> = await response.json();
-      return data.data || null;
+      return readResponse(response, decode, 'Failed to fetch booking');
     },
     queryKey: ['booking', bookingId],
   });
@@ -169,12 +170,11 @@ export const useRefundEstimate = (bookingId: string) => {
         `/api/bookings/${bookingId}/refund-estimate`
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch refund estimate');
-      }
-
-      const data: ApiResponse<RefundEstimateResponse> = await response.json();
-      return data.data || null;
+      return readResponse(
+        response,
+        decodeRefundEstimate,
+        'Failed to fetch refund estimate'
+      );
     },
     queryKey: ['refund-estimate', bookingId],
     staleTime: 5 * 60 * 1000,

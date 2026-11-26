@@ -135,8 +135,10 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
         </p>
         <Chip color='warning' size='lg' variant='flat'>
           Status:{' '}
-          {reservation.status.charAt(0).toUpperCase() +
-            reservation.status.slice(1)}
+          {reservation.status
+            ? reservation.status.charAt(0).toUpperCase() +
+              reservation.status.slice(1)
+            : 'Unknown'}
         </Chip>
       </div>
 
@@ -265,12 +267,14 @@ export default function DiningConfirmationPage({ params }: { params: Params }) {
           <h2 className={title({ size: 'sm' })}>Price Breakdown</h2>
         </CardHeader>
         <CardBody className='space-y-3'>
-          <ReservationCheckout
-            id={reservation._id}
-            isPaid={reservation.isPaid}
-            kind='dining'
-            status={reservation.status}
-          />
+          {reservation.status && (
+            <ReservationCheckout
+              id={reservation._id}
+              isPaid={reservation.isPaid === true}
+              kind='dining'
+              status={reservation.status}
+            />
+          )}
           <div className='flex justify-between items-center'>
             <span className='text-default-600'>
               {reservation.dining ? (
