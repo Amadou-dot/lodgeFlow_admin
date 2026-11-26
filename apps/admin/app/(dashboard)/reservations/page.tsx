@@ -206,7 +206,10 @@ export default function ReservationsPage() {
                         </Chip>
                       </TableCell>
                       <TableCell className='p-3 whitespace-nowrap'>
-                        {formatCurrency(row.totalPrice, settings?.currency)}
+                        {formatCurrency(
+                          row.totalPrice,
+                          settings?.currency ?? undefined
+                        )}
                         <div className='mt-1'>
                           <Chip
                             size='sm'

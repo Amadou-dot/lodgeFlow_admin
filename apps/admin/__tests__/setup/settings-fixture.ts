@@ -1,6 +1,6 @@
 import type { AppSettings } from '@/types';
 
-export const settings: AppSettings = {
+export const settings = {
   _id: '66ecbf94495f2679035c9687',
   id: '66ecbf94495f2679035c9687',
   singleton: 'global',
@@ -35,4 +35,4 @@ export const settings: AppSettings = {
     paymentReminders: true,
     checkInReminders: true,
   },
-};
+} satisfies AppSettings;

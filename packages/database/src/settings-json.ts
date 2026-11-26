@@ -1,5 +1,8 @@
 import { Types } from 'mongoose';
 import type { ISettings } from './models/Settings';
+import type { SettingsJson } from './settings-json-schema';
+
+export type { SettingsJson } from './settings-json-schema';
 
 type SettingsFields = Pick<
   ISettings,
@@ -27,15 +30,6 @@ type SettingsFields = Pick<
   | 'notifications'
   | 'fullAddress'
 >;
-
-export interface SettingsJson extends SettingsFields {
-  _id: string;
-  id: string;
-  contactInfo?: ISettings['contactInfo'];
-  createdAt?: string;
-  updatedAt?: string;
-  __v?: number;
-}
 
 export interface SettingsJsonSource extends SettingsFields {
   _id: Types.ObjectId;

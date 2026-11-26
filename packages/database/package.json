@@ -28,6 +28,7 @@
     "./experience-json": "./src/experience-json.ts",
     "./booking-json": "./src/booking-json.ts",
     "./settings-json": "./src/settings-json.ts",
+    "./settings-json-schema": "./src/settings-json-schema.ts",
     "./reservation-json": "./src/reservation-json.ts"
   },
   "scripts": {
@@ -38,7 +39,8 @@
   },
   "dependencies": {
     "mongoose": "^8.21.0",
-    "date-fns": "^4.1.0"
+    "date-fns": "^4.1.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "22.15.29",
