@@ -7,7 +7,10 @@ const mockAuth = jest.fn<Promise<{ userId: string | null }>, []>();
 const mockCurrentUser = jest.fn();
 const mockPopulate = jest.fn();
 const mockSend = jest.fn<
-  Promise<{ data?: { id: string }; error?: { message: string } }>,
+  Promise<
+    | { data: { id: string }; error: null }
+    | { data: null; error: { message: string } }
+  >,
   [{ react: ReactNode; from: string; to: string; subject: string }]
 >();
 jest.mock('@clerk/nextjs/server', () => ({
@@ -88,7 +91,7 @@ beforeEach(() => {
     ],
   });
   mockPopulate.mockResolvedValue(booking());
-  mockSend.mockResolvedValue({ data: { id: 'message' } });
+  mockSend.mockResolvedValue({ data: { id: 'message' }, error: null });
 });
 afterEach(() => {
   if (originalSender === undefined)
@@ -97,6 +100,8 @@ afterEach(() => {
 });
 
 test('renders the existing stay, cabin, extras and unpaid deposit details from persisted fields', async () => {
+  const providerData = { id: 'message', metadata: { queued: true } };
+  mockSend.mockResolvedValueOnce({ data: providerData, error: null });
   const response = await POST(
     request({
       bookingId: booking()._id.toHexString(),
@@ -106,7 +111,10 @@ test('renders the existing stay, cabin, extras and unpaid deposit details from p
     })
   );
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ id: 'message' });
+  expect(await response.json()).toEqual({
+    id: 'message',
+    metadata: { queued: true },
+  });
   expect(mockSend).toHaveBeenCalledWith(
     expect.objectContaining({
       from: 'LodgeFlow <notifications@lodgeflow.app>',
@@ -267,11 +275,18 @@ test('provider rejection and exceptions allow a retry without changing booking s
   const before = JSON.stringify(row);
   mockPopulate.mockResolvedValue(row);
   mockSend.mockResolvedValueOnce({
+    data: null,
     error: { message: 'Provider unavailable' },
   });
-  expect((await POST(request())).status).toBe(500);
   mockSend.mockRejectedValueOnce(new Error('Transport unavailable'));
-  expect((await POST(request())).status).toBe(500);
+  const providerFailure = await POST(request());
+  const transportFailure = await POST(request());
+  for (const response of [providerFailure, transportFailure]) {
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: 'Failed to send confirmation email',
+    });
+  }
   const retried = await POST(request());
   expect(retried.status).toBe(200);
   expect(await retried.json()).toEqual({ id: 'message' });

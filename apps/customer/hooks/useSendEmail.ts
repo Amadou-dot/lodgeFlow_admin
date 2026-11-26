@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { readSendEmailResponse } from '@/lib/validations/send-email-response';
 import type { BookingConfirmationInput } from '@/lib/validations/confirmation-email';
 
 /**
@@ -14,12 +15,7 @@ export function useSendConfirmationEmail() {
       method: 'POST',
     });
 
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to send confirmation email');
-    }
-
-    return response.json();
+    return readSendEmailResponse({ response, kind: 'confirmation' });
   }, []);
 
   return { sendConfirmationEmail };
@@ -37,11 +33,7 @@ export function useSendWelcomeEmail() {
       method: 'POST',
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send welcome email');
-    }
-
-    return response.json();
+    return readSendEmailResponse({ response, kind: 'welcome' });
   }, []);
 
   return { sendWelcomeEmail };
