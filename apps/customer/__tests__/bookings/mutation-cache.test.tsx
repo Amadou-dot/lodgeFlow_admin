@@ -203,7 +203,9 @@ test('checkout refreshes detail without fabricating settlement', async () => {
       data: { url: 'https://checkout.invalid' },
     }),
   } as Response);
-  const { result } = renderHook(() => useCreateCheckoutSession(), { wrapper });
+  const { result } = renderHook(() => useCreateCheckoutSession('record'), {
+    wrapper,
+  });
   await act(async () => {
     await result.current.mutateAsync('record');
   });
@@ -232,7 +234,7 @@ test('failed reservation mutations keep cached data fresh', async () => {
       dining: useCancelDiningReservation(['record']),
       experience: useCancelExperienceBooking(['record']),
       createExperience: useCreateExperienceBooking('listing'),
-      checkout: useCreateCheckoutSession(),
+      checkout: useCreateCheckoutSession('record'),
     }),
     { wrapper }
   );

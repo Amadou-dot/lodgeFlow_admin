@@ -3,6 +3,7 @@
 import { Button } from '@heroui/button';
 import { addToast } from '@heroui/toast';
 import { CreditCard } from 'lucide-react';
+import { useLayoutEffect } from 'react';
 
 import { useCreateCheckoutSession } from '@/hooks/usePayment';
 
@@ -21,13 +22,20 @@ export default function PaymentButton({
   size = 'md',
   className,
 }: PaymentButtonProps) {
-  const createCheckout = useCreateCheckoutSession();
+  const { actorKey, capture, isPending, mutateAsync, reset } =
+    useCreateCheckoutSession(bookingId);
+  useLayoutEffect(() => {
+    reset();
+  }, [actorKey, bookingId, reset]);
 
   const handlePayment = async () => {
+    const isCurrent = capture();
+    if (!isCurrent()) return;
     try {
-      const { url } = await createCheckout.mutateAsync(bookingId);
-      window.location.href = url;
+      const { url } = await mutateAsync(bookingId);
+      if (isCurrent()) window.location.href = url;
     } catch (error) {
+      if (!isCurrent()) return;
       addToast({
         title: 'Payment Error',
         description:
@@ -43,11 +51,9 @@ export default function PaymentButton({
     <Button
       className={className}
       color='success'
-      isLoading={createCheckout.isPending}
+      isLoading={isPending}
       size={size}
-      startContent={
-        !createCheckout.isPending && <CreditCard className='w-4 h-4' />
-      }
+      startContent={!isPending && <CreditCard className='w-4 h-4' />}
       onPress={handlePayment}
     >
       {isDeposit ? `Pay Deposit ($${amount})` : `Pay Now ($${amount})`}

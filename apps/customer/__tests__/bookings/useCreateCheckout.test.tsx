@@ -38,12 +38,15 @@ const requestOptions = {
   body: JSON.stringify({ bookingId }),
 };
 
-beforeEach(() => jest.resetAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  fetchMock.mockReset();
+});
 
 function renderCheckout() {
   const client = createTestQueryClient();
   const invalidate = jest.spyOn(client, 'invalidateQueries');
-  const hook = renderHook(() => useCreateCheckoutSession(), {
+  const hook = renderHook(() => useCreateCheckoutSession(bookingId), {
     wrapper: ({ children }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     ),

@@ -4,6 +4,12 @@ import { fireEvent, render, screen } from '@/__tests__/shared/test-utils';
 import DiningConfirmation from '@/app/dining/confirmation/[id]/page';
 import ExperienceConfirmation from '@/app/experiences/confirmation/[id]/page';
 jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: 'guest',
+    sessionId: 'session',
+  }),
   useUser: () => ({ user: { id: 'guest' }, isLoaded: true }),
 }));
 jest.mock('@heroui/card', () => ({

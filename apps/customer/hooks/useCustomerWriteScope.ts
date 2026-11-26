@@ -45,5 +45,17 @@ export function useCustomerWriteScope(resourceIds: readonly string[]) {
       throw new ObsoleteCustomerWriteError();
     return userId;
   }
-  return { meta: { resourceTokens }, customerIdFor };
+  // Keep the originating token for redirects and notices after dispatch.
+  function capture(resourceId: string) {
+    const key = resourceId.toLowerCase();
+    const token = resourceTokens.get(key);
+    return () => token !== undefined && active.current.get(key) === token;
+  }
+
+  return {
+    actorKey: JSON.stringify([isLoaded, isSignedIn, userId, sessionId]),
+    capture,
+    meta: { resourceTokens },
+    customerIdFor,
+  };
 }

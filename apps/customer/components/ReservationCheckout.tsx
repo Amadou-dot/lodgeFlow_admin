@@ -1,6 +1,7 @@
 'use client';
 import { openReservationCheckout } from '@/lib/open-reservation-checkout';
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
+import { useCustomerWriteScope } from '@/hooks/useCustomerWriteScope';
 export function ReservationCheckout({
   kind,
   id,
@@ -12,15 +13,26 @@ export function ReservationCheckout({
   isPaid: boolean;
   status: string;
 }) {
+  const canPay = !isPaid && ['pending', 'confirmed'].includes(status);
+  const resource = kind + ':' + id;
+  const { actorKey, capture } = useCustomerWriteScope(canPay ? [resource] : []);
   const [state, setState] = useState<
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'error'; message: string }
   >({ kind: 'idle' });
-  if (isPaid || !['pending', 'confirmed'].includes(status)) return null;
+  useLayoutEffect(() => {
+    setState({ kind: 'idle' });
+  }, [actorKey, canPay, resource]);
+
+  if (!canPay) return null;
+
   async function pay() {
+    const isCurrent = capture(resource);
+    if (!isCurrent()) return;
     setState({ kind: 'busy' });
     try {
-      await openReservationCheckout({ kind, id });
+      await openReservationCheckout({ kind, id, isCurrent });
     } catch (error) {
+      if (!isCurrent()) return;
       setState({
         kind: 'error',
         message:
