@@ -110,6 +110,7 @@ describe('useExperiences', () => {
     { ...experience, difficulty: 'other' },
     { ...experience, ctaText: '' },
     { ...experience, includes: [false] },
+    { ...experience, gallery: undefined },
     { ...experience, price: '25' },
     { ...experience, price: Infinity },
     { ...experience, createdAt: '2026-02-30T00:00:00.000Z' },
@@ -272,22 +273,35 @@ describe('experience mutations', () => {
     }
   });
 
-  test.each([
-    ['create', 'create'],
-    ['update', 'update'],
-    ['remove', 'delete'],
-  ] as const)(
-    'uses resource-specific fallback for an unstructured %s error',
-    async (action, verb) => {
-      fetchMock.mockResolvedValue(response({ ok: false, body: null }));
-      const { result } = renderHook(useMutations, { wrapper });
-      await act(async () => {
-        await expect(result.current[action]()).rejects.toThrow(
-          `Failed to ${verb} experience`
-        );
-      });
-    }
-  );
+  describe.each([
+    ['null', async (): Promise<null> => null],
+    [
+      'unreadable JSON',
+      async () => {
+        throw new SyntaxError('Invalid JSON');
+      },
+    ],
+  ] as const)('%s error body', (_label, json) => {
+    test.each([
+      ['create', 'create'],
+      ['update', 'update'],
+      ['remove', 'delete'],
+    ] as const)(
+      'uses resource-specific fallback for an unstructured %s error',
+      async (action, verb) => {
+        fetchMock.mockResolvedValue({ ok: false, json } satisfies Pick<
+          Response,
+          'ok' | 'json'
+        >);
+        const { result } = renderHook(useMutations, { wrapper });
+        await act(async () => {
+          await expect(result.current[action]()).rejects.toThrow(
+            `Failed to ${verb} experience`
+          );
+        });
+      }
+    );
+  });
 
   test('selects editable fields from an update before posting', async () => {
     const item = {

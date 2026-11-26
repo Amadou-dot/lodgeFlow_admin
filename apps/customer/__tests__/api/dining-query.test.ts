@@ -1,4 +1,8 @@
 /** @jest-environment node */
+import {
+  diningListSchema,
+  readCatalogResponse,
+} from '@/lib/validations/catalog-json';
 import mongoose, { type FilterQuery } from 'mongoose';
 import Dining, { type IDining } from '@lodgeflow/database/models/Dining';
 
@@ -54,6 +58,13 @@ describe('dining query characterization', () => {
     const before = JSON.stringify(row);
     mockSort.mockResolvedValue([row]);
     const response = await listing();
+    expect(
+      await readCatalogResponse({
+        response: response.clone(),
+        schema: diningListSchema,
+        fallback: 'Unexpected catalog response',
+      })
+    ).toStrictEqual([JSON.parse(before)]);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       success: true,
@@ -62,6 +73,19 @@ describe('dining query characterization', () => {
     expect(mockFind).toHaveBeenCalledWith({ isAvailable: true });
     expect(mockSort).toHaveBeenCalledWith({ mealType: 1, type: 1, name: 1 });
     expect(JSON.stringify(row)).toBe(before);
+  });
+
+  test('rejects a hydrated but unavailable row at the public list boundary', async () => {
+    const row = dining();
+    row.isAvailable = false;
+    mockSort.mockResolvedValue([row]);
+    await expect(
+      readCatalogResponse({
+        response: await listing(),
+        schema: diningListSchema,
+        fallback: 'Failed to fetch dining options',
+      })
+    ).rejects.toThrow('Failed to fetch dining options');
   });
 
   test('combines existing catalog, positive price, false popularity, dietary and search filters', async () => {

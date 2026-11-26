@@ -1,4 +1,8 @@
 /** @jest-environment node */
+import {
+  experienceListSchema,
+  readCatalogResponse,
+} from '@/lib/validations/catalog-json';
 import mongoose, { type FilterQuery } from 'mongoose';
 import {
   Experience,
@@ -61,6 +65,13 @@ describe('experience query characterization', () => {
     const before = JSON.stringify(row);
     mockSort.mockResolvedValue([row]);
     const response = await listing();
+    expect(
+      await readCatalogResponse({
+        response: response.clone(),
+        schema: experienceListSchema,
+        fallback: 'Unexpected catalog response',
+      })
+    ).toStrictEqual([JSON.parse(before)]);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       success: true,

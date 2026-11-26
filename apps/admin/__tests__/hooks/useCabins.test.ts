@@ -114,6 +114,7 @@ describe('cabin query contracts', () => {
     expect(client.getQueryData(['cabins', {}])).toEqual([legacy]);
   });
   test.each([
+    { ...cabin, id: '507f1f77bcf86cd799439012' },
     { ...cabin, price: '200' },
     { ...cabin, amenities: null },
     { ...cabin, createdAt: '2026-02-30T00:00:00.000Z' },
@@ -156,6 +157,23 @@ describe('cabin query contracts', () => {
       expect(client.getQueryData(['cabin', cabin._id])).toEqual(cabin);
     }
   );
+  test('accepts the same detail ID in a different case but rejects a different cabin', async () => {
+    const row = {
+      ...cabin,
+      _id: '507f1f77bcf86cd7994390ab',
+      id: '507f1f77bcf86cd7994390ab',
+    };
+    fetchMock.mockResolvedValue(response({ body: row }));
+    const { result, rerender } = renderHook((id: string) => useCabin(id), {
+      wrapper,
+      initialProps: row.id.toUpperCase(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    rerender(cabin.id);
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.error?.message).toBe('Failed to fetch cabin');
+    expect(client.getQueryData(['cabin', cabin.id])).toBeUndefined();
+  });
   test('does not fetch without an ID', () => {
     renderHook(() => useCabin(''), { wrapper });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -188,6 +206,7 @@ describe('cabin mutation contracts', () => {
   );
   test.each([
     { action: 'create', body: { success: true, data: { _id: cabin._id } } },
+    { action: 'update', body: { ...cabin, id: '507f1f77bcf86cd799439012' } },
     { action: 'update', body: { ...cabin, capacity: '4' } },
     { action: 'remove', body: { success: true } },
     { action: 'remove', body: { success: true, data: {} } },

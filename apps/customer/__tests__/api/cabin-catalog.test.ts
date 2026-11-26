@@ -1,6 +1,13 @@
 /** @jest-environment node */
+import {
+  cabinListSchema,
+  readCatalogResponse,
+} from '@/lib/validations/catalog-json';
 import mongoose, { type FilterQuery } from 'mongoose';
 import CabinModel, { type ICabin } from '@lodgeflow/database/models/Cabin';
+import { createElement, type ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import CabinPricingCalculator from '@/components/CabinPricingCalculator';
 import { NextRequest } from 'next/server';
 
 // Request binding is exercised with the actual production build in the HTTP gate.
@@ -8,6 +15,13 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<typeof import('next/server')>('next/server'),
   connection: () => Promise.resolve(),
 }));
+
+// Render the calculator header, as the collapsed accordion does on the cabin page.
+jest.mock('@heroui/accordion', () => ({
+  Accordion: ({ children }: { children: ReactNode }) => children,
+  AccordionItem: ({ title }: { title: ReactNode }) => title,
+}));
+jest.mock('@/hooks/useSettings', () => ({ useSettings: () => ({}) }));
 
 const TypedCabin = mongoose.model<ICabin>('Cabin', CabinModel.schema);
 type CabinDocument = InstanceType<typeof TypedCabin>;
@@ -154,6 +168,13 @@ describe('cabin catalog characterization', () => {
     const response = await listing(
       '?capacity=4&minPrice=50&maxPrice=250&search=pine&status=inactive&available=true'
     );
+    expect(
+      await readCatalogResponse({
+        response: response.clone(),
+        schema: cabinListSchema,
+        fallback: 'Unexpected catalog response',
+      })
+    ).toStrictEqual(json(rows));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, data: json(rows) });
     expect(mockFind).toHaveBeenCalledWith({
@@ -316,4 +337,25 @@ describe('cabin catalog regressions', () => {
       expect(mockConnect).not.toHaveBeenCalled();
     }
   );
+});
+
+test('a stored finite price outside the safe cents range still renders the calculator', async () => {
+  const row = cabin();
+  row.set({ price: 1e100, discount: 0 });
+  expect(row.validateSync()).toBeUndefined();
+  mockFindById.mockResolvedValue(row);
+  const stored = await getCabinById(cabinId);
+  expect(stored?.price).toBe(1e100);
+  if (!stored)
+    throw new Error(
+      'Expected the cabin loader to return its serialized record'
+    );
+  const html = renderToStaticMarkup(
+    createElement(CabinPricingCalculator, {
+      price: stored.price,
+      discount: stored.discount ?? 0,
+    })
+  );
+  expect(html).toContain('Price Calculator');
+  expect(html).toContain('Unavailable');
 });

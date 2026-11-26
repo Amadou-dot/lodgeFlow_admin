@@ -1,3 +1,4 @@
+import { useExperience } from '@/hooks/useExperience';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -23,6 +24,24 @@ beforeEach(() => {
 });
 
 describe('experience hook characterization', () => {
+  test.each([
+    [
+      'unreadable JSON',
+      async () => {
+        throw new SyntaxError('Invalid JSON');
+      },
+    ],
+    ['false data', async () => ({ success: true, data: false })],
+    ['a nonliteral success flag', async () => ({ success: 1, data: null })],
+    ['a false success with data', async () => ({ success: false, data: [] })],
+  ] as const)('rejects %s before caching', async (_label, json) => {
+    const { wrapper } = setup();
+    fetchMock.mockResolvedValue({ ok: true, json });
+    const { result } = renderHook(() => useExperiences(), { wrapper });
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.error?.message).toBe('Failed to fetch experiences');
+    expect(result.current.data).toBeUndefined();
+  });
   test('uses the existing unfiltered URL and success data', async () => {
     const { wrapper, client } = setup();
     const { result } = renderHook(() => useExperiences(), { wrapper });
@@ -94,13 +113,18 @@ describe('experience hook characterization', () => {
     }
   );
 
-  test('preserves the empty fallback for an omitted data field', async () => {
-    fetchMock.mockResolvedValue(response({ body: { success: true } }));
-    const { wrapper } = setup();
-    const { result } = renderHook(() => useExperiences(), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([]);
-  });
+  test.each([{}, { data: null }])(
+    'preserves empty success for nullish data (%j)',
+    async fields => {
+      fetchMock.mockResolvedValue(
+        response({ body: { success: true, ...fields } })
+      );
+      const { wrapper } = setup();
+      const { result } = renderHook(() => useExperiences(), { wrapper });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual([]);
+    }
+  );
 });
 
 describe('experience zero price regression', () => {
@@ -114,4 +138,58 @@ describe('experience zero price regression', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchMock).toHaveBeenCalledWith(url);
   });
+});
+
+const id = '507f1f77bcf86cd7994390ab';
+const lean = {
+  _id: id,
+  name: 'Tour',
+  description: 'Guided walk',
+  duration: '2h',
+  difficulty: 'Easy',
+  category: 'Nature',
+  image: '/tour',
+  ctaText: 'Reserve',
+  price: 12.345,
+  includes: null,
+  available: [null, 'Monday'],
+  gallery: null,
+  imported: { values: [1, null] },
+};
+test('caches the sparse detail including nested additive fields under its requested ID', async () => {
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: lean } })
+  );
+  const { wrapper, client } = setup();
+  const { result } = renderHook(() => useExperience(id.toUpperCase()), {
+    wrapper,
+  });
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(result.current.data).toBe(lean);
+  expect(client.getQueryData(['experience', id.toUpperCase()])).toStrictEqual(
+    lean
+  );
+});
+test.each([
+  { success: true, data: { ...lean, _id: '507f1f77bcf86cd7994390ac' } },
+  { success: true, data: { ...lean, price: 'free' } },
+  { success: 'true', data: lean },
+  { success: true, data: null },
+])('rejects an invalid detail before caching (%j)', async body => {
+  fetchMock.mockResolvedValue(response({ body }));
+  const { wrapper, client } = setup();
+  const { result } = renderHook(() => useExperience(id), { wrapper });
+  await waitFor(() => expect(result.current.isFetching).toBe(false));
+  expect(result.current.error?.message).toBe('Failed to fetch experience');
+  expect(client.getQueryData(['experience', id])).toBeUndefined();
+});
+test('rejects a sparse detail returned as a hydrated list row', async () => {
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: [lean] } })
+  );
+  const { wrapper, client } = setup();
+  const { result } = renderHook(() => useExperiences(), { wrapper });
+  await waitFor(() => expect(result.current.isFetching).toBe(false));
+  expect(result.current.error?.message).toBe('Failed to fetch experiences');
+  expect(client.getQueryData(['experiences', {}])).toBeUndefined();
 });

@@ -94,7 +94,9 @@ export function useCabin(id: string) {
 
       return parseResponse({
         body: await response.json(),
-        schema: cabinResponseSchema,
+        schema: cabinResponseSchema.refine(
+          row => row._id.toLowerCase() === id.toLowerCase()
+        ),
         fallback: 'Failed to fetch cabin',
       });
     },

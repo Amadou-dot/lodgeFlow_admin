@@ -4,7 +4,10 @@ import {
   TABLE_PREFERENCES,
 } from '@lodgeflow/database/config';
 import { z } from 'zod';
-import { diningJsonSchema, experienceJsonSchema } from './catalog-json';
+import {
+  diningJsonSchema,
+  experienceJsonSchema,
+} from '@lodgeflow/database/catalog-json-schema';
 import { jsonTimestampSchema as timestamp } from './customer-json';
 
 const objectId = z.string().regex(/^[a-f0-9]{24}$/i);
