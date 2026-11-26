@@ -1,3 +1,6 @@
+import { runInThisContext } from 'node:vm';
+import { TextEncoder } from 'node:util';
+import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
 import {
   act,
   fireEvent,
@@ -11,13 +14,14 @@ import DiningConfirmation from '@/app/dining/confirmation/[id]/page';
 import ExperienceConfirmation from '@/app/experiences/confirmation/[id]/page';
 import { createCabinFixture } from '@/__tests__/shared/cabin-fixture';
 
+let mockUserId = 'guest';
 let mockLoaded = true;
 let mockSignedIn = true;
 jest.mock('@clerk/nextjs', () => ({
   useUser: () => ({
     user: mockSignedIn
       ? {
-          id: 'guest',
+          id: mockUserId,
           emailAddresses: [{ emailAddress: 'guest@example.com' }],
         }
       : null,
@@ -110,15 +114,18 @@ function setup(Page: typeof CabinConfirmation, id = firstId, retry = 0) {
       <Page params={params} />
     </QueryClientProvider>
   );
-  const view = render(element(Promise.resolve({ id })));
+  const params = Promise.resolve({ id });
+  const view = render(element(params));
   return {
     client,
     ...view,
     element,
+    updateAuth: () => view.rerender(element(params)),
     change: (params: Promise<{ id: string }>) => view.rerender(element(params)),
   };
 }
 beforeEach(() => {
+  mockUserId = 'guest';
   mockLoaded = true;
   mockSignedIn = true;
   jest.mocked(fetch).mockReset();
@@ -530,4 +537,89 @@ for (const { kind, Page, key, noun } of cases) {
     await screen.findByText('Failed to load ' + noun);
     expect(view.client.getQueryData([key, id])).toBeUndefined();
   });
+}
+
+const ResponseStream: typeof ReadableStream =
+  runInThisContext('ReadableStream');
+for (const { kind, Page, key } of cases) {
+  test.each([401, 403, 404])(
+    'hides ' + kind + ' on HTTP %s headers while a streamed denial is pending',
+    async status => {
+      const data = fixture({ kind, id: privateId });
+      jest
+        .mocked(fetch)
+        .mockResolvedValue(FetchResponse.json({ success: true, data }));
+      const view = setup(Page, privateId);
+      await screen.findByText(privateId);
+      const queryKey = [key, privateId];
+      let finishBody: () => void = () => {
+        throw new Error('Missing stream controller');
+      };
+      const stream = new ResponseStream<Uint8Array>({
+        start(controller) {
+          finishBody = () => {
+            controller.enqueue(
+              new TextEncoder().encode(
+                JSON.stringify({
+                  success: false,
+                  error: 'Revoked during refresh',
+                })
+              )
+            );
+            controller.close();
+          };
+        },
+      });
+      const denial = new FetchResponse(stream, { status });
+      jest.mocked(fetch).mockResolvedValueOnce(denial);
+      let deniedRead: Promise<void> | undefined;
+      await act(async () => {
+        deniedRead = view.client.invalidateQueries({ queryKey });
+      });
+      await waitFor(() => expect(denial.bodyUsed).toBe(true));
+      expect(view.client.getQueryData(queryKey)).toBeNull();
+      await waitFor(() =>
+        expect(screen.queryByText(privateId)).not.toBeInTheDocument()
+      );
+      expect(
+        screen.queryByRole('button', { name: /^Pay / })
+      ).not.toBeInTheDocument();
+      if (status === 404) {
+        mockUserId = 'new-owner';
+        view.updateAuth();
+        const newer = {
+          ...data,
+          customer: mockUserId,
+          specialRequests: ['Newer authorized detail'],
+        };
+        jest
+          .mocked(fetch)
+          .mockResolvedValueOnce(
+            FetchResponse.json({ success: true, data: newer })
+          );
+        await act(async () => {
+          await view.client.invalidateQueries({ queryKey });
+        });
+        await screen.findByText('Newer authorized detail');
+        await act(async () => {
+          finishBody();
+          await deniedRead;
+        });
+        expect(view.client.getQueryData(queryKey)).toEqual(newer);
+        expect(screen.getByText('Newer authorized detail')).toBeInTheDocument();
+      } else {
+        await act(async () => {
+          finishBody();
+          await deniedRead;
+        });
+        expect(view.client.getQueryState(queryKey)?.error).toMatchObject({
+          status,
+          message: 'Revoked during refresh',
+        });
+        expect(
+          await screen.findByText('Revoked during refresh')
+        ).toBeInTheDocument();
+      }
+    }
+  );
 }

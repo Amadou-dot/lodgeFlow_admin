@@ -35,10 +35,14 @@ export class ConfirmationRequestError extends Error {
   }
 }
 
+function isUnavailableStatus(status: number) {
+  return status === 401 || status === 403 || status === 404;
+}
+
 export function isUnavailableConfirmationError(error: unknown) {
   return (
     error instanceof ConfirmationRequestError &&
-    (error.status === 401 || error.status === 403 || error.status === 404)
+    isUnavailableStatus(error.status)
   );
 }
 
@@ -71,6 +75,8 @@ export async function fetchConfirmationDetail<T>({
   } catch {
     throw new Error(loadError);
   }
+  // Headers settle access even if the server's error body is slow or stalls.
+  if (!signal.aborted && isUnavailableStatus(response.status)) onUnavailable();
   const body: unknown = await response.json().catch(() => undefined);
   if (response.ok) {
     const data = decode(body);
@@ -83,10 +89,8 @@ export async function fetchConfirmationDetail<T>({
     else if (failure.data.success === false)
       message = failure.data.error || notFoundError;
   }
-  const error = new ConfirmationRequestError({
+  throw new ConfirmationRequestError({
     message,
     status: response.status,
   });
-  if (!signal.aborted && isUnavailableConfirmationError(error)) onUnavailable();
-  throw error;
 }
