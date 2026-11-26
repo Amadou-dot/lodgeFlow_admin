@@ -173,8 +173,8 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** `ReservationInboxJson`, `ReservationRow` and kind-specific `CalendarJson` variants. Cabin resources/stays differ from capacity resources/usage. Retain string dates, nullable time/end date, domain-specific status/lifecycle, paging envelope and filter semantics.
 
-- [ ] Validate inbox and each calendar variant while preserving valid zero rows, valid empty usage, UTC/date window, half-open stay overlaps and orphaned resource labels. A malformed/aborted earlier request must not replace valid active resource state. Respect current no-store/abort and Phase 4 mobile layout.
-- [ ] Run `ADMIN '(reservations-operations|reservation-calendar-json|OperationsLoadState)'`. Expect exact wrapped route data and active-resource rendering behavior.
+- [x] Validate inbox and each calendar variant while preserving valid zero rows, valid empty usage, UTC/date window, half-open stay overlaps and orphaned resource labels. A malformed/aborted earlier request must not replace valid active resource state. Respect current no-store/abort and Phase 4 mobile layout.
+- [x] Run `ADMIN '(reservations-operations|reservation-calendar-json|OperationsLoadState)'`. Expect exact wrapped route data and active-resource rendering behavior.
 
 ### Task 12: Admin reservation details, status and receipt/refund responses
 
