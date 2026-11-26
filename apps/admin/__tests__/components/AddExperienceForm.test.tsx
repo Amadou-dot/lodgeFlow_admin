@@ -73,11 +73,15 @@ describe('AddExperienceForm', () => {
       throw new Error('Expected a form data updater');
     }
 
-    const previousForm = { ...emptyForm, price: 50 };
-    expect(updater(previousForm)).toEqual({
-      ...previousForm,
+    const originalForm = { ...emptyForm, price: 50 };
+    const previousForm = { ...originalForm };
+    const updatedForm = updater(previousForm);
+
+    expect(updatedForm).toEqual({
+      ...originalForm,
       title: 'Test Experience',
     });
+    expect(previousForm).toEqual(originalForm);
   });
 
   it('displays provided form data in the default-expanded section', () => {
