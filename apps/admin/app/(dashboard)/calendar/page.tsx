@@ -8,13 +8,15 @@ import {
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useResourceLoad } from '@/hooks/useResourceLoad';
+import { readCalendarResponse } from '@/lib/validations/reservation-calendar-json';
 import { utcDate } from '@/lib/reservation-options';
 import type {
-  CalendarJson as CalendarData,
+  CalendarKind,
   CalendarResource as Resource,
+  CalendarUsage,
 } from '@/types/reservation-calendar';
-import type { ApiResponse } from '@/types/api-response';
 const DAY = 86_400_000;
 const colors: Record<string, string> = {
   unconfirmed: 'bg-warning-100',
@@ -27,43 +29,26 @@ export default function CalendarPage() {
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   });
-  const [kind, setKind] = useState<'cabins' | 'dining' | 'experiences'>(
-    'cabins'
+  const [kind, setKind] = useState<CalendarKind>('cabins');
+  const end = new Date(
+    Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1)
   );
-  const [data, setData] = useState<CalendarData | null>(null),
-    [error, setError] = useState(''),
-    [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError('');
-    const end = new Date(
-      Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1)
-    );
-    const params = new URLSearchParams({
-      start: month.toISOString(),
-      end: end.toISOString(),
-    });
-    fetch(`/api/calendar/${kind}?${params}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-      .then(async response => {
-        const result: ApiResponse<CalendarData> = await response.json();
-        if (!response.ok || !result.success)
-          throw new Error(
-            !result.success ? result.error : 'Unable to load calendar'
-          );
-        if (!controller.signal.aborted) setData(result.data);
-      })
-      .catch(e => {
-        if (!controller.signal.aborted) setError(e.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [month, kind]);
+  const params = new URLSearchParams({
+    start: month.toISOString(),
+    end: end.toISOString(),
+  });
+  const endpoint = `/api/calendar/${kind}?${params}`;
+  const request = useCallback(
+    async (signal: AbortSignal) => {
+      const response = await fetch(endpoint, { signal, cache: 'no-store' });
+      return readCalendarResponse({ response, kind });
+    },
+    [endpoint, kind]
+  );
+  const { state } = useResourceLoad({ resourceKey: endpoint, request });
+  const data = state.data;
+  const error = state.kind === 'error' ? state.message : '';
+  const loading = state.kind === 'loading';
   const move = (offset: number) =>
     setMonth(
       new Date(
@@ -110,7 +95,7 @@ export default function CalendarPage() {
         <td
           key={day}
           colSpan={span}
-          className={`border border-default-200 p-1 ${colors[stay.status] || 'bg-default-100'}`}
+          className={`border border-default-200 p-1 ${colors[stay.status ?? ''] || 'bg-default-100'}`}
         >
           <Link
             className='block rounded p-2 text-xs underline truncate'
@@ -126,7 +111,7 @@ export default function CalendarPage() {
     return cells;
   }
   function capacityCell(resource: Resource, day: string) {
-    const usage = (data?.usage ?? []).filter(
+    const usage: CalendarUsage[] = (data?.usage ?? []).filter(
       item => item._id.resourceId === resource._id && item._id.date === day
     );
     const type = kind === 'dining' ? 'dining' : 'experience';
@@ -157,14 +142,14 @@ export default function CalendarPage() {
           ) : (
             usage.map(item => (
               <div
-                key={item._id.time || 'day'}
+                key={(kind === 'dining' && item._id.time) || 'day'}
                 className={
                   capacity != null && item.used >= capacity
                     ? 'rounded bg-warning-100 p-1'
                     : ''
                 }
               >
-                {item._id.time && (
+                {kind === 'dining' && item._id.time && (
                   <strong>
                     {item._id.time}
                     <br />
@@ -268,7 +253,7 @@ export default function CalendarPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.resources.map(resource => (
+                {data.resources.map((resource: Resource) => (
                   <tr key={resource._id}>
                     <th className='sm:sticky sm:left-0 sm:z-10 bg-content1 border border-default-200 p-3 text-sm'>
                       {resource.name}
@@ -277,8 +262,11 @@ export default function CalendarPage() {
                           {resource.maxPeople} seats per seating
                         </div>
                       )}
-                      {((resource.status && resource.status !== 'active') ||
-                        resource.isAvailable === false) && (
+                      {((kind === 'cabins' &&
+                        resource.status &&
+                        resource.status !== 'active') ||
+                        (kind === 'dining' &&
+                          resource.isAvailable === false)) && (
                         <div className='font-normal text-xs'>
                           Unavailable for new bookings
                         </div>

@@ -9,6 +9,7 @@ import type { ComponentProps } from 'react';
 import type { OperationsSelect } from '@/components/OperationsPage';
 import type { StaffMemberJson } from '@/types/staff-audit';
 import type { ReservationInboxJson } from '@/types/reservation-calendar';
+import CalendarPage from '@/app/(dashboard)/calendar/page';
 import ReservationsPage from '@/app/(dashboard)/reservations/page';
 import AuditPage from '@/app/(dashboard)/audit/page';
 import StaffPage from '@/app/(dashboard)/staff/page';
@@ -63,13 +64,13 @@ const inbox: ReservationInboxJson = {
   total: 1,
   rows: [
     {
-      _id: 'one',
+      _id: '507f1f77bcf86cd799439011',
       type: 'dining',
-      date: '2040-01-01T00:00:00Z',
+      date: '2040-01-01T00:00:00.000Z',
       endDate: null,
       time: '18:00',
       partySize: 2,
-      resourceId: 'dining',
+      resourceId: '507f1f77bcf86cd799439012',
       resourceName: 'Supper',
       customer: 'customer',
       customerName: 'Avery',
@@ -77,7 +78,7 @@ const inbox: ReservationInboxJson = {
       lifecycle: 'confirmed',
       totalPrice: 10,
       isPaid: false,
-      createdAt: '2040-01-01T00:00:00Z',
+      createdAt: '2040-01-01T00:00:00.000Z',
     },
   ],
 };
@@ -279,7 +280,14 @@ test('changing inbox filters aborts and ignores a late response for the previous
     .mockResolvedValueOnce(
       ok({
         ...inbox,
-        rows: [{ ...inbox.rows[0], resourceName: 'Current listing' }],
+        rows: [
+          {
+            ...inbox.rows[0],
+            type: 'experience',
+            time: null,
+            resourceName: 'Current listing',
+          },
+        ],
       })
     );
   render(<ReservationsPage />);
@@ -295,3 +303,200 @@ test('changing inbox filters aborts and ignores a late response for the previous
   expect(screen.queryByText('Supper')).not.toBeInTheDocument();
   expect(screen.getByText('Current listing')).toBeInTheDocument();
 });
+
+test.each([
+  ['invalid pagination', { page: '1' }],
+  [
+    'a status from another reservation type',
+    { rows: [{ ...inbox.rows[0], status: 'checked-in', lifecycle: 'active' }] },
+  ],
+  [
+    'an invalid lifecycle',
+    { rows: [{ ...inbox.rows[0], lifecycle: 'active' }] },
+  ],
+])('inbox rejects %s before rendering rows', async (_case, fields) => {
+  fetchMock.mockResolvedValueOnce(ok({ ...inbox, ...fields }));
+  render(<ReservationsPage />);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Unable to load reservations'
+  );
+  expect(screen.queryByText('Supper')).not.toBeInTheDocument();
+});
+
+test('inbox retries a malformed envelope and accepts an empty page', async () => {
+  fetchMock
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: inbox }) })
+    .mockResolvedValueOnce(ok({ ...inbox, rows: [], total: 0 }));
+  render(<ReservationsPage />);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Unable to load reservations'
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  expect(await screen.findByText('0 reservations')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+const calendarWindow = {
+  start: '2040-01-01T00:00:00.000Z',
+  end: '2040-01-03T00:00:00.000Z',
+};
+const cabinId = '507f1f77bcf86cd799439013';
+const bookingId = '507f1f77bcf86cd799439014';
+const cabinMonth = {
+  ...calendarWindow,
+  resources: [{ _id: cabinId, name: 'Creek cabin', status: null }],
+  reservations: [
+    {
+      _id: bookingId,
+      cabin: cabinId,
+      customer: 'user_guest',
+      checkInDate: '2039-12-31T00:00:00.000Z',
+      checkOutDate: '2040-01-02T00:00:00.000Z',
+      status: 'confirmed',
+    },
+  ],
+};
+const diningMonth = {
+  ...calendarWindow,
+  resources: [
+    {
+      _id: inbox.rows[0].resourceId,
+      name: 'Dinner',
+      isAvailable: false,
+      maxPeople: 4,
+      servingTime: { start: '12:00', end: '22:00' },
+    },
+  ],
+  usage: [],
+};
+const experienceMonth = {
+  ...calendarWindow,
+  resources: [{ _id: '507f1f77bcf86cd799439015', name: 'Local hike' }],
+  usage: [],
+};
+
+test.each([
+  [
+    'cabin',
+    'cabins',
+    {
+      ...cabinMonth,
+      reservations: [{ ...cabinMonth.reservations[0], checkOutDate: 'soon' }],
+    },
+  ],
+  [
+    'dining',
+    'dining',
+    {
+      ...diningMonth,
+      resources: [{ ...diningMonth.resources[0], maxPeople: '4' }],
+    },
+  ],
+  [
+    'experience',
+    'experiences',
+    {
+      ...experienceMonth,
+      usage: [
+        {
+          _id: {
+            resourceId: experienceMonth.resources[0]._id,
+            date: '2040-01-01',
+          },
+          used: '3',
+        },
+      ],
+    },
+  ],
+])(
+  'calendar rejects malformed %s data for the active view',
+  async (_name, view, payload) => {
+    if (view === 'cabins') fetchMock.mockResolvedValueOnce(ok(payload));
+    else
+      fetchMock
+        .mockResolvedValueOnce(ok(cabinMonth))
+        .mockResolvedValueOnce(ok(payload));
+    render(<CalendarPage />);
+    if (view !== 'cabins') {
+      await screen.findByText('Creek cabin');
+      fireEvent.change(screen.getByLabelText('View'), {
+        target: { value: view },
+      });
+    }
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load calendar'
+    );
+    expect(
+      screen.queryByRole('table', { name: 'Occupancy calendar' })
+    ).not.toBeInTheDocument();
+  }
+);
+
+test('calendar preserves checkout-day availability in the UTC window', async () => {
+  fetchMock.mockResolvedValueOnce(ok(cabinMonth));
+  render(<CalendarPage />);
+
+  expect(
+    await screen.findByRole('link', { name: 'confirmed' })
+  ).toHaveAttribute('href', '/bookings/' + bookingId);
+  expect(
+    screen.getByTitle('Creek cabin: available 2040-01-02')
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByTitle('Creek cabin: available 2040-01-01')
+  ).not.toBeInTheDocument();
+});
+
+test.each([
+  ['valid', cabinMonth],
+  ['malformed', { ...cabinMonth, start: 'bad' }],
+])(
+  'calendar ignores a late %s body after switching views',
+  async (_label, late) => {
+    let finish: (value: { success: true; data: unknown }) => void = () => {
+      throw new Error('body not read');
+    };
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          new Promise(resolve => {
+            finish = resolve;
+          }),
+      })
+      .mockResolvedValueOnce(ok(diningMonth));
+    render(<CalendarPage />);
+    await act(async () => {});
+    fireEvent.change(screen.getByLabelText('View'), {
+      target: { value: 'dining' },
+    });
+
+    expect(await screen.findByText('Dinner')).toBeInTheDocument();
+    expect(screen.getAllByText('0 booked')).toHaveLength(2);
+    expect(
+      screen.getByText('Unavailable for new bookings')
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: '0 booked' })[0]
+    ).toHaveAttribute(
+      'href',
+      '/reservations?type=dining&from=2040-01-01&to=2040-01-02&resourceId=' +
+        inbox.rows[0].resourceId
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/^\/api\/calendar\/dining\?start=.*&end=/),
+      { cache: 'no-store', signal: expect.any(AbortSignal) }
+    );
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+
+    await act(async () => finish({ success: true, data: late }));
+
+    expect(screen.getByText('Dinner')).toBeInTheDocument();
+    expect(screen.queryByText('Creek cabin')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  }
+);

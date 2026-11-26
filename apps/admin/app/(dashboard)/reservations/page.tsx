@@ -31,8 +31,7 @@ import {
   reservationHref,
   utcDate,
 } from '@/lib/reservation-options';
-import type { ReservationInboxJson } from '@/types/reservation-calendar';
-import type { ApiResponse } from '@/types/api-response';
+import { readReservationInboxResponse } from '@/lib/validations/reservation-calendar-json';
 export default function ReservationsPage() {
   const search = useSearchParams();
   const [filters, setFilters] = useState({
@@ -49,16 +48,9 @@ export default function ReservationsPage() {
     if (value) params.set(key, value);
   const endpoint = '/api/reservations?' + params;
   const request = useCallback(
-    async (
-      signal: AbortSignal
-    ): Promise<Pick<ReservationInboxJson, 'rows' | 'total'>> => {
+    async (signal: AbortSignal) => {
       const response = await fetch(endpoint, { signal, cache: 'no-store' });
-      const result: ApiResponse<ReservationInboxJson> = await response.json();
-      if (!response.ok || !result.success)
-        throw new Error(
-          !result.success ? result.error : 'Unable to load reservations'
-        );
-      return result.data;
+      return readReservationInboxResponse(response);
     },
     [endpoint]
   );

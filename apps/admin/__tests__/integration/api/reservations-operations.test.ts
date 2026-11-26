@@ -13,10 +13,13 @@ import {
 import { requireApiAuth } from '@/lib/api-utils';
 import {
   reservationPipeline,
-  cabinCalendar,
   capacityCalendar,
   calendarRange,
 } from '@/lib/reservation-reads';
+import {
+  readCalendarResponse,
+  readReservationInboxResponse,
+} from '@/lib/validations/reservation-calendar-json';
 import { reservationLifecycle } from '@/lib/reservation-options';
 import { GET as listReservations } from '@/app/api/reservations/route';
 import { PATCH as patchDining } from '@/app/api/dining-reservations/[id]/route';
@@ -146,7 +149,7 @@ it('sorts and paginates the whole union once, preserving times and native status
       'https://admin.test/api/reservations?resourceId=' + f.experience._id
     )
   );
-  expect((await response?.json()).data.total).toBe(1);
+  expect((await readReservationInboxResponse(response)).total).toBe(1);
   expect(
     (
       await listReservations(
@@ -183,11 +186,13 @@ it('includes boundary-crossing cabin stays and excludes checkout-day/cancelled o
     new Date('2030-06-14'),
     'cancelled'
   );
-  const result = await cabinCalendar({
-    start: day,
-    end: new Date('2030-07-01'),
-  });
-  expect(result.reservations.map(item => String(item._id))).toEqual([
+  const response = await calendar(
+    new Request(
+      'https://admin.test/api/calendar/cabins?start=2030-06-01&end=2030-07-01'
+    )
+  );
+  const result = await readCalendarResponse({ response, kind: 'cabins' });
+  expect(result.reservations?.map(item => item._id)).toEqual([
     crossing.id,
     lastDay.id,
   ]);
