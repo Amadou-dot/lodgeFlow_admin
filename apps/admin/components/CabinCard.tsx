@@ -43,7 +43,8 @@ export default function CabinCard({
   selectionMode,
 }: CabinCardProps) {
   const canWrite = usePermission('cabins:write');
-  const discountedPrice = cabin.price - cabin.discount;
+  const discount = cabin.discount ?? 0;
+  const discountedPrice = cabin.price - discount;
   const cabinStatus = cabin.status || 'active';
 
   return (
@@ -93,14 +94,14 @@ export default function CabinCard({
                 {cabinStatus}
               </Chip>
             )}
-            {cabin.discount > 0 && (
+            {discount > 0 && (
               <Chip
                 color='danger'
                 variant='solid'
                 size='sm'
                 className='shadow-md'
               >
-                ${cabin.discount} off
+                ${discount} off
               </Chip>
             )}
           </div>
@@ -164,7 +165,7 @@ export default function CabinCard({
           </div>
 
           <div className='flex items-center gap-2 mb-3'>
-            {cabin.discount > 0 ? (
+            {discount > 0 ? (
               <>
                 <span className='text-xl font-bold text-success'>
                   ${discountedPrice}

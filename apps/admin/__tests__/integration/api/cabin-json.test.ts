@@ -2,9 +2,18 @@ import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
 import { AuditLog, Cabin } from '@lodgeflow/database';
 import { GET, POST, PUT } from '@/app/api/cabins/route';
-import { GET as getById, PUT as updateById } from '@/app/api/cabins/[id]/route';
+import {
+  DELETE as deleteById,
+  GET as getById,
+  PUT as updateById,
+} from '@/app/api/cabins/[id]/route';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
+import {
+  cabinDeleteResponseSchema,
+  cabinListResponseSchema,
+  cabinResponseSchema,
+} from '@/lib/validations/cabin-json';
 
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 
@@ -84,10 +93,14 @@ test('list and detail preserve every persisted field, virtual, ID and timestamp'
   const expected = json(await Cabin.findById(cabin._id));
   const list = await GET(request());
   expect(list.status).toBe(200);
-  expect(await list.json()).toEqual({ success: true, data: [expected] });
+  const listBody: unknown = await list.json();
+  expect(listBody).toEqual({ success: true, data: [expected] });
+  expect(cabinListResponseSchema.parse(listBody)).toEqual([expected]);
   const detail = await getById(request(), params(String(cabin._id)));
   expect(detail.status).toBe(200);
-  expect(await detail.json()).toEqual({ success: true, data: expected });
+  const detailBody: unknown = await detail.json();
+  expect(detailBody).toEqual({ success: true, data: expected });
+  expect(cabinResponseSchema.parse(detailBody)).toEqual(expected);
 });
 
 test('retains hydrated defaults, nullable optional fields and absent timestamps on sparse legacy cabins', async () => {
@@ -107,7 +120,9 @@ test('retains hydrated defaults, nullable optional fields and absent timestamps 
   const expected = json(await Cabin.findById(id));
   const response = await getById(request(), params(String(id)));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ success: true, data: expected });
+  const body: unknown = await response.json();
+  expect(body).toEqual({ success: true, data: expected });
+  expect(cabinResponseSchema.parse(body)).toEqual(expected);
   expect(expected).toMatchObject({
     _id: String(id),
     id: String(id),
@@ -125,6 +140,68 @@ test('retains hydrated defaults, nullable optional fields and absent timestamps 
   expect(expected).not.toHaveProperty('createdAt');
   expect(expected).not.toHaveProperty('updatedAt');
   expect(expected).not.toHaveProperty('__v');
+});
+
+test('list and detail keep model-valid nulls, blank amenity members and fractional fields', async () => {
+  const legacy = await Cabin.create({
+    ...payload,
+    images: null,
+    status: null,
+    discount: null,
+    extraGuestFee: null,
+    amenities: ['WiFi', null, ''],
+    capacity: 3.5,
+    price: 250.125,
+    minNights: 1.5,
+  });
+  const updatedAt = new Date('+010000-01-01T00:00:00.000Z');
+  await Cabin.collection.updateOne(
+    { _id: legacy._id },
+    { $set: { createdAt: null, updatedAt, __v: null } }
+  );
+  const id = String(legacy._id);
+  const expected = {
+    ...payload,
+    _id: id,
+    id,
+    images: null,
+    status: null,
+    discount: null,
+    extraGuestFee: null,
+    amenities: ['WiFi', null, ''],
+    capacity: 3.5,
+    price: 250.125,
+    discountedPrice: 250.125,
+    minNights: 1.5,
+    createdAt: null,
+    updatedAt: '+010000-01-01T00:00:00.000Z',
+    __v: null,
+  };
+  const list = await GET(request());
+  expect(list.status).toBe(200);
+  const listBody: unknown = await list.json();
+  expect(listBody).toEqual({ success: true, data: [expected] });
+  expect(cabinListResponseSchema.parse(listBody)).toEqual([expected]);
+  const detail = await getById(request(), params(id));
+  expect(detail.status).toBe(200);
+  const detailBody: unknown = await detail.json();
+  expect(detailBody).toEqual({ success: true, data: expected });
+  expect(cabinResponseSchema.parse(detailBody)).toEqual(expected);
+});
+
+test('deleting by ID returns an explicit null and the existing message', async () => {
+  const cabin = await Cabin.create(payload);
+  const id = String(cabin._id);
+  const response = await deleteById(request({ method: 'DELETE' }), params(id));
+  expect(response.status).toBe(200);
+  const body: unknown = await response.json();
+  expect(body).toEqual({
+    success: true,
+    data: null,
+    message: 'Cabin deleted successfully',
+  });
+  expect(cabinDeleteResponseSchema.parse(body)).toEqual(body);
+  expect(await Cabin.findById(id)).toBeNull();
 });
 
 test('preserves list sorting, explicit status and conflicting legacy filter precedence', async () => {
@@ -176,7 +253,10 @@ test('creation returns complete saved JSON and keeps validation defaults', async
   expect(response.status).toBe(201);
   const stored = await Cabin.findOne({ name: payload.name });
   expect(stored).not.toBeNull();
-  expect(await response.json()).toEqual({ success: true, data: json(stored) });
+  const body: unknown = await response.json();
+  const expected = json(stored);
+  expect(body).toEqual({ success: true, data: expected });
+  expect(cabinResponseSchema.parse(body)).toEqual(expected);
 });
 
 test.each(['collection', 'detail'])(
@@ -201,10 +281,10 @@ test.each(['collection', 'detail'])(
       minNights: 2,
       extraGuestFee: 15,
     });
-    expect(await response.json()).toEqual({
-      success: true,
-      data: json(stored),
-    });
+    const body: unknown = await response.json();
+    const expected = json(stored);
+    expect(body).toEqual({ success: true, data: expected });
+    expect(cabinResponseSchema.parse(body)).toEqual(expected);
   }
 );
 
