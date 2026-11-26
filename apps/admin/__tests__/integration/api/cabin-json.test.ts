@@ -288,6 +288,33 @@ test.each(['collection', 'detail'])(
   }
 );
 
+test('detail PUT preserves omitted null status and persists an explicit Active repair', async () => {
+  const cabin = await Cabin.create({ ...payload, status: null });
+  const id = String(cabin._id);
+
+  const renamed = await updateById(
+    request({ method: 'PUT', body: { _id: id, name: 'Renamed' } }),
+    params(id)
+  );
+  expect(renamed.status).toBe(200);
+  expect(cabinResponseSchema.parse(await renamed.json())).toMatchObject({
+    name: 'Renamed',
+    status: null,
+  });
+  expect(await Cabin.findById(id).lean()).toMatchObject({ status: null });
+
+  const activated = await updateById(
+    request({ method: 'PUT', body: { _id: id, status: 'active' } }),
+    params(id)
+  );
+  expect(activated.status).toBe(200);
+  expect(cabinResponseSchema.parse(await activated.json())).toMatchObject({
+    name: 'Renamed',
+    status: 'active',
+  });
+  expect(await Cabin.findById(id).lean()).toMatchObject({ status: 'active' });
+});
+
 test('missing cabin keeps the 404 envelope without writes', async () => {
   const response = await getById(
     request(),

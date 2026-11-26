@@ -123,6 +123,28 @@ test('preserves legacy null fields and blank amenity entries during unrelated ed
   });
 });
 
+test('submits Active when staff explicitly select it for a cabin with null status', async () => {
+  render(
+    <CabinModal
+      {...mutationProps}
+      isOpen
+      onClose={jest.fn()}
+      cabin={{ ...cabin, status: null }}
+      mode='edit'
+    />
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: /Status/ }));
+  fireEvent.click(await screen.findByRole('option', { name: 'Active' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+  await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+  expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+    _id: cabin._id,
+    status: 'active',
+  });
+});
+
 test('view mode passes the same JSON cabin to the edit action', async () => {
   const edit = jest.fn();
   render(
