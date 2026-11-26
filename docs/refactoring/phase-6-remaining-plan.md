@@ -300,6 +300,12 @@ The next scoped review corrected two cases at `50a849126067a0392ac69f0986798fbfd
 
 [CI configuration and throwaway build key](../../.github/workflows/ci.yml) · [HTTP fixture](../../scripts/http-smoke/run.mjs) · [Production catalog fixture](../../scripts/http-smoke/catalog-freshness.mjs) · [Hosted and native acceptance](phase-4-browser-review.md)
 
+### Final integration verification
+
+All eight commands in the table above exited 0 on November 26, 2026, at source `447f9822379e66312baa49e083c6b0a363c71b6b`, using Node 22.23.2 and pnpm 11.17.0. The frozen install accepted the committed lockfile. The workspace format and lint checks passed. The syntax guard passed 18 fixtures and found zero prohibited nodes in 147 admin test/script files. All 3,575 package tests passed, comprising 2,099 admin Jest tests, one seeded admin factory test, 1,373 customer Jest tests, 99 database tests and three email tests. The strict admin test/script project and both application compilers passed separately.
+
+The isolated HTTP gate passed both harness tests and all 52 named checks. The production catalog test showed the replacement cabin on the public site and a 404 for the removed cabin detail. The workspace build passed with the CI throwaway public key. These local checks used disposable data and controlled provider responses. The historical Task 20 results above retain their original revisions and counts. [Integration regressions and inventory](inventory.md#phase-6-remaining-boundaries-on-the-review-branch-2026-11-26) · [External acceptance](phase-4-browser-review.md)
+
 ## Appendix: O01 baseline and ownership
 
 AST scan on `b190f44` found 81 explicit `any` nodes in 23 test/helper files and zero chained unknown assertions. All 11 excluded scripts compile under inherited strict options. All 129 TS/TSX test/support roots expose eight diagnostics. Including JS/CJS helpers with `checkJs` exposes 16, of which `fetch-jsdom.cjs` contributes zero.
