@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 import Booking from '@lodgeflow/database/models/Booking';
 import Cabin from '@lodgeflow/database/models/Cabin';
+import type { BookingInput, CabinInput } from '../../setup/factories';
 
 // Helper to create a valid cabin in the DB
-async function createTestCabin(overrides: Record<string, any> = {}) {
-  return Cabin.create({
+async function createTestCabin(overrides: Partial<CabinInput> = {}) {
+  const input: CabinInput = {
     name: 'Test Cabin',
     description: 'A test cabin for booking tests',
     capacity: 4,
@@ -14,14 +15,15 @@ async function createTestCabin(overrides: Record<string, any> = {}) {
     amenities: ['WiFi'],
     status: 'active',
     ...overrides,
-  });
+  };
+  return Cabin.create(input);
 }
 
 // Helper to create a valid booking input
 function createBookingData(
   cabinId: mongoose.Types.ObjectId,
-  overrides: Record<string, any> = {}
-) {
+  overrides: Partial<BookingInput> = {}
+): BookingInput {
   const checkIn = new Date('2027-06-01');
   const checkOut = new Date('2027-06-04');
   return {
@@ -116,7 +118,8 @@ describe('Booking Model', () => {
     it('validates status enum', async () => {
       const cabin = await createTestCabin();
       await expect(
-        Booking.create(createBookingData(cabin._id, { status: 'invalid' }))
+        // Pass the unsupported status directly to Mongoose's validator.
+        Booking.create({ ...createBookingData(cabin._id), status: 'invalid' })
       ).rejects.toThrow();
     });
 
@@ -381,7 +384,7 @@ describe('Booking Model', () => {
     it('has compound index on cabin+checkInDate+checkOutDate', async () => {
       const indexes = await Booking.collection.indexes();
       const compoundIndex = indexes.find(
-        (idx: any) =>
+        idx =>
           idx.key.cabin === 1 &&
           idx.key.checkInDate === 1 &&
           idx.key.checkOutDate === 1
@@ -391,7 +394,7 @@ describe('Booking Model', () => {
 
     it('has index on status', async () => {
       const indexes = await Booking.collection.indexes();
-      const statusIndex = indexes.find((idx: any) => idx.key.status === 1);
+      const statusIndex = indexes.find(idx => idx.key.status === 1);
       expect(statusIndex).toBeDefined();
     });
   });

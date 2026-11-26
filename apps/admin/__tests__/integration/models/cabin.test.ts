@@ -1,6 +1,7 @@
 import Cabin from '@lodgeflow/database/models/Cabin';
+import type { CabinInput } from '../../setup/factories';
 
-function createCabinData(overrides: Record<string, any> = {}) {
+function createCabinData(overrides: Partial<CabinInput> = {}): CabinInput {
   return {
     name: 'Mountain Lodge',
     description: 'A cozy cabin in the mountains',
@@ -9,7 +10,7 @@ function createCabinData(overrides: Record<string, any> = {}) {
     discount: 0,
     image: 'https://example.com/cabin.jpg',
     amenities: ['WiFi', 'Air Conditioning'],
-    status: 'active' as const,
+    status: 'active',
     ...overrides,
   };
 }
@@ -34,21 +35,22 @@ describe('Cabin Model', () => {
       expect(cabin.status).toBe('active');
     });
 
+    // Pass missing required fields and unsupported enum values directly to Mongoose.
     it('requires name', async () => {
       await expect(
-        Cabin.create(createCabinData({ name: undefined }))
+        Cabin.create({ ...createCabinData(), name: undefined })
       ).rejects.toThrow(/Cabin name is required/);
     });
 
     it('requires image', async () => {
       await expect(
-        Cabin.create(createCabinData({ image: undefined }))
+        Cabin.create({ ...createCabinData(), image: undefined })
       ).rejects.toThrow(/Cabin image is required/);
     });
 
     it('requires description', async () => {
       await expect(
-        Cabin.create(createCabinData({ description: undefined }))
+        Cabin.create({ ...createCabinData(), description: undefined })
       ).rejects.toThrow(/Description is required/);
     });
 
@@ -92,7 +94,7 @@ describe('Cabin Model', () => {
 
     it('validates status enum', async () => {
       await expect(
-        Cabin.create(createCabinData({ status: 'invalid' }))
+        Cabin.create({ ...createCabinData(), status: 'invalid' })
       ).rejects.toThrow();
     });
 
@@ -122,7 +124,7 @@ describe('Cabin Model', () => {
       const found = await Cabin.findById(created._id);
 
       expect(found).not.toBeNull();
-      expect(found!.name).toBe('Mountain Lodge');
+      expect(found?.name).toBe('Mountain Lodge');
     });
 
     it('updates cabin fields', async () => {
@@ -131,7 +133,7 @@ describe('Cabin Model', () => {
       await cabin.save();
 
       const updated = await Cabin.findById(cabin._id);
-      expect(updated!.price).toBe(300);
+      expect(updated?.price).toBe(300);
     });
 
     it('deletes cabin', async () => {
@@ -223,19 +225,19 @@ describe('Cabin Model', () => {
   describe('Indexes', () => {
     it('has index on capacity', async () => {
       const indexes = await Cabin.collection.indexes();
-      const idx = indexes.find((i: any) => i.key.capacity === 1);
+      const idx = indexes.find(i => i.key.capacity === 1);
       expect(idx).toBeDefined();
     });
 
     it('has index on price', async () => {
       const indexes = await Cabin.collection.indexes();
-      const idx = indexes.find((i: any) => i.key.price === 1);
+      const idx = indexes.find(i => i.key.price === 1);
       expect(idx).toBeDefined();
     });
 
     it('has text index on name and description', async () => {
       const indexes = await Cabin.collection.indexes();
-      const textIdx = indexes.find((i: any) => i.key._fts === 'text');
+      const textIdx = indexes.find(i => i.key._fts === 'text');
       expect(textIdx).toBeDefined();
     });
   });

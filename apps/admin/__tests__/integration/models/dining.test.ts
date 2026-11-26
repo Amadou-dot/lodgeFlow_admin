@@ -1,15 +1,16 @@
 import Dining from '@lodgeflow/database/models/Dining';
+import type { DiningInput } from '../../setup/factories';
 
-function createDiningData(overrides: Record<string, any> = {}) {
+function createDiningData(overrides: Partial<DiningInput> = {}): DiningInput {
   return {
     name: 'Mountain Breakfast Platter',
     description: 'A hearty breakfast with eggs, bacon, and toast',
-    type: 'menu' as const,
-    mealType: 'breakfast' as const,
+    type: 'menu',
+    mealType: 'breakfast',
     price: 25,
     servingTime: { start: '07:00', end: '10:00' },
     maxPeople: 6,
-    category: 'regular' as const,
+    category: 'regular',
     image: 'https://example.com/breakfast.jpg',
     ...overrides,
   };
@@ -41,44 +42,50 @@ describe('Dining Model', () => {
       expect(dining.tags).toEqual([]);
     });
 
+    // Pass missing required fields and unsupported enum values directly to Mongoose.
     it('requires name', async () => {
       await expect(
-        Dining.create(createDiningData({ name: undefined }))
+        Dining.create({ ...createDiningData(), name: undefined })
       ).rejects.toThrow();
     });
 
     it('requires description', async () => {
       await expect(
-        Dining.create(createDiningData({ description: undefined }))
+        Dining.create({ ...createDiningData(), description: undefined })
       ).rejects.toThrow();
     });
 
     it('requires type', async () => {
       await expect(
-        Dining.create(createDiningData({ type: undefined }))
+        Dining.create({ ...createDiningData(), type: undefined })
       ).rejects.toThrow();
     });
 
     it('validates type enum', async () => {
       await expect(
-        Dining.create(createDiningData({ type: 'invalid' }))
+        Dining.create({ ...createDiningData(), type: 'invalid' })
       ).rejects.toThrow();
     });
 
     it('requires mealType', async () => {
       await expect(
-        Dining.create(createDiningData({ mealType: undefined }))
+        Dining.create({ ...createDiningData(), mealType: undefined })
       ).rejects.toThrow();
     });
 
     it('validates mealType enum', async () => {
       await expect(
-        Dining.create(createDiningData({ mealType: 'brunch' }))
+        Dining.create({ ...createDiningData(), mealType: 'brunch' })
       ).rejects.toThrow();
     });
 
     it('accepts valid mealType values', async () => {
-      for (const mealType of ['breakfast', 'lunch', 'dinner', 'all-day']) {
+      for (const mealType of [
+        'breakfast',
+        'lunch',
+        'dinner',
+        'all-day',
+      ] satisfies DiningInput['mealType'][]) {
         const dining = await Dining.create(createDiningData({ mealType }));
         expect(dining.mealType).toBe(mealType);
       }
@@ -86,25 +93,25 @@ describe('Dining Model', () => {
 
     it('requires price', async () => {
       await expect(
-        Dining.create(createDiningData({ price: undefined }))
+        Dining.create({ ...createDiningData(), price: undefined })
       ).rejects.toThrow();
     });
 
     it('requires servingTime', async () => {
       await expect(
-        Dining.create(createDiningData({ servingTime: undefined }))
+        Dining.create({ ...createDiningData(), servingTime: undefined })
       ).rejects.toThrow();
     });
 
     it('requires category', async () => {
       await expect(
-        Dining.create(createDiningData({ category: undefined }))
+        Dining.create({ ...createDiningData(), category: undefined })
       ).rejects.toThrow();
     });
 
     it('validates category enum', async () => {
       await expect(
-        Dining.create(createDiningData({ category: 'seafood' }))
+        Dining.create({ ...createDiningData(), category: 'seafood' })
       ).rejects.toThrow();
     });
 
@@ -115,7 +122,7 @@ describe('Dining Model', () => {
         'wine',
         'spirits',
         'non-alcoholic',
-      ]) {
+      ] satisfies DiningInput['category'][]) {
         const dining = await Dining.create(createDiningData({ category }));
         expect(dining.category).toBe(category);
       }
@@ -123,13 +130,13 @@ describe('Dining Model', () => {
 
     it('requires image', async () => {
       await expect(
-        Dining.create(createDiningData({ image: undefined }))
+        Dining.create({ ...createDiningData(), image: undefined })
       ).rejects.toThrow();
     });
 
     it('requires maxPeople', async () => {
       await expect(
-        Dining.create(createDiningData({ maxPeople: undefined }))
+        Dining.create({ ...createDiningData(), maxPeople: undefined })
       ).rejects.toThrow();
     });
 
@@ -143,7 +150,7 @@ describe('Dining Model', () => {
 
     it('rejects invalid dietary values', async () => {
       await expect(
-        Dining.create(createDiningData({ dietary: ['invalid-diet'] }))
+        Dining.create({ ...createDiningData(), dietary: ['invalid-diet'] })
       ).rejects.toThrow();
     });
 
@@ -178,17 +185,16 @@ describe('Dining Model', () => {
       );
 
       expect(dining.beverages).toHaveLength(1);
-      expect(dining.beverages![0].name).toBe('Craft IPA');
-      expect(dining.beverages![0].category).toBe('craft-beer');
+      expect(dining.beverages?.[0]?.name).toBe('Craft IPA');
+      expect(dining.beverages?.[0]?.category).toBe('craft-beer');
     });
 
     it('validates beverage category enum', async () => {
       await expect(
-        Dining.create(
-          createDiningData({
-            beverages: [{ name: 'Bad Drink', category: 'invalid-category' }],
-          })
-        )
+        Dining.create({
+          ...createDiningData(),
+          beverages: [{ name: 'Bad Drink', category: 'invalid-category' }],
+        })
       ).rejects.toThrow();
     });
   });
@@ -199,7 +205,7 @@ describe('Dining Model', () => {
       const found = await Dining.findById(created._id);
 
       expect(found).not.toBeNull();
-      expect(found!.name).toBe('Mountain Breakfast Platter');
+      expect(found?.name).toBe('Mountain Breakfast Platter');
     });
 
     it('updates dining item fields', async () => {
@@ -209,8 +215,8 @@ describe('Dining Model', () => {
       await dining.save();
 
       const updated = await Dining.findById(dining._id);
-      expect(updated!.price).toBe(30);
-      expect(updated!.isPopular).toBe(true);
+      expect(updated?.price).toBe(30);
+      expect(updated?.isPopular).toBe(true);
     });
 
     it('deletes dining item', async () => {
@@ -257,27 +263,25 @@ describe('Dining Model', () => {
   describe('Indexes', () => {
     it('has compound index on type and mealType', async () => {
       const indexes = await Dining.collection.indexes();
-      const idx = indexes.find(
-        (i: any) => i.key.type === 1 && i.key.mealType === 1
-      );
+      const idx = indexes.find(i => i.key.type === 1 && i.key.mealType === 1);
       expect(idx).toBeDefined();
     });
 
     it('has index on category', async () => {
       const indexes = await Dining.collection.indexes();
-      const idx = indexes.find((i: any) => i.key.category === 1);
+      const idx = indexes.find(i => i.key.category === 1);
       expect(idx).toBeDefined();
     });
 
     it('has index on isAvailable', async () => {
       const indexes = await Dining.collection.indexes();
-      const idx = indexes.find((i: any) => i.key.isAvailable === 1);
+      const idx = indexes.find(i => i.key.isAvailable === 1);
       expect(idx).toBeDefined();
     });
 
     it('has index on isPopular', async () => {
       const indexes = await Dining.collection.indexes();
-      const idx = indexes.find((i: any) => i.key.isPopular === 1);
+      const idx = indexes.find(i => i.key.isPopular === 1);
       expect(idx).toBeDefined();
     });
   });
