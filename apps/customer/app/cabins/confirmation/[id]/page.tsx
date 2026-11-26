@@ -114,6 +114,7 @@ export default function BookingConfirmationPage({
     );
   }
 
+  const cabinSubtotal = booking.cabinPrice * booking.numNights;
   const cabinName = booking.cabin?.name ?? 'Removed cabin';
   const extras = booking.extras;
   const specialRequests = booking.specialRequests ?? [];
@@ -294,7 +295,9 @@ export default function BookingConfirmationPage({
               {booking.numNights > 1 ? 's' : ''}
             </span>
             <span className='font-semibold'>
-              ${booking.cabinPrice * booking.numNights}
+              {Number.isFinite(cabinSubtotal)
+                ? `$${cabinSubtotal}`
+                : 'Unavailable'}
             </span>
           </div>
 

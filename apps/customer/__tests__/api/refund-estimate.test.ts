@@ -72,7 +72,9 @@ it('logs an unexpected failure while returning the safe error envelope', async (
 it('returns received-money estimate with ISO deadlines and the existing envelope', async () => {
   const response = await request();
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const body = await response.json();
+  expect(decodeRefundEstimate(body)).toBe(body.data);
+  expect(body).toEqual({
     success: true,
     data: {
       estimate: {
@@ -102,7 +104,9 @@ it.each(['checked-in', 'checked-out', 'cancelled'])(
     mockFindSettings.mockResolvedValue(null);
     const response = await request();
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    const body = await response.json();
+    expect(decodeRefundEstimate(body)).toBe(body.data);
+    expect(body).toMatchObject({
       success: true,
       data: {
         canCancel: false,
@@ -128,7 +132,9 @@ it('disallows cancellation during active checkout while preserving the policy es
   mockFindBooking.mockResolvedValue({ ...booking, checkoutPending: true });
   const response = await request();
   expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
+  const body = await response.json();
+  expect(decodeRefundEstimate(body)).toBe(body.data);
+  expect(body).toMatchObject({
     success: true,
     data: {
       canCancel: false,
@@ -165,4 +171,55 @@ it('retains the stored null policy and its fallback description', async () => {
     policyDescription: 'Unknown policy',
   });
   expect(decodeRefundEstimate(body)).toBe(body.data);
+});
+
+it('accepts a real partial refund rounded to cents and a past stay with signed lead time', async () => {
+  mockFindBooking.mockResolvedValue({
+    ...booking,
+    checkInDate: new Date('2030-02-04T12:00:00.000Z'),
+    amountPaid: 10.01,
+  });
+  const partial = await (await request()).json();
+  expect(partial.data.estimate).toMatchObject({
+    refundType: 'partial',
+    refundPercentage: 50,
+    refundAmount: 5.01,
+  });
+  const data = {
+    ...partial.data,
+    estimate: { ...partial.data.estimate, extra: 'preserved' },
+  };
+  expect(decodeRefundEstimate({ ...partial, data })).toBe(data);
+  mockFindBooking.mockResolvedValue({
+    ...booking,
+    checkInDate: new Date('2030-01-31T12:00:00.000Z'),
+  });
+  const past = await (await request()).json();
+  expect(past.data.estimate).toMatchObject({
+    refundType: 'none',
+    refundPercentage: 0,
+    refundAmount: 0,
+    daysUntilCheckIn: -1,
+  });
+  expect(decodeRefundEstimate(past)).toBe(past.data);
+});
+
+it.each([
+  { estimate: { refundPercentage: 50, refundType: 'full' } },
+  { estimate: { refundPercentage: 75, refundType: 'partial' } },
+  { estimate: { refundPercentage: 0, refundType: 'none', refundAmount: 1 } },
+  { estimate: { refundAmount: 1.005 } },
+  { estimate: { refundAmount: 1e100 } },
+  { deadlines: { policy: 'strict' } },
+  { canCancel: true, cancelNotAllowedReason: 'Already checked in' },
+  { canCancel: false, cancelNotAllowedReason: '' },
+])('rejects contradictory successful estimate %j', async overrides => {
+  const body = await (await request()).json();
+  const data = {
+    ...body.data,
+    ...overrides,
+    estimate: { ...body.data.estimate, ...overrides.estimate },
+    deadlines: { ...body.data.deadlines, ...overrides.deadlines },
+  };
+  expect(decodeRefundEstimate({ ...body, data })).toBeUndefined();
 });

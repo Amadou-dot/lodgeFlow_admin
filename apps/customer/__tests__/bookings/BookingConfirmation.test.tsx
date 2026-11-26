@@ -131,3 +131,21 @@ it.each([
   await renderBooking(bookingFixture(overrides));
   expect(screen.queryByRole('button', { name: /Pay/ })).not.toBeInTheDocument();
 });
+
+it('shows an unavailable cabin subtotal for overflow while retaining its stored total', async () => {
+  await renderBooking(
+    bookingFixture({
+      cabin: null,
+      cabinPrice: Number.MAX_VALUE,
+      numNights: 2,
+      totalPrice: 20,
+    })
+  );
+  expect(screen.getByText(/× 2 nights/).parentElement).toHaveTextContent(
+    'Unavailable'
+  );
+  expect(screen.queryByText(/Infinity/)).not.toBeInTheDocument();
+  expect(
+    screen.getByText('Total (before taxes)').parentElement
+  ).toHaveTextContent('$20');
+});
