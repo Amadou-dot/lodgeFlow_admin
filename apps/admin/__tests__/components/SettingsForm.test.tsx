@@ -7,8 +7,8 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import SettingsForm from '@/components/SettingsForm';
-import type { SettingsSectionProps } from '@/components/SettingsForm/types';
 import type { AppSettings } from '@/types';
 import type { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import {
@@ -37,19 +37,9 @@ jest.mock('@/hooks/useConfirmDialog', () => ({
 jest.mock('@/components/SettingsForm/index', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   return {
-    SettingsBookingSection: ({
-      formData,
-      onInputChange,
-    }: SettingsSectionProps) =>
-      React.createElement('input', {
-        'aria-label': 'Minimum Booking Length',
-        value: formData.minBookingLength,
-        onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
-          onInputChange({
-            field: 'minBookingLength',
-            value: Number(event.target.value),
-          }),
-      }),
+    SettingsBookingSection: jest.requireActual<
+      typeof import('@/components/SettingsForm/SettingsBookingSection')
+    >('@/components/SettingsForm/SettingsBookingSection').default,
     SettingsCheckInOutSection: () => null,
     SettingsPricingSection: jest.requireActual<
       typeof import('@/components/SettingsForm/SettingsPricingSection')
@@ -152,6 +142,39 @@ test('saves only the edited breakfast price from a legacy Settings response', as
   expect(mockUpdate).toHaveBeenCalledWith({ breakfastPrice: 15 });
 });
 
+test('reselecting the current cancellation policy leaves Save disabled', async () => {
+  const user = userEvent.setup();
+  render(
+    createElement(SettingsForm, { settings, onSettingsUpdate: jest.fn() })
+  );
+  const policy = screen.getByRole('button', { name: /Cancellation Policy/ });
+
+  await user.click(policy);
+  await user.click(await screen.findByRole('option', { name: 'Moderate' }));
+
+  expect(policy).toHaveTextContent('Moderate');
+  expect(screen.getByText('Save')).toBeDisabled();
+});
+
+test('saves a different cancellation policy as the only change', async () => {
+  const user = userEvent.setup();
+  const onSettingsUpdate = jest.fn();
+  mockUpdate.mockResolvedValueOnce({
+    ...settings,
+    cancellationPolicy: 'strict',
+  });
+  render(createElement(SettingsForm, { settings, onSettingsUpdate }));
+  const policy = screen.getByRole('button', { name: /Cancellation Policy/ });
+
+  await user.click(policy);
+  await user.click(await screen.findByRole('option', { name: 'Strict' }));
+  await user.click(screen.getByText('Save'));
+
+  await waitFor(() => expect(onSettingsUpdate).toHaveBeenCalledTimes(1));
+  expect(mockUpdate).toHaveBeenCalledWith({ cancellationPolicy: 'strict' });
+  expect(policy).toHaveTextContent('Strict');
+});
+
 test('refresh preserves edits; retry and discard use the server response', async () => {
   const onSettingsUpdate = jest.fn();
   const view = render(
@@ -174,7 +197,7 @@ test('refresh preserves edits; retry and discard use the server response', async
   view.rerender(
     createElement(SettingsForm, { settings: refreshed, onSettingsUpdate })
   );
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('2');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(2);
   expect(screen.getByLabelText('Breakfast Price')).toHaveValue(3);
   expect(screen.getByText('Save')).toBeEnabled();
 
@@ -221,7 +244,7 @@ test('failed reset rejects for dialog retry and successful reset adopts defaults
   mockReset.mockResolvedValueOnce(defaults);
   await act(async () => confirm());
   expect(onSettingsUpdate).toHaveBeenCalledTimes(1);
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('3');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(3);
   expect(screen.getByText('Save')).toBeDisabled();
 });
 
@@ -245,7 +268,7 @@ test('an edit made while save is pending survives the saved response and server 
     target: { value: '3' },
   });
   await act(async () => resolveSave?.({ ...settings, minBookingLength: 2 }));
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('3');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(3);
   expect(screen.getByText('Save')).toBeEnabled();
   view.rerender(
     createElement(SettingsForm, {
@@ -253,7 +276,7 @@ test('an edit made while save is pending survives the saved response and server 
       onSettingsUpdate,
     })
   );
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('3');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(3);
   expect(screen.getByText('Save')).toBeEnabled();
 
   mockUpdate.mockResolvedValueOnce({ ...settings, minBookingLength: 3 });
@@ -289,7 +312,7 @@ test('a pending save preserves a newer edit that reverts to the old server value
   );
 
   await act(async () => resolveSave?.({ ...settings, minBookingLength: 2 }));
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('1');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(1);
   expect(screen.getByText('Save')).toBeEnabled();
   view.rerender(
     createElement(SettingsForm, {
@@ -297,7 +320,7 @@ test('a pending save preserves a newer edit that reverts to the old server value
       onSettingsUpdate,
     })
   );
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('1');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(1);
   expect(screen.getByText('Save')).toBeEnabled();
 
   mockUpdate.mockResolvedValueOnce(settings);
@@ -331,7 +354,7 @@ test('a pending reset preserves a newer edit that reverts to the old server valu
   });
 
   await act(async () => resolveReset?.({ ...settings, minBookingLength: 3 }));
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('1');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(1);
   expect(screen.getByText('Save')).toBeEnabled();
   view.rerender(
     createElement(SettingsForm, {
@@ -339,7 +362,7 @@ test('a pending reset preserves a newer edit that reverts to the old server valu
       onSettingsUpdate,
     })
   );
-  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue('1');
+  expect(screen.getByLabelText('Minimum Booking Length')).toHaveValue(1);
   expect(screen.getByText('Save')).toBeEnabled();
 
   mockUpdate.mockResolvedValueOnce(settings);

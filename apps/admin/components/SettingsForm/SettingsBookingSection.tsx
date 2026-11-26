@@ -68,13 +68,13 @@ export default function SettingsBookingSection({
           />
           <Select
             label='Cancellation Policy'
+            disallowEmptySelection
             selectedKeys={
               formData.cancellationPolicy ? [formData.cancellationPolicy] : []
             }
             onSelectionChange={(keys: SharedSelection) => {
               const value = Array.from(keys)[0];
               if (
-                value === undefined ||
                 value === 'flexible' ||
                 value === 'moderate' ||
                 value === 'strict'

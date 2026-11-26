@@ -25,7 +25,7 @@ type EditableSettings = Pick<
 export type SettingsEdit = {
   [Field in keyof EditableSettings]-?: {
     field: Field;
-    value: EditableSettings[Field];
+    value: Exclude<EditableSettings[Field], undefined>;
   };
 }[keyof EditableSettings];
 
