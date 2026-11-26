@@ -26,11 +26,12 @@
  * @see hooks/useCustomers.ts - Same pattern for customer operations
  */
 
-import { SWR_CONFIG } from '@/lib/config';
+import { STAFF_TEST_UI, SWR_CONFIG } from '@/lib/config';
 import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type { BookingsFilters } from '@/types';
 import type { AdminBooking, BookingByEmail } from '@/types/booking-read';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { z } from 'zod';
 import {
   bookingListResponse,
@@ -152,7 +153,10 @@ export const useBooking = (id: string) => {
         fallback: 'Failed to fetch booking',
         showHttpError: false,
       });
-      if (result.data._id !== id.toLowerCase())
+      if (
+        result.data._id.toLowerCase() !==
+        url.slice('/api/bookings/'.length).toLowerCase()
+      )
         throw new Error('Failed to fetch booking');
       return result.data;
     },
@@ -254,13 +258,42 @@ export const useRecordPayment = ({
   dialogId: symbol | null;
   onReconciled: () => void;
 }) => {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
+  const owner = useMemo(
+    () =>
+      dialogId &&
+      (STAFF_TEST_UI || (isLoaded && isSignedIn && userId && sessionId))
+        ? { userId, sessionId, bookingId: booking._id, dialogId }
+        : null,
+    [isLoaded, isSignedIn, userId, sessionId, booking._id, dialogId]
+  );
+  const activeOwner = useRef<typeof owner>(null);
+  useLayoutEffect(() => {
+    activeOwner.current = owner;
+    return () => {
+      activeOwner.current = null;
+    };
+  }, [owner]);
+
   const pending = useRef<ReceiptAttempt | null>(null);
+  useLayoutEffect(
+    () => () => {
+      pending.current = null;
+    },
+    [isLoaded, isSignedIn, userId, sessionId, booking._id]
+  );
   const refreshBookingCaches = useRefreshBookingCaches();
 
   const mutation = useMutation({
+    // TanStack captures meta when enqueued, even if the first dispatch waits for reconnect.
+    meta: { owner },
+    retry: false,
     mutationFn: async (
-      data: StaffPayment | { retryReceiptId: string }
+      data: StaffPayment | { retryReceiptId: string },
+      context
     ): Promise<AdminBooking> => {
+      if (!activeOwner.current || activeOwner.current !== context.meta?.owner)
+        throw new Error('This payment dialog is no longer active.');
       const unresolved = pending.current;
       let attempt = unresolved;
       if ('retryReceiptId' in data) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { STAFF_TEST_UI } from '@/lib/config';
 import { useAuth } from '@clerk/nextjs';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -21,11 +22,9 @@ export function useStaffAccess() {
 export function usePermission(permission: Permission) {
   return useStaffAccess()?.permissions.includes(permission) ?? false;
 }
-const isTestMode =
-  process.env.NODE_ENV !== 'production' &&
-  process.env.NEXT_PUBLIC_TESTING === 'true';
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  if (isTestMode)
+  if (STAFF_TEST_UI)
     return (
       <AccessContext.Provider
         value={{ userId: 'test-user', role: 'admin', permissions: PERMISSIONS }}

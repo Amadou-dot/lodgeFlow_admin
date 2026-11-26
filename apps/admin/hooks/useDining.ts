@@ -84,7 +84,9 @@ export function useUpdateDining() {
 
       return readCatalogResponse({
         response,
-        schema: diningResponseSchema,
+        schema: diningResponseSchema.refine(
+          row => row._id.toLowerCase() === dining._id.toLowerCase()
+        ),
         fallback: 'Failed to update dining item',
         failure: message => displayToast(message, 'error'),
       });

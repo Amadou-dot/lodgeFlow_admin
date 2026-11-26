@@ -8,7 +8,10 @@ import type { AdminBooking } from '@/types/booking-read';
 import QuickActionsCard from '@/components/BookingDetails/QuickActionsCard';
 import RecordPaymentModal from '@/components/RecordPaymentModal';
 
-async function show(remainingAmount: number | null = 10.01) {
+async function show(
+  remainingAmount: number | null = 10.01,
+  { totalAmount = 1234.5 } = {}
+) {
   const onRecordPayment = jest.fn().mockResolvedValue(undefined);
   const onClose = jest.fn();
   const modal = (balance: number | null) => (
@@ -17,7 +20,7 @@ async function show(remainingAmount: number | null = 10.01) {
       isLoading={false}
       onClose={onClose}
       onRecordPayment={onRecordPayment}
-      totalAmount={1234.5}
+      totalAmount={totalAmount}
       remainingAmount={balance}
       bookingId='507f1f77bcf86cd799439011'
       guestName='Avery'
@@ -302,5 +305,24 @@ test.each(['detail refresh', 'explicit original retry'] as const)(
       client.clear();
       global.fetch = originalFetch;
     }
+  }
+);
+
+test.each([
+  { balance: 1e100, total: 120, label: '$120.00' },
+  { balance: 10, total: 1e100, label: '$10.00' },
+])(
+  'blocks new receipts with out-of-range stored amounts and retains the valid neighbor',
+  async ({ balance, total, label }) => {
+    const { onRecordPayment } = await show(balance, { totalAmount: total });
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Amount Paid/ }), {
+      target: { value: '1' },
+    });
+    const submit = screen.getByRole('button', { name: 'Record Payment' });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    expect(onRecordPayment).not.toHaveBeenCalled();
   }
 );

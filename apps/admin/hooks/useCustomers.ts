@@ -134,7 +134,11 @@ async function fetchCustomer(url: string): Promise<CustomerWithStats> {
   if (!response.ok) throw new Error(fallback);
 
   const result = await readCustomerResponseJson(response, fallback);
-  if (!isCustomerDetailSuccessResponse(result)) throw new Error(fallback);
+  if (
+    !isCustomerDetailSuccessResponse(result) ||
+    result.data.id !== url.slice('/api/customers/'.length)
+  )
+    throw new Error(fallback);
   return result.data;
 }
 
@@ -196,7 +200,10 @@ export const useUpdateCustomer = () => {
         body: JSON.stringify(customerData),
       });
 
-      return readCustomerMutation(response, 'Failed to update customer');
+      const fallback = 'Failed to update customer';
+      const saved = await readCustomerMutation(response, fallback);
+      if (saved.id !== customerData.id) throw new Error(fallback);
+      return saved;
     },
     onSuccess: () =>
       refreshCustomerCaches({

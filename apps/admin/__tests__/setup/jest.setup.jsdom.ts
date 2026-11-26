@@ -83,6 +83,7 @@ jest.mock('@clerk/nextjs', () => ({
   })),
   useAuth: jest.fn(() => ({
     userId: 'test-user-id',
+    sessionId: 'test-session-id',
     isLoaded: true,
     isSignedIn: true,
     has: jest.fn(({ role }: { role: string }) => role === 'org:admin'),

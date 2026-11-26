@@ -1,7 +1,7 @@
 'use client';
 
 import { ObsoleteCustomerWriteError } from '@/hooks/useCustomerWriteScope';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SignInButton, useAuth } from '@clerk/nextjs';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
@@ -110,10 +110,19 @@ export default function BookingsPage() {
       </div>
     );
   }
-  return <BookingHistory key={`${userId}:${sessionId}`} />;
+  return <BookingHistory key={JSON.stringify([userId, sessionId])} />;
 }
 
 function BookingHistory() {
+  // The keyed history view owns feedback for one signed-in user and session.
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('cabins');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -226,6 +235,7 @@ function BookingHistory() {
         updates,
       });
 
+      if (!mounted.current) return;
       addToast({
         title: 'Booking Updated',
         description: 'Your booking has been successfully updated.',
@@ -235,7 +245,8 @@ function BookingHistory() {
         current === submittedDialog ? { kind: 'closed' } : current
       );
     } catch (error) {
-      if (error instanceof ObsoleteCustomerWriteError) return;
+      if (!mounted.current || error instanceof ObsoleteCustomerWriteError)
+        return;
       addToast({
         title: 'Error',
         description:
@@ -260,6 +271,7 @@ function BookingHistory() {
       await cancelBooking.mutateAsync({
         bookingId: submittedDialog.bookingId,
       });
+      if (!mounted.current) return;
       addToast({
         title: 'Booking Cancelled',
         description: 'Your booking has been successfully cancelled.',
@@ -269,7 +281,8 @@ function BookingHistory() {
         current === submittedDialog ? { kind: 'closed' } : current
       );
     } catch (error) {
-      if (error instanceof ObsoleteCustomerWriteError) return;
+      if (!mounted.current || error instanceof ObsoleteCustomerWriteError)
+        return;
       addToast({
         title: 'Error',
         description: 'Failed to cancel booking. Please try again.',
@@ -692,6 +705,7 @@ function BookingHistory() {
                                     await cancelExpBooking.mutateAsync(
                                       booking._id.toString()
                                     );
+                                    if (!mounted.current) return;
                                     addToast({
                                       title: 'Booking Cancelled',
                                       description:
@@ -700,8 +714,9 @@ function BookingHistory() {
                                     });
                                   } catch (error) {
                                     if (
+                                      !mounted.current ||
                                       error instanceof
-                                      ObsoleteCustomerWriteError
+                                        ObsoleteCustomerWriteError
                                     )
                                       return;
                                     addToast({
@@ -882,6 +897,7 @@ function BookingHistory() {
                                     await cancelDiningReservation.mutateAsync(
                                       reservation._id.toString()
                                     );
+                                    if (!mounted.current) return;
                                     addToast({
                                       title: 'Reservation Cancelled',
                                       description:
@@ -890,8 +906,9 @@ function BookingHistory() {
                                     });
                                   } catch (error) {
                                     if (
+                                      !mounted.current ||
                                       error instanceof
-                                      ObsoleteCustomerWriteError
+                                        ObsoleteCustomerWriteError
                                     )
                                       return;
                                     addToast({

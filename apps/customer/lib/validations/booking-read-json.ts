@@ -11,7 +11,7 @@ import type {
   CreateBookingRequest,
   UpdateBookingDetailsInput,
 } from './booking';
-import { decodeSuccess, forDetailId } from './read-response';
+import { forCustomerHistory, forDetailId } from './read-response';
 
 const detailCabin: z.ZodType<BookingDetailCabin, BookingDetailCabin> =
   cabinJsonSchema;
@@ -39,7 +39,7 @@ export const bookingDetail = bookingFields.extend({
   durationText: z.string().optional(),
   paymentStatus: z.enum(['paid', 'partial', 'unpaid']).optional(),
 });
-export const decodeBookingHistory = decodeSuccess(z.array(bookingHistoryItem));
+export const decodeBookingHistory = forCustomerHistory(bookingHistoryItem);
 export const decodeBookingDetail = (id: string) =>
   forDetailId(bookingDetail, id);
 

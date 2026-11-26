@@ -216,3 +216,24 @@ test('the editor shows stored text entries and omits untouched special requests 
   expect(screen.getAllByRole('listitem')).toHaveLength(2);
   expect(screen.getByText('Extra towels')).toBeInTheDocument();
 });
+
+test('the payment summary and PDF retain ordinary totals beside an out-of-range stored price', () => {
+  const stored = { ...booking, cabinPrice: 1e100, totalPrice: 120 };
+  render(
+    <>
+      <PaymentSummaryCard
+        numNights={stored.numNights}
+        cabinPrice={stored.cabinPrice}
+        totalPrice={stored.totalPrice}
+        depositAmount={stored.depositAmount}
+        depositPaid={stored.depositPaid}
+        extrasPrice={stored.extrasPrice}
+        amountPaid={stored.amountPaid}
+        remainingAmount={stored.remainingAmount}
+      />
+      <BookingPDFTemplate booking={stored} />
+    </>
+  );
+  expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(2);
+  expect(screen.getAllByText('$120.00').length).toBeGreaterThanOrEqual(2);
+});

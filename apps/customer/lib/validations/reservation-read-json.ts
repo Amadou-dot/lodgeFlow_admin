@@ -10,7 +10,7 @@ import {
 } from '@lodgeflow/database/reservation-read-fields';
 import { DINING_TYPES, MEAL_TYPES } from '@lodgeflow/database/config';
 import { ownedDetail, type MutationTarget } from './mutation-response';
-import { decodeSuccess, forDetailId } from './read-response';
+import { forCustomerHistory, forDetailId } from './read-response';
 
 const catalog = z.object({
   _id: objectId,
@@ -39,10 +39,8 @@ const experienceHistory = experience
       .extend({ category: z.string().min(1), duration: z.string().min(1) })
       .nullable(),
   });
-export const decodeDiningHistory = decodeSuccess(z.array(diningHistory));
-export const decodeExperienceHistory = decodeSuccess(
-  z.array(experienceHistory)
-);
+export const decodeDiningHistory = forCustomerHistory(diningHistory);
+export const decodeExperienceHistory = forCustomerHistory(experienceHistory);
 const diningDetail = dining.extend({
   id: objectId,
   dining: diningJsonSchema.nullable(),

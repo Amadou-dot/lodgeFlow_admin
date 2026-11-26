@@ -7,7 +7,8 @@ import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Modal, ModalBody, ModalContent } from '@heroui/modal';
 import { addToast } from '@heroui/toast';
-import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import { useLayoutEffect, useRef, useState } from 'react';
 import RecordPaymentModal, { PaymentData } from '../RecordPaymentModal';
 import BookingPDFTemplate from './BookingPDFTemplate';
 
@@ -34,7 +35,13 @@ function extractCabinId(
 }
 
 export default function QuickActionsCard(props: QuickActionsCardProps) {
-  return <QuickActionsContent key={props.booking._id} {...props} />;
+  const { userId, sessionId } = useAuth();
+  return (
+    <QuickActionsContent
+      key={JSON.stringify([props.booking._id, userId, sessionId])}
+      {...props}
+    />
+  );
 }
 function QuickActionsContent({
   booking,
@@ -48,7 +55,7 @@ function QuickActionsContent({
     { kind: 'closed' | 'print' } | { kind: 'payment'; id: symbol }
   >({ kind: 'closed' });
   const active = useRef(true);
-  useEffect(() => {
+  useLayoutEffect(() => {
     active.current = true;
     return () => {
       active.current = false;
@@ -121,14 +128,16 @@ function QuickActionsContent({
         ...paymentData,
       });
 
+      if (!active.current) return;
       addToast({
         color: 'success',
         description: 'Payment recorded successfully',
       });
 
       // Call the callback to refresh booking data
-      if (active.current) onPaymentRecorded?.();
+      onPaymentRecorded?.();
     } catch (error) {
+      if (!active.current) throw error;
       addToast({
         color: 'danger',
         description: `Failed to record payment: ${(error as Error).message}`,
@@ -140,11 +149,13 @@ function QuickActionsContent({
   const handleRetryPreviousPayment = async () => {
     try {
       await recordPaymentMutation.retryPreviousPayment();
+      if (!active.current) return;
       addToast({
         color: 'success',
         description: 'Previously submitted payment confirmed',
       });
     } catch (error) {
+      if (!active.current) return;
       addToast({
         color: 'danger',
         description:

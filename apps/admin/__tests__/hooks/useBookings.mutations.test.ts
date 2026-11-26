@@ -1,12 +1,19 @@
 /** @jest-environment ./__tests__/setup/fetch-jsdom.cjs */
 import { createElement, type ReactNode } from 'react';
-import { act, renderHook } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import {
+  QueryClient,
+  QueryClientProvider,
+  onlineManager,
+} from '@tanstack/react-query';
+import { SWRConfig } from 'swr';
 import { addToast } from '@heroui/toast';
+import { patchBookingSchema } from '@/lib/validations/booking';
 import { bookingDetailResponse } from '@/lib/validations/booking-json';
 import type { AdminBooking } from '@/types/booking-read';
 import type { CreateBookingInput } from '@/types/api';
 import {
+  useBooking,
   useCheckInBooking,
   useCheckOutBooking,
   useConfirmBooking,
@@ -17,6 +24,13 @@ import {
 } from '@/hooks/useBookings';
 
 jest.unmock('swr');
+let mockStaff = {
+  isLoaded: true,
+  isSignedIn: true,
+  userId: 'staff',
+  sessionId: 'session',
+};
+jest.mock('@clerk/nextjs', () => ({ useAuth: () => mockStaff }));
 const id = '507f1f77bcf86cd799439011';
 const customer = { id: 'user_1', name: 'Unavailable guest', email: 'N/A' };
 const row = {
@@ -54,6 +68,12 @@ function wrapper({ children }: { children: ReactNode }) {
   return createElement(QueryClientProvider, { client }, children);
 }
 beforeEach(() => {
+  mockStaff = {
+    isLoaded: true,
+    isSignedIn: true,
+    userId: 'staff',
+    sessionId: 'session',
+  };
   jest.clearAllMocks();
   fetchMock.mockReset();
   global.fetch = fetchMock;
@@ -392,3 +412,124 @@ test('a fresh dialog cannot replay even a byte-identical prior draft as a new pa
     notes: payment.notes,
   });
 });
+
+test('a cached booking revalidates its own SWR key after selection changes', async () => {
+  const url = (id: string) => '/api/bookings/' + id;
+  const second = '507f1f77bcf86cd799439012';
+  const cache = new Map<string, { data?: unknown; error?: unknown }>([
+    [url(id), { data: row }],
+  ]);
+  fetchMock.mockImplementation(async input => {
+    const selected = String(input).slice('/api/bookings/'.length);
+    return Response.json({
+      success: true,
+      data: { ...row, id: selected, _id: selected, revision: 2 },
+    });
+  });
+  const frames: FrameRequestCallback[] = [];
+  const raf = jest
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation(frame => frames.push(frame));
+  const config = { provider: () => cache, shouldRetryOnError: false };
+  try {
+    const view = renderHook(({ id }) => useBooking(id), {
+      initialProps: { id },
+      wrapper: ({ children }) =>
+        createElement(SWRConfig, { value: config }, children),
+    });
+    view.rerender({ id: second });
+    await act(async () => {
+      frames.splice(0).forEach(frame => frame(0));
+    });
+    expect(fetchMock.mock.calls).toEqual([[url(second)], [url(id)]]);
+    expect(cache.get(url(id))?.error).toBeUndefined();
+    expect(cache.get(url(id))?.data).toEqual({ ...row, revision: 2 });
+  } finally {
+    raf.mockRestore();
+  }
+});
+
+test.each([
+  'reopen',
+  'resource',
+  'staff',
+  'session',
+  'dialog',
+  'active',
+] as const)(
+  'only the current receipt owner dispatches on reconnect after %s',
+  async change => {
+    const second = '507f1f77bcf86cd799439012';
+    fetchMock.mockImplementation(async (_url, init) => {
+      const { recordPayment } = patchBookingSchema.parse(
+        JSON.parse(String(init?.body))
+      );
+      if (!recordPayment?.receiptId)
+        throw new Error('Expected the submitted receipt ID');
+      return Response.json({
+        success: true,
+        data: {
+          ...row,
+          payments: [
+            {
+              id: recordPayment.receiptId,
+              amount: recordPayment.amountPaid,
+              method: recordPayment.paymentMethod,
+              receivedAt: row.checkInDate,
+            },
+          ],
+        },
+      });
+    });
+    const mount = () =>
+      renderHook(
+        ({ booking, dialogId }) =>
+          useRecordPayment({ booking, dialogId, onReconciled: jest.fn() }),
+        { initialProps: { booking: row, dialogId }, wrapper }
+      );
+    onlineManager.setOnline(false);
+    try {
+      const first = mount();
+      const enqueue = (owner: ReturnType<typeof mount>) => {
+        const promise = owner.result.current.mutateAsync(payment);
+        // The offline mutation can reject as soon as the test restores connectivity.
+        void promise.catch(() => {});
+        return promise;
+      };
+      const initial = enqueue(first);
+      await waitFor(() => expect(first.result.current.isPaused).toBe(true));
+      let latest: Promise<AdminBooking> | undefined;
+      if (change === 'reopen') {
+        first.unmount();
+        const next = mount();
+        latest = enqueue(next);
+        await waitFor(() => expect(next.result.current.isPaused).toBe(true));
+      } else if (change === 'resource')
+        first.rerender({
+          booking: { ...row, id: second, _id: second },
+          dialogId,
+        });
+      else if (change === 'dialog')
+        first.rerender({ booking: row, dialogId: Symbol() });
+      else if (change === 'staff' || change === 'session') {
+        mockStaff =
+          change === 'staff'
+            ? { ...mockStaff, userId: 'another' }
+            : { ...mockStaff, sessionId: 'another' };
+        first.rerender({ booking: row, dialogId });
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+      await act(async () => {
+        onlineManager.setOnline(true);
+        if (change === 'active') await initial;
+        else await expect(initial).rejects.toThrow();
+        if (latest) await latest;
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(
+        change === 'active' || change === 'reopen' ? 1 : 0
+      );
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  }
+);

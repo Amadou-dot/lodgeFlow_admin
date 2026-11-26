@@ -101,3 +101,8 @@ export const LOYALTY_TIERS = {
   SILVER: { threshold: 2000, name: 'Silver', color: 'default' },
   BRONZE: { threshold: 0, name: 'Bronze', color: 'primary' },
 } as const;
+
+// Client UX only. Staff API authorization is always enforced on the server.
+export const STAFF_TEST_UI =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NEXT_PUBLIC_TESTING === 'true';

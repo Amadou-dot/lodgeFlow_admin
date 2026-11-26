@@ -46,23 +46,29 @@ export default function CabinModal({
   isSaving,
 }: CabinModalProps) {
   const canWrite = usePermission('cabins:write');
-  const [formData, setFormData] = useState({
+  const [draft, setFormData] = useState({
     name: '',
     image: '',
-    images: [] as string[],
+    images: [] as string[] | null,
     status: 'active' as Cabin['status'],
     capacity: 0,
     price: 0,
-    discount: 0,
+    discount: 0 as number | null,
     description: '',
     amenities: [] as string[],
     bedrooms: undefined as number | undefined,
     bathrooms: undefined as number | undefined,
     size: undefined as number | undefined,
     minNights: undefined as number | undefined,
-    extraGuestFee: 0,
+    extraGuestFee: 0 as number | null,
   });
 
+  const formData = {
+    ...draft,
+    images: draft.images ?? [],
+    discount: draft.discount ?? 0,
+    extraGuestFee: draft.extraGuestFee ?? 0,
+  };
   const [newAmenity, setNewAmenity] = useState('');
   const [newGalleryImage, setNewGalleryImage] = useState('');
   const [imageValidation, setImageValidation] = useState({
@@ -77,18 +83,19 @@ export default function CabinModal({
       setFormData({
         name: cabin.name,
         image: cabin.image,
-        images: cabin.images || [],
+        images: cabin.images,
         status: cabin.status,
         capacity: cabin.capacity,
         price: cabin.price,
-        discount: cabin.discount ?? 0,
+        discount: cabin.discount,
         description: cabin.description,
         amenities: cabin.amenities.filter(isNamedAmenity),
         bedrooms: cabin.bedrooms ?? undefined,
         bathrooms: cabin.bathrooms ?? undefined,
         size: cabin.size ?? undefined,
         minNights: cabin.minNights ?? undefined,
-        extraGuestFee: cabin.extraGuestFee || 0,
+        extraGuestFee:
+          cabin.extraGuestFee === undefined ? 0 : cabin.extraGuestFee,
       });
     } else if (mode === 'create') {
       setFormData({
@@ -150,7 +157,7 @@ export default function CabinModal({
           images,
           status,
           ...fields
-        } = formData;
+        } = draft;
         const originalAmenities = cabin.amenities.filter(isNamedAmenity);
         const unchangedLegacyAmenities =
           originalAmenities.length < cabin.amenities.length &&
@@ -163,14 +170,9 @@ export default function CabinModal({
           ...fields,
           _id: cabin._id,
           amenities: unchangedLegacyAmenities ? undefined : amenities,
-          discount:
-            cabin.discount === null && discount === 0 ? undefined : discount,
-          extraGuestFee:
-            cabin.extraGuestFee === null && extraGuestFee === 0
-              ? undefined
-              : extraGuestFee,
-          images:
-            cabin.images === null && images.length === 0 ? undefined : images,
+          discount: discount ?? undefined,
+          extraGuestFee: extraGuestFee ?? undefined,
+          images: images ?? undefined,
           status: status ?? undefined,
         });
       }
@@ -208,7 +210,7 @@ export default function CabinModal({
     ) {
       setFormData(prev => ({
         ...prev,
-        images: [...prev.images, newGalleryImage.trim()],
+        images: [...(prev.images ?? []), newGalleryImage.trim()],
       }));
       setNewGalleryImage('');
     }
@@ -217,7 +219,7 @@ export default function CabinModal({
   const removeGalleryImage = (url: string) => {
     setFormData(prev => ({
       ...prev,
-      images: prev.images.filter(img => img !== url),
+      images: (prev.images ?? []).filter(img => img !== url),
     }));
   };
 

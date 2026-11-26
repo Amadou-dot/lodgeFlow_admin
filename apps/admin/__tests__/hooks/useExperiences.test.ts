@@ -224,6 +224,7 @@ describe('experience mutations', () => {
     ['create', { success: true, data: { _id: experience._id } }, 'create'],
     ['create', { success: true, data: null }, 'create'],
     ['update', { ...experience, price: '25' }, 'update'],
+    ['update', { ...experience, _id: '507f1f77bcf86cd799439012' }, 'update'],
     ['update', { ...experience, success: false, error: 'Denied' }, 'update'],
     ['remove', { success: true }, 'delete'],
     ['remove', { success: true, data: {} }, 'delete'],
@@ -328,5 +329,19 @@ describe('experience mutations', () => {
         }),
       })
     );
+  });
+});
+
+test('PUT accepts case-equivalent Mongo IDs', async () => {
+  const id = '507f1f77bcf86cd7994390ab';
+  const saved = { ...experience, _id: id, id };
+  fetchMock.mockResolvedValue(
+    response({ body: { success: true, data: saved } })
+  );
+  const { result } = renderHook(useUpdateExperience, { wrapper });
+  await act(async () => {
+    await expect(
+      result.current.mutateAsync({ _id: id.toUpperCase() })
+    ).resolves.toEqual(saved);
   });
 });

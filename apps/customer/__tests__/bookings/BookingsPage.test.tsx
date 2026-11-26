@@ -15,6 +15,17 @@ import { mockBrowserTimeZone } from '@/__tests__/shared/browser-time-zone';
 
 jest.mock('@heroui/toast', () => ({ addToast: jest.fn() }));
 const mockCancelBooking = jest.fn();
+const mockCancelDining = jest.fn();
+const mockCancelExperience = jest.fn();
+let mockReservation: 'dining' | 'experience' | undefined;
+const mockReservationFields = {
+  _id: '507f1f77bcf86cd799439021',
+  customer: 'user_customer',
+  date: '2030-01-01T00:00:00.000Z',
+  totalPrice: 12,
+  status: 'confirmed',
+  isPaid: true,
+};
 const mockUpdateBooking = jest.fn();
 type UpdateHook = (
   id: string | undefined
@@ -126,19 +137,32 @@ jest.mock('@/hooks/useBooking', () => ({
 }));
 jest.mock('@/hooks/useDiningReservation', () => ({
   useDiningReservationHistory: () => ({
-    data: [],
+    data:
+      mockReservation === 'dining'
+        ? [
+            {
+              ...mockReservationFields,
+              dining: null,
+              time: '18:00',
+              numGuests: 2,
+            },
+          ]
+        : [],
     isLoading: false,
     error: null,
   }),
-  useCancelDiningReservation: () => ({ mutateAsync: jest.fn() }),
+  useCancelDiningReservation: () => ({ mutateAsync: mockCancelDining }),
 }));
 jest.mock('@/hooks/useExperienceBooking', () => ({
   useExperienceBookingHistory: () => ({
-    data: [],
+    data:
+      mockReservation === 'experience'
+        ? [{ ...mockReservationFields, experience: null, numParticipants: 2 }]
+        : [],
     isLoading: false,
     error: null,
   }),
-  useCancelExperienceBooking: () => ({ mutateAsync: jest.fn() }),
+  useCancelExperienceBooking: () => ({ mutateAsync: mockCancelExperience }),
 }));
 jest.mock('@/components/PaymentButton', () => ({
   __esModule: true,
@@ -161,6 +185,10 @@ beforeEach(() => {
     mutateAsync: mockCancelBooking,
     isPending: false,
   }));
+  mockReservation = undefined;
+  mockCancelBooking.mockReset();
+  mockCancelDining.mockReset();
+  mockCancelExperience.mockReset();
   mockUpdateBooking.mockReset();
   mockBookings = [mockBooking];
 });
@@ -243,7 +271,9 @@ describe('booking history JSON in the bookings page', () => {
       fireEvent.change(screen.getByRole('spinbutton'), {
         target: { value: '1' },
       });
+      jest.mocked(addToast).mockClear();
       await act(async () => complete());
+      expect(addToast).not.toHaveBeenCalled();
       expect(screen.getByRole('spinbutton')).toHaveValue(1);
       expect(
         screen.getByRole('button', { name: 'Update Booking' })
@@ -465,5 +495,65 @@ it.each(['Edit', 'Cancel'] as const)(
     expect(addToast).not.toHaveBeenCalledWith(
       expect.objectContaining({ color: 'success' })
     );
+  }
+);
+
+describe.each(['cabin', 'dining', 'experience'] as const)(
+  '%s cancellation feedback',
+  kind => {
+    test.each([
+      'session changes',
+      'view unmounts',
+      'refresh removes eligibility',
+    ] as const)('%s before the response arrives', async transition => {
+      if (kind !== 'cabin') {
+        mockBookings = [];
+        mockReservation = kind;
+      }
+      const cancel =
+        kind === 'cabin'
+          ? mockCancelBooking
+          : kind === 'dining'
+            ? mockCancelDining
+            : mockCancelExperience;
+      let complete: () => void = () => {
+        throw new Error('No pending cancellation');
+      };
+      cancel.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            complete = () => {
+              if (transition === 'view unmounts')
+                reject(new Error('Old cancellation failed'));
+              else resolve();
+            };
+          })
+      );
+      const view = render(<BookingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      if (kind === 'cabin')
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel Booking' }));
+      expect(cancel).toHaveBeenCalledTimes(1);
+      if (transition === 'view unmounts') view.unmount();
+      else {
+        if (transition === 'session changes')
+          mockAuth = { ...mockAuth, sessionId: 'replacement' };
+        else {
+          mockBookings = mockBookings.map(row => ({
+            ...row,
+            status: 'cancelled',
+          }));
+          mockReservation = undefined;
+        }
+        view.rerender(<BookingsPage />);
+      }
+      jest.mocked(addToast).mockClear();
+      await act(async () => complete());
+      if (transition === 'refresh removes eligibility')
+        expect(addToast).toHaveBeenCalledWith(
+          expect.objectContaining({ color: 'success' })
+        );
+      else expect(addToast).not.toHaveBeenCalled();
+    });
   }
 );

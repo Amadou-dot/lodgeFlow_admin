@@ -114,8 +114,8 @@ const receipt = {
 for (const kind of ['dining', 'experience'] as const) {
   const isDining = kind === 'dining';
   const decodeHistory = isDining
-    ? decodeDiningHistory
-    : decodeExperienceHistory;
+    ? decodeDiningHistory({ userId: common.customer })
+    : decodeExperienceHistory({ userId: common.customer });
   const decodeDetail = isDining ? decodeDiningDetail : decodeExperienceDetail;
   const detailRoute = isDining ? diningDetail : experienceDetail;
   const historyRoute = isDining ? diningHistory : experienceHistory;
