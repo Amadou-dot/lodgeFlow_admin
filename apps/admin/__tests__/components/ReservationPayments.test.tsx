@@ -700,3 +700,87 @@ test('changing reservation clears the previous mounted uncertain attempt and edi
   expect(screen.getByLabelText('Amount (EUR)')).toHaveValue('');
   expect(fetchMock).toHaveBeenCalledTimes(3);
 });
+
+test('explicit pending retry reaches the provider with the saved token after a competing equal-body refund', async () => {
+  const pending = {
+    ...stripeDetail,
+    reservation: {
+      ...stripeDetail.reservation,
+      stripeRefund: {
+        token: secondId,
+        amountCents: 29,
+        reference: 'Guest request',
+        status: 'pending',
+      },
+    },
+  };
+  const provider = jest.fn().mockResolvedValue(ok({ status: 'pending' }));
+  fetchMock
+    .mockResolvedValueOnce(ok(stripeDetail))
+    .mockResolvedValueOnce(stripeDenial)
+    .mockResolvedValueOnce(ok(pending))
+    .mockImplementationOnce(async (_url: string, options: RequestInit) => {
+      const input = reservationReceiptSchema.parse(
+        JSON.parse(String(options.body))
+      );
+      return input.id === secondId ? provider(input) : stripeDenial;
+    })
+    .mockResolvedValueOnce(ok(pending));
+  await submitStripeRefund();
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Check or retry refund' })
+  );
+  await waitFor(() => expect(provider).toHaveBeenCalledTimes(1));
+  const original = reservationReceiptSchema.parse(
+    JSON.parse(fetchMock.mock.calls[1][1].body)
+  );
+  expect(original.id).toBe(firstId);
+  expect(provider).toHaveBeenCalledWith({ ...original, id: secondId });
+  expect(crypto.randomUUID).toHaveBeenCalledTimes(1);
+  await waitFor(() =>
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  );
+});
+
+test('invalid manual reference stays editable without transmission and correction records one receipt', async () => {
+  const stored = new Map<string, (typeof write.receipts)[number]>();
+  fetchMock.mockImplementation(async (_url: string, options: RequestInit) => {
+    const parsed = reservationReceiptSchema.safeParse(
+      JSON.parse(String(options.body))
+    );
+    if (!parsed.success) throw new Error('Response lost');
+    const row = { ...write.receipts[0], ...parsed.data };
+    stored.set(row.id, row);
+    return ok({ ...write, receipts: Array.from(stored.values()) });
+  });
+  const reload = show();
+  fireEvent.change(screen.getByLabelText('Method'), {
+    target: { value: 'card' },
+  });
+  const note = screen.getByLabelText('Receipt reference / refund reason');
+  fireEvent.change(note, { target: { value: '   ' } });
+  enterAmount('0.29');
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Provide a receipt reference or refund reason'
+  );
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(stored.size).toBe(0);
+  expect(
+    screen.queryByRole('button', { name: 'Retry original transaction' })
+  ).not.toBeInTheDocument();
+  fireEvent.change(note, { target: { value: '  Terminal 42  ' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+  await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body).reference).toBe(
+    '  Terminal 42  '
+  );
+  expect(Array.from(stored.values())).toEqual([
+    expect.objectContaining({
+      method: 'card',
+      type: 'payment',
+      amountCents: 29,
+      reference: 'Terminal 42',
+    }),
+  ]);
+});
