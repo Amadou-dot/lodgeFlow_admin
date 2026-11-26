@@ -3,6 +3,7 @@ import {
   type ConfirmationEmailRequest,
 } from '@/lib/validations/confirmation-email';
 import { useCallback } from 'react';
+import { readSendEmailResponse } from '@/lib/validations/send-email-response';
 import type { WelcomeEmailInput } from '@/lib/validations/welcome-email';
 
 export function useSendConfirmationEmail() {
@@ -17,12 +18,7 @@ export function useSendConfirmationEmail() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to send confirmation email');
-      }
-
-      return response.json();
+      return readSendEmailResponse({ response, kind: 'confirmation' });
     },
     []
   );
@@ -41,11 +37,7 @@ export function useSendWelcomeEmail() {
         body: JSON.stringify({ firstName, email }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to send welcome email');
-      }
-
-      return response.json();
+      return readSendEmailResponse({ response, kind: 'welcome' });
     },
     []
   );

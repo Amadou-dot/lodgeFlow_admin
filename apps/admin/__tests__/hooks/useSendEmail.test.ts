@@ -35,11 +35,12 @@ test('returns a callable confirmation sender', () => {
 test('sends named confirmation data as the existing POST body', async () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
-    json: async () => ({ id: 'email' }),
+    json: async () => ({ id: 'mail:opaque/1', metadata: { queued: true } }),
   } satisfies Pick<Response, 'ok' | 'json'>);
   const { result } = renderHook(() => useSendConfirmationEmail());
   expect(await result.current.sendConfirmationEmail(payload)).toEqual({
-    id: 'email',
+    id: 'mail:opaque/1',
+    metadata: { queued: true },
   });
   expect(global.fetch).toHaveBeenCalledWith('/api/send/confirm', {
     method: 'POST',
@@ -48,18 +49,89 @@ test('sends named confirmation data as the existing POST body', async () => {
   });
 });
 test.each([
-  { error: 'Email service unavailable', expected: 'Email service unavailable' },
-  { error: undefined, expected: 'Failed to send confirmation email' },
-])('retains error handling: $expected', async ({ error, expected }) => {
+  { status: 400, body: { error: 'Invalid JSON body' } },
+  { status: 400, body: { error: 'Invalid email address' } },
+  { status: 400, body: { error: 'Missing booking or cabin data' } },
+  { status: 400, body: { error: 'Invalid confirmation email data' } },
+  { status: 401, body: { success: false, error: 'Unauthorized' } },
+  { status: 401, body: { success: false, error: 'Authentication failed' } },
+  {
+    status: 403,
+    body: { success: false, error: 'Forbidden: Insufficient permissions' },
+  },
+  {
+    status: 429,
+    body: {
+      success: false,
+      error: 'Too many requests. Please try again later.',
+      retryAfter: 30,
+    },
+  },
+  { status: 500, body: { error: 'Failed to send confirmation email' } },
+])('retains the API error from $status $body', async ({ status, body }) => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: false,
-    json: async () => ({ error }),
+    status,
+    json: async () => body,
+  } satisfies Pick<Response, 'ok' | 'status' | 'json'>);
+  const { result } = renderHook(() => useSendConfirmationEmail());
+  await expect(result.current.sendConfirmationEmail(payload)).rejects.toThrow(
+    body.error
+  );
+});
+
+test.each([
+  null,
+  {},
+  { id: 42 },
+  { error: { message: 'Private provider details' } },
+  { error: '   ' },
+])(
+  'uses the confirmation fallback for an unusable error body %j',
+  async body => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      json: async () => body,
+    } satisfies Pick<Response, 'ok' | 'json'>);
+    const { result } = renderHook(() => useSendConfirmationEmail());
+    await expect(result.current.sendConfirmationEmail(payload)).rejects.toThrow(
+      'Failed to send confirmation email'
+    );
+  }
+);
+
+test.each([
+  null,
+  {},
+  { id: 42 },
+  { data: { id: 'mail:opaque/1' }, error: null },
+  { error: 'Unverified error in a 200 response' },
+])('rejects malformed success %j without resending', async body => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => body,
   } satisfies Pick<Response, 'ok' | 'json'>);
   const { result } = renderHook(() => useSendConfirmationEmail());
   await expect(result.current.sendConfirmationEmail(payload)).rejects.toThrow(
-    expected
+    'Failed to send confirmation email'
   );
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });
+
+test.each([true, false])(
+  'uses the confirmation fallback for invalid JSON (ok=%s)',
+  async ok => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok,
+      json: async () => JSON.parse('<html>Gateway response</html>'),
+    } satisfies Pick<Response, 'ok' | 'json'>);
+    const { result } = renderHook(() => useSendConfirmationEmail());
+    await expect(result.current.sendConfirmationEmail(payload)).rejects.toThrow(
+      'Failed to send confirmation email'
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  }
+);
 
 test.each([{ remainingAmount: null }, { extras: { hasBreakfast: true } }])(
   'rejects incomplete lean booking fields before sending',

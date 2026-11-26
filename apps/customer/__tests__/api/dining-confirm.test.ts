@@ -75,33 +75,36 @@ test.each([0, 50])(
     expect(html).toContain('18:00');
   }
 );
-test.each([null, [], {}, { reservationId: [] }, { reservationId: 'invalid' }])(
-  'invalid input is 400 before database/provider effects',
-  async body => {
-    expect((await POST(request(body))).status).toBe(400);
+test.each([
+  { body: null, error: 'Invalid request body' },
+  { body: [], error: 'Invalid request body' },
+  { body: {}, error: 'Reservation ID is required' },
+  { body: { reservationId: [] }, error: 'Invalid reservation ID' },
+  { body: { reservationId: 'invalid' }, error: 'Invalid reservation ID' },
+])(
+  'returns 400 $error before database/provider effects',
+  async ({ body, error }) => {
+    const response = await POST(request(body));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error });
     expect(mockConnect).not.toHaveBeenCalled();
     expect(mockSend).not.toHaveBeenCalled();
   }
 );
+function malformedRequest() {
+  return new Request('https://customer.test', { method: 'POST', body: '{' });
+}
 test('malformed JSON is a safe 400', async () => {
-  expect(
-    (
-      await POST(
-        new Request('https://customer.test', { method: 'POST', body: '{' })
-      )
-    ).status
-  ).toBe(400);
+  const response = await POST(malformedRequest());
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: 'Invalid JSON body' });
   expect(mockConnect).not.toHaveBeenCalled();
 });
 test('auth denial precedes parsing', async () => {
   mockAuth.mockResolvedValueOnce({ userId: null });
-  expect(
-    (
-      await POST(
-        new Request('https://customer.test', { method: 'POST', body: '{' })
-      )
-    ).status
-  ).toBe(401);
+  const response = await POST(malformedRequest());
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: 'Authentication required' });
   expect(mockConnect).not.toHaveBeenCalled();
 });
 test('foreign reservation retains 403 before missing-catalog checks', async () => {
@@ -110,13 +113,21 @@ test('foreign reservation retains 403 before missing-catalog checks', async () =
     customer: 'foreign',
     dining: null,
   });
-  expect((await POST(request())).status).toBe(403);
+  const response = await POST(request());
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({
+    error: 'Not authorized to send this confirmation',
+  });
   expect(mockUser).not.toHaveBeenCalled();
   expect(mockSend).not.toHaveBeenCalled();
 });
 test('unpaid positive total retains 409', async () => {
   mockPopulate.mockResolvedValueOnce({ ...reservation, isPaid: false });
-  expect((await POST(request())).status).toBe(409);
+  const response = await POST(request());
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({
+    error: 'Payment is required before confirmation',
+  });
   expect(mockSend).not.toHaveBeenCalled();
 });
 test('missing dining is 404 without sending', async () => {

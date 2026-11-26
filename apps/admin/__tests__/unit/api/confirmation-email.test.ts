@@ -83,9 +83,14 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 test('retains staff authorization, rate key, sender, recipient, rendered fields and success ID', async () => {
+  const providerData = { id: 'email', metadata: { queued: true } };
+  mockSend.mockResolvedValueOnce({ data: providerData, error: null });
   const response = await POST(request());
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ id: 'email' });
+  expect(await response.json()).toEqual({
+    id: 'email',
+    metadata: { queued: true },
+  });
   expect(mockAuth).toHaveBeenCalledWith({ permission: 'bookings:manage' });
   expect(mockRateLimit.mock.calls[0][0]).toBe('staff:send-confirm');
   const input = mockSend.mock.calls[0][0];
@@ -197,15 +202,21 @@ test.each([
 );
 
 test('auth and rate denials precede parsing and sending', async () => {
+  jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
   mockAuth.mockResolvedValueOnce({
     authenticated: false,
-    error: createErrorResponse('Denied', 403),
+    error: createErrorResponse('Forbidden: Insufficient permissions', 403),
   });
   const input = new Request('https://admin.test', {
     method: 'POST',
     body: '{',
   });
-  expect((await POST(input)).status).toBe(403);
+  const denied = await POST(input);
+  expect(denied.status).toBe(403);
+  expect(await denied.json()).toEqual({
+    success: false,
+    error: 'Forbidden: Insufficient permissions',
+  });
   expect(mockRateLimit).not.toHaveBeenCalled();
   mockRateLimit.mockResolvedValueOnce({
     success: false,
@@ -213,30 +224,62 @@ test('auth and rate denials precede parsing and sending', async () => {
     remaining: 0,
     resetTime: Date.now() + 30000,
   });
-  expect((await POST(input)).status).toBe(429);
+  const throttled = await POST(input);
+  expect(throttled.status).toBe(429);
+  expect(await throttled.json()).toEqual({
+    success: false,
+    error: 'Too many requests. Please try again later.',
+    retryAfter: 30,
+  });
+  expect(throttled.headers.get('Retry-After')).toBe('30');
+  expect(throttled.headers.get('X-RateLimit-Reset')).toBe('1700000030000');
   expect(mockSend).not.toHaveBeenCalled();
 });
 test.each([
-  null,
-  [],
-  { ...payload, email: ['guest@example.invalid'] },
-  { ...payload, firstName: {} },
-  { ...payload, bookingData: null },
-  { ...payload, cabinData: null },
-  { ...payload, bookingData: { ...payload.bookingData, checkInDate: 'bad' } },
-  { ...payload, cabinData: { ...payload.cabinData, amenities: 'bad' } },
-])('invalid confirmation payload is 400 without sending', async body => {
-  expect((await POST(request(body))).status).toBe(400);
-  expect(mockSend).not.toHaveBeenCalled();
-});
+  { body: null, error: 'Invalid confirmation email data' },
+  { body: [], error: 'Missing booking or cabin data' },
+  {
+    body: { ...payload, email: ['guest@example.invalid'] },
+    error: 'Invalid email address',
+  },
+  {
+    body: { ...payload, firstName: {} },
+    error: 'Invalid confirmation email data',
+  },
+  {
+    body: { ...payload, bookingData: null },
+    error: 'Missing booking or cabin data',
+  },
+  {
+    body: { ...payload, cabinData: null },
+    error: 'Missing booking or cabin data',
+  },
+  {
+    body: {
+      ...payload,
+      bookingData: { ...payload.bookingData, checkInDate: 'bad' },
+    },
+    error: 'Invalid confirmation email data',
+  },
+  {
+    body: { ...payload, cabinData: { ...payload.cabinData, amenities: 'bad' } },
+    error: 'Invalid confirmation email data',
+  },
+])(
+  'returns 400 $error for invalid confirmation data',
+  async ({ body, error }) => {
+    const response = await POST(request(body));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error });
+    expect(mockSend).not.toHaveBeenCalled();
+  }
+);
 test('malformed JSON is 400 without sending', async () => {
-  expect(
-    (
-      await POST(
-        new Request('https://admin.test', { method: 'POST', body: '{' })
-      )
-    ).status
-  ).toBe(400);
+  const response = await POST(
+    new Request('https://admin.test', { method: 'POST', body: '{' })
+  );
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({ error: 'Invalid JSON body' });
   expect(mockSend).not.toHaveBeenCalled();
 });
 test('provider rejection is a safe 500', async () => {

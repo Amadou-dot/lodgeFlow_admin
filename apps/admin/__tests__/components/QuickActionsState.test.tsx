@@ -13,7 +13,9 @@ import {
 } from '@tanstack/react-query';
 import type RecordPaymentModal from '@/components/RecordPaymentModal';
 import type { PaymentData } from '@/components/RecordPaymentModal';
-import type { PopulatedBooking } from '@/types';
+import type { Cabin, PopulatedBooking } from '@/types';
+import type { BookingByEmail } from '@/types/booking-read';
+import { addToast } from '@heroui/toast';
 import QuickActionsCard from '@/components/BookingDetails/QuickActionsCard';
 const booking: PopulatedBooking = {
   _id: 'booking',
@@ -50,8 +52,14 @@ const mockReceiptRender = jest.fn<
   ]
 >();
 const mockPDF = jest.fn<Promise<void>, [string]>();
+const mockBookingByEmail = jest.fn<
+  { data: BookingByEmail | null; isLoading: boolean },
+  []
+>();
+const mockCabin = jest.fn<{ data: Cabin | null; isLoading: boolean }, []>();
+const originalFetch = global.fetch;
 jest.mock('@/hooks/useBookings', () => ({
-  useBookingByEmail: () => ({ data: null, isLoading: false }),
+  useBookingByEmail: () => mockBookingByEmail(),
   useRecordPayment: (options: {
     dialogId: symbol | null;
     onReconciled: () => void;
@@ -62,10 +70,7 @@ jest.mock('@/hooks/useBookings', () => ({
   },
 }));
 jest.mock('@/hooks/useCabins', () => ({
-  useCabin: () => ({ data: null, isLoading: false }),
-}));
-jest.mock('@/hooks/useSendEmail', () => ({
-  useSendConfirmationEmail: () => ({ sendConfirmationEmail: jest.fn() }),
+  useCabin: () => mockCabin(),
 }));
 jest.mock('@/hooks/usePrintBooking', () => ({
   usePrintBooking: () => ({
@@ -105,6 +110,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockPayment.mockResolvedValue(undefined);
   mockPDF.mockResolvedValue(undefined);
+  mockBookingByEmail.mockReturnValue({ data: null, isLoading: false });
+  mockCabin.mockReturnValue({ data: null, isLoading: false });
+});
+afterEach(() => {
+  global.fetch = originalFetch;
 });
 function show(selected = booking) {
   const client = new QueryClient({
@@ -214,3 +224,71 @@ test('reconciliation closes the submitting draft while preserving a newer paymen
   expect(screen.getByRole('dialog', { name: 'Payment' })).toBeInTheDocument();
   expect(mockPayment).not.toHaveBeenCalled();
 });
+
+test.each([
+  {
+    body: { id: 'email-provider-id' },
+    color: 'success',
+    description: 'Confirmation email sent successfully',
+  },
+  {
+    body: {},
+    color: 'danger',
+    description: 'Email Failed to send: Failed to send confirmation email',
+  },
+])(
+  'shows $color feedback for the manual send response $body',
+  async ({ body, color, description }) => {
+    const customer = {
+      id: 'user_guest',
+      name: 'Rae Guest',
+      email: 'guest@example.invalid',
+      first_name: 'Rae',
+    };
+    const cabinId = '507f1f77bcf86cd7994390ab';
+    const cabin: Cabin = {
+      _id: cabinId,
+      id: cabinId,
+      name: 'Lake Cabin',
+      image: '/lake-cabin.jpg',
+      images: [],
+      capacity: 4,
+      price: 10,
+      discount: 0,
+      description: 'Quiet cabin',
+      status: 'active',
+      amenities: [],
+    };
+    mockBookingByEmail.mockReturnValue({
+      data: {
+        ...booking,
+        _id: '507f1f77bcf86cd7994390ac',
+        checkInDate: '2040-01-01T00:00:00.000Z',
+        checkOutDate: '2040-01-02T00:00:00.000Z',
+        customer: customer.id,
+        cabin,
+      },
+      isLoading: false,
+    });
+    mockCabin.mockReturnValue({ data: cabin, isLoading: false });
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => body,
+    } satisfies Pick<Response, 'ok' | 'json'>);
+    global.fetch = fetchMock;
+    show({ ...booking, customer });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Send Confirmation Email' })
+    );
+
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith({ color, description })
+    );
+    expect(addToast).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/send/confirm',
+      expect.objectContaining({ method: 'POST' })
+    );
+  }
+);
