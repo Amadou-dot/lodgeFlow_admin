@@ -104,9 +104,9 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** Checked dependency signatures from Clerk client methods, actual Redis/rate limit contracts, admin error/pagination helpers, and framework search params; test-only mock types limited to exercised methods.
 
-- [ ] Characterize existing cache hit/miss, Redis failure, Clerk batch behavior, retry counts, auth/validation envelope, pagination and URL filter assertions.
-- [ ] Replace 21 `any` nodes. Remove two file-level `no-explicit-any` suppressions after migrating. Keep transport fixtures inert and retain negative-input tests as explicit runtime assertions. Use Jest module mock typing, typed test-local dependency surface, or actual fixture data as appropriate.
-- [ ] Run `ADMIN '(api-utils|clerk-users.(batch|redis-cache)|rate-limit|useURLFilters)'` and Task 2 gate. Expected assertions and no node candidates in owned files.
+- [x] Characterize existing cache hit/miss, Redis failure, Clerk batch behavior, retry counts, auth/validation envelope, pagination and URL filter assertions.
+- [x] Replace 21 `any` nodes. Remove two file-level `no-explicit-any` suppressions after migrating. Keep transport fixtures inert and retain negative-input tests as explicit runtime assertions. Use Jest module mock typing, typed test-local dependency surface, or actual fixture data as appropriate.
+- [x] Run `ADMIN '(api-utils|clerk-users.(batch|redis-cache)|rate-limit|useURLFilters)'` and Task 2 gate. Expected assertions and no node candidates in owned files.
 
 ### Task 5: Admin dashboard, booking analytics and stats
 
