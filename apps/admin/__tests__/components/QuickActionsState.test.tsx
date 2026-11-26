@@ -39,10 +39,20 @@ const mockPayment = jest.fn<
   Promise<void>,
   [PaymentData & { bookingId: string }]
 >();
+const mockReceiptRender = jest.fn<
+  void,
+  [{ onReconciled: () => void; booking: PopulatedBooking }]
+>();
 const mockPDF = jest.fn<Promise<void>, [string]>();
 jest.mock('@/hooks/useBookings', () => ({
   useBookingByEmail: () => ({ data: null, isLoading: false }),
-  useRecordPayment: () => useMutation({ mutationFn: mockPayment }),
+  useRecordPayment: (options: {
+    onReconciled: () => void;
+    booking: PopulatedBooking;
+  }) => {
+    mockReceiptRender(options);
+    return useMutation({ mutationFn: mockPayment });
+  },
 }));
 jest.mock('@/hooks/useCabins', () => ({
   useCabin: () => ({ data: null, isLoading: false }),
@@ -176,4 +186,20 @@ test('a null booking status keeps staff receipt access without offering a status
   expect(
     screen.queryByRole('button', { name: /Check (In|Out) Guest/ })
   ).not.toBeInTheDocument();
+});
+
+test('reconciliation closes the submitting draft while preserving a newer payment dialog', () => {
+  show();
+  fireEvent.click(screen.getByRole('button', { name: 'Record Payment' }));
+  const previous = mockReceiptRender.mock.lastCall?.[0];
+  if (!previous) throw new Error('Missing receipt dialog');
+  expect(previous.booking).toEqual(booking);
+  act(previous.onReconciled);
+  expect(
+    screen.queryByRole('dialog', { name: 'Payment' })
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Record Payment' }));
+  act(previous.onReconciled);
+  expect(screen.getByRole('dialog', { name: 'Payment' })).toBeInTheDocument();
+  expect(mockPayment).not.toHaveBeenCalled();
 });

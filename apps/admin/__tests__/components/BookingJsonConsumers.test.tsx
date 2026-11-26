@@ -1,5 +1,9 @@
 import { render, renderHook, screen } from '@testing-library/react';
 import type { AdminBooking } from '@/types/booking-read';
+import {
+  initializeBookingForm,
+  buildBookingUpdateInput,
+} from '@/components/BookingForm/booking-form-data';
 import { useBookingEditForm } from '@/hooks/useBookingForm';
 import CabinInformationCard from '@/components/BookingDetails/CabinInformationCard';
 import BookingPDFTemplate from '@/components/BookingDetails/BookingPDFTemplate';
@@ -178,4 +182,37 @@ test('legacy missing status and amounts remain unavailable in the list, sidebar 
     'Unavailable'
   );
   expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(6);
+});
+
+test('the editor shows stored text entries and omits untouched special requests from updates', () => {
+  const customer = {
+    id: 'user_guest',
+    name: 'Guest',
+    email: 'guest@example.com',
+  };
+  const saved: AdminBooking = {
+    ...booking,
+    customer,
+    guest: customer,
+    specialRequests: [null, 'Extra towels', ''],
+  };
+  const initial = initializeBookingForm(saved);
+  expect(initial.specialRequests).toEqual(['Extra towels', '']);
+  expect(
+    buildBookingUpdateInput({
+      booking: saved,
+      initial,
+      formData: { ...initial, observations: 'New note' },
+    })
+  ).toEqual({ _id: saved._id, observations: 'New note' });
+  expect(
+    buildBookingUpdateInput({
+      booking: saved,
+      initial,
+      formData: { ...initial, specialRequests: ['Late arrival'] },
+    })
+  ).toEqual({ _id: saved._id, specialRequests: ['Late arrival'] });
+  render(<BookingPDFTemplate booking={saved} />);
+  expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  expect(screen.getByText('Extra towels')).toBeInTheDocument();
 });

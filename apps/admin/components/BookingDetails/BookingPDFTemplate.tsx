@@ -111,6 +111,9 @@ export default function BookingPDFTemplate({
       : format(parsed, 'MMM dd, yyyy h:mm a');
   };
 
+  const specialRequests = booking.specialRequests?.filter(
+    request => request !== null
+  );
   const getStatusHexColor = (status: PopulatedBooking['status']) => {
     switch (status) {
       case 'confirmed':
@@ -424,7 +427,7 @@ export default function BookingPDFTemplate({
 
       {/* Notes and Observations */}
       {(booking.observations ||
-        booking.specialRequests?.length ||
+        specialRequests?.length ||
         booking.cancellationReason) && (
         <div style={printStyles.section}>
           <h2 style={printStyles.sectionTitle}>Notes & Special Requests</h2>
@@ -436,7 +439,7 @@ export default function BookingPDFTemplate({
               </div>
             </div>
           )}
-          {booking.specialRequests && booking.specialRequests.length > 0 && (
+          {specialRequests && specialRequests.length > 0 && (
             <div>
               <div style={printStyles.label}>Special Requests:</div>
               <ul
@@ -446,7 +449,7 @@ export default function BookingPDFTemplate({
                   color: '#1e293b',
                 }}
               >
-                {booking.specialRequests.map((request, index) => (
+                {specialRequests.map((request, index) => (
                   <li key={index}>{request}</li>
                 ))}
               </ul>

@@ -30,7 +30,7 @@ import { SWR_CONFIG } from '@/lib/config';
 import { resourceReadKey } from '@/hooks/resourceReadKey';
 import type { BookingsFilters } from '@/types';
 import type { AdminBooking, BookingByEmail } from '@/types/booking-read';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { z } from 'zod';
 import {
   bookingListResponse,
@@ -219,55 +219,104 @@ export const useCreateBooking = () => {
   });
 };
 
-// Record payment for a booking
-export const useRecordPayment = () => {
-  // A transport or acknowledgement failure may follow a committed PATCH.
-  // Keep the same reference until the server confirms the receipt.
-  const pending = useRef<{ bookingId: string; receiptId: string } | null>(null);
+type Receipt = NonNullable<AdminBooking['payments']>[number];
+type ReceiptAttempt = Pick<Receipt, 'id' | 'amount' | 'method'> & {
+  bookingId: string;
+  onReconciled: () => void;
+};
+
+function confirmsReceipt(booking: AdminBooking, attempt: ReceiptAttempt) {
+  return (
+    booking._id === attempt.bookingId.toLowerCase() &&
+    booking.payments?.some(
+      receipt =>
+        receipt.id === attempt.id &&
+        receipt.amount === attempt.amount &&
+        receipt.method === attempt.method
+    )
+  );
+}
+
+export const useRecordPayment = ({
+  booking,
+  onReconciled,
+}: {
+  booking: AdminBooking;
+  onReconciled: () => void;
+}) => {
+  const pending = useRef<ReceiptAttempt | null>(null);
   const refreshBookingCaches = useRefreshBookingCaches();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (data: {
       bookingId: string;
-      paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'online';
+      paymentMethod: Receipt['method'];
       amountPaid: number;
       notes?: string;
     }): Promise<AdminBooking> => {
       const { bookingId, ...paymentData } = data;
-      if (pending.current?.bookingId !== bookingId) {
-        pending.current = { bookingId, receiptId: crypto.randomUUID() };
+      const unresolved = pending.current;
+      if (
+        unresolved &&
+        (unresolved.bookingId !== bookingId ||
+          unresolved.amount !== data.amountPaid ||
+          unresolved.method !== data.paymentMethod)
+      ) {
+        throw new Error(
+          'Refresh this booking to confirm the previous payment before recording a different payment.'
+        );
       }
-      const attempt = pending.current;
+      const attempt = {
+        bookingId,
+        id: unresolved?.id ?? crypto.randomUUID(),
+        amount: data.amountPaid,
+        method: data.paymentMethod,
+        onReconciled,
+      };
+      pending.current = attempt;
 
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recordPayment: { ...paymentData, receiptId: attempt.receiptId },
+          recordPayment: { ...paymentData, receiptId: attempt.id },
         }),
       });
 
-      const { data: booking } = await readResponse({
+      // A first-attempt client error is a definitive rejection. After an
+      // ambiguous attempt, a later rejection cannot establish that it never committed.
+      if (
+        !unresolved &&
+        !response.ok &&
+        response.status >= 400 &&
+        response.status < 500 &&
+        pending.current === attempt
+      ) {
+        pending.current = null;
+      }
+      const { data: saved } = await readResponse({
         response,
         schema: bookingDetailResponse,
         fallback: 'Failed to record payment',
       });
-      if (
-        booking._id !== bookingId.toLowerCase() ||
-        !booking.payments?.some(
-          receipt =>
-            receipt.id === attempt.receiptId &&
-            receipt.amount === paymentData.amountPaid &&
-            receipt.method === paymentData.paymentMethod
-        )
-      ) {
+      if (!confirmsReceipt(saved, attempt))
         throw new Error('Failed to record payment');
-      }
       if (pending.current === attempt) pending.current = null;
-      return booking;
+      return saved;
     },
     onSuccess: refreshBookingCaches,
   });
+
+  useEffect(() => {
+    const attempt = pending.current;
+    if (mutation.isError && attempt && confirmsReceipt(booking, attempt)) {
+      pending.current = null;
+      attempt.onReconciled();
+      refreshBookingCaches();
+    }
+  }, [booking, mutation.isError, refreshBookingCaches]);
+
+  return mutation;
 };
 
 // Update an existing booking

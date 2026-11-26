@@ -44,7 +44,6 @@ function QuickActionsContent({
   onPaymentRecorded,
 }: QuickActionsCardProps) {
   const { sendConfirmationEmail } = useSendConfirmationEmail();
-  const recordPaymentMutation = useRecordPayment();
   const [dialog, setDialog] = useState<{
     kind: 'closed' | 'payment' | 'print';
   }>({ kind: 'closed' });
@@ -57,6 +56,16 @@ function QuickActionsContent({
   }, []);
   const closeDialog = () =>
     setDialog(current => (current === dialog ? { kind: 'closed' } : current));
+  const recordPaymentMutation = useRecordPayment({
+    booking,
+    onReconciled: () => {
+      closeDialog();
+      addToast({
+        color: 'success',
+        description: 'Previously submitted payment confirmed',
+      });
+    },
+  });
   const onPaymentModalOpen = () => setDialog({ kind: 'payment' });
   const onPrintModalOpen = () => setDialog({ kind: 'print' });
   const paymentLoading = recordPaymentMutation.isPending;

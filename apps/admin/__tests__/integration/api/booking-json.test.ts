@@ -86,7 +86,7 @@ async function fixture() {
       },
     ],
     observations: 'Late arrival',
-    specialRequests: ['Quiet cabin'],
+    specialRequests: [null, 'Quiet cabin'],
     status: 'confirmed',
   });
   return { cabin, booking };
@@ -260,6 +260,7 @@ test('by-email validates the actual lean result, its stored-only sparse fields a
   expect(full).toMatchObject({
     ...legacyStay,
     customer: customer.id,
+    specialRequests: [null, 'Quiet cabin'],
     cabin: { _id: String(cabin._id), description: cabin.description },
     payments: [{ id: 'receipt_1', amount: 100 }],
   });
