@@ -124,8 +124,8 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** Validate `CabinDetail[]` list and `CabinDetail` detail/create/update, `ApiResponse<null>` delete, and separate existing bulk delete `{deletedCount:number}` and discount `{modifiedCount:number}` data. Admin availability schema already used by `BookingDatesGuests`.
 
-- [ ] Preserve sparse and nullable legacy cabin fields, existing response fallbacks where evidenced, the single operation-specific bulk count in each response and successful deletion's explicit `data:null`. Reject malformed list member and malformed mutation success before cache invalidation. Assert each bulk operation returns its own counter and keeps the existing success feedback.
-- [ ] Run `ADMIN '(useCabins|cabin-(json|bulk-delete|bulk-request|availability)|catalog-query|Catalog(PendingMutations|Dialogs))'`. Expect route DTOs to pass their browser validators and invalid success to skip normal refresh.
+- [x] Preserve sparse and nullable legacy cabin fields, existing response fallbacks where evidenced, the single operation-specific bulk count in each response and successful deletion's explicit `data:null`. Reject malformed list member and malformed mutation success before cache invalidation. Assert each bulk operation returns its own counter and keeps the existing success feedback.
+- [x] Run `ADMIN '(useCabins|cabin-(json|bulk-delete|bulk-request|availability)|catalog-query|Catalog(PendingMutations|Dialogs))'`. Expect route DTOs to pass their browser validators and invalid success to skip normal refresh.
 
 ### Task 7: Admin dining and experience catalog
 
@@ -193,6 +193,7 @@ Tasks 12, 15 and 16 must run or port the real stored-record fixtures in `package
 
 **Interfaces** `CabinDetail` via the public list route, `DiningJson`, `ExperienceJson`, with browser DTOs derived from observed public rows. Customer catalogue JSON envelope/HTTP policy remains separate from admin.
 
+- [ ] Resolve the Task6 deferred full-cabin ID-alias finding while establishing the common catalog contract: real producers emit equal `_id` and `id`, while single edit and bulk selection consume different aliases. Reject a row carrying different aliases and test that it cannot enter either app's catalog data or trigger mutation success effects. Keep independent booking/lean projections separate.
 - [ ] Assert real public list and detail shapes, query/order/filter compatibility, empty arrays, nullable/sparse legacy properties, and invalid row rejection before cache. Preserve live server catalog reads and both `connection()` boundaries. Retain server freshness smoke.
 - [ ] Run `CUSTOMER '(useCabins|catalog-(details|order|pages)|cabin-catalog|dining-(catalog|query)|experience-query)'`. Reuse admin shape only after wire equivalence is verified. Include existing exact fresh-catalog gate at integration boundary.
 
