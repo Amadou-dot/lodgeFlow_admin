@@ -48,6 +48,20 @@ test('sends named confirmation data as the existing POST body', async () => {
     body: JSON.stringify(payload),
   });
 });
+test('returns the original parsed provider response and all its own fields', async () => {
+  const body: unknown = JSON.parse(
+    '{"id":"mail:opaque/1","__proto__":{"state":"queued"},"metadata":{"queued":true}}'
+  );
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => body,
+  } satisfies Pick<Response, 'ok' | 'json'>);
+  const { result } = renderHook(() => useSendConfirmationEmail());
+  const sent = await result.current.sendConfirmationEmail(payload);
+  expect(Object.prototype.hasOwnProperty.call(sent, '__proto__')).toBe(true);
+  expect(sent).toBe(body);
+});
+
 test.each([
   { status: 400, body: { error: 'Invalid JSON body' } },
   { status: 400, body: { error: 'Invalid email address' } },
