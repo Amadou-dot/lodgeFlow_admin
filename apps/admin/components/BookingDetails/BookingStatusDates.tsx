@@ -16,9 +16,9 @@ const safeFormat = ({
 };
 
 interface BookingStatusDatesProps {
-  status: string;
-  isPaid: boolean;
-  depositPaid: boolean;
+  status: string | null | undefined;
+  isPaid: boolean | null | undefined;
+  depositPaid: boolean | null | undefined;
   checkInDate: string;
   checkOutDate: string;
   numNights: number;

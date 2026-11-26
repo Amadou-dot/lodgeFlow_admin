@@ -2,6 +2,8 @@ import { render, renderHook, screen } from '@testing-library/react';
 import type { AdminBooking } from '@/types/booking-read';
 import { useBookingEditForm } from '@/hooks/useBookingForm';
 import CabinInformationCard from '@/components/BookingDetails/CabinInformationCard';
+import BookingPDFTemplate from '@/components/BookingDetails/BookingPDFTemplate';
+import PaymentSummaryCard from '@/components/BookingDetails/PaymentSummaryCard';
 import BookingHistoryCard from '@/components/BookingDetails/BookingHistoryCard';
 import GuestInformationCard from '@/components/BookingDetails/GuestInformationCard';
 import BookingStatusDates from '@/components/BookingDetails/BookingStatusDates';
@@ -145,4 +147,35 @@ test('minimal list customer fallback renders without document or Date fields', (
   );
   expect(screen.getByText('Unavailable guest')).toBeInTheDocument();
   expect(screen.getByText('N/A')).toBeInTheDocument();
+});
+
+test('legacy missing status and amounts remain unavailable in the list, sidebar and PDF', () => {
+  const sparse = {
+    ...booking,
+    status: null,
+    remainingAmount: null,
+    extrasPrice: null,
+    amountPaid: null,
+    extras: { hasBreakfast: true },
+  };
+  render(
+    <>
+      <BookingTableCell booking={sparse} columnKey='status' />
+      <PaymentSummaryCard
+        numNights={sparse.numNights}
+        cabinPrice={sparse.cabinPrice}
+        totalPrice={sparse.totalPrice}
+        depositAmount={100}
+        depositPaid={true}
+        extrasPrice={null}
+        amountPaid={null}
+        remainingAmount={null}
+      />
+      <BookingPDFTemplate booking={sparse} />
+    </>
+  );
+  expect(screen.getByText('Breakfast:').parentElement).toHaveTextContent(
+    'Unavailable'
+  );
+  expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(6);
 });

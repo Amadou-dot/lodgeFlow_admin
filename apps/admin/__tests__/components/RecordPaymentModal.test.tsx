@@ -1,24 +1,29 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import RecordPaymentModal from '@/components/RecordPaymentModal';
 
-async function show(remainingAmount = 10.01) {
+async function show(remainingAmount: number | null = 10.01) {
   const onRecordPayment = jest.fn().mockResolvedValue(undefined);
   const onClose = jest.fn();
-  render(
+  const modal = (balance: number | null) => (
     <RecordPaymentModal
       isOpen
       isLoading={false}
       onClose={onClose}
       onRecordPayment={onRecordPayment}
       totalAmount={1234.5}
-      remainingAmount={remainingAmount}
+      remainingAmount={balance}
       bookingId='507f1f77bcf86cd799439011'
       guestName='Avery'
     />
   );
+  const view = render(modal(remainingAmount));
   fireEvent.click(screen.getByRole('button', { name: /Payment Method/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'Cash' }));
-  return { onRecordPayment, onClose };
+  return {
+    onRecordPayment,
+    onClose,
+    refresh: (balance: number | null) => view.rerender(modal(balance)),
+  };
 }
 
 test('renders fixed ungrouped major units and submits a full balance with trimmed notes', async () => {
@@ -107,6 +112,38 @@ test('legacy fractional balances still display while a receipt must contain exac
       paymentMethod: 'cash',
       amountPaid: 0.5,
       notes: undefined,
+    })
+  );
+});
+
+test('an unavailable balance disables receipt actions without losing the same-booking draft', async () => {
+  const { onRecordPayment, refresh } = await show(null);
+  const submit = screen.getByRole('button', { name: 'Record Payment' });
+  const amount = screen.getByRole('spinbutton', { name: /Amount Paid/ });
+  const notes = screen.getByLabelText('Payment Notes (Optional)');
+  expect(screen.getByText('Unavailable')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^Full Amount/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /^Half/ })).toBeDisabled();
+  expect(submit).toBeDisabled();
+  refresh(10);
+  fireEvent.change(amount, { target: { value: '8' } });
+  fireEvent.change(notes, { target: { value: 'Desk receipt' } });
+  expect(submit).toBeEnabled();
+  refresh(null);
+  expect(submit).toBeDisabled();
+  fireEvent.click(submit);
+  refresh(6);
+  expect(submit).toBeDisabled();
+  expect(amount).toHaveValue(8);
+  expect(notes).toHaveValue('Desk receipt');
+  refresh(9);
+  expect(onRecordPayment).not.toHaveBeenCalled();
+  fireEvent.click(submit);
+  await waitFor(() =>
+    expect(onRecordPayment).toHaveBeenCalledWith({
+      paymentMethod: 'cash',
+      amountPaid: 8,
+      notes: 'Desk receipt',
     })
   );
 });

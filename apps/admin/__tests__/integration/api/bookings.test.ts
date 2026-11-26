@@ -1,3 +1,7 @@
+import {
+  bookingCollectionWriteResponse,
+  bookingDeleteResponse,
+} from '@/lib/validations/booking-json';
 import type { CabinDetailSource } from '@lodgeflow/database/cabin-json';
 import type { BookingReadSource } from '@lodgeflow/database/booking-json';
 import type { Customer } from '@/types/clerk';
@@ -228,6 +232,7 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(201);
+      bookingCollectionWriteResponse.parse(body);
       expect(body.success).toBe(true);
       expect(body.data.customer).toBeDefined();
     });
@@ -616,6 +621,7 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
+      bookingCollectionWriteResponse.parse(body);
       expect(body.success).toBe(true);
       expect(body.data.status).toBe('confirmed');
     });
@@ -1348,6 +1354,7 @@ describe('Bookings API Routes', () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
+      bookingDeleteResponse.parse(body);
       expect(body.success).toBe(true);
 
       // Verify it's actually deleted

@@ -1,7 +1,6 @@
 import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import type { PopulatedBooking } from '@/types';
-import { getStatusLabel } from '@/utils/bookingUtils';
-import { formatCurrency } from '@/utils/utilityFunctions';
+import { formatBookingAmount, getStatusLabel } from '@/utils/bookingUtils';
 import { format } from 'date-fns';
 
 interface BookingPDFTemplateProps {
@@ -112,9 +111,7 @@ export default function BookingPDFTemplate({
       : format(parsed, 'MMM dd, yyyy h:mm a');
   };
 
-  const formatPrice = (price: number) => formatCurrency(price);
-
-  const getStatusHexColor = (status: string) => {
+  const getStatusHexColor = (status: PopulatedBooking['status']) => {
     switch (status) {
       case 'confirmed':
         return { backgroundColor: '#10b981', color: '#ffffff' };
@@ -132,22 +129,26 @@ export default function BookingPDFTemplate({
   const getAddons = () => {
     const addons = [];
     if (booking.extras?.hasBreakfast) {
-      addons.push(`Breakfast - ${formatPrice(booking.extras.breakfastPrice)}`);
+      addons.push(
+        `Breakfast - ${formatBookingAmount(booking.extras.breakfastPrice)}`
+      );
     }
     if (booking.extras?.hasPets) {
-      addons.push(`Pet Fee - ${formatPrice(booking.extras.petFee)}`);
+      addons.push(`Pet Fee - ${formatBookingAmount(booking.extras.petFee)}`);
     }
     if (booking.extras?.hasParking) {
-      addons.push(`Parking - ${formatPrice(booking.extras.parkingFee)}`);
+      addons.push(
+        `Parking - ${formatBookingAmount(booking.extras.parkingFee)}`
+      );
     }
     if (booking.extras?.hasEarlyCheckIn) {
       addons.push(
-        `Early Check-in - ${formatPrice(booking.extras.earlyCheckInFee)}`
+        `Early Check-in - ${formatBookingAmount(booking.extras.earlyCheckInFee)}`
       );
     }
     if (booking.extras?.hasLateCheckOut) {
       addons.push(
-        `Late Check-out - ${formatPrice(booking.extras.lateCheckOutFee)}`
+        `Late Check-out - ${formatBookingAmount(booking.extras.lateCheckOutFee)}`
       );
     }
     return addons;
@@ -281,7 +282,7 @@ export default function BookingPDFTemplate({
         <div style={printStyles.row}>
           <span style={printStyles.label}>Nightly Rate:</span>
           <span style={printStyles.value}>
-            {booking.cabin ? formatPrice(booking.cabin.price) : 'N/A'}
+            {booking.cabin ? formatBookingAmount(booking.cabin.price) : 'N/A'}
           </span>
         </div>
       </div>
@@ -308,34 +309,34 @@ export default function BookingPDFTemplate({
         <div style={printStyles.row}>
           <span style={printStyles.label}>Cabin Subtotal:</span>
           <span style={printStyles.value}>
-            {formatPrice(booking.cabinPrice)}
+            {formatBookingAmount(booking.cabinPrice)}
           </span>
         </div>
         <div style={printStyles.row}>
           <span style={printStyles.label}>Extras Subtotal:</span>
           <span style={printStyles.value}>
-            {formatPrice(booking.extrasPrice)}
+            {formatBookingAmount(booking.extrasPrice)}
           </span>
         </div>
         <hr style={printStyles.divider} />
         <div style={printStyles.row}>
           <span style={printStyles.label}>Total:</span>
           <span style={{ ...printStyles.value, ...printStyles.totalPrice }}>
-            {formatPrice(booking.totalPrice)}
+            {formatBookingAmount(booking.totalPrice)}
           </span>
         </div>
-        {booking.depositAmount > 0 && (
+        {(booking.depositAmount == null || booking.depositAmount > 0) && (
           <>
             <div style={printStyles.row}>
               <span style={printStyles.label}>Required Deposit:</span>
               <span style={printStyles.value}>
-                {formatPrice(booking.depositAmount)}
+                {formatBookingAmount(booking.depositAmount)}
               </span>
             </div>
             <div style={printStyles.row}>
               <span style={printStyles.label}>Remaining Balance:</span>
               <span style={printStyles.value}>
-                {formatPrice(booking.remainingAmount)}
+                {formatBookingAmount(booking.remainingAmount)}
               </span>
             </div>
           </>
@@ -349,7 +350,11 @@ export default function BookingPDFTemplate({
               fontWeight: 'bold',
             }}
           >
-            {booking.isPaid ? 'Paid' : 'Unpaid'}
+            {booking.isPaid == null
+              ? 'Unavailable'
+              : booking.isPaid
+                ? 'Paid'
+                : 'Unpaid'}
           </span>
         </div>
         {booking.paymentMethod && (
@@ -401,7 +406,7 @@ export default function BookingPDFTemplate({
               <div style={printStyles.row}>
                 <span style={printStyles.label}>Refund Amount:</span>
                 <span style={printStyles.value}>
-                  {formatPrice(booking.refundAmount)}
+                  {formatBookingAmount(booking.refundAmount)}
                 </span>
               </div>
             )}

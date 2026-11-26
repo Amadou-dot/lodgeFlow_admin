@@ -2,12 +2,30 @@ import { NextRequest } from 'next/server';
 import { Types } from 'mongoose';
 import { Booking, Cabin } from '@lodgeflow/database';
 import { GET } from '@/app/api/bookings/route';
+import { GET as getByEmail } from '@/app/api/bookings/by-email/route';
+import {
+  bookingByEmailResponse,
+  bookingListResponse,
+  bookingDetailResponse,
+} from '@/lib/validations/booking-json';
 import { GET as getById, PATCH } from '@/app/api/bookings/[id]/route';
-import { getClerkUser, getClerkUsersBatch } from '@/lib/clerk-users';
+import {
+  getClerkUser,
+  getClerkUsers,
+  getClerkUsersBatch,
+} from '@/lib/clerk-users';
 import { createErrorResponse, requireApiAuth } from '@/lib/api-utils';
 import connectDB from '@/lib/mongodb';
 import type { Customer } from '@/types/clerk';
 
+jest.mock('@/lib/clerk-users', () => ({
+  ...jest.requireActual<typeof import('@/lib/clerk-users')>(
+    '@/lib/clerk-users'
+  ),
+  getClerkUser: jest.fn(),
+  getClerkUsersBatch: jest.fn(),
+  getClerkUsers: jest.fn(),
+}));
 jest.mock('@/lib/mongodb', () => jest.fn().mockResolvedValue(undefined));
 const customer: Customer = {
   id: 'user_guest',
@@ -28,7 +46,7 @@ const customer: Customer = {
   totalBookings: 2,
   totalSpent: 400,
   loyaltyTier: 'Bronze',
-  lastBookingDate: new Date('2030-06-01'),
+  lastBookingDate: new Date('+010000-06-01T00:00:00.000Z'),
 };
 const legacyStay = {
   checkInDate: '2040-06-01T23:30:00.000Z',
@@ -101,7 +119,9 @@ test('list preserves its cabin projection, complete receipt JSON, virtuals and c
   });
   const response = await GET(request());
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const body: unknown = await response.json();
+  bookingListResponse.parse(body);
+  expect(body).toEqual({
     success: true,
     data: [expected],
     pagination: {
@@ -121,6 +141,7 @@ test('detail preserves full cabin and customer JSON including legacy stay instan
   const response = await getById(request(), params(String(booking._id)));
   expect(response.status).toBe(200);
   const body: unknown = await response.json();
+  bookingDetailResponse.parse(body);
   expect(body).toMatchObject({
     data: { ...legacyStay, numNights: 2 },
   });
@@ -217,3 +238,69 @@ test.each(['list', 'detail'])(
     expect(connectDB).not.toHaveBeenCalled();
   }
 );
+
+test('by-email validates the actual lean result, its stored-only sparse fields and an orphaned cabin', async () => {
+  const { booking, cabin } = await fixture();
+  jest
+    .mocked(getClerkUsers)
+    .mockResolvedValue({ data: [customer], totalCount: 1 });
+  async function read() {
+    const response = await getByEmail(
+      new NextRequest(
+        'https://admin.test/api/bookings/by-email?email=guest%40example.invalid'
+      )
+    );
+    expect(response.status).toBe(200);
+    const body: unknown = await response.json();
+    const parsed = bookingByEmailResponse.parse(body);
+    expect(body).toEqual(parsed);
+    return parsed.data;
+  }
+  const full = await read();
+  expect(full).toMatchObject({
+    ...legacyStay,
+    customer: customer.id,
+    cabin: { _id: String(cabin._id), description: cabin.description },
+    payments: [{ id: 'receipt_1', amount: 100 }],
+  });
+  for (const field of [
+    'guest',
+    'id',
+    'durationText',
+    'paymentStatus',
+    'cabinName',
+    'cabin.id',
+  ])
+    expect(full).not.toHaveProperty(field);
+  await Booking.collection.updateOne(
+    { _id: booking._id },
+    {
+      $set: {
+        extras: { hasBreakfast: true, breakfastPrice: null },
+        remainingAmount: null,
+        checkInDate: new Date('+010000-06-01T23:30:00.000Z'),
+      },
+      $unset: { status: '', amountPaid: '', payments: '' },
+    }
+  );
+  await Cabin.deleteOne({ _id: cabin._id });
+  const sparse = await read();
+  expect(sparse).toMatchObject({
+    cabin: null,
+    extras: { hasBreakfast: true, breakfastPrice: null },
+    remainingAmount: null,
+    checkInDate: '+010000-06-01T23:30:00.000Z',
+  });
+  for (const field of ['status', 'payments', 'amountPaid', 'extras.hasPets'])
+    expect(sparse).not.toHaveProperty(field);
+  await Booking.collection.updateOne(
+    { _id: booking._id },
+    { $set: { extras: null } }
+  );
+  expect((await read()).extras).toBeNull();
+  await Booking.collection.updateOne(
+    { _id: booking._id },
+    { $unset: { extras: '' } }
+  );
+  expect(await read()).not.toHaveProperty('extras');
+});

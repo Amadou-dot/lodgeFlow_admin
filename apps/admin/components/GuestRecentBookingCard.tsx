@@ -37,7 +37,7 @@ export default function GuestRecentBookingCard({
                 variant='flat'
                 className='text-xs'
               >
-                {booking.status}
+                {booking.status ?? 'Unavailable'}
               </Chip>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { priceAmountSchema } from './money';
 import { z } from 'zod';
-import type { Cabin, PopulatedBooking } from '@/types';
+import type { Cabin } from '@/types';
+import type { BookingByEmail } from '@/types/booking-read';
 
 const dateString = z
   .string()
@@ -54,7 +55,7 @@ export interface ConfirmationEmailRequest {
   firstName: string;
   email: string;
   bookingData: Pick<
-    PopulatedBooking,
+    BookingByEmail,
     | '_id'
     | 'checkInDate'
     | 'checkOutDate'

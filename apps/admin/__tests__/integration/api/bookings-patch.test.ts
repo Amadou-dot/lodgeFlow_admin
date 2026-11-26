@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { bookingDetailResponse } from '@/lib/validations/booking-json';
 
 jest.mock('@lodgeflow/database/mongodb', () =>
   jest.fn().mockResolvedValue(undefined)
@@ -78,11 +79,37 @@ describe('PATCH /api/bookings/[id]', () => {
 
       expect(response.status).toBe(200);
       expect(body.success).toBe(true);
+      bookingDetailResponse.parse(body);
       expect(body.data.amountPaid).toBe(300);
       expect(body.data.remainingAmount).toBe(700);
       expect(body.data.isPaid).toBe(false);
       expect(body.data.depositPaid).toBe(true);
       expect(body.data.paidAt).toBeDefined();
+    });
+
+    it('replays the same partial receipt and note once and rejects conflicting retry details', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id);
+      const id = String(booking._id);
+      const payment = {
+        amountPaid: 10,
+        paymentMethod: 'cash',
+        receiptId: crypto.randomUUID(),
+        notes: 'At desk',
+      };
+      for (let i = 0; i < 2; i++) {
+        const reply = await callPatch(id, { recordPayment: payment });
+        expect(reply.status).toBe(200);
+        const { data } = bookingDetailResponse.parse(await reply.json());
+        expect(data.payments).toHaveLength(1);
+        expect(data.amountPaid).toBe(10);
+        expect(data.observations).toBe('Payment recorded: At desk');
+      }
+      expect(
+        (await callPatch(id, { recordPayment: { ...payment, amountPaid: 20 } }))
+          .status
+      ).toBe(409);
+      expect((await Booking.findById(id).orFail()).amountPaid).toBe(10);
     });
 
     it('marks booking as fully paid when balance reaches zero', async () => {

@@ -121,7 +121,7 @@ export async function PATCH(req: Request, { params }: IdParam) {
           'Checkout is active; complete or expire it before recording another payment',
           409
         );
-      addBookingPayment(booking, {
+      const added = addBookingPayment(booking, {
         id: updateData.recordPayment.receiptId ?? randomUUID(),
         amount: amountPaid,
         method: paymentMethod,
@@ -129,7 +129,7 @@ export async function PATCH(req: Request, { params }: IdParam) {
       });
 
       // Add payment notes to observations if provided
-      if (notes) {
+      if (added && notes) {
         const combined = booking.observations
           ? `${booking.observations}\n\nPayment recorded: ${notes}`
           : `Payment recorded: ${notes}`;

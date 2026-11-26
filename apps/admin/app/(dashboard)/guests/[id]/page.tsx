@@ -442,7 +442,7 @@ export default function GuestDetailPage() {
                                 size='sm'
                                 variant='flat'
                               >
-                                {booking.status}
+                                {booking.status ?? 'Unavailable'}
                               </Chip>
                             </TableCell>
                             <TableCell className='font-medium'>

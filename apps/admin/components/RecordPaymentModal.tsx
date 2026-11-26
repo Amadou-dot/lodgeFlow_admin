@@ -34,7 +34,7 @@ interface RecordPaymentModalProps {
   onClose: () => void;
   onRecordPayment: (paymentData: PaymentData) => Promise<void>;
   totalAmount: number;
-  remainingAmount: number;
+  remainingAmount: number | null;
   bookingId: string;
   guestName: string;
 }
@@ -89,12 +89,18 @@ export default function RecordPaymentModal({
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const total = majorAmount(totalAmount, { precision: 'preserve' });
-  const remaining = majorAmount(remainingAmount, { precision: 'preserve' });
-  const half = halfPaymentAmount(remaining);
-  const parsedAmount = parsePaymentAmount({
-    value: amountPaid,
-    remainingAmount: remaining,
-  });
+  const remaining =
+    remainingAmount == null
+      ? null
+      : majorAmount(remainingAmount, { precision: 'preserve' });
+  const half = remaining === null ? null : halfPaymentAmount(remaining);
+  const parsedAmount =
+    remaining === null
+      ? undefined
+      : parsePaymentAmount({
+          value: amountPaid,
+          remainingAmount: remaining,
+        });
 
   const paymentMethods = [
     { key: 'cash', label: 'Cash' },
@@ -125,7 +131,8 @@ export default function RecordPaymentModal({
     onClose();
   };
 
-  const handleAmountPreset = (amount: MajorCurrencyAmount) => {
+  const handleAmountPreset = (amount: MajorCurrencyAmount | null) => {
+    if (amount === null) return;
     setAmountPaid(majorToFixed({ amount }));
   };
 
@@ -153,7 +160,9 @@ export default function RecordPaymentModal({
               <div className='flex justify-between items-center'>
                 <span className='text-sm text-default-600'>Remaining:</span>
                 <span className='font-semibold text-warning'>
-                  ${majorToFixed({ amount: remaining })}
+                  {remaining === null
+                    ? 'Unavailable'
+                    : `$${majorToFixed({ amount: remaining })}`}
                 </span>
               </div>
             </div>
@@ -165,16 +174,20 @@ export default function RecordPaymentModal({
                 <Button
                   variant='bordered'
                   size='sm'
+                  isDisabled={remaining === null}
                   onPress={() => handleAmountPreset(remaining)}
                 >
-                  Full Amount (${majorToFixed({ amount: remaining })})
+                  Full Amount
+                  {remaining !== null &&
+                    ` ($${majorToFixed({ amount: remaining })})`}
                 </Button>
                 <Button
                   variant='bordered'
                   size='sm'
+                  isDisabled={half === null}
                   onPress={() => handleAmountPreset(half)}
                 >
-                  Half (${majorToFixed({ amount: half })})
+                  Half{half !== null && ` ($${majorToFixed({ amount: half })})`}
                 </Button>
               </div>
             </div>
@@ -193,7 +206,7 @@ export default function RecordPaymentModal({
               type='number'
               step='0.01'
               min='0'
-              max={remainingAmount}
+              max={remainingAmount ?? undefined}
               isRequired
             />
 

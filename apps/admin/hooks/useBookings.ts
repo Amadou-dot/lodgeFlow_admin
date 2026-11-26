@@ -28,7 +28,17 @@
 
 import { SWR_CONFIG } from '@/lib/config';
 import { resourceReadKey } from '@/hooks/resourceReadKey';
-import type { BookingsFilters, PopulatedBooking } from '@/types';
+import type { BookingsFilters } from '@/types';
+import type { AdminBooking, BookingByEmail } from '@/types/booking-read';
+import { useRef } from 'react';
+import { z } from 'zod';
+import {
+  bookingListResponse,
+  bookingDetailResponse,
+  bookingCollectionWriteResponse,
+  bookingByEmailResponse,
+  bookingDeleteResponse,
+} from '@/lib/validations/booking-json';
 import type { CreateBookingInput, UpdateBookingInput } from '@/types/api';
 import { addToast } from '@heroui/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -53,39 +63,56 @@ const useRefreshBookingCaches = () => {
   };
 };
 
-interface BookingsResponse {
-  bookings: PopulatedBooking[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalBookings: number;
-    limit: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-  _clerkWarning?: string;
+const errorBody = z.object({
+  success: z.literal(false).optional(),
+  error: z.string().min(1),
+});
+function matches<T>(body: unknown, schema: z.ZodType<T>): body is T {
+  return schema.safeParse(body).success;
+}
+async function readResponse<T>({
+  response,
+  schema,
+  fallback,
+  showHttpError = true,
+}: {
+  response: Response;
+  schema: z.ZodType<T>;
+  fallback: string;
+  showHttpError?: boolean;
+}): Promise<T> {
+  if (!response.ok && !showHttpError) throw new Error(fallback);
+  const body: unknown = await response.json().catch(() => undefined);
+  if (response.ok && matches(body, schema)) return body;
+  const failure = errorBody.safeParse(body);
+  throw new Error(failure.success ? failure.data.error : fallback);
 }
 
-// Fetcher function for SWR
-const fetcher = (url: string): Promise<BookingsResponse> =>
-  fetch(url)
-    .then(res => {
-      if (!res.ok) {
-        throw new Error('Failed to fetch bookings');
-      }
-      return res.json();
-    })
-    .then(result => {
-      // Handle new API response format
-      if (result.success) {
-        return {
-          bookings: result.data as PopulatedBooking[],
-          pagination: result.pagination,
-          _clerkWarning: result._clerkWarning,
-        };
-      }
-      throw new Error(result.error || 'Failed to fetch bookings');
-    });
+const fetcher = async (url: string) => {
+  const {
+    data: bookings,
+    pagination,
+    _clerkWarning,
+  } = await readResponse({
+    response: await fetch(url),
+    schema: bookingListResponse,
+    fallback: 'Failed to fetch bookings',
+    showHttpError: false,
+  });
+  return { bookings, pagination, _clerkWarning };
+};
+
+async function readCollectionWrite(
+  response: Response,
+  fallback: string
+): Promise<AdminBooking> {
+  const result = await readResponse({
+    response,
+    schema: bookingCollectionWriteResponse,
+    fallback,
+  });
+  return result.success ? result.data : result;
+}
 
 // Fetch bookings with filters and pagination using SWR
 export const useBookings = (filters: BookingsFilters = {}) => {
@@ -98,15 +125,13 @@ export const useBookings = (filters: BookingsFilters = {}) => {
   if (filters.sortBy) params.append('sortBy', filters.sortBy);
   if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
 
-  const { data, error, isLoading, mutate } = useSWR<BookingsResponse>(
-    `/api/bookings?${params.toString()}`,
-    fetcher,
-    {
-      keepPreviousData: SWR_CONFIG.KEEP_PREVIOUS_DATA,
-      revalidateOnFocus: SWR_CONFIG.REVALIDATE_ON_FOCUS,
-      dedupingInterval: SWR_CONFIG.DEDUPING_INTERVAL,
-    }
-  );
+  const { data, error, isLoading, mutate } = useSWR<
+    Awaited<ReturnType<typeof fetcher>>
+  >(`/api/bookings?${params.toString()}`, fetcher, {
+    keepPreviousData: SWR_CONFIG.KEEP_PREVIOUS_DATA,
+    revalidateOnFocus: SWR_CONFIG.REVALIDATE_ON_FOCUS,
+    dedupingInterval: SWR_CONFIG.DEDUPING_INTERVAL,
+  });
 
   return {
     data,
@@ -118,18 +143,18 @@ export const useBookings = (filters: BookingsFilters = {}) => {
 
 // Fetch a single booking by ID
 export const useBooking = (id: string) => {
-  const { data, error, isLoading, mutate } = useSWR<PopulatedBooking>(
+  const { data, error, isLoading, mutate } = useSWR<AdminBooking>(
     id ? `/api/bookings/${id}` : null,
     async (url: string) => {
-      const response = await fetch(url);
-      if (!response.ok) {
+      const result = await readResponse({
+        response: await fetch(url),
+        schema: bookingDetailResponse,
+        fallback: 'Failed to fetch booking',
+        showHttpError: false,
+      });
+      if (result.data._id !== id.toLowerCase())
         throw new Error('Failed to fetch booking');
-      }
-      const result = await response.json();
-      if (result.success) {
-        return result.data as PopulatedBooking;
-      }
-      throw new Error(result.error || 'Failed to fetch booking');
+      return result.data;
     },
     {
       keepPreviousData: SWR_CONFIG.KEEP_PREVIOUS_DATA,
@@ -148,18 +173,16 @@ export const useBooking = (id: string) => {
 
 // Fetch a single booking by email
 export const useBookingByEmail = (email: string) => {
-  const { data, error, isLoading, mutate } = useSWR<PopulatedBooking>(
+  const { data, error, isLoading, mutate } = useSWR<BookingByEmail>(
     email ? `/api/bookings/by-email?email=${encodeURIComponent(email)}` : null,
     async (url: string) => {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Failed to fetch booking');
-      }
-      const result = await response.json();
-      if (result.success) {
-        return result.data as PopulatedBooking;
-      }
-      throw new Error(result.error || 'Failed to fetch booking');
+      const result = await readResponse({
+        response: await fetch(url),
+        schema: bookingByEmailResponse,
+        fallback: 'Failed to fetch booking',
+        showHttpError: false,
+      });
+      return result.data;
     },
     {
       keepPreviousData: true,
@@ -183,19 +206,14 @@ export const useCreateBooking = () => {
   return useMutation({
     mutationFn: async (
       bookingData: CreateBookingInput
-    ): Promise<PopulatedBooking> => {
+    ): Promise<AdminBooking> => {
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bookingData),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to create booking');
-      }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      return readCollectionWrite(response, 'Failed to create booking');
     },
     onSuccess: refreshBookingCaches,
   });
@@ -203,6 +221,9 @@ export const useCreateBooking = () => {
 
 // Record payment for a booking
 export const useRecordPayment = () => {
+  // A transport or acknowledgement failure may follow a committed PATCH.
+  // Keep the same reference until the server confirms the receipt.
+  const pending = useRef<{ bookingId: string; receiptId: string } | null>(null);
   const refreshBookingCaches = useRefreshBookingCaches();
 
   return useMutation({
@@ -211,24 +232,39 @@ export const useRecordPayment = () => {
       paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'online';
       amountPaid: number;
       notes?: string;
-    }): Promise<PopulatedBooking> => {
+    }): Promise<AdminBooking> => {
       const { bookingId, ...paymentData } = data;
+      if (pending.current?.bookingId !== bookingId) {
+        pending.current = { bookingId, receiptId: crypto.randomUUID() };
+      }
+      const attempt = pending.current;
 
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recordPayment: { ...paymentData, receiptId: crypto.randomUUID() },
+          recordPayment: { ...paymentData, receiptId: attempt.receiptId },
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to record payment');
+      const { data: booking } = await readResponse({
+        response,
+        schema: bookingDetailResponse,
+        fallback: 'Failed to record payment',
+      });
+      if (
+        booking._id !== bookingId.toLowerCase() ||
+        !booking.payments?.some(
+          receipt =>
+            receipt.id === attempt.receiptId &&
+            receipt.amount === paymentData.amountPaid &&
+            receipt.method === paymentData.paymentMethod
+        )
+      ) {
+        throw new Error('Failed to record payment');
       }
-
-      const result = await response.json();
-      return result.data;
+      if (pending.current === attempt) pending.current = null;
+      return booking;
     },
     onSuccess: refreshBookingCaches,
   });
@@ -241,19 +277,24 @@ export const useUpdateBooking = () => {
   return useMutation({
     mutationFn: async (
       updateData: UpdateBookingInput
-    ): Promise<PopulatedBooking> => {
+    ): Promise<AdminBooking> => {
       const response = await fetch('/api/bookings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData),
       });
 
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to update booking');
-      }
-      const result = await response.json();
-      return result.success ? result.data : result;
+      const booking = await readCollectionWrite(
+        response,
+        'Failed to update booking'
+      );
+      if (
+        booking._id !== updateData._id.toLowerCase() ||
+        (updateData.status !== undefined &&
+          booking.status !== updateData.status)
+      )
+        throw new Error('Failed to update booking');
+      return booking;
     },
     onSuccess: () => {
       refreshBookingCaches();
@@ -283,91 +324,52 @@ export const useDeleteBooking = () => {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to delete booking');
-      }
+      await readResponse({
+        response,
+        schema: bookingDeleteResponse,
+        fallback: 'Failed to delete booking',
+        showHttpError: false,
+      });
     },
     onSuccess: refreshBookingCaches,
   });
 };
 
-// Check in a booking
-export const useCheckInBooking = () => {
+function useBookingTransition({
+  status,
+  fallback,
+}: {
+  status: 'checked-in' | 'checked-out' | 'confirmed';
+  fallback: string;
+}) {
   const refreshBookingCaches = useRefreshBookingCaches();
-
   return useMutation({
-    mutationFn: async (bookingId: string): Promise<PopulatedBooking> => {
+    mutationFn: async (bookingId: string): Promise<AdminBooking> => {
       const response = await fetch('/api/bookings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          _id: bookingId,
-          status: 'checked-in',
-        }),
+        body: JSON.stringify({ _id: bookingId, status }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to check in booking');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
+      const booking = await readCollectionWrite(response, fallback);
+      if (booking._id !== bookingId.toLowerCase() || booking.status !== status)
+        throw new Error(fallback);
+      return booking;
     },
     onSuccess: refreshBookingCaches,
   });
-};
-
-// Check out a booking
-export const useCheckOutBooking = () => {
-  const refreshBookingCaches = useRefreshBookingCaches();
-
-  return useMutation({
-    mutationFn: async (bookingId: string): Promise<PopulatedBooking> => {
-      const response = await fetch('/api/bookings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          _id: bookingId,
-          status: 'checked-out',
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to check out booking');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
-    },
-    onSuccess: refreshBookingCaches,
+}
+export const useCheckInBooking = () =>
+  useBookingTransition({
+    status: 'checked-in',
+    fallback: 'Failed to check in booking',
   });
-};
-
-// Confirm a booking
-export const useConfirmBooking = () => {
-  const refreshBookingCaches = useRefreshBookingCaches();
-
-  return useMutation({
-    mutationFn: async (bookingId: string): Promise<PopulatedBooking> => {
-      const response = await fetch('/api/bookings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          _id: bookingId,
-          status: 'confirmed',
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to confirm booking');
-      }
-
-      const result = await response.json();
-      return result.success ? result.data : result;
-    },
-    onSuccess: refreshBookingCaches,
+export const useCheckOutBooking = () =>
+  useBookingTransition({
+    status: 'checked-out',
+    fallback: 'Failed to check out booking',
   });
-};
+export const useConfirmBooking = () =>
+  useBookingTransition({
+    status: 'confirmed',
+    fallback: 'Failed to confirm booking',
+  });
