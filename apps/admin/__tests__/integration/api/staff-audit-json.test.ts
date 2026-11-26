@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 import {
   auditHistoryJsonSchema,
   readStaffAuditResponse,
+  staffAccessJsonSchema,
   staffRoleChangeJsonSchema,
   staffRosterJsonSchema,
 } from '@/lib/validations/staff-audit-json';
@@ -156,7 +157,112 @@ test('audit JSON preserves full lean records, snapshots, timestamps and metadata
 });
 
 test.each([
+  {
+    resource: 'staff access',
+    schema: staffAccessJsonSchema,
+    data: {
+      userId: 'user_guest',
+      role: 'front_desk',
+      permissions: ['bookings:read', 'bookings:manage'],
+      accessMetadata: { source: 'assignment' },
+    },
+  },
+  {
+    resource: 'staff roster',
+    schema: staffRosterJsonSchema,
+    data: [
+      { userId: 'user_guest', role: null, displayMetadata: { verified: true } },
+      { role: null, source: 'sparse profile' },
+    ],
+  },
+  {
+    resource: 'staff role acknowledgement',
+    schema: staffRoleChangeJsonSchema,
+    data: {
+      userId: 'user_guest',
+      role: null,
+      assignmentMetadata: { revision: 2 },
+    },
+  },
+])('preserves additive fields in $resource', async ({ schema, data }) => {
+  const response = Response.json({ success: true, data });
+  await expect(
+    readStaffAuditResponse<unknown>({
+      response,
+      schema,
+      fallback: 'Invalid staff response',
+    })
+  ).resolves.toStrictEqual(data);
+});
+
+const emptyAuditPage = {
+  events: [],
+  total: 0,
+  page: 1,
+  limit: 25,
+  actions: ['staff.role_change'],
+};
+
+test('preserves additive audit history and event data', async () => {
+  const data = {
+    ...emptyAuditPage,
+    auditMetadata: { nextCursor: null },
+    total: 1,
+    events: [
+      {
+        _id: '507f1f77bcf86cd799439011',
+        organizationId,
+        actor: 'user_admin',
+        actorRole: 'admin',
+        action: 'staff.role_change',
+        resourceType: 'staff',
+        resourceId: 'user_guest',
+        before: { role: 'manager', ['__proto__']: { opaque: true } },
+        after: { role: null },
+        createdAt: '2030-01-01T00:00:00.000Z',
+        eventMetadata: { correlation: ['request_1', null] },
+      },
+    ],
+  };
+  await expect(
+    readStaffAuditResponse({
+      response: Response.json({ success: true, data }),
+      schema: auditHistoryJsonSchema,
+      fallback: 'Invalid audit history',
+    })
+  ).resolves.toStrictEqual(data);
+});
+
+test('accepts positive audit read pagination above the current request caps', async () => {
+  const data = { ...emptyAuditPage, page: 10001, limit: 101 };
+  await expect(
+    readStaffAuditResponse({
+      response: Response.json({ success: true, data }),
+      schema: auditHistoryJsonSchema,
+      fallback: 'Invalid audit history',
+    })
+  ).resolves.toStrictEqual(data);
+});
+
+test.each([{ page: 0 }, { limit: 0 }, { page: 1.5 }, { limit: 1.5 }])(
+  'rejects invalid audit pagination metadata %j',
+  async fields => {
+    await expect(
+      readStaffAuditResponse({
+        response: Response.json({
+          success: true,
+          data: { ...emptyAuditPage, ...fields },
+        }),
+        schema: auditHistoryJsonSchema,
+        fallback: 'Invalid audit history',
+      })
+    ).rejects.toThrow('Invalid audit history');
+  }
+);
+
+test.each([
   'page=0',
+  'page=10001',
   'page=Infinity',
   'limit=101',
   'action=unknown',

@@ -52,9 +52,14 @@ export const auditEventJsonSchema = z.object({
 export const auditHistoryJsonSchema = z.object({
   events: z.array(auditEventJsonSchema),
   total: z.int().nonnegative(),
-  page: z.int().min(1).max(10000),
-  limit: z.int().min(1).max(100),
+  page: z.int().positive(),
+  limit: z.int().positive(),
   actions: z.array(action).readonly(),
+});
+
+const successJsonSchema = z.object({
+  success: z.literal(true),
+  data: z.unknown(),
 });
 
 const errorJsonSchema = z.object({
@@ -62,20 +67,31 @@ const errorJsonSchema = z.object({
   error: z.string().min(1),
 });
 
+function isStaffAuditJson<T>(
+  value: unknown,
+  schema: z.ZodType<T, T>
+): value is T {
+  // Keep the original JSON so newer producers can add fields at any depth.
+  return schema.safeParse(value).success;
+}
+
 export async function readStaffAuditResponse<T>({
   response,
   schema,
   fallback,
 }: {
   response: Response;
-  schema: z.ZodType<T>;
+  schema: z.ZodType<T, T>;
   fallback: string;
 }): Promise<T> {
   const body: unknown = await response.json().catch(() => undefined);
-  const result = z
-    .object({ success: z.literal(true), data: schema })
-    .safeParse(body);
-  if (response.ok && result.success) return result.data.data;
+  const result = successJsonSchema.safeParse(body);
+  if (
+    response.ok &&
+    result.success &&
+    isStaffAuditJson(result.data.data, schema)
+  )
+    return result.data.data;
 
   const failure = errorJsonSchema.safeParse(body);
   throw new Error(failure.success ? failure.data.error : fallback);
