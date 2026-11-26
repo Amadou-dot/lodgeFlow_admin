@@ -1,10 +1,11 @@
-import type { Customer } from '@/types';
 import { Autocomplete, AutocompleteItem } from '@heroui/autocomplete';
 import { Avatar } from '@heroui/avatar';
-import { BookingFormFieldProps } from './types';
+import type { BookingCustomerOption } from './types';
 
-interface CustomerSelectionProps extends BookingFormFieldProps {
-  customers: Customer[];
+interface CustomerSelectionProps {
+  selectedCustomerId: string;
+  customers: BookingCustomerOption[];
+  onCustomerSelection: (customer: BookingCustomerOption | undefined) => void;
   customersLoading: boolean;
   scrollerRef?: React.RefObject<HTMLElement>;
   onOpenChange?: (isOpen: boolean) => void;
@@ -12,8 +13,8 @@ interface CustomerSelectionProps extends BookingFormFieldProps {
 }
 
 export default function CustomerSelection({
-  formData,
-  onInputChange,
+  selectedCustomerId,
+  onCustomerSelection,
   customers,
   customersLoading,
   scrollerRef,
@@ -25,10 +26,13 @@ export default function CustomerSelection({
       isVirtualized={false}
       label='Select Customer'
       placeholder='Search and choose a customer'
-      selectedKey={formData.customer || ''}
-      onSelectionChange={key => onInputChange('customer', key as string)}
+      selectedKey={selectedCustomerId || null}
+      onSelectionChange={key =>
+        onCustomerSelection(customers.find(customer => customer.id === key))
+      }
+      clearButtonProps={{ 'aria-label': 'Clear customer' }}
       isRequired
-      defaultItems={customers || []}
+      defaultItems={customers}
       variant='bordered'
       isLoading={customersLoading}
       onInputChange={onSearchChange}

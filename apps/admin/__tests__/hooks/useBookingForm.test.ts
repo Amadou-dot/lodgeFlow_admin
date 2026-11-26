@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
-import { useBookingForm } from '@/hooks/useBookingForm';
+import { useBookingEditForm, useBookingForm } from '@/hooks/useBookingForm';
 import { createBookingSchema } from '@/lib/validations/booking';
 import type { Cabin, Settings } from '@/types';
+import type { AdminBooking } from '@/types/booking-read';
 const mockCabins: Cabin[] = [
   {
     _id: '507f1f77bcf86cd799439011',
@@ -90,6 +91,7 @@ test('form selections produce an accepted request without forged pricing or paym
   ).toBe(true);
   expect(request.extras?.hasBreakfast).toBe(true);
   expect(request.checkInDate).toBe('2040-01-01T00:00:00.000Z');
+  expect(request.checkOutDate).toBe('2040-01-03T00:00:00.000Z');
   expect(request.paymentMethod).toBe('cash');
   expect(request).not.toHaveProperty('isPaid');
   expect(request).not.toHaveProperty('totalPrice');
@@ -213,4 +215,57 @@ test('draft changes and refreshed settings render with their current price, with
   expect(previews.slice(beforeDraft)).toEqual([
     { guests: 3, breakfastRate: 3, price: 18 },
   ]);
+});
+
+const legacyBooking: AdminBooking = {
+  _id: '507f1f77bcf86cd799439012',
+  id: '507f1f77bcf86cd799439012',
+  cabin: mockCabins[0],
+  customer: {
+    id: 'user_guest',
+    name: 'Saved Guest',
+    email: 'guest@example.com',
+  },
+  guest: null,
+  checkInDate: '2040-01-07T12:34:56.789Z',
+  checkOutDate: '2040-01-10T13:57:24.680Z',
+  numNights: 3,
+  numGuests: 2,
+  status: 'confirmed',
+  cabinPrice: 200,
+  extrasPrice: 0,
+  totalPrice: 600,
+  isPaid: true,
+  amountPaid: 600,
+  depositPaid: true,
+  depositAmount: 150,
+  remainingAmount: 0,
+};
+
+test('an edit sends both UTC-midnight dates when either day changes', () => {
+  const { result } = renderHook(() => useBookingEditForm(legacyBooking));
+  act(() => result.current.handleInputChange('checkOutDate', '2040-01-11'));
+  expect(result.current.buildBookingData()).toMatchObject({
+    checkInDate: '2040-01-07T00:00:00.000Z',
+    checkOutDate: '2040-01-11T00:00:00.000Z',
+  });
+
+  act(() => {
+    result.current.handleInputChange('checkInDate', '2040-01-06');
+    result.current.handleInputChange('checkOutDate', '2040-01-10');
+  });
+  expect(result.current.buildBookingData()).toMatchObject({
+    checkInDate: '2040-01-06T00:00:00.000Z',
+    checkOutDate: '2040-01-10T00:00:00.000Z',
+  });
+});
+
+test('reverting a draft stay to its initial range omits both dates from the edit', () => {
+  const { result } = renderHook(() => useBookingEditForm(legacyBooking));
+  act(() => result.current.handleInputChange('checkOutDate', '2040-01-11'));
+  act(() => result.current.handleInputChange('checkOutDate', '2040-01-10'));
+
+  const body = result.current.buildBookingData();
+  expect(body).not.toHaveProperty('checkInDate');
+  expect(body).not.toHaveProperty('checkOutDate');
 });

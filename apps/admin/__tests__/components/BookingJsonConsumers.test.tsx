@@ -1,6 +1,6 @@
 import { render, renderHook, screen } from '@testing-library/react';
 import type { AdminBooking } from '@/types/booking-read';
-import { useBookingForm } from '@/hooks/useBookingForm';
+import { useBookingEditForm } from '@/hooks/useBookingForm';
 import CabinInformationCard from '@/components/BookingDetails/CabinInformationCard';
 import BookingHistoryCard from '@/components/BookingDetails/BookingHistoryCard';
 import GuestInformationCard from '@/components/BookingDetails/GuestInformationCard';
@@ -49,7 +49,7 @@ const booking: AdminBooking = {
 };
 
 test('booking form handles missing references while keeping date-only and receipt flags', () => {
-  const { result } = renderHook(() => useBookingForm(booking));
+  const { result } = renderHook(() => useBookingEditForm(booking));
   expect(result.current.formData).toMatchObject({
     cabin: '',
     customer: '',

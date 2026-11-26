@@ -68,6 +68,12 @@ presented as behavior-neutral cleanup:
 - The admin customer selector ignores late results from old searches, resets pagination
   when search is cleared, and permits retry after a next-page failure. Customer
   profile edits refresh populated booking reads.
+- The admin booking editor initializes after the matching detail response and keeps
+  its draft through same-booking refreshes. A resolved selected guest stays available
+  across customer list pages and searches. An edit omits both stay dates when the
+  chosen range matches the initial calendar selection, preserving the exact stored
+  timestamps on legacy stays. Creation and genuine stay changes send both dates at
+  UTC midnight.
 - Successful booking writes refresh actual SWR list/detail readers and TanStack
   reporting readers, including sales/durations; cabin writes refresh affected
   detail readers as well as catalog/statistics caches.

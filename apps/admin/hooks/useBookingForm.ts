@@ -1,8 +1,7 @@
-import type { CreateBookingInput } from '@/lib/validations/booking';
 import { useCabins } from '@/hooks/useCabins';
 import { useInfiniteCustomers } from '@/hooks/useInfiniteCustomers';
 import { useSettings } from '@/hooks/useSettings';
-import type { PopulatedBooking } from '@/types';
+import type { AdminBooking } from '@/types/booking-read';
 import {
   calcNumNights,
   formatCurrency as formatCurrencyAmount,
@@ -11,68 +10,55 @@ import { majorAmount, roundMajorAmount } from '@lodgeflow/database/money';
 import { useInfiniteScroll } from '@heroui/use-infinite-scroll';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  BookingCustomerOption,
   BookingFormData,
   PriceBreakdown,
 } from '@/components/BookingForm/types';
 
+import {
+  buildBookingCreateInput,
+  buildBookingUpdateInput,
+  initializeBookingForm,
+} from '@/components/BookingForm/booking-form-data';
+
 export type { BookingFormData, PriceBreakdown };
 
-const getInitialFormData = (booking?: PopulatedBooking): BookingFormData => {
-  if (booking) {
-    return {
-      cabin: booking.cabin?._id ?? '',
-      customer: booking.customer?.id ?? '',
-      checkInDate: booking.checkInDate.split('T')[0],
-      checkOutDate: booking.checkOutDate.split('T')[0],
-      numGuests: booking.numGuests,
-      hasBreakfast: booking.extras?.hasBreakfast || false,
-      hasPets: booking.extras?.hasPets || false,
-      hasParking: booking.extras?.hasParking || false,
-      hasEarlyCheckIn: booking.extras?.hasEarlyCheckIn || false,
-      hasLateCheckOut: booking.extras?.hasLateCheckOut || false,
-      observations: booking.observations || '',
-      specialRequests: booking.specialRequests || [],
-      paymentMethod: booking.paymentMethod || '',
-      isPaid: booking.isPaid,
-      depositPaid: booking.depositPaid,
-    };
-  }
-
-  return {
-    cabin: '',
-    customer: '',
-    checkInDate: '',
-    checkOutDate: '',
-    numGuests: 1,
-    hasBreakfast: false,
-    hasPets: false,
-    hasParking: false,
-    hasEarlyCheckIn: false,
-    hasLateCheckOut: false,
-    observations: '',
-    specialRequests: [],
-    paymentMethod: '',
-    isPaid: false,
-    depositPaid: false,
-  };
-};
-
-export const useBookingForm = (initialBooking?: PopulatedBooking) => {
-  const [formData, setFormData] = useState<BookingFormData>(() =>
-    getInitialFormData(initialBooking)
-  );
+function useBookingFormDraft({
+  initialize,
+  initialCustomer,
+}: {
+  initialize: () => BookingFormData;
+  initialCustomer?: BookingCustomerOption;
+}) {
+  const [formData, setFormData] = useState(initialize);
+  const [retainedCustomer, setRetainedCustomer] = useState(initialCustomer);
 
   const [specialRequestInput, setSpecialRequestInput] = useState('');
   // Data fetching hooks
   const { data: cabins } = useCabins();
   const {
-    customers,
+    customers: listedCustomers,
     hasMore,
     isLoading: customersLoading,
     onLoadMore,
     searchCustomers,
   } = useInfiniteCustomers();
   const { data: settings } = useSettings();
+
+  const listedCustomer = listedCustomers.find(
+    customer => customer.id === formData.customer
+  );
+  // A prefilled ID can resolve when its page first arrives.
+  if (listedCustomer && listedCustomer !== retainedCustomer) {
+    setRetainedCustomer(listedCustomer);
+  }
+  const customers = useMemo(
+    () =>
+      !listedCustomer && retainedCustomer?.id === formData.customer
+        ? [retainedCustomer, ...listedCustomers]
+        : listedCustomers,
+    [listedCustomer, retainedCustomer, formData.customer, listedCustomers]
+  );
 
   // Customer selection state
   const [isCustomerOpen, setIsCustomerOpen] = useState(false);
@@ -220,6 +206,14 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     []
   );
 
+  const handleCustomerSelection = useCallback(
+    (customer: BookingCustomerOption | undefined) => {
+      setRetainedCustomer(customer);
+      handleInputChange('customer', customer?.id ?? '');
+    },
+    [handleInputChange]
+  );
+
   const addSpecialRequest = useCallback(() => {
     if (specialRequestInput.trim()) {
       setFormData(prev => ({
@@ -288,29 +282,6 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     [settings?.currency]
   );
 
-  // Build booking data for API - memoized
-  const buildBookingData = useCallback(
-    (): CreateBookingInput => ({
-      cabin: formData.cabin,
-      customer: formData.customer,
-      checkInDate: new Date(formData.checkInDate).toISOString(),
-      checkOutDate: new Date(formData.checkOutDate).toISOString(),
-      numGuests: formData.numGuests,
-      status: 'unconfirmed',
-      paymentMethod: formData.paymentMethod || undefined,
-      extras: {
-        hasBreakfast: formData.hasBreakfast,
-        hasPets: formData.hasPets,
-        hasParking: formData.hasParking,
-        hasEarlyCheckIn: formData.hasEarlyCheckIn,
-        hasLateCheckOut: formData.hasLateCheckOut,
-      },
-      observations: formData.observations || undefined,
-      specialRequests: formData.specialRequests,
-    }),
-    [formData]
-  );
-
   return {
     // State
     formData,
@@ -335,6 +306,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     // Handlers
     handleInputChange,
     handleCustomerSearch,
+    handleCustomerSelection,
     addSpecialRequest,
     removeSpecialRequest,
     setSpecialRequestInput,
@@ -342,6 +314,31 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     // Utilities
     validateForm,
     formatCurrency,
-    buildBookingData,
   };
-};
+}
+
+export function useBookingForm() {
+  const draft = useBookingFormDraft({ initialize: initializeBookingForm });
+  return {
+    ...draft,
+    buildBookingData: () => buildBookingCreateInput(draft.formData),
+  };
+}
+
+export function useBookingEditForm(booking: AdminBooking) {
+  const [initialFormData] = useState(() => initializeBookingForm(booking));
+  const draft = useBookingFormDraft({
+    initialize: () => initialFormData,
+    initialCustomer: booking.customer ?? undefined,
+  });
+
+  return {
+    ...draft,
+    buildBookingData: () =>
+      buildBookingUpdateInput({
+        booking,
+        formData: draft.formData,
+        initialStay: initialFormData,
+      }),
+  };
+}
