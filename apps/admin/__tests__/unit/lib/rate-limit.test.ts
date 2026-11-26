@@ -1,27 +1,37 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Ratelimit } from '@upstash/ratelimit';
 
-// Mocks are hoisted above the imports, so the factories below reference the
-// `mock*` bindings lazily (inside arrow functions) to avoid a TDZ error.
-const mockRatelimitLimit = jest.fn();
-const mockFixedWindow = jest.fn((limit: number, window: string) => ({
-  limit,
-  window,
-}));
-const mockRatelimitConstructor = jest.fn();
+const mockRatelimitLimit = jest.fn<
+  ReturnType<Ratelimit['limit']>,
+  Parameters<Ratelimit['limit']>
+>();
+const mockRatelimitConstructor = jest.fn<
+  void,
+  ConstructorParameters<typeof Ratelimit>
+>();
+const mockFixedWindow = jest.fn(
+  (...args: Parameters<typeof Ratelimit.fixedWindow>) =>
+    jest
+      .requireActual<typeof import('@upstash/ratelimit')>('@upstash/ratelimit')
+      .Ratelimit.fixedWindow(...args)
+);
 
 jest.mock('@upstash/ratelimit', () => ({
-  Ratelimit: Object.assign(
-    function Ratelimit(this: any, config: any) {
+  Ratelimit: class implements Pick<Ratelimit, 'limit'> {
+    constructor(config: ConstructorParameters<typeof Ratelimit>[0]) {
       mockRatelimitConstructor(config);
-      this.limit = (...args: any[]) => mockRatelimitLimit(...args);
-    },
-    { fixedWindow: (...args: any[]) => (mockFixedWindow as any)(...args) }
-  ),
+    }
+
+    static fixedWindow(...args: Parameters<typeof Ratelimit.fixedWindow>) {
+      return mockFixedWindow(...args);
+    }
+
+    limit(...args: Parameters<Ratelimit['limit']>) {
+      return mockRatelimitLimit(...args);
+    }
+  },
 }));
 
-jest.mock('@upstash/redis', () => ({
-  Redis: jest.fn().mockImplementation(() => ({ __upstash: true })),
-}));
+jest.mock('@upstash/redis', () => ({ Redis: class {} }));
 
 import {
   checkRateLimit,
@@ -202,6 +212,7 @@ describe('checkRateLimit — distributed store selection (Upstash env vars set)'
   it('routes the check through @upstash/ratelimit instead of the local Map', async () => {
     const reset = Date.now() + 60_000;
     mockRatelimitLimit.mockResolvedValue({
+      pending: Promise.resolve(),
       success: true,
       limit: 5,
       remaining: 4,
@@ -222,6 +233,7 @@ describe('checkRateLimit — distributed store selection (Upstash env vars set)'
 
   it('builds a fixed window matching the config and namespaces the keys', async () => {
     mockRatelimitLimit.mockResolvedValue({
+      pending: Promise.resolve(),
       success: true,
       limit: 5,
       remaining: 4,
@@ -238,6 +250,7 @@ describe('checkRateLimit — distributed store selection (Upstash env vars set)'
 
   it('reuses one limiter per config instead of rebuilding it each call', async () => {
     mockRatelimitLimit.mockResolvedValue({
+      pending: Promise.resolve(),
       success: true,
       limit: 5,
       remaining: 4,
@@ -254,6 +267,7 @@ describe('checkRateLimit — distributed store selection (Upstash env vars set)'
 
   it('builds a separate limiter for a different config', async () => {
     mockRatelimitLimit.mockResolvedValue({
+      pending: Promise.resolve(),
       success: true,
       limit: 5,
       remaining: 4,
@@ -269,6 +283,7 @@ describe('checkRateLimit — distributed store selection (Upstash env vars set)'
   it('propagates a denial from the distributed store', async () => {
     const reset = Date.now() + 30_000;
     mockRatelimitLimit.mockResolvedValue({
+      pending: Promise.resolve(),
       success: false,
       limit: 5,
       remaining: 0,

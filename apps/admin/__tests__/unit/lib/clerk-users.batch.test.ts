@@ -1,22 +1,31 @@
-// Mock Clerk SDK before importing the module under test
-const mockGetUser = jest.fn();
-const mockGetUserList = jest.fn();
-
-jest.mock('@clerk/nextjs/server', () => ({
-  clerkClient: jest.fn().mockResolvedValue({
-    users: {
-      getUser: (...args: any[]) => mockGetUser(...args),
-      getUserList: (...args: any[]) => mockGetUserList(...args),
-    },
-  }),
-  User: {},
-}));
-
+import type { clerkClient } from '@clerk/nextjs/server';
 import {
   getClerkUser,
   getClerkUsers,
   getClerkUsersBatch,
+  type CustomerClerkSource,
 } from '@/lib/clerk-users';
+
+type ClerkUsers = Awaited<ReturnType<typeof clerkClient>>['users'];
+type ClerkUserList = Awaited<ReturnType<ClerkUsers['getUserList']>>;
+type MockUserList = Omit<ClerkUserList, 'data'> & {
+  data: CustomerClerkSource[];
+};
+
+const mockGetUser = jest.fn<
+  Promise<CustomerClerkSource>,
+  Parameters<ClerkUsers['getUser']>
+>();
+const mockGetUserList = jest.fn<
+  Promise<MockUserList>,
+  Parameters<ClerkUsers['getUserList']>
+>();
+
+jest.mock('@clerk/nextjs/server', () => ({
+  clerkClient: async () => ({
+    users: { getUser: mockGetUser, getUserList: mockGetUserList },
+  }),
+}));
 
 // The module keeps an in-memory user cache, so every test uses unique user
 // IDs to stay isolated from previously cached entries.
@@ -26,7 +35,7 @@ function uid(prefix = 'user'): string {
   return `${prefix}_${Date.now()}_${uniqueCounter}`;
 }
 
-function clerkUser(id: string, overrides: Record<string, any> = {}) {
+function clerkUser(id: string): CustomerClerkSource {
   return {
     id,
     firstName: 'Test',
@@ -45,7 +54,6 @@ function clerkUser(id: string, overrides: Record<string, any> = {}) {
     lastActiveAt: Date.now(),
     banned: false,
     locked: false,
-    ...overrides,
   };
 }
 
@@ -120,9 +128,7 @@ describe('getClerkUser', () => {
 describe('getClerkUsersBatch', () => {
   it('fetches every requested user', async () => {
     const ids = [uid('batch'), uid('batch'), uid('batch')];
-    mockGetUser.mockImplementation((id: string) =>
-      Promise.resolve(clerkUser(id))
-    );
+    mockGetUser.mockImplementation(id => Promise.resolve(clerkUser(id)));
 
     const { users, errors } = await getClerkUsersBatch(ids);
 
@@ -136,9 +142,7 @@ describe('getClerkUsersBatch', () => {
   it('reuses cached users instead of re-fetching', async () => {
     const cachedId = uid('batch');
     const freshId = uid('batch');
-    mockGetUser.mockImplementation((id: string) =>
-      Promise.resolve(clerkUser(id))
-    );
+    mockGetUser.mockImplementation(id => Promise.resolve(clerkUser(id)));
 
     await getClerkUser(cachedId); // populate cache
     mockGetUser.mockClear();
@@ -153,7 +157,7 @@ describe('getClerkUsersBatch', () => {
   it('maps deleted users (404) to null without counting an error', async () => {
     const goneId = uid('batch');
     const okId = uid('batch');
-    mockGetUser.mockImplementation((id: string) =>
+    mockGetUser.mockImplementation(id =>
       id === goneId
         ? Promise.reject({ status: 404 })
         : Promise.resolve(clerkUser(id))
@@ -170,7 +174,7 @@ describe('getClerkUsersBatch', () => {
     const flakyId = uid('batch');
     mockGetUser
       .mockRejectedValueOnce({ status: 500 })
-      .mockImplementation((id: string) => Promise.resolve(clerkUser(id)));
+      .mockImplementation(id => Promise.resolve(clerkUser(id)));
 
     const first = await getClerkUsersBatch([flakyId]);
     expect(first.errors).toBe(1);
@@ -188,7 +192,7 @@ describe('getClerkUsersBatch', () => {
 
     let active = 0;
     let maxActive = 0;
-    mockGetUser.mockImplementation(async (id: string) => {
+    mockGetUser.mockImplementation(async id => {
       active++;
       maxActive = Math.max(maxActive, active);
       await new Promise(resolve => setTimeout(resolve, 20));
