@@ -2,8 +2,9 @@
 /**
  * TypeScript Type Checking Script
  *
- * This script runs TypeScript compiler in noEmit mode to check for type errors
- * across the entire project without generating output files.
+ * With no arguments, this checks the application tsconfig.json. Positional
+ * files are checked in standalone tsc mode with TypeScript's default options
+ * and --noEmit. Use check:types:test-scripts for the strict test/script project.
  */
 
 import { execSync } from 'child_process';
@@ -99,7 +100,7 @@ async function checkTypes() {
 
 // Additional function to check specific files
 async function checkSpecificFiles(files: string[]) {
-  header('TypeScript Type Checking (Specific Files)');
+  header('TypeScript Type Checking (Standalone Files)');
 
   if (files.length === 0) {
     log('❌ No files specified', 'red');
@@ -109,7 +110,10 @@ async function checkSpecificFiles(files: string[]) {
   const startTime = Date.now();
 
   try {
-    log(`\n📝 Checking ${files.length} file(s)...`, 'blue');
+    log(
+      `\n📝 Checking ${files.length} file(s) with TypeScript defaults...`,
+      'blue'
+    );
     log('Files:', 'cyan');
     files.forEach(file => log(`  - ${file}`, 'cyan'));
     log('');
@@ -160,13 +164,20 @@ if (args.length > 0 && !args[0].startsWith('-')) {
   checkSpecificFiles(args);
 } else if (args.includes('--help') || args.includes('-h')) {
   log('\nUsage:', 'cyan');
-  log('  npm run check:types                  - Check all files', 'yellow');
   log(
-    '  npm run check:types file1.ts file2.ts - Check specific files',
+    '  pnpm check:types                  - Check the application project',
     'yellow'
   );
-  log('  npm run check:types -- --help        - Show this help\n', 'yellow');
+  log(
+    '  pnpm check:types file1.ts file2.ts - Check standalone files with TypeScript defaults',
+    'yellow'
+  );
+  log(
+    '  pnpm check:types:test-scripts     - Check tests and scripts with project options',
+    'yellow'
+  );
+  log('  pnpm check:types --help           - Show this help\n', 'yellow');
 } else {
-  // Check all files
+  // Check the application project.
   checkTypes();
 }

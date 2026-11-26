@@ -31,32 +31,44 @@ const MOTION_ONLY_PROPS = [
   'dragMomentum',
 ];
 
+/** @param {string} tag */
 function createMotionComponent(tag) {
-  return React.forwardRef(function MotionMock(props, ref) {
+  /**
+   * @param {Record<string, unknown>} props
+   * @param {import('react').ForwardedRef<Element>} ref
+   */
+  function MotionMock(props, ref) {
     const domProps = { ...props };
     for (const key of MOTION_ONLY_PROPS) delete domProps[key];
     return React.createElement(tag, { ...domProps, ref });
-  });
+  }
+
+  return React.forwardRef(MotionMock);
 }
 
+/** @type {Record<string, ReturnType<typeof createMotionComponent>>} */
+const motionComponents = {};
+
 // Render any motion.<tag> / m.<tag> as the plain HTML tag.
-const motionProxy = new Proxy(
-  {},
-  {
-    get: (target, prop) => {
-      if (typeof prop !== 'string') return undefined;
-      if (!target[prop]) target[prop] = createMotionComponent(prop);
-      return target[prop];
-    },
-  }
-);
+const motionProxy = new Proxy(motionComponents, {
+  get: (target, prop) => {
+    if (typeof prop !== 'string') return undefined;
+    if (!target[prop]) target[prop] = createMotionComponent(prop);
+    return target[prop];
+  },
+});
+
+/** @typedef {{ children?: import('react').ReactNode }} MockChildrenProps */
 
 module.exports = {
   ...actual,
   __esModule: true,
-  AnimatePresence: ({ children }) => children,
-  LazyMotion: ({ children }) => children,
-  MotionConfig: ({ children }) => children,
+  AnimatePresence: /** @param {MockChildrenProps} props */ ({ children }) =>
+    children,
+  LazyMotion: /** @param {MockChildrenProps} props */ ({ children }) =>
+    children,
+  MotionConfig: /** @param {MockChildrenProps} props */ ({ children }) =>
+    children,
   motion: motionProxy,
   m: motionProxy,
   domAnimation: {},
