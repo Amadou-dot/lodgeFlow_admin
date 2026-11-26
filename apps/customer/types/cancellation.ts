@@ -1,5 +1,5 @@
 import type { REFUND_STATUSES } from '@lodgeflow/database/config';
-import type { BookingDetail } from './booking-read';
+import type { BookingDetail } from '@lodgeflow/database/booking-json';
 
 export type CancellationPolicy = 'flexible' | 'moderate' | 'strict';
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
@@ -23,8 +23,12 @@ export interface CancellationDeadlines {
 }
 
 export interface RefundEstimateResponse {
-  estimate: RefundEstimate;
-  deadlines: CancellationDeadlines;
+  estimate: Omit<RefundEstimate, 'policy'> & {
+    policy: CancellationPolicy | null;
+  };
+  deadlines: Omit<CancellationDeadlines, 'policy'> & {
+    policy: CancellationPolicy | null;
+  };
   policyDescription: string;
   canCancel: boolean;
   cancelNotAllowedReason?: string;

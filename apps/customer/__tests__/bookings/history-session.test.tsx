@@ -53,7 +53,7 @@ function historyResponse({
   owner: string;
 }) {
   const common = {
-    _id: `${owner}-${resource.kind}`,
+    _id: '507f1f77bcf86cd799439011',
     customer: owner,
     status: 'confirmed' as const,
     totalPrice: 20,
@@ -64,8 +64,8 @@ function historyResponse({
       ? ({
           ...common,
           cabin: null,
-          checkInDate: '2030-01-01',
-          checkOutDate: '2030-01-03',
+          checkInDate: '2030-01-01T00:00:00.000Z',
+          checkOutDate: '2030-01-03T00:00:00.000Z',
           numNights: 2,
           numGuests: 2,
           cabinPrice: 10,
@@ -74,14 +74,14 @@ function historyResponse({
         ? ({
             ...common,
             dining: null,
-            date: '2030-01-01',
+            date: '2030-01-01T00:00:00.000Z',
             time: '19:00',
             numGuests: 2,
           } satisfies DiningReservationHistory)
         : ({
             ...common,
             experience: null,
-            date: '2030-01-01',
+            date: '2030-01-01T00:00:00.000Z',
             numParticipants: 2,
           } satisfies ExperienceReservationHistory);
   return {
@@ -96,7 +96,9 @@ function Probe({ resource }: { resource: Resource }) {
   return (
     <div>
       {query.data?.map(record => (
-        <p key={record._id}>{record._id}</p>
+        <p key={record._id}>
+          {record.customer}-{resource.kind}
+        </p>
       ))}
     </div>
   );

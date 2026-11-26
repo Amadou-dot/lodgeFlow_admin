@@ -132,7 +132,9 @@ export default function ExperienceConfirmationPage({
         </p>
         <Chip color='warning' size='lg' variant='flat'>
           Status:{' '}
-          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+          {booking.status
+            ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1)
+            : 'Unknown'}
         </Chip>
       </div>
 
@@ -234,12 +236,14 @@ export default function ExperienceConfirmationPage({
           <h2 className={title({ size: 'sm' })}>Price Breakdown</h2>
         </CardHeader>
         <CardBody className='space-y-3'>
-          <ReservationCheckout
-            id={booking._id}
-            isPaid={booking.isPaid}
-            kind='experience'
-            status={booking.status}
-          />
+          {booking.status && (
+            <ReservationCheckout
+              id={booking._id}
+              isPaid={booking.isPaid === true}
+              kind='experience'
+              status={booking.status}
+            />
+          )}
           <div className='flex justify-between items-center'>
             <span className='text-default-600'>
               {booking.experience ? (

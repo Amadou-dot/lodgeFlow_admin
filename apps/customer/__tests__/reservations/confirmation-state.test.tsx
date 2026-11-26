@@ -36,6 +36,9 @@ jest.mock('@heroui/button', () => ({
   }) => <button onClick={onPress}>{children}</button>,
 }));
 
+const firstId = '507f1f77bcf86cd7994390a1';
+const secondId = '507f1f77bcf86cd7994390a2';
+const privateId = '507f1f77bcf86cd7994390a3';
 const cases = [
   { kind: 'cabin', Page: CabinConfirmation, key: 'booking', noun: 'booking' },
   {
@@ -62,6 +65,7 @@ function fixture({
 }) {
   const common = {
     _id: id,
+    id,
     customer,
     status: 'confirmed',
     totalPrice: 50,
@@ -71,10 +75,9 @@ function fixture({
   if (kind === 'cabin')
     return {
       ...common,
-      id,
       cabin: createCabinFixture(),
-      checkInDate: '2030-06-01',
-      checkOutDate: '2030-06-03',
+      checkInDate: '2030-06-01T00:00:00.000Z',
+      checkOutDate: '2030-06-03T00:00:00.000Z',
       numGuests: 2,
       numNights: 2,
       cabinPrice: 50,
@@ -83,7 +86,7 @@ function fixture({
     return {
       ...common,
       dining: null,
-      date: '2030-06-01',
+      date: '2030-06-01T00:00:00.000Z',
       time: '19:00',
       numGuests: 2,
       dietaryRequirements: [],
@@ -91,14 +94,14 @@ function fixture({
   return {
     ...common,
     experience: null,
-    date: '2030-06-01',
+    date: '2030-06-01T00:00:00.000Z',
     numParticipants: 2,
   };
 }
 function response(data: unknown, ok = true) {
   return { ok, json: async () => data } satisfies Pick<Response, 'ok' | 'json'>;
 }
-function setup(Page: typeof CabinConfirmation, id = 'first', retry = 0) {
+function setup(Page: typeof CabinConfirmation, id = firstId, retry = 0) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry, retryDelay: 0, gcTime: Infinity } },
   });
@@ -134,7 +137,7 @@ for (const { kind, Page, key, noun } of cases) {
     jest.mocked(fetch).mockResolvedValueOnce(
       response({
         success: true,
-        data: fixture({ kind, id: 'first' }),
+        data: fixture({ kind, id: firstId }),
       }) as Response
     );
     setup(Page);
@@ -142,7 +145,7 @@ for (const { kind, Page, key, noun } of cases) {
       await screen.findByText('Owned resource unavailable')
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
-    expect(await screen.findByText('first')).toBeInTheDocument();
+    expect(await screen.findByText(firstId)).toBeInTheDocument();
     expect(
       screen.queryByText('Owned resource unavailable')
     ).not.toBeInTheDocument();
@@ -151,13 +154,13 @@ for (const { kind, Page, key, noun } of cases) {
     jest.mocked(fetch).mockResolvedValue(
       response({
         success: true,
-        data: fixture({ kind, id: 'first' }),
+        data: fixture({ kind, id: firstId }),
       }) as Response
     );
     const view = setup(Page);
-    await screen.findByText('first');
+    await screen.findByText(firstId);
     view.change(new Promise(() => {}));
-    expect(screen.queryByText('first')).not.toBeInTheDocument();
+    expect(screen.queryByText(firstId)).not.toBeInTheDocument();
     expect(screen.getByText(`Loading ${noun} details...`)).toBeInTheDocument();
   });
   test(`${kind} ignores an older request completing after a newer route`, async () => {
@@ -172,45 +175,45 @@ for (const { kind, Page, key, noun } of cases) {
     jest.mocked(fetch).mockResolvedValue(
       response({
         success: true,
-        data: fixture({ kind, id: 'second' }),
+        data: fixture({ kind, id: secondId }),
       }) as Response
     );
-    view.change(Promise.resolve({ id: 'second' }));
-    await screen.findByText('second');
+    view.change(Promise.resolve({ id: secondId }));
+    await screen.findByText(secondId);
     await act(async () =>
       finishOld(
         response({
           success: true,
-          data: fixture({ kind, id: 'first' }),
+          data: fixture({ kind, id: firstId }),
         }) as Response
       )
     );
-    expect(screen.getByText('second')).toBeInTheDocument();
-    expect(screen.queryByText('first')).not.toBeInTheDocument();
+    expect(screen.getByText(secondId)).toBeInTheDocument();
+    expect(screen.queryByText(firstId)).not.toBeInTheDocument();
   });
   test(`${kind} refreshes authoritative detail without converting a background failure into not-found`, async () => {
     jest.mocked(fetch).mockResolvedValue(
       response({
         success: true,
-        data: fixture({ kind, id: 'first' }),
+        data: fixture({ kind, id: firstId }),
       }) as Response
     );
     const view = setup(Page);
-    await screen.findByText('first');
+    await screen.findByText(firstId);
     jest.mocked(fetch).mockRejectedValue(new Error('offline'));
     await act(async () => {
-      await view.client.invalidateQueries({ queryKey: [key, 'first'] });
+      await view.client.invalidateQueries({ queryKey: [key, firstId] });
     });
-    expect(screen.getByText('first')).toBeInTheDocument();
+    expect(screen.getByText(firstId)).toBeInTheDocument();
     expect(screen.queryByText(/Not Found/)).not.toBeInTheDocument();
     jest.mocked(fetch).mockResolvedValue(
       response({
         success: true,
-        data: fixture({ kind, id: 'first', customer: 'someone-else' }),
+        data: fixture({ kind, id: firstId, customer: 'someone-else' }),
       }) as Response
     );
     await act(async () => {
-      await view.client.invalidateQueries({ queryKey: [key, 'first'] });
+      await view.client.invalidateQueries({ queryKey: [key, firstId] });
     });
     expect(await screen.findByText('Unauthorized Access')).toBeInTheDocument();
     expect(
@@ -222,22 +225,22 @@ for (const { kind, Page, key, noun } of cases) {
     jest.mocked(fetch).mockResolvedValue(
       response({
         success: true,
-        data: fixture({ kind, id: 'first' }),
+        data: fixture({ kind, id: firstId }),
       }) as Response
     );
     const view = setup(Page);
     await act(async () => {});
     expect(fetch).not.toHaveBeenCalled();
     mockLoaded = true;
-    view.change(Promise.resolve({ id: 'first' }));
-    await screen.findByText('first');
+    view.change(Promise.resolve({ id: firstId }));
+    await screen.findByText(firstId);
   });
 }
 
 for (const { kind, Page, noun } of cases) {
   test(`${kind} preserves immediate failure rather than inheriting global automatic retries`, async () => {
     jest.mocked(fetch).mockRejectedValue(new Error('offline'));
-    setup(Page, 'first', 3);
+    setup(Page, firstId, 3);
     expect(
       await screen.findByText(`Failed to load ${noun}`)
     ).toBeInTheDocument();
@@ -268,11 +271,8 @@ for (const { kind, Page, key } of cases) {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    client.setQueryData(
-      [key, 'private-record'],
-      fixture({ kind, id: 'private-record' })
-    );
-    const params = Promise.resolve({ id: 'private-record' });
+    client.setQueryData([key, privateId], fixture({ kind, id: privateId }));
+    const params = Promise.resolve({ id: privateId });
     const element = () => (
       <QueryClientProvider client={client}>
         <Page params={params} />
@@ -282,16 +282,16 @@ for (const { kind, Page, key } of cases) {
   };
   test(`${kind} hides private cached detail immediately after sign-out and on a signed-out remount`, async () => {
     const view = cachedView();
-    await screen.findByText('private-record');
+    await screen.findByText(privateId);
     mockSignedIn = false;
     view.rerender(view.element());
     await act(async () => {});
-    expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+    expect(screen.queryByText(privateId)).not.toBeInTheDocument();
     expect(screen.getByText('Unauthorized Access')).toBeInTheDocument();
     view.unmount();
     render(view.element());
     await act(async () => {});
-    expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+    expect(screen.queryByText(privateId)).not.toBeInTheDocument();
     expect(screen.getByText('Unauthorized Access')).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -299,7 +299,7 @@ for (const { kind, Page, key } of cases) {
     `${kind} hides cached detail after definitive HTTP %s and preserves its server error`,
     async status => {
       const view = cachedView();
-      await screen.findByText('private-record');
+      await screen.findByText(privateId);
       if (status === 401) {
         mockSignedIn = false;
         view.unmount();
@@ -314,13 +314,13 @@ for (const { kind, Page, key } of cases) {
       } as Response);
       await act(async () => {
         await view.client.invalidateQueries({
-          queryKey: [key, 'private-record'],
+          queryKey: [key, privateId],
         });
       });
       expect(
         await screen.findByText('Record no longer accessible')
       ).toBeInTheDocument();
-      expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+      expect(screen.queryByText(privateId)).not.toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: /^Pay / })
       ).not.toBeInTheDocument();
@@ -328,30 +328,30 @@ for (const { kind, Page, key } of cases) {
   );
   test(`${kind} retains valid owned cached detail after HTTP 503`, async () => {
     const view = cachedView();
-    await screen.findByText('private-record');
+    await screen.findByText(privateId);
     jest.mocked(fetch).mockResolvedValue({
       ...response({ success: false, error: 'Temporarily unavailable' }, false),
       status: 503,
     } as Response);
     await act(async () => {
       await view.client.invalidateQueries({
-        queryKey: [key, 'private-record'],
+        queryKey: [key, privateId],
       });
     });
-    expect(screen.getByText('private-record')).toBeInTheDocument();
+    expect(screen.getByText(privateId)).toBeInTheDocument();
     expect(screen.queryByText(/Not Found/)).not.toBeInTheDocument();
   });
 }
 
 for (const { kind, Page, key, noun } of cases) {
   test(`${kind} ignores a canceled request's denial after a newer authorized read`, async () => {
-    const data = fixture({ kind, id: 'private-record' });
+    const data = fixture({ kind, id: privateId });
     jest.mocked(fetch).mockResolvedValue({
       ...response({ success: true, data }),
       status: 200,
     } as Response);
-    const view = setup(Page, 'private-record');
-    await screen.findByText('private-record');
+    const view = setup(Page, privateId);
+    await screen.findByText(privateId);
 
     let finishOlderRequest: (value: Response) => void = () => {};
     jest.mocked(fetch).mockReturnValueOnce(
@@ -361,7 +361,7 @@ for (const { kind, Page, key, noun } of cases) {
     );
     await act(async () => {
       void view.client.invalidateQueries({
-        queryKey: [key, 'private-record'],
+        queryKey: [key, privateId],
       });
     });
     const authorizedData = {
@@ -374,7 +374,7 @@ for (const { kind, Page, key, noun } of cases) {
     } as Response);
     await act(async () => {
       await view.client.invalidateQueries({
-        queryKey: [key, 'private-record'],
+        queryKey: [key, privateId],
       });
     });
     expect(
@@ -389,9 +389,7 @@ for (const { kind, Page, key, noun } of cases) {
         status: 404,
       } as Response);
     });
-    expect(view.client.getQueryData([key, 'private-record'])).toEqual(
-      authorizedData
-    );
+    expect(view.client.getQueryData([key, privateId])).toEqual(authorizedData);
     expect(screen.getByText('Fresh authorized details')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Pay / })).toBeInTheDocument();
   });
@@ -400,13 +398,13 @@ for (const { kind, Page, key, noun } of cases) {
     test.each(['network failure', 'HTTP 503'] as const)(
       'keeps denied detail and checkout hidden through a %s retry and remount until an authorized read succeeds',
       async failure => {
-        const data = fixture({ kind, id: 'private-record' });
+        const data = fixture({ kind, id: privateId });
         jest.mocked(fetch).mockResolvedValue({
           ...response({ success: true, data }),
           status: 200,
         } as Response);
-        const view = setup(Page, 'private-record');
-        await screen.findByText('private-record');
+        const view = setup(Page, privateId);
+        await screen.findByText(privateId);
         expect(
           screen.getByRole('button', { name: /^Pay / })
         ).toBeInTheDocument();
@@ -420,13 +418,13 @@ for (const { kind, Page, key, noun } of cases) {
         } as Response);
         await act(async () => {
           await view.client.invalidateQueries({
-            queryKey: [key, 'private-record'],
+            queryKey: [key, privateId],
           });
         });
         expect(
           await screen.findByText('Record no longer accessible')
         ).toBeInTheDocument();
-        expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+        expect(screen.queryByText(privateId)).not.toBeInTheDocument();
         expect(
           screen.queryByRole('button', { name: /^Pay / })
         ).not.toBeInTheDocument();
@@ -445,7 +443,7 @@ for (const { kind, Page, key, noun } of cases) {
         await act(async () => {
           fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
         });
-        expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+        expect(screen.queryByText(privateId)).not.toBeInTheDocument();
         expect(
           screen.queryByRole('button', { name: /^Pay / })
         ).not.toBeInTheDocument();
@@ -456,9 +454,9 @@ for (const { kind, Page, key, noun } of cases) {
         expect(await screen.findByText(retryError)).toBeInTheDocument();
 
         view.unmount();
-        render(view.element(Promise.resolve({ id: 'private-record' })));
+        render(view.element(Promise.resolve({ id: privateId })));
         expect(await screen.findByText(retryError)).toBeInTheDocument();
-        expect(screen.queryByText('private-record')).not.toBeInTheDocument();
+        expect(screen.queryByText(privateId)).not.toBeInTheDocument();
         expect(
           screen.queryByRole('button', { name: /^Pay / })
         ).not.toBeInTheDocument();
@@ -468,12 +466,68 @@ for (const { kind, Page, key, noun } of cases) {
           status: 200,
         } as Response);
         fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
-        expect(await screen.findByText('private-record')).toBeInTheDocument();
+        expect(await screen.findByText(privateId)).toBeInTheDocument();
         expect(
           screen.getByRole('button', { name: /^Pay / })
         ).toBeInTheDocument();
         expect(screen.queryByText(retryError)).not.toBeInTheDocument();
       }
     );
+  });
+}
+
+for (const { kind, Page, key, noun } of cases) {
+  test.each([null, 'not JSON'])(
+    'clears cached ' + kind + ' detail on a malformed denial %j',
+    async body => {
+      const id = '507f1f77bcf86cd7994390aa';
+      const data = fixture({ kind, id });
+      jest
+        .mocked(fetch)
+        .mockResolvedValue(response({ success: true, data }) as Response);
+      const view = setup(Page, id);
+      await screen.findByText(id);
+      jest.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => {
+          if (body === 'not JSON') throw new SyntaxError();
+          return body;
+        },
+      } as Response);
+      await act(async () => {
+        await view.client.invalidateQueries({ queryKey: [key, id] });
+      });
+      expect(view.client.getQueryData([key, id])).toBeNull();
+      expect(view.client.getQueryState([key, id])?.error).toMatchObject({
+        status: 403,
+      });
+    }
+  );
+  test.each([
+    'different ID',
+    'missing detail',
+    'malformed detail',
+    'nonliteral success',
+  ])('rejects ' + kind + ' %s', async reason => {
+    const id = '507f1f77bcf86cd7994390aa';
+    const data = fixture({
+      kind,
+      id: reason === 'different ID' ? '507f1f77bcf86cd7994390bb' : id,
+    });
+    jest.mocked(fetch).mockResolvedValue(
+      response({
+        success: reason === 'nonliteral success' ? 1 : true,
+        data:
+          reason === 'missing detail'
+            ? null
+            : reason === 'malformed detail'
+              ? { ...data, totalPrice: '1' }
+              : data,
+      }) as Response
+    );
+    const view = setup(Page, id);
+    await screen.findByText('Failed to load ' + noun);
+    expect(view.client.getQueryData([key, id])).toBeUndefined();
   });
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ApiResponse } from '@/types';
+import { z } from 'zod';
 
 export interface ConfirmationDetailOptions {
   enabled?: boolean;
@@ -42,6 +42,11 @@ export function isUnavailableConfirmationError(error: unknown) {
   );
 }
 
+const errorBody = z.object({
+  success: z.unknown().optional(),
+  error: z.string().optional(),
+});
+
 /** Preserve confirmation-page errors while sharing the existing detail cache. */
 export async function fetchConfirmationDetail<T>({
   url,
@@ -49,44 +54,39 @@ export async function fetchConfirmationDetail<T>({
   notFoundError,
   statusError = notFoundError,
   onUnavailable,
+  decode,
+  signal,
 }: {
   url: string;
   loadError: string;
   notFoundError: string;
   statusError?: string;
   onUnavailable: () => void;
+  signal: AbortSignal;
+  decode: (value: unknown) => T | undefined;
 }): Promise<T | null> {
   let response: Response;
-  let result: ApiResponse<T>;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal });
   } catch {
     throw new Error(loadError);
   }
-  try {
-    try {
-      result = await response.json();
-    } catch {
-      throw new ConfirmationRequestError({
-        message: loadError,
-        status: response.status,
-      });
-    }
-    if (!response.ok)
-      throw new ConfirmationRequestError({
-        message: result.error || statusError,
-        status: response.status,
-      });
-    if (!result.success)
-      throw new ConfirmationRequestError({
-        message: result.error || notFoundError,
-        status: response.status,
-      });
-  } catch (error) {
-    // Clear denied data immediately before rejection so later transient retries
-    // and remounts cannot restore it, while preserving the server's error.
-    if (isUnavailableConfirmationError(error)) onUnavailable();
-    throw error;
+  const body: unknown = await response.json().catch(() => undefined);
+  if (response.ok) {
+    const data = decode(body);
+    if (data !== undefined) return data;
   }
-  return result.data || null;
+  const failure = errorBody.safeParse(body);
+  let message = loadError;
+  if (failure.success) {
+    if (!response.ok) message = failure.data.error || statusError;
+    else if (failure.data.success === false)
+      message = failure.data.error || notFoundError;
+  }
+  const error = new ConfirmationRequestError({
+    message,
+    status: response.status,
+  });
+  if (!signal.aborted && isUnavailableConfirmationError(error)) onUnavailable();
+  throw error;
 }

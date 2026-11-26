@@ -1,9 +1,5 @@
-import {
-  BOOKING_STATUSES,
-  CABIN_STATUSES,
-  PAYMENT_METHODS,
-  REFUND_STATUSES,
-} from '@lodgeflow/database/config';
+import { CABIN_STATUSES } from '@lodgeflow/database/config';
+import { bookingFields } from '@lodgeflow/database/reservation-read-fields';
 import { z } from 'zod';
 import {
   customerJsonSchema,
@@ -41,79 +37,6 @@ const bookingCabinJsonSchema = cabinFields
   .extend({ id: bookingIdSchema })
   .refine(sameId);
 
-const bookingPaymentJsonSchema = z.object({
-  id: text,
-  amount: z.number(),
-  method: z.enum(PAYMENT_METHODS),
-  receivedAt: timestamp,
-  paymentIntentId: z.string().nullish(),
-  refundedAmount: z.number().nullish(),
-});
-
-const bookingExtrasJsonSchema = z.object({
-  hasBreakfast: z.boolean().nullish(),
-  breakfastPrice: z.number().nullish(),
-  hasPets: z.boolean().nullish(),
-  petFee: z.number().nullish(),
-  hasParking: z.boolean().nullish(),
-  parkingFee: z.number().nullish(),
-  hasEarlyCheckIn: z.boolean().nullish(),
-  earlyCheckInFee: z.number().nullish(),
-  hasLateCheckOut: z.boolean().nullish(),
-  lateCheckOutFee: z.number().nullish(),
-});
-
-const bookingCancellationRefundJsonSchema = z.object({
-  paymentIntentId: text,
-  amount: z.number(),
-  refundId: z.string().nullish(),
-});
-
-// Match the serialized booking read DTO and retain legacy nullable metadata
-// and finite major-unit amounts without applying today's request limits.
-const bookingFields = z.object({
-  _id: bookingIdSchema,
-  __v: z.number().nullish(),
-  customer: text,
-  checkInDate: timestamp,
-  checkOutDate: timestamp,
-  numNights: z.number(),
-  numGuests: z.number(),
-  status: z.enum(BOOKING_STATUSES).nullish(),
-  cabinPrice: z.number(),
-  extrasPrice: z.number().nullish(),
-  totalPrice: z.number(),
-  isPaid: z.boolean().nullish(),
-  amountPaid: z.number().nullish(),
-  payments: z.array(bookingPaymentJsonSchema).nullish(),
-  checkoutPending: z.boolean().nullish(),
-  checkoutToken: z.string().nullish(),
-  checkoutAmount: z.number().nullish(),
-  checkoutTotalPrice: z.number().nullish(),
-  checkoutCurrency: z.string().nullish(),
-  paymentMethod: z.enum(PAYMENT_METHODS).nullish(),
-  extras: bookingExtrasJsonSchema.nullish(),
-  observations: z.string().nullish(),
-  specialRequests: z.array(z.string().nullable()).nullish(),
-  depositPaid: z.boolean().nullish(),
-  depositAmount: z.number().nullish(),
-  stripePaymentIntentId: z.string().nullish(),
-  stripeSessionId: z.string().nullish(),
-  paidAt: timestamp.nullish(),
-  cancelledAt: timestamp.nullish(),
-  cancellationReason: z.string().nullish(),
-  refundStatus: z.enum(REFUND_STATUSES).nullish(),
-  refundAmount: z.number().nullish(),
-  refundRequestedAmount: z.number().nullish(),
-  cancellationRefunds: z.array(bookingCancellationRefundJsonSchema).nullish(),
-  refundedAt: timestamp.nullish(),
-  paymentConfirmationSentAt: timestamp.nullish(),
-  remainingAmount: z.number().nullish(),
-  checkInTime: timestamp.nullish(),
-  checkOutTime: timestamp.nullish(),
-  createdAt: timestamp.nullish(),
-  updatedAt: timestamp.nullish(),
-});
 const recentBookingFields = bookingFields.extend({
   id: bookingIdSchema,
   cabin: bookingCabinJsonSchema.nullable(),

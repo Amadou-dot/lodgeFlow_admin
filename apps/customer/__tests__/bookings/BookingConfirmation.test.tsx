@@ -123,6 +123,8 @@ it.each([undefined, null])(
 
 it.each([
   { isPaid: true },
+  { status: null },
+  { status: undefined },
   { status: 'cancelled' as const },
   { amountPaid: 690 },
 ])('does not offer payment when no amount is payable: %j', async overrides => {

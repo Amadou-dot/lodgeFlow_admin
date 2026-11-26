@@ -1,9 +1,13 @@
+import { readResponse } from '@/lib/validations/read-response';
+import {
+  decodeExperienceHistory,
+  decodeExperienceDetail,
+} from '@/lib/validations/reservation-read-json';
 import { useAuth } from '@clerk/nextjs';
 import {
   fetchConfirmationDetail,
   type ConfirmationDetailOptions,
 } from '@/hooks/useConfirmation';
-import type { ExperienceReservationHistory } from '@lodgeflow/database/reservation-json';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -54,20 +58,18 @@ export const useExperienceBookingHistory = (status?: string) => {
   const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   return useQuery({
     enabled: isLoaded && isSignedIn && !!userId && !!sessionId,
-    queryFn: async ({ signal }): Promise<ExperienceReservationHistory[]> => {
+    queryFn: async ({ signal }) => {
       const url = status
         ? `/api/experience-bookings/history?status=${status}`
         : '/api/experience-bookings/history';
 
       const response = await fetch(url, { signal });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch experience booking history');
-      }
-
-      const data: ApiResponse<ExperienceReservationHistory[]> =
-        await response.json();
-      return data.data || [];
+      return readResponse(
+        response,
+        decodeExperienceHistory,
+        'Failed to fetch experience booking history'
+      );
     },
     queryKey: ['experience-bookings-history', status, userId, sessionId],
   });
@@ -84,29 +86,28 @@ export const useExperienceBookingById = (
   return useQuery({
     enabled: !!bookingId && options.enabled !== false,
     ...(options.mode === 'confirmation' ? { retry: false } : {}),
-    queryFn: async (context): Promise<PopulatedExperienceBooking | null> => {
+    queryFn: async context => {
+      const decode = decodeExperienceDetail(bookingId);
       if (options.mode === 'confirmation') {
         const { signal } = context;
-        return fetchConfirmationDetail<PopulatedExperienceBooking>({
+        return fetchConfirmationDetail({
+          decode,
+          signal,
           url: `/api/experience-bookings/${bookingId}`,
           loadError: 'Failed to load booking',
           notFoundError: 'Booking not found',
           onUnavailable: () => {
-            if (!signal.aborted)
-              queryClient.setQueryData(['experience-booking', bookingId], null);
+            queryClient.setQueryData(['experience-booking', bookingId], null);
           },
         });
       }
 
       const response = await fetch(`/api/experience-bookings/${bookingId}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch experience booking');
-      }
-
-      const data: ApiResponse<PopulatedExperienceBooking> =
-        await response.json();
-      return data.data || null;
+      return readResponse(
+        response,
+        decode,
+        'Failed to fetch experience booking'
+      );
     },
     queryKey: ['experience-booking', bookingId],
   });

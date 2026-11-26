@@ -1,10 +1,14 @@
+import { readResponse } from '@/lib/validations/read-response';
+import {
+  decodeDiningHistory,
+  decodeDiningDetail,
+} from '@/lib/validations/reservation-read-json';
 import { useAuth } from '@clerk/nextjs';
 import {
   fetchConfirmationDetail,
   type ConfirmationDetailOptions,
 } from '@/hooks/useConfirmation';
 import { diningDayAvailabilityResponseSchema } from '@/lib/validations/reservation-availability';
-import type { DiningReservationHistory } from '@lodgeflow/database/reservation-json';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -56,20 +60,18 @@ export const useDiningReservationHistory = (status?: string) => {
   const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
   return useQuery({
     enabled: isLoaded && isSignedIn && !!userId && !!sessionId,
-    queryFn: async ({ signal }): Promise<DiningReservationHistory[]> => {
+    queryFn: async ({ signal }) => {
       const url = status
         ? `/api/dining-reservations/history?status=${status}`
         : '/api/dining-reservations/history';
 
       const response = await fetch(url, { signal });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch dining reservation history');
-      }
-
-      const data: ApiResponse<DiningReservationHistory[]> =
-        await response.json();
-      return data.data || [];
+      return readResponse(
+        response,
+        decodeDiningHistory,
+        'Failed to fetch dining reservation history'
+      );
     },
     queryKey: ['dining-reservations-history', status, userId, sessionId],
   });
@@ -86,32 +88,31 @@ export const useDiningReservationById = (
   return useQuery({
     enabled: !!reservationId && options.enabled !== false,
     ...(options.mode === 'confirmation' ? { retry: false } : {}),
-    queryFn: async (context): Promise<PopulatedDiningReservation | null> => {
+    queryFn: async context => {
+      const decode = decodeDiningDetail(reservationId);
       if (options.mode === 'confirmation') {
         const { signal } = context;
-        return fetchConfirmationDetail<PopulatedDiningReservation>({
+        return fetchConfirmationDetail({
+          decode,
+          signal,
           url: `/api/dining-reservations/${reservationId}`,
           loadError: 'Failed to load reservation',
           notFoundError: 'Reservation not found',
           onUnavailable: () => {
-            if (!signal.aborted)
-              queryClient.setQueryData(
-                ['dining-reservation', reservationId],
-                null
-              );
+            queryClient.setQueryData(
+              ['dining-reservation', reservationId],
+              null
+            );
           },
         });
       }
 
       const response = await fetch(`/api/dining-reservations/${reservationId}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch dining reservation');
-      }
-
-      const data: ApiResponse<PopulatedDiningReservation> =
-        await response.json();
-      return data.data || null;
+      return readResponse(
+        response,
+        decode,
+        'Failed to fetch dining reservation'
+      );
     },
     queryKey: ['dining-reservation', reservationId],
   });
