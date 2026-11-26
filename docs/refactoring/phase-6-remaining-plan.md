@@ -83,10 +83,10 @@ From root, use Node 22 and pnpm 11.17.0. `ADMIN <pattern>` below means `pnpm --f
 
 **Interfaces** New `pnpm --filter @lodgeflow/admin check:types:test-scripts` invokes inherited `tsc --noEmit` for test/script roots, with JS/CJS helpers explicitly included and checked. Keep existing app type check. Bring any positional-file wrapper behavior into alignment with real project options or document that existing command accurately instead of routing the gate through it.
 
-- [ ] Reproduce the eight TS and eight JS diagnostics listed in the appendix with inherited strict settings. Confirm application and all 11 scripts compile independently. Distinguish files excluded from an application check from untyped mocks that compile under strict.
-- [ ] Supply complete typed `AddExperienceForm` data and updater fixtures. Remove or assert the unused booking-patch body. Type the dining request helper to `ConstructorParameters<typeof NextRequest>[1]`. Give Framer proxy keys/target and mocked element children checked types while preserving captured props and events. Keep both JS/CJS helpers runnable under their current Jest entry points.
-- [ ] Add the inherited type gate to the admin CI matrix only. Keep production compile/project, Jest transforms, build gates and script execution separate. A check is read-only and must not execute any script/seed/provider operation.
-- [ ] Run `pnpm --filter @lodgeflow/admin check:types:test-scripts`, `ADMIN '(AddExperienceForm|bookings-patch|integration/api/dining|customer-(list|lock)-boundary|local-seed)'` and admin app type check. Expect zero diagnostics and preserved strict invalid-type fixture behavior.
+- [x] Reproduce the eight TS and eight JS diagnostics listed in the appendix with inherited strict settings. Confirm application and all 11 scripts compile independently. Distinguish files excluded from an application check from untyped mocks that compile under strict.
+- [x] Supply complete typed `AddExperienceForm` data and updater fixtures. Remove or assert the unused booking-patch body. Type the dining request helper to `ConstructorParameters<typeof NextRequest>[1]`. Give Framer proxy keys/target and mocked element children checked types while preserving captured props and events. Keep both JS/CJS helpers runnable under their current Jest entry points.
+- [x] Add the inherited type gate to the admin CI matrix only. Keep production compile/project, Jest transforms, build gates and script execution separate. A check is read-only and must not execute any script/seed/provider operation.
+- [x] Run `pnpm --filter @lodgeflow/admin check:types:test-scripts`, `ADMIN '(AddExperienceForm|bookings-patch|integration/api/dining|customer-(list|lock)-boundary|local-seed)'` and admin app type check. Expect zero diagnostics and preserved strict invalid-type fixture behavior.
 
 ### Task 3: Admin Mongoose fixtures and Mongo test lifecycle
 
