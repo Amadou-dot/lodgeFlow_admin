@@ -1,4 +1,5 @@
 import { subtitle, title } from '@/components/primitives';
+import { useCreateAttempt } from '@/hooks/useCreateAttempt';
 import { useCreateBooking } from '@/hooks/useBooking';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSettings } from '@/hooks/useSettings';
@@ -60,6 +61,7 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
   const { mutate: createBooking } = useCreateBooking();
   const { data: settings } = useSettings();
   const router = useRouter();
+  const createAttempt = useCreateAttempt(cabin._id);
   const isMobile = useIsMobile();
 
   const { data: availability, error: availabilityError } = useSWR(
@@ -129,26 +131,16 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
       observations: typeof observations === 'string' ? observations : '',
     };
 
+    const attempt = createAttempt.begin();
+    if (!attempt) return;
     createBooking(bookingData, {
       onSuccess: response => {
-        // Redirect to confirmation page with booking ID
-        if (response.data && response.data._id) {
+        if (attempt.current())
           router.push(`/cabins/confirmation/${response.data._id}`);
-        } else {
-          addToast({
-            title: 'Success',
-            description: 'Your booking request has been submitted!',
-            color: 'success',
-          });
-        }
       },
       onError: error => {
-        addToast({
-          title: 'Error',
-          description:
-            error instanceof Error ? error.message : 'An error occurred',
-          color: 'danger',
-        });
+        const notice = attempt.failed(error);
+        if (notice) addToast(notice);
       },
     });
   };
@@ -497,13 +489,19 @@ export default function BookingForm({ cabin, userData }: BookingFormProps) {
               )}
             </div>
 
+            {createAttempt.notice && (
+              <p role='status'>{createAttempt.notice}</p>
+            )}
             <Button
               className='w-full'
               color='primary'
               size='lg'
               type='submit'
               isDisabled={
-                !dateRange?.start || !dateRange?.end || !numberOfGuests
+                createAttempt.blocked ||
+                !dateRange?.start ||
+                !dateRange?.end ||
+                !numberOfGuests
               }
             >
               Submit Booking Request

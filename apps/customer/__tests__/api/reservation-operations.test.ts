@@ -1,4 +1,9 @@
 /** @jest-environment node */
+import {
+  diningMutationResult,
+  experienceMutationResult,
+} from '@/lib/validations/reservation-read-json';
+import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { NextRequest } from 'next/server';
 import type {
   createDiningReservation,
@@ -14,11 +19,22 @@ import type {
 } from '@lodgeflow/database/reservation-json';
 const base = {
   _id: new Types.ObjectId('507f1f77bcf86cd7994390ac'),
+  id: '507f1f77bcf86cd7994390ac',
   customer: 'owner',
   totalPrice: 50,
   isPaid: false,
   date: new Date('2030-06-01T18:00:00Z'),
-  receipts: [],
+  receipts: [
+    {
+      id: 'historical',
+      type: 'payment' as const,
+      amountCents: 1.5,
+      method: 'cash' as const,
+      reference: '',
+      actor: 'staff',
+      recordedAt: new Date('2030-06-01T18:00:00Z'),
+    },
+  ],
   specialRequests: [],
 };
 const diningSource = {
@@ -42,19 +58,19 @@ function json(value: unknown): unknown {
 const mockAuth = jest.fn<Promise<{ userId: string | null }>, []>();
 const mockConnect = jest.fn<Promise<void>, []>();
 const mockCreateDining = jest.fn<
-  Promise<typeof diningResponse>,
+  Promise<typeof diningResponse | null>,
   Parameters<typeof createDiningReservation>
 >();
 const mockUpdateDining = jest.fn<
-  Promise<typeof diningResponse>,
+  Promise<typeof diningResponse | null>,
   Parameters<typeof updateDiningReservation>
 >();
 const mockCreateExperience = jest.fn<
-  Promise<typeof experienceResponse>,
+  Promise<typeof experienceResponse | null>,
   Parameters<typeof createExperienceReservation>
 >();
 const mockUpdateExperience = jest.fn<
-  Promise<typeof experienceResponse>,
+  Promise<typeof experienceResponse | null>,
   Parameters<typeof updateExperienceReservation>
 >();
 jest.mock('@clerk/nextjs/server', () => ({ auth: () => mockAuth() }));
@@ -196,6 +212,55 @@ for (const profile of profiles) {
       });
       expect(profile.update).not.toHaveBeenCalled();
     });
+    test.each(['create', 'cancel'] as const)(
+      '%s result accepts raw fractional cents or an explicit null follow-up read',
+      async action => {
+        const target =
+          action === 'create'
+            ? { customerId: 'owner', listingId }
+            : { customerId: 'owner', id: base.id.toUpperCase() };
+        for (const missing of [false, true]) {
+          if (missing)
+            (action === 'create'
+              ? profile.create
+              : profile.update
+            ).mockResolvedValueOnce(null);
+          const requestPromise =
+            action === 'create'
+              ? profile.post(
+                  request({
+                    method: 'POST',
+                    body: JSON.stringify(profile.body),
+                  })
+                )
+              : profile.remove(request({ method: 'DELETE', body: '' }), params);
+          const response = await requestPromise;
+          const body: unknown = await response.clone().json();
+          const options = {
+            request: Promise.resolve(response),
+            status: action === 'create' ? (201 as const) : (200 as const),
+            fallback: 'Invalid reservation',
+          };
+          const result =
+            profile.kind === 'dining'
+              ? await readMutationResponse({
+                  ...options,
+                  schema: diningMutationResult(target),
+                })
+              : await readMutationResponse({
+                  ...options,
+                  schema: experienceMutationResult(target),
+                });
+          expect(result).toEqual(body);
+          if (missing) expect(result.data).toBeNull();
+          else
+            expect(result.data).toMatchObject({
+              receipts: [{ amountCents: 1.5, reference: '' }],
+              [profile.kind]: null,
+            });
+        }
+      }
+    );
     test('POST rejects invalid selection before connecting', async () => {
       const response = await profile.post(
         request({

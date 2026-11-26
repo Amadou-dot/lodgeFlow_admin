@@ -1,4 +1,10 @@
 /** @jest-environment node */
+import Booking from '@lodgeflow/database/models/Booking';
+import {
+  createdBookingResult,
+  updatedBookingResult,
+} from '@/lib/validations/booking-read-json';
+import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { NextRequest } from 'next/server';
 const mockAuth = jest.fn();
 const mockConnect = jest.fn();
@@ -115,3 +121,46 @@ test('empty cancellation body remains optional', async () => {
   expect((await DELETE(req(''), params)).status).toBe(404);
   expect(mockFind).toHaveBeenCalled();
 });
+
+test.each(['create', 'update'] as const)(
+  '%s returns the wrapped hydrated booking, retaining nullable request lines',
+  async action => {
+    const document = Booking.hydrate({
+      _id: id,
+      customer: 'customer',
+      cabin: null,
+      checkInDate: new Date('2040-01-01'),
+      checkOutDate: new Date('2040-01-03'),
+      numGuests: 2,
+      numNights: 2,
+      cabinPrice: 100,
+      totalPrice: 100,
+      status: 'unconfirmed',
+      specialRequests: [null, 'Towels'],
+    });
+    const updates = { numGuests: 2 };
+    (action === 'create' ? mockCreate : mockUpdate).mockResolvedValueOnce(
+      document
+    );
+    const response = await (action === 'create'
+      ? POST(req(JSON.stringify(create)))
+      : PATCH(req(JSON.stringify(updates)), params));
+    const json: unknown = await response.clone().json();
+    const result = await readMutationResponse({
+      request: Promise.resolve(response),
+      status: action === 'create' ? 201 : 200,
+      schema:
+        action === 'create'
+          ? createdBookingResult({ customerId: 'customer', cabinId: id })
+          : updatedBookingResult({ customerId: 'customer', id, updates }),
+      fallback: 'Invalid booking',
+    });
+    expect(result).toEqual(json);
+    expect(result.data.specialRequests).toEqual([null, 'Towels']);
+    expect(result.message).toBe(
+      action === 'create'
+        ? 'Booking created successfully'
+        : 'Booking updated successfully'
+    );
+  }
+);

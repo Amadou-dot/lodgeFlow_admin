@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  useCreateAttempt,
+  missingCreatedDetail,
+} from '@/hooks/useCreateAttempt';
 import { openReservationCheckout } from '@/lib/open-reservation-checkout';
 import { useState } from 'react';
 import { Button } from '@heroui/button';
@@ -59,6 +63,7 @@ export default function DiningReservationForm({
 }: DiningReservationFormProps) {
   const { user } = useUser();
   const router = useRouter();
+  const createAttempt = useCreateAttempt(dining._id);
   const createReservation = useCreateDiningReservation();
 
   const [date, setDate] = useState<CalendarDate | null>(null);
@@ -118,9 +123,11 @@ export default function DiningReservationForm({
       return;
     }
 
-    try {
-      const reservationDate = date.toDate(getLocalTimeZone());
+    const reservationDate = date.toDate(getLocalTimeZone());
 
+    const attempt = createAttempt.begin();
+    if (!attempt) return;
+    try {
       const result = await createReservation.mutateAsync({
         diningId: dining._id.toString(),
         date: reservationDate.toISOString(),
@@ -137,6 +144,16 @@ export default function DiningReservationForm({
         occasion: occasion || undefined,
       });
 
+      if (!attempt.current()) return;
+      if (result.data === null) {
+        attempt.missingDetail();
+        addToast({
+          title: 'Request saved',
+          description: missingCreatedDetail,
+          color: 'warning',
+        });
+        return;
+      }
       addToast({
         title: 'Reservation Created!',
         description: 'Your dining reservation has been submitted.',
@@ -148,9 +165,11 @@ export default function DiningReservationForm({
         try {
           await openReservationCheckout({
             kind: 'dining',
-            id: String(result.data._id),
+            id: result.data._id,
+            isCurrent: attempt.current,
           });
         } catch {
+          if (!attempt.current()) return;
           addToast({
             title: 'Payment still required',
             description:
@@ -161,14 +180,8 @@ export default function DiningReservationForm({
         }
       } else router.push(confirmationUrl);
     } catch (error) {
-      addToast({
-        title: 'Reservation Failed',
-        description:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create reservation. Please try again.',
-        color: 'danger',
-      });
+      const notice = attempt.failed(error);
+      if (notice) addToast(notice);
     }
   };
 
@@ -315,6 +328,7 @@ export default function DiningReservationForm({
           </div>
         </div>
 
+        {createAttempt.notice && <p role='status'>{createAttempt.notice}</p>}
         {/* Submit Button */}
         <Button
           className='w-full'
@@ -322,7 +336,10 @@ export default function DiningReservationForm({
           isLoading={createReservation.isPending}
           size='lg'
           isDisabled={
-            isFullyBooked || insufficientSeats || isCheckingAvailability
+            createAttempt.blocked ||
+            isFullyBooked ||
+            insufficientSeats ||
+            isCheckingAvailability
           }
           startContent={
             !createReservation.isPending && <Calendar className='w-4 h-4' />

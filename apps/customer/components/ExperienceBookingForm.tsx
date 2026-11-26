@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  useCreateAttempt,
+  missingCreatedDetail,
+} from '@/hooks/useCreateAttempt';
 import { openReservationCheckout } from '@/lib/open-reservation-checkout';
 import { useState } from 'react';
 import { Button } from '@heroui/button';
@@ -25,6 +29,7 @@ export default function ExperienceBookingForm({
 }: ExperienceBookingFormProps) {
   const { user } = useUser();
   const router = useRouter();
+  const createAttempt = useCreateAttempt(experience._id);
   const createBooking = useCreateExperienceBooking();
 
   const [date, setDate] = useState<CalendarDate | null>(null);
@@ -54,18 +59,20 @@ export default function ExperienceBookingForm({
       return;
     }
 
+    if (!experience._id) {
+      addToast({
+        title: 'Booking Failed',
+        description: 'This experience is missing an identifier.',
+        color: 'danger',
+      });
+      return;
+    }
+
+    const bookingDate = date.toDate(getLocalTimeZone());
+
+    const attempt = createAttempt.begin();
+    if (!attempt) return;
     try {
-      if (!experience._id) {
-        addToast({
-          title: 'Booking Failed',
-          description: 'This experience is missing an identifier.',
-          color: 'danger',
-        });
-        return;
-      }
-
-      const bookingDate = date.toDate(getLocalTimeZone());
-
       const result = await createBooking.mutateAsync({
         experienceId: experience._id.toString(),
         date: bookingDate.toISOString(),
@@ -76,6 +83,16 @@ export default function ExperienceBookingForm({
         observations: observations || undefined,
       });
 
+      if (!attempt.current()) return;
+      if (result.data === null) {
+        attempt.missingDetail();
+        addToast({
+          title: 'Request saved',
+          description: missingCreatedDetail,
+          color: 'warning',
+        });
+        return;
+      }
       addToast({
         title: 'Booking Created!',
         description: 'Your experience booking has been submitted.',
@@ -87,9 +104,11 @@ export default function ExperienceBookingForm({
         try {
           await openReservationCheckout({
             kind: 'experience',
-            id: String(result.data._id),
+            id: result.data._id,
+            isCurrent: attempt.current,
           });
         } catch {
+          if (!attempt.current()) return;
           addToast({
             title: 'Payment still required',
             description:
@@ -100,14 +119,8 @@ export default function ExperienceBookingForm({
         }
       } else router.push(confirmationUrl);
     } catch (error) {
-      addToast({
-        title: 'Booking Failed',
-        description:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create booking. Please try again.',
-        color: 'danger',
-      });
+      const notice = attempt.failed(error);
+      if (notice) addToast(notice);
     }
   };
 
@@ -186,10 +199,12 @@ export default function ExperienceBookingForm({
           </div>
         </div>
 
+        {createAttempt.notice && <p role='status'>{createAttempt.notice}</p>}
         {/* Submit Button */}
         <Button
           className='w-full'
           color='primary'
+          isDisabled={createAttempt.blocked}
           isLoading={createBooking.isPending}
           size='lg'
           startContent={

@@ -1,4 +1,6 @@
 /** @jest-environment node */
+import { cancellationResult } from '@/lib/validations/cancellation-json';
+import { readMutationResponse } from '@/lib/validations/mutation-response';
 import { NextRequest } from 'next/server';
 import { Error as MongooseError, Types } from 'mongoose';
 import BookingModel from '@lodgeflow/database/models/Booking';
@@ -172,7 +174,15 @@ test('reuses the saved refund plan after provider failure without recalculating 
   });
   const failure = await cancel();
   expect(failure.status).toBe(200);
-  expect(await failure.json()).toMatchObject({
+  const wire: unknown = await failure.clone().json();
+  const result = await readMutationResponse({
+    request: Promise.resolve(failure),
+    status: 200,
+    schema: cancellationResult({ customerId: 'owner', id }),
+    fallback: 'Invalid cancellation',
+  });
+  expect(result).toEqual(wire);
+  expect(result).toMatchObject({
     success: true,
     data: {
       refund: {
@@ -246,3 +256,21 @@ test.each([NaN, Infinity, -1, 1.005, Number.MAX_SAFE_INTEGER])(
     expect(mockUpdate).not.toHaveBeenCalled();
   }
 );
+
+test('accepts a cancellation when its post-refund read returns null', async () => {
+  mockPopulate.mockResolvedValueOnce(booking()).mockResolvedValueOnce(null);
+  const result = await readMutationResponse({
+    request: cancel(),
+    status: 200,
+    schema: cancellationResult({ customerId: 'owner', id }),
+    fallback: 'Invalid cancellation',
+  });
+  expect(result).toMatchObject({
+    success: true,
+    message: 'Booking cancelled successfully',
+    data: {
+      booking: null,
+      refund: { amount: 35, type: 'full', status: 'none' },
+    },
+  });
+});

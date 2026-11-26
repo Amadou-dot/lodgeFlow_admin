@@ -1,4 +1,7 @@
 import { majorAmount, MoneyError } from '@lodgeflow/database/money';
+import { REFUND_STATUSES } from '@lodgeflow/database/config';
+import { bookingDetail } from './booking-read-json';
+import { ownedDetail, type MutationTarget } from './mutation-response';
 import { z } from 'zod';
 import { timestamp } from '@lodgeflow/database/reservation-read-fields';
 import type { RefundEstimateResponse } from '@/types/cancellation';
@@ -59,3 +62,22 @@ const refundEstimate = z
     { path: ['cancelNotAllowedReason'] }
   ) satisfies z.ZodType<RefundEstimateResponse>;
 export const decodeRefundEstimate = decodeSuccess(refundEstimate);
+
+export const cancellationResult = (target: MutationTarget) =>
+  z
+    .object({
+      booking: ownedDetail(bookingDetail, target).nullable(),
+      refund: z
+        .object({
+          amount: roundedAmount,
+          type: z.enum(['none', 'partial', 'full']),
+          status: z.enum(REFUND_STATUSES),
+          reason: z.string(),
+          error: z.string().optional(),
+        })
+        .refine(refund => refund.type !== 'none' || refund.amount === 0),
+    })
+    .refine(
+      result =>
+        result.refund.status === (result.booking?.refundStatus ?? 'none')
+    );

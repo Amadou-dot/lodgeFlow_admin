@@ -6,6 +6,8 @@ import {
   objectId,
 } from '@lodgeflow/database/reservation-read-fields';
 import { CABIN_STATUSES } from '@lodgeflow/database/config';
+import { ownedDetail, type MutationTarget } from './mutation-response';
+import type { UpdateBookingDetailsInput } from './booking';
 import { decodeSuccess, forDetailId } from './read-response';
 
 const detailCabin: z.ZodType<BookingDetailCabin, BookingDetailCabin> =
@@ -37,3 +39,47 @@ export const bookingDetail = bookingFields.extend({
 export const decodeBookingHistory = decodeSuccess(z.array(bookingHistoryItem));
 export const decodeBookingDetail = (id: string) =>
   forDetailId(bookingDetail, id);
+
+export function createdBookingResult({
+  customerId,
+  cabinId,
+}: Pick<MutationTarget, 'customerId'> & { cabinId: string }) {
+  return ownedDetail(bookingDetail, { customerId }).refine(
+    row =>
+      row.status === 'unconfirmed' &&
+      (row.cabin === null ||
+        row.cabin._id.toLowerCase() === cabinId.toLowerCase())
+  );
+}
+const extraChoices = [
+  'hasBreakfast',
+  'hasPets',
+  'hasParking',
+  'hasEarlyCheckIn',
+  'hasLateCheckOut',
+] as const;
+
+export function updatedBookingResult({
+  customerId,
+  id,
+  updates,
+}: Required<MutationTarget> & { updates: UpdateBookingDetailsInput }) {
+  return ownedDetail(bookingDetail, { customerId, id }).refine(row => {
+    const requested = updates.specialRequests;
+    return (
+      (row.status === 'confirmed' || row.status === 'unconfirmed') &&
+      (updates.numGuests === undefined ||
+        row.numGuests === updates.numGuests) &&
+      (requested === undefined ||
+        (row.specialRequests?.length === requested.length &&
+          requested.every(
+            (text, index) => text.trim() === row.specialRequests?.[index]
+          ))) &&
+      extraChoices.every(
+        key =>
+          updates.extras?.[key] === undefined ||
+          row.extras?.[key] === updates.extras[key]
+      )
+    );
+  });
+}

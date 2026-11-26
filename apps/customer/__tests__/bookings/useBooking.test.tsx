@@ -64,13 +64,17 @@ describe('useCreateBooking', () => {
 
   it('creates a booking successfully', async () => {
     const mockBooking = {
-      ...historyBooking({ id: '1', status: 'unconfirmed' }),
+      ...historyBooking({
+        id: '507f1f77bcf86cd7994390ab',
+        status: 'unconfirmed',
+      }),
       cabin: null,
-      id: '1',
+      id: '507f1f77bcf86cd7994390ab',
     } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      status: 201,
       json: async () => ({ data: mockBooking, success: true }),
     });
 
@@ -276,15 +280,19 @@ describe('useUpdateBooking', () => {
 
   it('updates a booking successfully', async () => {
     const mockUpdatedBooking = {
-      ...historyBooking({ id: '1', status: 'unconfirmed' }),
+      ...historyBooking({
+        id: '507f1f77bcf86cd7994390ab',
+        status: 'unconfirmed',
+      }),
       cabin: null,
-      id: '1',
+      id: '507f1f77bcf86cd7994390ab',
       numGuests: 3,
     } satisfies BookingDetail;
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ data: mockUpdatedBooking }),
+      status: 200,
+      json: async () => ({ success: true, data: mockUpdatedBooking }),
     });
 
     const queryClient = createTestQueryClient();
@@ -298,18 +306,21 @@ describe('useUpdateBooking', () => {
     });
 
     const response = await result.current.mutateAsync({
-      bookingId: '1',
+      bookingId: '507f1f77bcf86cd7994390ab',
       updates: { numGuests: 3 },
     });
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/bookings/1', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ numGuests: 3 }),
-    });
-    expect(response).toEqual({ data: mockUpdatedBooking });
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/bookings/507f1f77bcf86cd7994390ab',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numGuests: 3 }),
+      }
+    );
+    expect(response).toEqual({ success: true, data: mockUpdatedBooking });
     expect(invalidate.mock.calls).toEqual([
-      [{ queryKey: ['booking', '1'] }],
+      [{ queryKey: ['booking', '507f1f77bcf86cd7994390ab'] }],
       [{ queryKey: ['bookings-history'] }],
     ]);
   });
@@ -332,7 +343,7 @@ describe('useUpdateBooking', () => {
 
     await expect(
       result.current.mutateAsync({
-        bookingId: '1',
+        bookingId: '507f1f77bcf86cd7994390ab',
         updates: { numGuests: 3 },
       })
     ).rejects.toThrow('Booking not found');
@@ -357,7 +368,7 @@ describe('useUpdateBooking', () => {
 
     await expect(
       result.current.mutateAsync({
-        bookingId: '1',
+        bookingId: '507f1f77bcf86cd7994390ab',
         updates: { numGuests: 3 },
       })
     ).rejects.toThrow('Failed to update booking');
@@ -380,9 +391,13 @@ describe('useCancelBooking', () => {
       message: 'Booking cancelled successfully',
       data: {
         booking: {
-          ...historyBooking({ id: '1', status: 'cancelled' }),
+          ...historyBooking({
+            id: '507f1f77bcf86cd7994390ab',
+            status: 'cancelled',
+          }),
+          refundStatus: 'pending',
           cabin: null,
-          id: '1',
+          id: '507f1f77bcf86cd7994390ab',
         },
         refund: {
           amount: 75,
@@ -395,6 +410,7 @@ describe('useCancelBooking', () => {
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      status: 200,
       json: async () => mockResponse,
     });
 
@@ -408,21 +424,26 @@ describe('useCancelBooking', () => {
       ),
     });
 
-    const response = await result.current.mutateAsync({ bookingId: '1' });
+    const response = await result.current.mutateAsync({
+      bookingId: '507f1f77bcf86cd7994390ab',
+    });
     expect(response).toEqual(mockResponse);
     expect(invalidate.mock.calls).toEqual([
-      [{ queryKey: ['booking', '1'] }],
+      [{ queryKey: ['booking', '507f1f77bcf86cd7994390ab'] }],
       [{ queryKey: ['bookings-history'] }],
       [{ queryKey: ['bookings'] }],
-      [{ queryKey: ['refund-estimate', '1'] }],
+      [{ queryKey: ['refund-estimate', '507f1f77bcf86cd7994390ab'] }],
       [{ queryKey: ['cabin-availability'] }],
     ]);
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/bookings/1', {
-      body: JSON.stringify({ reason: undefined }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'DELETE',
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/bookings/507f1f77bcf86cd7994390ab',
+      {
+        body: JSON.stringify({ reason: undefined }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'DELETE',
+      }
+    );
   });
 
   it('handles cancellation errors with error message', async () => {
@@ -434,7 +455,7 @@ describe('useCancelBooking', () => {
     const { result } = renderHook(() => useCancelBooking(), { wrapper });
 
     await expect(
-      result.current.mutateAsync({ bookingId: '1' })
+      result.current.mutateAsync({ bookingId: '507f1f77bcf86cd7994390ab' })
     ).rejects.toThrow('Cannot cancel confirmed booking');
   });
 
@@ -447,7 +468,7 @@ describe('useCancelBooking', () => {
     const { result } = renderHook(() => useCancelBooking(), { wrapper });
 
     await expect(
-      result.current.mutateAsync({ bookingId: '1' })
+      result.current.mutateAsync({ bookingId: '507f1f77bcf86cd7994390ab' })
     ).rejects.toThrow('Failed to cancel booking');
   });
 });

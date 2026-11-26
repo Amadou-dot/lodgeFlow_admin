@@ -1,0 +1,407 @@
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { parseDate, type CalendarDate } from '@internationalized/date';
+import { addToast } from '@heroui/toast';
+import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
+import DiningReservationForm from '@/components/DiningReservationForm';
+import ExperienceBookingForm from '@/components/ExperienceBookingForm';
+import BookingForm from '@/components/BookingForm';
+import type { Dining, Experience } from '@/types';
+
+const mockPush = jest.fn();
+let mockUser = 'guest';
+let mockSession = 'session';
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({
+    userId: mockUser,
+    sessionId: mockSession,
+    isLoaded: true,
+    isSignedIn: true,
+  }),
+  useUser: () => ({ user: { id: mockUser }, isLoaded: true, isSignedIn: true }),
+}));
+jest.mock('@heroui/ripple', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@heroui/ripple'),
+  Ripple: () => null,
+}));
+jest.mock('@heroui/toast', () => ({ addToast: jest.fn() }));
+jest.mock('@/hooks/useSettings', () => ({ useSettings: () => ({}) }));
+jest.mock('@heroui/date-picker', () => ({
+  DatePicker: ({ onChange }: { onChange: (date: CalendarDate) => void }) => (
+    <button onClick={() => onChange(parseDate('2040-02-01'))}>Pick day</button>
+  ),
+  DateRangePicker: ({
+    onChange,
+  }: {
+    onChange: (range: { start: CalendarDate; end: CalendarDate }) => void;
+  }) => (
+    <button
+      type='button'
+      onClick={() =>
+        onChange({
+          start: parseDate('2040-02-01'),
+          end: parseDate('2040-02-02'),
+        })
+      }
+    >
+      Pick day
+    </button>
+  ),
+}));
+const id = '507f1f77bcf86cd7994390ab';
+const listing = '507f1f77bcf86cd7994390cd';
+const servingTime = { start: '17:00', end: '19:00' };
+const dining = {
+  _id: listing,
+  name: 'Dinner',
+  description: 'Dinner',
+  price: 25,
+  image: '/d.jpg',
+  type: 'menu',
+  mealType: 'dinner',
+  category: 'regular',
+  maxPeople: 0,
+  servingTime,
+} satisfies Dining;
+const experience = {
+  _id: listing,
+  name: 'Hike',
+  description: 'Hike',
+  price: 25,
+  image: '/e.jpg',
+  category: 'Local',
+  difficulty: 'Easy',
+  duration: '1h',
+  ctaText: 'Book',
+} satisfies Experience;
+const cabin = { _id: listing, name: 'Cabin', regularPrice: 25, maxCapacity: 4 };
+const userData = {
+  firstName: 'Test',
+  lastName: 'Guest',
+  phone: '123456789',
+  email: 'guest@example.com',
+};
+
+type Kind = 'dining' | 'experience' | 'cabin';
+const paths = {
+  dining: ['/api/dining-reservations', '/dining/confirmation/', 'Reserve Now'],
+  experience: [
+    '/api/experience-bookings',
+    '/experiences/confirmation/',
+    'Book Experience',
+  ],
+  cabin: ['/api/bookings', '/cabins/confirmation/', 'Submit Booking Request'],
+};
+function record(kind: Kind, totalPrice = 0) {
+  const common = {
+    _id: id,
+    id,
+    customer: 'guest',
+    totalPrice,
+    isPaid: false,
+    specialRequests: [null, 'Quiet'],
+  };
+  if (kind === 'cabin')
+    return {
+      ...common,
+      cabin: null,
+      checkInDate: '2040-02-01T00:00:00.000Z',
+      checkOutDate: '2040-02-02T00:00:00.000Z',
+      numNights: 1,
+      numGuests: 2,
+      status: 'unconfirmed',
+      cabinPrice: 25,
+    };
+  const shared = {
+    ...common,
+    date: '2040-02-01T00:00:00.000Z',
+    status: 'pending',
+  };
+  return kind === 'dining'
+    ? { ...shared, dining: null, time: '17:00', numGuests: 1 }
+    : { ...shared, experience: null, numParticipants: 1 };
+}
+const reply = (data: unknown) =>
+  FetchResponse.json({ success: true, data }, { status: 201 });
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+async function mount(
+  kind: Kind,
+  create: () => Promise<Response>,
+  checkout?: () => Promise<Response>
+) {
+  const [createPath, , label] = paths[kind];
+  const createPost = jest.fn(create);
+  const checkoutPost = jest.fn(checkout);
+  jest.mocked(fetch).mockImplementation(async (path, init) => {
+    if (path === createPath && init?.method === 'POST') return createPost();
+    if (String(path).endsWith('/checkout')) {
+      const response = checkoutPost();
+      if (response) return response;
+      throw new Error('Unexpected checkout');
+    }
+    if (String(path).includes('/availability')) {
+      const url = new URL(String(path), 'https://local.test');
+      const data =
+        kind === 'cabin'
+          ? { unavailableDates: [] }
+          : {
+              diningId: listing,
+              date: '2040-02-01',
+              time: url.searchParams.get('time'),
+              seatsRemaining: null,
+              maxPeople: null,
+              isAvailable: true,
+              servingTime,
+            };
+      return FetchResponse.json({ success: true, data });
+    }
+    throw new Error('Unexpected request');
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const invalidated = jest.spyOn(client, 'invalidateQueries');
+  const ui = () => (
+    <QueryClientProvider client={client}>
+      {kind === 'dining' ? (
+        <DiningReservationForm dining={dining} />
+      ) : kind === 'experience' ? (
+        <ExperienceBookingForm experience={experience} />
+      ) : (
+        <BookingForm cabin={cabin} userData={userData} />
+      )}
+    </QueryClientProvider>
+  );
+  const mounted = render(ui());
+  fireEvent.click(screen.getByRole('button', { name: 'Pick day' }));
+  if (kind !== 'experience') {
+    const select = mounted.container.querySelector('select');
+    if (!select) throw new Error('Missing selection');
+    fireEvent.change(select, {
+      target: { value: kind === 'dining' ? '17:00' : '2' },
+    });
+  }
+  const draft = screen.getByRole('textbox', { name: /Special Requests/ });
+  fireEvent.change(draft, { target: { value: 'Quiet please' } });
+  const button = await screen.findByRole('button', { name: label });
+  await waitFor(() => expect(button).toBeEnabled());
+  const press = () => fireEvent.click(button);
+  return {
+    button,
+    press,
+    createPost,
+    checkoutPost,
+    invalidated,
+    draft,
+    rerender: () => mounted.rerender(ui()),
+  };
+}
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockUser = 'guest';
+  mockSession = 'session';
+});
+
+for (const kind of ['dining', 'experience', 'cabin'] as const) {
+  test.each([
+    'missing data',
+    'unreadable body',
+    'network interruption',
+    'contradictory rejection',
+    'unreadable rejection',
+    'different owner',
+    'unexpected success status',
+    'server failure',
+  ])(
+    kind + ' retains the draft and prevents repeat create after %s',
+    async failure => {
+      const result = await mount(kind, async () => {
+        if (failure === 'contradictory rejection')
+          return FetchResponse.json(
+            { success: false, data: record(kind), error: 'Unavailable' },
+            { status: 409 }
+          );
+        if (failure === 'unreadable rejection')
+          return new FetchResponse('{', { status: 409 });
+        if (failure === 'different owner')
+          return reply({ ...record(kind), customer: 'other' });
+        if (failure === 'unexpected success status')
+          return FetchResponse.json({ success: true, data: record(kind) });
+        if (failure === 'network interruption') throw new TypeError('network');
+        if (failure === 'unreadable body')
+          return new FetchResponse('{', { status: 201 });
+        if (failure === 'server failure')
+          return FetchResponse.json(
+            { success: false, error: 'Failed to create' },
+            { status: 500 }
+          );
+        return FetchResponse.json({ success: true }, { status: 201 });
+      });
+      result.press();
+      await waitFor(() => expect(addToast).toHaveBeenCalled());
+      expect(addToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ color: 'success' })
+      );
+      expect(result.draft).toHaveValue('Quiet please');
+      expect(result.invalidated).not.toHaveBeenCalled();
+      expect(result.button).toBeDisabled();
+      await act(async () => {
+        result.press();
+      });
+      expect(result.createPost).toHaveBeenCalledTimes(1);
+      expect(result.checkoutPost).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    }
+  );
+  test(
+    kind +
+      ' allows retry after a definitive rejection and holds a successful confirmation handoff',
+    async () => {
+      const request = jest
+        .fn<Promise<Response>, []>()
+        .mockResolvedValueOnce(
+          FetchResponse.json(
+            { success: false, error: 'Unavailable' },
+            { status: 409 }
+          )
+        )
+        .mockResolvedValueOnce(reply(record(kind)));
+      const result = await mount(kind, request);
+      result.press();
+      await waitFor(() =>
+        expect(addToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            color: 'danger',
+            description: 'Unavailable',
+          })
+        )
+      );
+      expect(result.button).toBeEnabled();
+      result.press();
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith(paths[kind][1] + id)
+      );
+      expect(result.button).toBeDisabled();
+      await act(async () => {
+        result.press();
+      });
+      expect(result.createPost).toHaveBeenCalledTimes(2);
+      expect(result.checkoutPost).not.toHaveBeenCalled();
+    }
+  );
+  test(
+    kind + ' ignores a late write handoff after the original session ends',
+    async () => {
+      const pending = deferred<Response>();
+      const result = await mount(kind, () => pending.promise);
+      result.press();
+      await waitFor(() => expect(result.createPost).toHaveBeenCalledTimes(1));
+      mockSession = 'new-session';
+      result.rerender();
+      await act(async () => pending.resolve(reply(record(kind, 25))));
+      expect(result.checkoutPost).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(addToast).not.toHaveBeenCalled();
+    }
+  );
+}
+for (const kind of ['dining', 'experience'] as const) {
+  test(
+    kind +
+      ' acknowledges a committed create without detail and holds the draft',
+    async () => {
+      const result = await mount(kind, async () => reply(null));
+      result.press();
+      await waitFor(() => expect(addToast).toHaveBeenCalled());
+      expect(addToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ color: 'danger' })
+      );
+      expect(result.button).toBeDisabled();
+      await act(async () => {
+        result.press();
+      });
+      expect(result.draft).toHaveValue('Quiet please');
+      expect(
+        result.invalidated.mock.calls.map(([filter]) => filter?.queryKey)
+      ).toContainEqual(
+        kind === 'dining'
+          ? ['dining-reservations-history']
+          : ['experience-bookings-history']
+      );
+      expect(result.createPost).toHaveBeenCalledTimes(1);
+      expect(result.checkoutPost).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    }
+  );
+  test(
+    kind + ' allows only the saved confirmation to recover a failed checkout',
+    async () => {
+      const pending = deferred<Response>();
+      const result = await mount(
+        kind,
+        async () => reply(record(kind, 25)),
+        () => pending.promise
+      );
+      result.press();
+      await waitFor(() => expect(result.checkoutPost).toHaveBeenCalledTimes(1));
+      expect(fetch).toHaveBeenCalledWith(
+        paths[kind][0] + '/' + id + '/checkout',
+        { method: 'POST' }
+      );
+      expect(result.button).toBeDisabled();
+      await act(async () => {
+        result.press();
+      });
+      await act(async () =>
+        pending.resolve(
+          FetchResponse.json({ error: 'Unavailable' }, { status: 409 })
+        )
+      );
+      expect(mockPush).toHaveBeenCalledWith(paths[kind][1] + id);
+      expect(result.button).toBeDisabled();
+      await act(async () => {
+        result.press();
+      });
+      expect(result.createPost).toHaveBeenCalledTimes(1);
+      expect(result.checkoutPost).toHaveBeenCalledTimes(1);
+    }
+  );
+}
+
+test.each(['dining', 'experience'] as const)(
+  '%s suppresses late checkout recovery after session replacement',
+  async kind => {
+    const pending = deferred<Response>();
+    const result = await mount(
+      kind,
+      async () => reply(record(kind, 25)),
+      () => pending.promise
+    );
+    result.press();
+    await waitFor(() => expect(result.checkoutPost).toHaveBeenCalledTimes(1));
+    mockSession = 'new-session';
+    result.rerender();
+    await act(async () =>
+      pending.resolve(
+        FetchResponse.json({ error: 'Unavailable' }, { status: 409 })
+      )
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Payment still required' })
+    );
+  }
+);
