@@ -1,8 +1,89 @@
 import { faker } from '@faker-js/faker';
-import mongoose from 'mongoose';
+import {
+  DINING_CATEGORIES,
+  DINING_TYPES,
+  EXPERIENCE_DIFFICULTIES,
+  MEAL_TYPES,
+} from '@lodgeflow/database/config';
+import type {
+  IBooking,
+  ICabin,
+  IDining,
+  IExperience,
+  ISettings,
+} from '@lodgeflow/database';
+import type { CustomerClerkSource } from '@/lib/clerk-users';
+import { Types, type Document } from 'mongoose';
+
+type ModelInput<
+  Model,
+  RequiredFields extends keyof Model = never,
+  VirtualFields extends keyof Model = never,
+> = Pick<Model, RequiredFields> &
+  Partial<
+    Omit<
+      Model,
+      | keyof Document
+      | 'createdAt'
+      | 'updatedAt'
+      | RequiredFields
+      | VirtualFields
+    >
+  >;
+
+export type CabinInput = ModelInput<
+  ICabin,
+  'name' | 'description' | 'capacity' | 'price' | 'image',
+  'discountedPrice'
+>;
+
+export type BookingInput = Omit<
+  ModelInput<
+    IBooking,
+    | 'cabin'
+    | 'customer'
+    | 'checkInDate'
+    | 'checkOutDate'
+    | 'numNights'
+    | 'numGuests'
+    | 'cabinPrice'
+    | 'totalPrice',
+    'durationText' | 'paymentStatus'
+  >,
+  'extras'
+> & { extras?: Partial<IBooking['extras']> };
+
+export type DiningInput = ModelInput<
+  IDining,
+  | 'name'
+  | 'description'
+  | 'type'
+  | 'mealType'
+  | 'price'
+  | 'servingTime'
+  | 'maxPeople'
+  | 'category'
+  | 'image'
+>;
+
+export type ExperienceInput = ModelInput<
+  IExperience,
+  | 'name'
+  | 'price'
+  | 'duration'
+  | 'difficulty'
+  | 'category'
+  | 'description'
+  | 'image'
+  | 'ctaText'
+>;
+
+type SettingsInput = ModelInput<ISettings, never, 'fullAddress'>;
 
 // ---- Cabin Factory ----
-export function createCabinInput(overrides: Record<string, any> = {}) {
+export function createCabinInput(
+  overrides: Partial<CabinInput> = {}
+): CabinInput {
   return {
     name: faker.lorem.words(2) + ' Cabin',
     description: faker.lorem.sentence(10),
@@ -11,29 +92,29 @@ export function createCabinInput(overrides: Record<string, any> = {}) {
     discount: 0,
     image: `https://example.com/${faker.string.alphanumeric(10)}.jpg`,
     amenities: ['WiFi', 'Air Conditioning'],
-    status: 'active' as const,
+    status: 'active',
     ...overrides,
   };
 }
 
 // ---- Booking Factory ----
-export function createBookingInput(overrides: Record<string, any> = {}) {
-  const checkIn = faker.date.future({ years: 0.5 });
+export function createBookingInput(
+  overrides: Partial<BookingInput> = {}
+): BookingInput {
+  const checkIn = faker.date.soon({ days: 182 });
+  const numNights = faker.number.int({ min: 1, max: 7 });
   const checkOut = new Date(checkIn);
-  checkOut.setDate(checkOut.getDate() + faker.number.int({ min: 1, max: 7 }));
-  const numNights = Math.ceil(
-    (checkOut.getTime() - checkIn.getTime()) / (1000 * 3600 * 24)
-  );
+  checkOut.setDate(checkOut.getDate() + numNights);
   const cabinPrice = faker.number.int({ min: 100, max: 500 }) * numNights;
 
   return {
-    cabin: new mongoose.Types.ObjectId(),
+    cabin: new Types.ObjectId(),
     customer: `user_${faker.string.alphanumeric(10)}`,
     checkInDate: checkIn,
     checkOutDate: checkOut,
     numNights,
     numGuests: faker.number.int({ min: 1, max: 4 }),
-    status: 'unconfirmed' as const,
+    status: 'unconfirmed',
     cabinPrice,
     extrasPrice: 0,
     totalPrice: cabinPrice,
@@ -71,19 +152,18 @@ export function createBookingInput(overrides: Record<string, any> = {}) {
 }
 
 // ---- Dining Factory ----
-export function createDiningInput(overrides: Record<string, any> = {}) {
+export function createDiningInput(
+  overrides: Partial<DiningInput> = {}
+): DiningInput {
   return {
     name: faker.lorem.words(3),
     description: faker.lorem.sentence(10),
     price: faker.number.float({ min: 5, max: 50, fractionDigits: 2 }),
-    type: faker.helpers.arrayElement(['breakfast', 'lunch', 'dinner', 'snack']),
-    mealType: faker.helpers.arrayElement(['starter', 'main', 'dessert']),
-    category: faker.helpers.arrayElement([
-      'appetizer',
-      'main',
-      'dessert',
-      'beverage',
-    ]),
+    type: faker.helpers.arrayElement(DINING_TYPES),
+    mealType: faker.helpers.arrayElement(MEAL_TYPES),
+    category: faker.helpers.arrayElement(DINING_CATEGORIES),
+    servingTime: { start: '07:00', end: '21:00' },
+    maxPeople: faker.number.int({ min: 2, max: 20 }),
     image: `https://example.com/${faker.string.alphanumeric(10)}.jpg`,
     isAvailable: true,
     ...overrides,
@@ -91,23 +171,28 @@ export function createDiningInput(overrides: Record<string, any> = {}) {
 }
 
 // ---- Experience Factory ----
-export function createExperienceInput(overrides: Record<string, any> = {}) {
+export function createExperienceInput(
+  overrides: Partial<ExperienceInput> = {}
+): ExperienceInput {
   return {
     name: faker.lorem.words(3),
     description: faker.lorem.sentence(10),
     price: faker.number.int({ min: 20, max: 200 }),
     duration: `${faker.number.int({ min: 1, max: 8 })} hours`,
-    difficulty: faker.helpers.arrayElement(['Easy', 'Moderate', 'Challenging']),
+    difficulty: faker.helpers.arrayElement(EXPERIENCE_DIFFICULTIES),
     maxParticipants: faker.number.int({ min: 2, max: 20 }),
     category: faker.lorem.word(),
     image: `https://example.com/${faker.string.alphanumeric(10)}.jpg`,
-    available: true,
+    available: ['Monday', 'Wednesday', 'Saturday'],
+    ctaText: 'Book Now',
     ...overrides,
   };
 }
 
 // ---- Settings Factory ----
-export function createSettingsInput(overrides: Record<string, any> = {}) {
+export function createSettingsInput(
+  overrides: Partial<SettingsInput> = {}
+): SettingsInput {
   return {
     minBookingLength: 1,
     maxBookingLength: 30,
@@ -127,7 +212,9 @@ export function createSettingsInput(overrides: Record<string, any> = {}) {
 }
 
 // ---- Mock Clerk User Factory ----
-export function createMockClerkUser(overrides: Record<string, any> = {}) {
+export function createMockClerkUser(
+  overrides: Partial<CustomerClerkSource> = {}
+): CustomerClerkSource {
   const id = `user_${faker.string.alphanumeric(20)}`;
   const firstName = faker.person.firstName();
   const lastName = faker.person.lastName();

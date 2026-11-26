@@ -1,11 +1,14 @@
 import { Experience } from '@lodgeflow/database/models/Experience';
+import type { ExperienceInput } from '../../setup/factories';
 
-function createExperienceData(overrides: Record<string, any> = {}) {
+function createExperienceData(
+  overrides: Partial<ExperienceInput> = {}
+): ExperienceInput {
   return {
     name: 'Mountain Hiking Tour',
     price: 75,
     duration: '4 hours',
-    difficulty: 'Moderate' as const,
+    difficulty: 'Moderate',
     category: 'outdoor',
     description: 'A guided hiking tour through the mountains',
     image: 'https://example.com/hiking.jpg',
@@ -41,38 +44,43 @@ describe('Experience Model', () => {
       expect(experience.tags).toEqual([]);
     });
 
+    // Pass missing required fields and unsupported enum values directly to Mongoose.
     it('requires name', async () => {
       await expect(
-        Experience.create(createExperienceData({ name: undefined }))
+        Experience.create({ ...createExperienceData(), name: undefined })
       ).rejects.toThrow();
     });
 
     it('requires price', async () => {
       await expect(
-        Experience.create(createExperienceData({ price: undefined }))
+        Experience.create({ ...createExperienceData(), price: undefined })
       ).rejects.toThrow();
     });
 
     it('requires duration', async () => {
       await expect(
-        Experience.create(createExperienceData({ duration: undefined }))
+        Experience.create({ ...createExperienceData(), duration: undefined })
       ).rejects.toThrow();
     });
 
     it('requires difficulty', async () => {
       await expect(
-        Experience.create(createExperienceData({ difficulty: undefined }))
+        Experience.create({ ...createExperienceData(), difficulty: undefined })
       ).rejects.toThrow();
     });
 
     it('validates difficulty enum', async () => {
       await expect(
-        Experience.create(createExperienceData({ difficulty: 'Extreme' }))
+        Experience.create({ ...createExperienceData(), difficulty: 'Extreme' })
       ).rejects.toThrow();
     });
 
     it('accepts valid difficulty values', async () => {
-      for (const difficulty of ['Easy', 'Moderate', 'Challenging']) {
+      for (const difficulty of [
+        'Easy',
+        'Moderate',
+        'Challenging',
+      ] satisfies ExperienceInput['difficulty'][]) {
         const experience = await Experience.create(
           createExperienceData({ difficulty })
         );
@@ -82,19 +90,19 @@ describe('Experience Model', () => {
 
     it('requires category', async () => {
       await expect(
-        Experience.create(createExperienceData({ category: undefined }))
+        Experience.create({ ...createExperienceData(), category: undefined })
       ).rejects.toThrow();
     });
 
     it('requires description', async () => {
       await expect(
-        Experience.create(createExperienceData({ description: undefined }))
+        Experience.create({ ...createExperienceData(), description: undefined })
       ).rejects.toThrow();
     });
 
     it('requires image', async () => {
       await expect(
-        Experience.create(createExperienceData({ image: undefined }))
+        Experience.create({ ...createExperienceData(), image: undefined })
       ).rejects.toThrow();
     });
 
@@ -114,7 +122,7 @@ describe('Experience Model', () => {
 
     it('requires ctaText', async () => {
       await expect(
-        Experience.create(createExperienceData({ ctaText: undefined }))
+        Experience.create({ ...createExperienceData(), ctaText: undefined })
       ).rejects.toThrow();
     });
 
@@ -181,7 +189,7 @@ describe('Experience Model', () => {
       const found = await Experience.findById(created._id);
 
       expect(found).not.toBeNull();
-      expect(found!.name).toBe('Mountain Hiking Tour');
+      expect(found?.name).toBe('Mountain Hiking Tour');
     });
 
     it('updates experience fields', async () => {
@@ -191,8 +199,8 @@ describe('Experience Model', () => {
       await experience.save();
 
       const updated = await Experience.findById(experience._id);
-      expect(updated!.price).toBe(100);
-      expect(updated!.isPopular).toBe(true);
+      expect(updated?.price).toBe(100);
+      expect(updated?.isPopular).toBe(true);
     });
 
     it('deletes experience', async () => {
