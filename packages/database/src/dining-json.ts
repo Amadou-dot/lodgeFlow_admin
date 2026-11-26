@@ -1,42 +1,62 @@
 import { Types } from 'mongoose';
 import type { IDining } from './models/Dining';
 
-// Pick data fields only: persistence dates and identifiers never cross this boundary.
-type DiningFields = Omit<
+type DiningFields = Pick<
   IDining,
-  | '_id'
-  | 'createdAt'
-  | 'updatedAt'
-  | 'beverages'
-  | 'minPeople'
-  | 'isPopular'
-  | 'isAvailable'
+  | 'name'
+  | 'description'
+  | 'type'
+  | 'mealType'
+  | 'price'
+  | 'servingTime'
+  | 'maxPeople'
+  | 'category'
+  | 'image'
 >;
+type DietaryOption = NonNullable<IDining['dietary']>[number];
 type BeverageFields = NonNullable<IDining['beverages']>[number];
+type BeverageJson = Pick<BeverageFields, 'name' | 'category'> & {
+  _id?: string;
+  description?: string | null;
+  price?: number | null;
+  alcoholContent?: number | null;
+};
 
+// Legacy wire fields preserve nulls and lean reads can omit hydrated defaults.
 export interface DiningJson extends DiningFields {
-  minPeople?: number;
-  isPopular?: boolean;
-  isAvailable?: boolean;
   _id: string;
-  createdAt?: string;
-  updatedAt?: string;
-  __v?: number;
+  minPeople?: number | null;
+  subCategory?: string | null;
+  gallery?: (string | null)[] | null;
+  ingredients?: (string | null)[] | null;
+  allergens?: (string | null)[] | null;
+  dietary?: (DietaryOption | null)[] | null;
+  beverages?: BeverageJson[] | null;
+  includes?: (string | null)[] | null;
+  duration?: string | null;
+  location?: string | null;
+  specialRequirements?: (string | null)[] | null;
+  isPopular?: boolean | null;
+  isAvailable?: boolean | null;
+  seasonality?: string | null;
+  tags?: (string | null)[] | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  __v?: number | null;
   reservationVersion?: number;
-  beverages?: (BeverageFields & { _id?: string })[];
 }
 
-export interface DiningJsonSource extends DiningFields {
-  minPeople?: number;
-  isPopular?: boolean;
-  isAvailable?: boolean;
+export type DiningJsonSource = Omit<
+  DiningJson,
+  '_id' | 'createdAt' | 'updatedAt' | 'beverages'
+> & {
   _id: Types.ObjectId;
-  createdAt?: Date;
-  updatedAt?: Date;
-  __v?: number;
-  reservationVersion?: number;
-  beverages?: (BeverageFields & { _id?: Types.ObjectId })[];
-}
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  beverages?: (Omit<BeverageJson, '_id'> & { _id?: Types.ObjectId })[] | null;
+};
 
 function objectId(value: Types.ObjectId): string {
   if (!(value instanceof Types.ObjectId)) {

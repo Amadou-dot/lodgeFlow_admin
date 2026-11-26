@@ -14,7 +14,7 @@ export default function DiningSettingsToggles({
     <div className='flex justify-between items-center'>
       <div className='flex gap-4'>
         <Switch
-          isSelected={formData.isPopular}
+          isSelected={formData.isPopular ?? false}
           onValueChange={checked =>
             onFormDataChange({ ...formData, isPopular: checked })
           }
@@ -23,7 +23,7 @@ export default function DiningSettingsToggles({
         </Switch>
 
         <Switch
-          isSelected={formData.isAvailable}
+          isSelected={formData.isAvailable ?? false}
           onValueChange={checked =>
             onFormDataChange({ ...formData, isAvailable: checked })
           }

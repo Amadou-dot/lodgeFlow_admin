@@ -101,6 +101,18 @@ const dining: Dining = {
   maxPeople: 4,
   category: 'regular',
   image: 'https://example.com/supper.jpg',
+  minPeople: 1,
+  gallery: [],
+  ingredients: [],
+  allergens: [],
+  dietary: [],
+  beverages: [],
+  includes: [],
+  specialRequirements: [],
+  isPopular: false,
+  isAvailable: true,
+  tags: [],
+  reviewCount: 0,
 };
 const experience: Experience = {
   _id: '507f1f77bcf86cd799439013',
@@ -114,6 +126,13 @@ const experience: Experience = {
   ctaText: 'Book',
   includes: ['Guide'],
   available: ['Daily'],
+  isPopular: false,
+  gallery: [],
+  requirements: [],
+  highlights: [],
+  whatToBring: [],
+  tags: [],
+  reviewCount: 0,
 };
 
 async function fillCabin(name: string) {
@@ -344,6 +363,143 @@ test.each(operations)(
       await act(async () => {
         requests.forEach(request => request.finish(false));
       });
+      client.clear();
+    }
+  }
+);
+
+const legacyEdits = [
+  {
+    name: 'Dining',
+    Page: DiningPage,
+    record: {
+      ...dining,
+      location: null,
+      tags: ['Local', null],
+      beverages: [
+        {
+          _id: '507f1f77bcf86cd799439014',
+          name: 'Juice',
+          category: 'non-alcoholic',
+          price: null,
+        },
+      ],
+      isAvailable: null,
+    },
+    title: 'Enter dining item name',
+    invalidFields: ['location', 'tags', 'beverages', 'isAvailable'],
+    save: /Update Dining Item/,
+    async select() {
+      fireEvent.click(screen.getByRole('switch', { name: 'Available' }));
+    },
+    selected: { isAvailable: true },
+    schema: updateDiningSchema,
+  },
+  {
+    name: 'Experience',
+    Page: ExperiencesPage,
+    record: {
+      ...experience,
+      location: null,
+      available: null,
+      tags: ['Local', null],
+      isPopular: null,
+    },
+    title: 'Experience Title',
+    invalidFields: ['location', 'tags', 'available', 'isPopular'],
+    save: /Save Changes/,
+    async select() {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Booking & Policies' })
+      );
+      fireEvent.click(
+        await screen.findByRole('checkbox', { name: 'Mark as popular' })
+      );
+    },
+    selected: { isPopular: true },
+    schema: updateExperienceSchema,
+  },
+];
+
+test.each(legacyEdits)(
+  '$name omits untouched nullable fields but submits an explicit selection',
+  async ({
+    name,
+    Page,
+    record,
+    title,
+    invalidFields,
+    save,
+    select,
+    selected,
+    schema,
+  }) => {
+    const requests: unknown[] = [];
+    const originalFetch = global.fetch;
+    global.fetch = jest
+      .fn()
+      .mockImplementation(
+        async (_input: RequestInfo | URL, options?: RequestInit) => {
+          if (options?.method === 'PUT') {
+            requests.push(JSON.parse(String(options.body)));
+            // Keep the same editor open after the first response so a real field can be selected.
+            return {
+              ok: false,
+              json: async () => ({ success: false, error: 'Try again' }),
+            };
+          }
+          return {
+            ok: true,
+            json: async () => ({ success: true, data: [record] }),
+          };
+        }
+      );
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const rendered = render(
+      <QueryClientProvider client={client}>
+        <Page />
+      </QueryClientProvider>
+    );
+
+    try {
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit item' }));
+      if (name === 'Experience') {
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Basic Information' })
+        );
+      }
+      const titleInput =
+        name === 'Dining'
+          ? screen.getByPlaceholderText(title)
+          : await screen.findByLabelText(title);
+      fireEvent.change(titleInput, { target: { value: 'Renamed' } });
+      const submit = await screen.findByRole('button', { name: save });
+      fireEvent.click(submit);
+      await waitFor(() => expect(requests).toHaveLength(1));
+      await waitFor(() => expect(submit).toBeEnabled());
+      expect(requests[0]).toMatchObject({ _id: record._id, name: 'Renamed' });
+      for (const field of invalidFields) {
+        expect(requests[0]).not.toHaveProperty(field);
+      }
+      expect(schema.safeParse(requests[0]).success).toBe(true);
+
+      await select();
+      fireEvent.click(submit);
+      await waitFor(() => expect(requests).toHaveLength(2));
+      expect(requests[1]).toMatchObject({
+        _id: record._id,
+        name: 'Renamed',
+        ...selected,
+      });
+      expect(schema.safeParse(requests[1]).success).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+      rendered.unmount();
       client.clear();
     }
   }

@@ -1,24 +1,51 @@
 import { Types } from 'mongoose';
 import type { IExperience } from './models/Experience';
 
-type ExperienceFields = Omit<
+type ExperienceFields = Pick<
   IExperience,
-  '_id' | 'createdAt' | 'updatedAt' | 'includes' | 'available' | 'isPopular'
-> & { includes?: string[]; available?: string[]; isPopular?: boolean };
+  | 'name'
+  | 'price'
+  | 'duration'
+  | 'difficulty'
+  | 'category'
+  | 'description'
+  | 'image'
+  | 'ctaText'
+>;
+
+// Legacy wire fields preserve nulls and lean reads can omit hydrated defaults.
 export interface ExperienceJson extends ExperienceFields {
   _id: string;
-  createdAt?: string;
-  updatedAt?: string;
-  __v?: number;
+  longDescription?: string | null;
+  gallery?: (string | null)[] | null;
+  includes?: (string | null)[] | null;
+  available?: (string | null)[] | null;
+  isPopular?: boolean | null;
+  maxParticipants?: number | null;
+  minAge?: number | null;
+  requirements?: (string | null)[] | null;
+  location?: string | null;
+  highlights?: (string | null)[] | null;
+  whatToBring?: (string | null)[] | null;
+  cancellationPolicy?: string | null;
+  seasonality?: string | null;
+  tags?: (string | null)[] | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  __v?: number | null;
   reservationVersion?: number;
 }
-export interface ExperienceJsonSource extends ExperienceFields {
+
+export type ExperienceJsonSource = Omit<
+  ExperienceJson,
+  '_id' | 'createdAt' | 'updatedAt'
+> & {
   _id: Types.ObjectId;
-  createdAt?: Date;
-  updatedAt?: Date;
-  __v?: number;
-  reservationVersion?: number;
-}
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+};
 
 /** Preserve hydrated defaults, lean omissions and legacy nulls without mutation. */
 export function serializeExperience(

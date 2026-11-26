@@ -15,11 +15,13 @@ export default function DiningTagsManager({
 }: DiningTagsManagerProps) {
   const [currentTag, setCurrentTag] = useState('');
 
+  const tags = formData.tags?.filter(entry => entry !== null) ?? [];
+
   const addTag = () => {
-    if (currentTag.trim() && !formData.tags?.includes(currentTag.trim())) {
+    if (currentTag.trim() && !tags.includes(currentTag.trim())) {
       onFormDataChange({
         ...formData,
-        tags: [...(formData.tags || []), currentTag.trim()],
+        tags: [...tags, currentTag.trim()],
       });
       setCurrentTag('');
     }
@@ -28,7 +30,7 @@ export default function DiningTagsManager({
   const removeTag = (tag: string) => {
     onFormDataChange({
       ...formData,
-      tags: formData.tags?.filter(t => t !== tag) || [],
+      tags: tags.filter(entry => entry !== tag),
     });
   };
 
@@ -48,7 +50,7 @@ export default function DiningTagsManager({
         </Button>
       </div>
       <div className='flex gap-1 flex-wrap'>
-        {formData.tags?.map(tag => (
+        {tags.map(tag => (
           <Chip key={tag} onClose={() => removeTag(tag)} variant='flat'>
             {tag}
           </Chip>

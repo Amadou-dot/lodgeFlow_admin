@@ -15,17 +15,17 @@ export default function DiningIngredientsManager({
 }: DiningIngredientsManagerProps) {
   const [currentIngredient, setCurrentIngredient] = useState('');
 
+  const ingredients =
+    formData.ingredients?.filter(entry => entry !== null) ?? [];
+
   const addIngredient = () => {
     if (
       currentIngredient.trim() &&
-      !formData.ingredients?.includes(currentIngredient.trim())
+      !ingredients.includes(currentIngredient.trim())
     ) {
       onFormDataChange({
         ...formData,
-        ingredients: [
-          ...(formData.ingredients || []),
-          currentIngredient.trim(),
-        ],
+        ingredients: [...ingredients, currentIngredient.trim()],
       });
       setCurrentIngredient('');
     }
@@ -34,7 +34,7 @@ export default function DiningIngredientsManager({
   const removeIngredient = (ingredient: string) => {
     onFormDataChange({
       ...formData,
-      ingredients: formData.ingredients?.filter(i => i !== ingredient) || [],
+      ingredients: ingredients.filter(entry => entry !== ingredient),
     });
   };
 
@@ -56,7 +56,7 @@ export default function DiningIngredientsManager({
         </Button>
       </div>
       <div className='flex gap-1 flex-wrap'>
-        {formData.ingredients?.map(ingredient => (
+        {ingredients.map(ingredient => (
           <Chip
             key={ingredient}
             onClose={() => removeIngredient(ingredient)}
