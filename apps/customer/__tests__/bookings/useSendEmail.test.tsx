@@ -28,6 +28,20 @@ test('sends only the booking ID and retains the successful provider response', a
   });
 });
 
+test('returns the original parsed provider response and all its own fields', async () => {
+  const body: unknown = JSON.parse(
+    '{"id":"mail:opaque/1","__proto__":{"state":"queued"},"metadata":{"queued":true}}'
+  );
+  fetchMock.mockResolvedValue({
+    ok: true,
+    json: async () => body,
+  } satisfies Pick<Response, 'ok' | 'json'>);
+  const { result } = renderHook(() => useSendConfirmationEmail());
+  const sent = await result.current.sendConfirmationEmail(bookingId);
+  expect(Object.prototype.hasOwnProperty.call(sent, '__proto__')).toBe(true);
+  expect(sent).toBe(body);
+});
+
 test('surfaces safe route errors and can retry successfully', async () => {
   fetchMock.mockResolvedValueOnce({
     ok: false,

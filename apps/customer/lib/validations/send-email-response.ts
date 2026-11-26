@@ -1,7 +1,18 @@
 import { z } from 'zod';
 
 // The routes return the provider's data object directly.
-const sentEmailSchema = z.looseObject({ id: z.string() });
+function isSentEmail(
+  body: unknown
+): body is { id: string; [field: string]: unknown } {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    !Array.isArray(body) &&
+    'id' in body &&
+    Object.hasOwn(body, 'id') &&
+    typeof body.id === 'string'
+  );
+}
 const sendEmailErrorSchema = z.object({
   error: z.string().refine(message => message.trim().length > 0),
 });
@@ -22,8 +33,7 @@ export async function readSendEmailResponse({
 
   const body: unknown = await response.json().catch(() => undefined);
   if (response.ok) {
-    const result = sentEmailSchema.safeParse(body);
-    if (result.success) return result.data;
+    if (isSentEmail(body)) return body;
   } else {
     const result = sendEmailErrorSchema.safeParse(body);
     if (result.success) throw new Error(result.data.error);
