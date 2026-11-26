@@ -1,3 +1,4 @@
+import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import type { ConfirmationEmailInput } from '@/lib/validations/confirmation-email';
 import { formatCurrency } from '@/utils/utilityFunctions';
 
@@ -140,15 +141,6 @@ export function BookingConfirmationEmail({
   bookingData,
   cabinData,
 }: BookingEmailTemplateProps) {
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   const formatPrice = (price: number) => formatCurrency(price);
 
   const getAddons = () => {
@@ -198,13 +190,19 @@ export function BookingConfirmationEmail({
           <div style={emailStyles.row}>
             <span style={emailStyles.label}>Check-in:</span>
             <span style={emailStyles.value}>
-              {formatDate(bookingData.checkInDate)}
+              {formatBookingStayDate({
+                date: bookingData.checkInDate,
+                style: 'long-weekday',
+              })}
             </span>
           </div>
           <div style={emailStyles.row}>
             <span style={emailStyles.label}>Check-out:</span>
             <span style={emailStyles.value}>
-              {formatDate(bookingData.checkOutDate)}
+              {formatBookingStayDate({
+                date: bookingData.checkOutDate,
+                style: 'long-weekday',
+              })}
             </span>
           </div>
           <div style={emailStyles.row}>

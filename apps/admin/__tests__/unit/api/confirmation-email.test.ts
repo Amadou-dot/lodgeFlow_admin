@@ -42,8 +42,8 @@ const payload = {
   email: 'UPPER@Example.invalid',
   bookingData: {
     _id: '507f1f77bcf86cd799439011',
-    checkInDate: '2040-01-01',
-    checkOutDate: '2040-01-03',
+    checkInDate: '2040-01-01T00:00:00.000Z',
+    checkOutDate: '2040-01-03T00:00:00.000Z',
     numNights: 2,
     numGuests: 2,
     cabinPrice: 200,
@@ -98,6 +98,8 @@ test('retains staff authorization, rate key, sender, recipient, rendered fields 
   expect(html).toContain('Lake &amp; Pine');
   expect(html).toContain('$400.00');
   expect(html).toContain('WiFi');
+  expect(html).toContain('Sunday, January 1, 2040');
+  expect(html).toContain('Tuesday, January 3, 2040');
 });
 test('auth and rate denials precede parsing and sending', async () => {
   mockAuth.mockResolvedValueOnce({

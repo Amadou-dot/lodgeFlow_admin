@@ -193,6 +193,21 @@ describe('Print Functionality', () => {
       expect(screen.getAllByText('$25.00')).toHaveLength(2);
     });
 
+    it('preserves the stay date fallback and day padding in print', () => {
+      render(
+        <BookingPDFTemplate
+          booking={{
+            ...mockBooking,
+            checkInDate: 'bad-date',
+            checkOutDate: '2027-01-03T00:00:00.000Z',
+          }}
+        />
+      );
+
+      expect(screen.getByText('Invalid date')).toBeInTheDocument();
+      expect(screen.getByText('Sunday, January 03, 2027')).toBeInTheDocument();
+    });
+
     it('applies the correct ID for printing', () => {
       const { container } = render(
         <TestWrapper>

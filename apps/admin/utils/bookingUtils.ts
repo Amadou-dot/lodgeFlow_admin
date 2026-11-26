@@ -1,5 +1,6 @@
+import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import type { BOOKING_STATUSES } from '@lodgeflow/database/config';
-import { format, formatDistanceToNow, isAfter } from 'date-fns';
+import { formatDistanceToNow, isAfter } from 'date-fns';
 
 export const formatBookingDates = ({
   checkIn,
@@ -16,8 +17,15 @@ export const formatBookingDates = ({
   const checkOutDate = new Date(checkOut);
   const now = new Date();
 
-  // Format the date range
-  const dateRange = `${format(checkInDate, 'MMM dd, yyyy')} — ${format(checkOutDate, 'MMM dd, yyyy')}`;
+  const checkInLabel = formatBookingStayDate({
+    date: checkIn,
+    style: 'short-padded',
+  });
+  const checkOutLabel = formatBookingStayDate({
+    date: checkOut,
+    style: 'short-padded',
+  });
+  const dateRange = `${checkInLabel} — ${checkOutLabel}`;
 
   let timeInfo = '';
   let showTimeInfo = true;

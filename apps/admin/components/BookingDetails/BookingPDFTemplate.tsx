@@ -1,3 +1,4 @@
+import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import type { PopulatedBooking } from '@/types';
 import { getStatusLabel } from '@/utils/bookingUtils';
 import { formatCurrency } from '@/utils/utilityFunctions';
@@ -104,12 +105,6 @@ export default function BookingPDFTemplate({
   className,
   id = 'booking-pdf-template',
 }: BookingPDFTemplateProps) {
-  const formatDate = (date: string) => {
-    const parsed = new Date(date);
-    return isNaN(parsed.getTime())
-      ? 'Invalid date'
-      : format(parsed, 'EEEE, MMMM dd, yyyy');
-  };
   const formatDateTime = (date: string) => {
     const parsed = new Date(date);
     return isNaN(parsed.getTime())
@@ -191,13 +186,19 @@ export default function BookingPDFTemplate({
         <div style={printStyles.row}>
           <span style={printStyles.label}>Check-in:</span>
           <span style={printStyles.value}>
-            {formatDate(booking.checkInDate)}
+            {formatBookingStayDate({
+              date: booking.checkInDate,
+              style: 'long-weekday-padded',
+            })}
           </span>
         </div>
         <div style={printStyles.row}>
           <span style={printStyles.label}>Check-out:</span>
           <span style={printStyles.value}>
-            {formatDate(booking.checkOutDate)}
+            {formatBookingStayDate({
+              date: booking.checkOutDate,
+              style: 'long-weekday-padded',
+            })}
           </span>
         </div>
         <div style={printStyles.row}>

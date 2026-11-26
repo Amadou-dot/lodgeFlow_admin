@@ -24,15 +24,17 @@ jest.mock('@/hooks/useSendEmail', () => ({
   useSendConfirmationEmail: () => ({ sendConfirmationEmail: jest.fn() }),
 }));
 
+const checkInTime = '2027-03-20T00:30:00.000Z';
 const booking: PopulatedBooking = {
   _id: '507f1f77bcf86cd799439011',
   id: '507f1f77bcf86cd799439011',
   guest: null,
   cabin: null,
   customer: null,
-  checkInDate: '2040-01-01',
-  checkOutDate: '2040-01-02',
-  numNights: 1,
+  checkInDate: '2027-03-20T00:00:00.000Z',
+  checkOutDate: '2027-03-23T00:00:00.000Z',
+  checkInTime,
+  numNights: 3,
   numGuests: 1,
   status: 'confirmed',
   cabinPrice: 10,
@@ -71,6 +73,14 @@ test('opens the real preview before exporting and permits retry and reopening', 
   expect(screen.getByRole('button', { name: 'Print' })).toBeEnabled();
   const template = document.getElementById('booking-pdf-template');
   expect(template).toHaveTextContent('Booking Details');
+  expect(template).toHaveTextContent('Saturday, March 20, 2027');
+  expect(template).toHaveTextContent('Tuesday, March 23, 2027');
+  expect(template).toHaveTextContent('3 nights');
+  const localTime = new Date(checkInTime).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  expect(template).toHaveTextContent(`Check-in Time:${localTime}`);
   fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
   await waitFor(() => expect(html2canvas).toHaveBeenCalledTimes(1));
   expect(html2canvas).toHaveBeenCalledWith(template, expect.any(Object));
