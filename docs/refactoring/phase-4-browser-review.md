@@ -346,7 +346,8 @@ recorded in the final Task 4 evidence.
   verification. The prior accepted #132 delivery covers its existing email
   flows, as recorded in [Phase 5](plan.md#phase-5--provider-configuration-and-existing-email-repair).
 
-Phase 4, [issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150)
-and [milestone #2](https://github.com/Amadou-dot/lodgeFlow_admin/milestone/2)
-remain open. Independent Phase 6 work follows the locally reviewed source
-continuation. [Remaining Phase 6 work](plan.md#phase-6--remaining-debt-and-milestone-verification)
+The Phase 4 follow-up merged in [PR #207](https://github.com/Amadou-dot/lodgeFlow_admin/pull/207).
+[PR #208](https://github.com/Amadou-dot/lodgeFlow_admin/pull/208) closed
+[tracker #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150) on
+2026-11-27. [Milestone #2](https://github.com/Amadou-dot/lodgeFlow_admin/milestone/2)
+was still open. The hosted and native checks above remain outstanding.

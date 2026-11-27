@@ -1,5 +1,9 @@
 # Remaining Phase 4 functional fixes implementation plan
 
+This plan records the work delivered in [PR #207](https://github.com/Amadou-dot/lodgeFlow_admin/pull/207)
+at `5aa48de`. The [acceptance matrix](phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
+lists the remaining browser and payment checks.
+
 > **For agentic workers:** Use `superpowers:subagent-driven-development` task by task. Implement only the task brief supplied by the controller. Do not spawn other agents.
 
 **Goal:** Finish the reproducible remaining Phase 4 functional fixes while preserving the established refactor contracts.

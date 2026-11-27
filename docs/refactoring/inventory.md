@@ -1,9 +1,11 @@
 # Refactoring debt inventory
 
-Baseline: `07670932f0b8349fa826802a6ee27f20b3501908` (2026-09-15).
-This inventory assigns work; it does not authorize skipping the Phase 0B/0C gates.
-All confirmed items below remain open unless their status explicitly says otherwise.
-The owning phase is an execution dependency, not an assigned person.
+The baseline was recorded at `07670932f0b8349fa826802a6ee27f20b3501908` on
+2026-09-15. The Phase 6 inventory below was delivered in
+[PR #208](https://github.com/Amadou-dot/lodgeFlow_admin/pull/208). Its dated
+checkpoints preserve the status at each review. The
+[acceptance matrix](phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
+lists the remaining hosted and native checks.
 
 ## Phase 6 remaining boundaries on the review branch (2026-11-26)
 

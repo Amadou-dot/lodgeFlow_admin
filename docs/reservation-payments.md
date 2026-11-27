@@ -25,6 +25,10 @@ Dining and experience confirmation pages offer **Pay outstanding balance**, usin
 
 ## Recovery and historical data
 
+If a manual payment or refund loses its reply, keep the reservation detail open and use **Retry original transaction**. It resends the saved amount, method, reference, and receipt ID. If a replay is rejected, the form checks the reservation ledger. A matching receipt confirms the entry. If the ledger shows no receipt with that ID, staff can correct the entry using the same ID. If an earlier request wins the race, review the recorded amount and balance before recording any additional money.
+
+The cabin booking dialog labels the same recovery action **Retry previous payment**. Recovery belongs to the current staff session and record. After leaving the detail or reloading the page, review its transaction history before entering the payment again.
+
 Pending online transactions block manual money entries and reservation edits. Retrying uses the saved Stripe operation and idempotency key. If creation has an unknown outcome for more than 23 hours, staff must reconcile it against Stripe before clearing the operation; do not recreate an unknown charge or refund. Configure and monitor webhook delivery.
 
 Historical `isPaid` records without payment receipts are displayed as paid but require reconciliation before refunding. This change does not invent transaction evidence for those records. Issue reservation refunds through this workflow; refunds created separately in the Stripe Dashboard require reconciliation.
