@@ -177,6 +177,10 @@ return the provider object with its string `id`. Use the reader for that route.
 
 **Status Code:** `400`
 
+Routes that read JSON bodies return `400` when the body exceeds 1 MiB
+(1,048,576 bytes). The limit applies to the bytes received even when the
+request omits `Content-Length`.
+
 ### Common Error Status Codes
 
 | Status | Description                                                     |
@@ -303,7 +307,7 @@ outstanding. [Booking schemas](../apps/admin/lib/validations/booking.ts) · [Pri
 | `numGuests`       | number       | Yes      | Number of guests (1-50, capped by cabin capacity and settings) |
 | `status`          | string       | No       | Default: `unconfirmed`                                         |
 | `paymentMethod`   | string       | No       | `cash`, `card`, `bank-transfer`, `online`                      |
-| `specialRequests` | string[]     | No       | Default: `[]`. List of special requests                        |
+| `specialRequests` | string[]     | No       | Up to 100 entries of 1,000 characters each. Defaults to `[]`.  |
 | `extras`          | object       | No       | Optional add-ons                                               |
 | `observations`    | string       | No       | Special requests (max 1000 chars)                              |
 

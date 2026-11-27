@@ -1,3 +1,4 @@
+import { bookingNotesSchema } from './booking-notes';
 import { objectRequestSchema } from './object-request';
 import { z } from 'zod';
 
@@ -34,8 +35,8 @@ const createBodySchema = z
       .string()
       .regex(timeRegex, 'Time must be in HH:MM format (e.g., 14:30)'),
     numGuests: z.number().int().min(1, 'At least 1 guest required').max(100),
-    dietaryRequirements: z.array(z.string()).optional().default([]),
-    specialRequests: z.array(z.string()).optional().default([]),
+    dietaryRequirements: bookingNotesSchema.optional().default([]),
+    specialRequests: bookingNotesSchema.optional().default([]),
     tablePreference: tablePreferenceSchema.optional().default('no-preference'),
     occasion: z.string().max(100).optional(),
   })
@@ -64,8 +65,8 @@ const updateBodySchema = z.strictObject({
   date: z.string().pipe(z.coerce.date()).optional(),
   time: z.string().regex(timeRegex).optional(),
   numGuests: z.number().int().min(1).max(100).optional(),
-  dietaryRequirements: z.array(z.string()).optional(),
-  specialRequests: z.array(z.string()).optional(),
+  dietaryRequirements: bookingNotesSchema.optional(),
+  specialRequests: bookingNotesSchema.optional(),
   tablePreference: tablePreferenceSchema.optional(),
   occasion: z.string().max(100).optional(),
 });

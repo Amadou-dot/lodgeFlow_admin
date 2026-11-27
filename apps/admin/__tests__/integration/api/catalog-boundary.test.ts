@@ -95,7 +95,8 @@ test.each(mutations)(
       error: createErrorResponse('Permission denied', 403),
     });
     const input = req('{');
-    const read = jest.spyOn(input, 'text');
+    if (!input.body) throw new Error('Expected a request body');
+    const read = jest.spyOn(input.body, 'getReader');
     expect((await invoke(input)).status).toBe(403);
     expect(read).not.toHaveBeenCalled();
     expect(connectDB).not.toHaveBeenCalled();

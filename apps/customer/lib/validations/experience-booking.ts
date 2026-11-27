@@ -1,3 +1,4 @@
+import { bookingNotesSchema } from './booking-notes';
 import { objectRequestSchema } from './object-request';
 import { z } from 'zod';
 
@@ -26,7 +27,7 @@ const createBodySchema = z
       .int()
       .min(1, 'At least 1 participant required')
       .max(500),
-    specialRequests: z.array(z.string()).optional().default([]),
+    specialRequests: bookingNotesSchema.optional().default([]),
     observations: z.string().max(1000).optional(),
   })
   .refine(
@@ -54,7 +55,7 @@ const updateBodySchema = z.strictObject({
   date: z.string().pipe(z.coerce.date()).optional(),
   timeSlot: z.string().max(50).optional(),
   numParticipants: z.number().int().min(1).max(500).optional(),
-  specialRequests: z.array(z.string()).optional(),
+  specialRequests: bookingNotesSchema.optional(),
   observations: z.string().max(1000).optional(),
 });
 

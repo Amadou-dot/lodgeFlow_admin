@@ -45,7 +45,7 @@ beforeEach(() => {
   });
 });
 const cashReceipt = {
-  id: '780b7330-b62d-4b6e-80cb-7c9f588ce19b',
+  id: '00000000-0000-4000-8000-000000000001',
   type: 'payment' as const,
   method: 'cash' as const,
   amountCents: 100,
@@ -190,7 +190,7 @@ test('staff status and receipt mutations retain unpopulated JSON and virtual IDs
       new Request('https://admin.test', {
         method: 'POST',
         body: JSON.stringify({
-          id: '780b7330-b62d-4b6e-80cb-7c9f588ce19b',
+          id: cashReceipt.id,
           type: 'payment',
           amountCents: 100,
           method: 'cash',
@@ -227,7 +227,7 @@ test('manual receipt failures are safely logged', async () => {
       new Request('https://admin.test', {
         method: 'POST',
         body: JSON.stringify({
-          id: '780b7330-b62d-4b6e-80cb-7c9f588ce19b',
+          id: cashReceipt.id,
           type: 'payment',
           amountCents: 100,
           method: 'cash',
@@ -253,7 +253,7 @@ test('manual receipts reject prototype keys before connecting', async () => {
   const response = await reservationPayment(
     new Request('https://admin.test', {
       method: 'POST',
-      body: '{"id":"780b7330-b62d-4b6e-80cb-7c9f588ce19b","type":"payment","amountCents":100,"method":"cash","reference":"","__proto__":{}}',
+      body: `{"id":"${cashReceipt.id}","type":"payment","amountCents":100,"method":"cash","reference":"","__proto__":{}}`,
     }),
     { kind: 'dining', id: '507f1f77bcf86cd7994390ab' }
   );
@@ -416,7 +416,7 @@ test('detail retains additive data recursively and checks the amount units befor
 
 test('refund route returns the provider status and reconciles the same token on retry', async () => {
   const [f] = await fixtures();
-  const token = '780b7330-b62d-4b6e-80cb-7c9f588ce19b';
+  const token = cashReceipt.id;
   mockRefundCreate.mockResolvedValueOnce({ id: 're_test', status: null });
   mockRefundRetrieve.mockResolvedValueOnce({
     id: 're_test',
@@ -472,7 +472,7 @@ test('refund route returns the provider status and reconciles the same token on 
 
 test('unchanged status and duplicate receipt keep legacy stored amounts that detail cannot summarize', async () => {
   const [f] = await fixtures();
-  const token = '780b7330-b62d-4b6e-80cb-7c9f588ce19b';
+  const token = cashReceipt.id;
   const saved = {
     id: token,
     type: 'payment' as const,
