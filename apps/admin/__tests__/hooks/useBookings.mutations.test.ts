@@ -474,7 +474,12 @@ test('a rejected cabin replay permits correction after the balance changes and t
       'Payment exceeds the outstanding balance'
     );
   });
-  expect(result.current.previousPayment).toBeUndefined();
+  await waitFor(() => {
+    expect(result.current.error?.message).toBe(
+      'Payment exceeds the outstanding balance'
+    );
+    expect(result.current.previousPayment).toBeUndefined();
+  });
   await act(async () => {
     await expect(
       result.current.mutateAsync({ ...payment, amountPaid: 9 })
