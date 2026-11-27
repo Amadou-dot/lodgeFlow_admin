@@ -413,6 +413,79 @@ test('a fresh dialog cannot replay even a byte-identical prior draft as a new pa
   });
 });
 
+test('a rejected cabin replay permits correction after the balance changes and the dialog reopens', async () => {
+  const initial: AdminBooking = { ...row, remainingAmount: 50, payments: [] };
+  const reduced = {
+    ...row,
+    remainingAmount: 9,
+    payments: [
+      {
+        id: 'other-receipt',
+        amount: 41,
+        method: 'cash' as const,
+        receivedAt: row.checkInDate,
+      },
+    ],
+  };
+  const { result, rerender } = renderHook(
+    ({ booking, dialogId }: { booking: AdminBooking; dialogId: symbol }) =>
+      useRecordPayment({ booking, dialogId, onReconciled: jest.fn() }),
+    { wrapper, initialProps: { booking: initial, dialogId } }
+  );
+  fetchMock.mockRejectedValueOnce(new Error('Lost response'));
+  await act(async () => {
+    await expect(result.current.mutateAsync(payment)).rejects.toThrow(
+      'Lost response'
+    );
+  });
+  // The old amount is no longer valid in the form, so replay must also be
+  // reachable in the same dialog before staff close and reopen it.
+  rerender({ booking: reduced, dialogId });
+  expect(result.current.previousPayment?.amount).toBe(payment.amountPaid);
+  rerender({ booking: reduced, dialogId: Symbol('reopened') });
+  const original = patchBookingSchema.parse(
+    JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+  ).recordPayment;
+  if (!original?.receiptId) throw new Error('Expected the original receipt ID');
+  const saved = {
+    ...reduced,
+    remainingAmount: 0,
+    payments: [
+      ...reduced.payments,
+      {
+        id: original.receiptId,
+        amount: 9,
+        method: payment.paymentMethod,
+        receivedAt: row.checkInDate,
+      },
+    ],
+  };
+  fetchMock
+    .mockResolvedValueOnce(
+      Response.json(
+        { success: false, error: 'Payment exceeds the outstanding balance' },
+        { status: 409 }
+      )
+    )
+    .mockResolvedValueOnce(Response.json({ success: true, data: reduced }))
+    .mockResolvedValueOnce(Response.json({ success: true, data: saved }));
+  await act(async () => {
+    await expect(result.current.retryPreviousPayment()).rejects.toThrow(
+      'Payment exceeds the outstanding balance'
+    );
+  });
+  expect(result.current.previousPayment).toBeUndefined();
+  await act(async () => {
+    await expect(
+      result.current.mutateAsync({ ...payment, amountPaid: 9 })
+    ).resolves.toEqual(saved);
+  });
+  expect(fetchMock.mock.calls[1]).toEqual(fetchMock.mock.calls[0]);
+  expect(
+    JSON.parse(String(fetchMock.mock.calls[3][1]?.body)).recordPayment
+  ).toEqual({ ...original, amountPaid: 9 });
+});
+
 test('a cached booking revalidates its own SWR key after selection changes', async () => {
   const url = (id: string) => '/api/bookings/' + id;
   const second = '507f1f77bcf86cd799439012';

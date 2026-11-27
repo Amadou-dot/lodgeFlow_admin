@@ -1,7 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { ReservationDetail } from '@/components/ReservationDetail';
 import { reservationReceiptSchema } from '@/lib/validations/reservation-payment';
 import { ReservationPayments } from '@/components/ReservationPayments';
+import { useReservationPaymentAttempt } from '@/hooks/useReservationPaymentAttempt';
 import type { ComponentProps } from 'react';
 
 const firstId = '00000000-0000-4000-8000-000000000001';
@@ -35,6 +42,10 @@ function ok(data: unknown) {
 
 let mockCanManage = true;
 let mockCanRefund = true;
+let mockSessionId = 'staff-session';
+jest.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({ userId: 'staff', sessionId: mockSessionId }),
+}));
 jest.mock('@/components/AuthGuard', () => ({
   usePermission: (permission: string) =>
     permission === 'refunds:issue' ? mockCanRefund : mockCanManage,
@@ -42,12 +53,16 @@ jest.mock('@/components/AuthGuard', () => ({
 const fetchMock = jest.fn();
 const originalFetch = global.fetch;
 
-function show(
-  overrides: Partial<ComponentProps<typeof ReservationPayments>> = {}
-) {
+type FormProps = Omit<ComponentProps<typeof ReservationPayments>, 'submission'>;
+function PaymentForm(props: FormProps) {
+  const submission = useReservationPaymentAttempt();
+  return <ReservationPayments {...props} submission={submission} />;
+}
+
+function show(overrides: Partial<FormProps> = {}) {
   const reload = jest.fn().mockResolvedValue(stripeDetail);
   render(
-    <ReservationPayments
+    <PaymentForm
       kind='dining'
       reservationId={write._id}
       endpoint={`/api/dining-reservations/${write._id}`}
@@ -89,6 +104,7 @@ function enterAmount(value: string) {
 beforeEach(() => {
   mockCanManage = true;
   mockCanRefund = true;
+  mockSessionId = 'staff-session';
   fetchMock.mockReset().mockResolvedValue(ok(write));
   global.fetch = fetchMock;
   jest
@@ -473,6 +489,240 @@ const stripeDetail = {
     legacyPaid: false,
   },
 };
+const unpaidDetail = {
+  ...stripeDetail,
+  reservation: { ...stripeDetail.reservation, receipts: [] },
+  payment: {
+    ...stripeDetail.payment,
+    paidCents: 0,
+    refundableCents: 0,
+    balanceCents: 1000,
+  },
+};
+
+test('a rejected replay allows the amount to be corrected under the original receipt ID', async () => {
+  const saved = {
+    ...write,
+    receipts: [{ ...write.receipts[0], amountCents: 1000 }],
+  };
+  fetchMock
+    .mockResolvedValueOnce(ok(unpaidDetail))
+    .mockRejectedValueOnce(new Error('Lost payment response'))
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: 'Payment exceeds the outstanding balance',
+      }),
+    })
+    .mockResolvedValueOnce(ok(unpaidDetail))
+    .mockResolvedValueOnce(ok(saved))
+    .mockResolvedValueOnce(
+      ok({
+        ...unpaidDetail,
+        reservation: { ...saved, dining: null, isPaid: true },
+        payment: { ...unpaidDetail.payment, paidCents: 1000, balanceCents: 0 },
+      })
+    );
+  render(<ReservationDetail kind='dining' id={write._id} />);
+  await screen.findByLabelText('Amount (EUR)');
+  enterAmount('11');
+  const replay = await screen.findByRole('button', {
+    name: 'Retry original transaction',
+  });
+  fireEvent.change(screen.getByLabelText('Amount (EUR)'), {
+    target: { value: '10' },
+  });
+  fireEvent.click(replay);
+  const pay = screen.getByRole('button', { name: /Saving…|Record payment/ });
+  await waitFor(() => expect(pay).toBeEnabled());
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Payment exceeds the outstanding balance'
+  );
+  fireEvent.click(pay);
+  await screen.findByText(/Payment · €10.00/);
+  expect(fetchMock.mock.calls[2]).toEqual(fetchMock.mock.calls[1]);
+  expect(JSON.parse(fetchMock.mock.calls[4][1].body)).toMatchObject({
+    id: firstId,
+    amountCents: 1000,
+  });
+  expect(crypto.randomUUID).toHaveBeenCalledTimes(1);
+});
+
+test('a denied refresh hides the detail and preserves the in-flight partial receipt on return', async () => {
+  let loseResponse!: (error: Error) => void;
+  const inFlight = new Promise((_resolve, reject) => {
+    loseResponse = reject;
+  });
+  fetchMock
+    .mockResolvedValueOnce(ok(unpaidDetail))
+    .mockReturnValueOnce(inFlight)
+    .mockResolvedValueOnce(ok({ ...write, status: 'completed' }))
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ success: false, error: 'Detail unavailable' }),
+    })
+    .mockResolvedValueOnce(ok(unpaidDetail))
+    .mockResolvedValueOnce(ok(write))
+    .mockResolvedValueOnce(ok(unpaidDetail));
+  render(<ReservationDetail kind='dining' id={write._id} />);
+  await screen.findByLabelText('Amount (EUR)');
+  enterAmount('0.29');
+  fireEvent.change(screen.getByLabelText('Change status'), {
+    target: { value: 'completed' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Detail unavailable'
+  );
+  expect(screen.queryByText('Payments and refunds')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('Guest', { selector: 'dd' })
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  const amount = await screen.findByLabelText('Amount (EUR)');
+  expect(amount).toHaveValue('');
+  fireEvent.change(amount, { target: { value: '0.29' } });
+  fireEvent.submit(
+    screen.getByRole('button', { name: /Record payment|Saving…/ })
+  );
+  expect(fetchMock).toHaveBeenCalledTimes(5);
+  await act(async () => loseResponse(new Error('Connection lost')));
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Retry original transaction' })
+  );
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
+  expect(fetchMock.mock.calls[5]).toEqual(fetchMock.mock.calls[1]);
+  expect(crypto.randomUUID).toHaveBeenCalledTimes(1);
+});
+
+test('a delayed original receipt wins over a correction without reporting the correction as saved', async () => {
+  const conflict = {
+    ok: false,
+    status: 409,
+    json: async () => ({ success: false, error: 'Reservation changed' }),
+  };
+  const reload = show();
+  reload.mockResolvedValueOnce(unpaidDetail).mockResolvedValueOnce({
+    ...unpaidDetail,
+    reservation: { ...write, dining: null },
+  });
+  fetchMock
+    .mockRejectedValueOnce(new Error('Offline'))
+    .mockResolvedValueOnce(conflict)
+    .mockResolvedValueOnce(conflict);
+  enterAmount('0.29');
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Retry original transaction' })
+  );
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Record payment' })).toBeEnabled()
+  );
+  enterAmount('0.28');
+  await waitFor(() =>
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'already records a cash payment of €0.29'
+    )
+  );
+  expect(screen.getByLabelText('Amount (EUR)')).toHaveValue('0.28');
+  expect(crypto.randomUUID).toHaveBeenCalledTimes(1);
+});
+
+test('checking an existing Stripe refund keeps the ID and draft of a rejected manual receipt', async () => {
+  const partial = {
+    ...stripeDetail,
+    reservation: { ...stripeDetail.reservation, totalPrice: 20 },
+    payment: { ...stripeDetail.payment, totalCents: 2000, balanceCents: 1000 },
+  };
+  const pending = {
+    ...partial,
+    reservation: {
+      ...partial.reservation,
+      stripeRefund: {
+        token: secondId,
+        amountCents: 29,
+        reference: 'Original refund',
+        status: 'pending',
+      },
+    },
+  };
+  const receipts = [
+    stripeReceipt,
+    {
+      ...stripeReceipt,
+      type: 'refund',
+      id: secondId,
+      amountCents: 29,
+      reference: 'Original refund',
+    },
+  ];
+  const refunded = {
+    ...partial,
+    reservation: { ...partial.reservation, receipts },
+    payment: { ...partial.payment, refundedCents: 29, refundableCents: 971 },
+  };
+  const recorded = [...receipts, write.receipts[0]];
+  fetchMock
+    .mockResolvedValueOnce(ok(partial))
+    .mockRejectedValueOnce(new Error('Offline'))
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({
+        success: false,
+        error: 'An online transaction is pending',
+      }),
+    })
+    .mockResolvedValueOnce(ok(pending))
+    .mockResolvedValueOnce(ok({ status: 'succeeded' }))
+    .mockResolvedValueOnce(ok(refunded))
+    .mockResolvedValueOnce(ok({ ...write, totalPrice: 20, receipts: recorded }))
+    .mockResolvedValueOnce(
+      ok({
+        ...refunded,
+        reservation: { ...refunded.reservation, receipts: recorded },
+        payment: {
+          ...refunded.payment,
+          paidCents: 1029,
+          balanceCents: 971,
+          refundableCents: 1000,
+        },
+      })
+    );
+  render(<ReservationDetail kind='dining' id={write._id} />);
+  await screen.findByLabelText('Amount (EUR)');
+  enterAmount('0.30');
+  const replay = await screen.findByRole('button', {
+    name: 'Retry original transaction',
+  });
+  fireEvent.change(screen.getByLabelText('Amount (EUR)'), {
+    target: { value: '0.29' },
+  });
+  fireEvent.click(replay);
+  const check = await screen.findByRole('button', {
+    name: 'Check or retry refund',
+  });
+  await waitFor(() => expect(check).toBeEnabled());
+  fireEvent.click(check);
+  expect(await screen.findByLabelText('Amount (EUR)')).toHaveValue('0.29');
+  fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+  await waitFor(() =>
+    expect(screen.getByLabelText('Amount (EUR)')).toHaveValue('')
+  );
+  expect(JSON.parse(fetchMock.mock.calls[4][1].body)).toMatchObject({
+    id: secondId,
+    method: 'stripe',
+  });
+  expect(JSON.parse(fetchMock.mock.calls[6][1].body)).toMatchObject({
+    id: firstId,
+    method: 'cash',
+    amountCents: 29,
+  });
+  expect(crypto.randomUUID).toHaveBeenCalledTimes(1);
+});
+
 const stripeDenial = {
   ok: false,
   status: 409,
@@ -668,38 +918,46 @@ test.each([401, 403, 404])(
     expect(screen.getByLabelText('Transaction')).toHaveValue('payment');
     expect(screen.getByLabelText('Amount (EUR)')).toHaveValue('');
     expect(
-      screen.queryByRole('button', { name: 'Retry original transaction' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Retry original transaction' })
+    ).toBeEnabled();
   }
 );
 
-test('changing reservation clears the previous mounted uncertain attempt and edited draft', async () => {
-  const nextId = '507f1f77bcf86cd799439099';
-  const next = {
-    ...stripeDetail,
-    customerName: 'Next guest',
-    reservation: { ...stripeDetail.reservation, _id: nextId, id: nextId },
-  };
-  fetchMock
-    .mockResolvedValueOnce(ok(stripeDetail))
-    .mockRejectedValueOnce(new Error('Offline'))
-    .mockResolvedValueOnce(ok(next));
-  const view = await submitStripeRefund();
-  await screen.findByRole('button', { name: 'Retry original transaction' });
-  fireEvent.change(screen.getByLabelText('Receipt reference / refund reason'), {
-    target: { value: 'Held note' },
-  });
-  view.rerender(<ReservationDetail kind='dining' id={nextId} />);
-  await screen.findByText('Next guest');
-  expect(
-    screen.queryByRole('button', { name: 'Retry original transaction' })
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByLabelText('Receipt reference / refund reason')
-  ).toHaveValue('');
-  expect(screen.getByLabelText('Amount (EUR)')).toHaveValue('');
-  expect(fetchMock).toHaveBeenCalledTimes(3);
-});
+test.each(['reservation', 'session'])(
+  'changing %s clears the previous mounted uncertain attempt and edited draft',
+  async change => {
+    const nextId =
+      change === 'reservation' ? '507f1f77bcf86cd799439099' : write._id;
+    const next = {
+      ...stripeDetail,
+      customerName: 'Next guest',
+      reservation: { ...stripeDetail.reservation, _id: nextId, id: nextId },
+    };
+    fetchMock
+      .mockResolvedValueOnce(ok(stripeDetail))
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockResolvedValueOnce(ok(next));
+    const view = await submitStripeRefund();
+    await screen.findByRole('button', { name: 'Retry original transaction' });
+    fireEvent.change(
+      screen.getByLabelText('Receipt reference / refund reason'),
+      {
+        target: { value: 'Held note' },
+      }
+    );
+    if (change === 'session') mockSessionId = 'another-session';
+    view.rerender(<ReservationDetail kind='dining' id={nextId} />);
+    await screen.findByText('Next guest');
+    expect(
+      screen.queryByRole('button', { name: 'Retry original transaction' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Receipt reference / refund reason')
+    ).toHaveValue('');
+    expect(screen.getByLabelText('Amount (EUR)')).toHaveValue('');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  }
+);
 
 test('explicit pending retry reaches the provider with the saved token after a competing equal-body refund', async () => {
   const pending = {

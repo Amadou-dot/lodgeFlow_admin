@@ -279,6 +279,10 @@ The [reviewed inventory](inventory.md#phase-6-remaining-boundaries-on-the-review
 
 Task 9 adds a direct database dependency on the already locked Zod 4.4.3. Compared with parent `a329a1b`, pnpm-lock.yaml gains three database importer lines. The package exports `./settings-json-schema`, `./catalog-json-schema` and `./reservation-read-fields` for the respective cross-app contracts. The original staff/audit model exports remain compatible.
 
+A denied reservation detail read hides the guest and discards the form draft. The mounted detail retains the pending transaction for the same staff session and reservation. For manual cabin and reservation receipts, an explicit replay rejection triggers a fresh read of the same record. A missing receipt allows staff to correct the draft using the original ID, so a delayed request and a correction can produce at most one receipt. An inconclusive read retains the original replay action.
+
+The Settings PUT response reflects nested replacement. It can contain a single notification flag or business-hours field, and Mongoose can omit an empty nested object. Both apps accept those shapes as returned.
+
 All eight local gates exited 0 at source `14e72c04c28d04776591ea997264e6ed581363f1` on November 26, 2026, with Node 22.23.2 and pnpm 11.17.0. The initial helper invocation selected an alternate store and pnpm declined replacing installed modules without a TTY. The exact frozen command succeeded using the installed store. Task 20 introduced no lockfile change.
 
 | Command from repository root                                                                | Verified outcome                                                                                                                                                                                                 |

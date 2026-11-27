@@ -149,11 +149,6 @@ function QuickActionsContent({
   const handleRetryPreviousPayment = async () => {
     try {
       await recordPaymentMutation.retryPreviousPayment();
-      if (!active.current) return;
-      addToast({
-        color: 'success',
-        description: 'Previously submitted payment confirmed',
-      });
     } catch (error) {
       if (!active.current) return;
       addToast({

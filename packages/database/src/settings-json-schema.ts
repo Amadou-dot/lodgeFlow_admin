@@ -30,7 +30,8 @@ const businessHours = z
     close: z.string(),
     daysOpen: z.array(z.string().nullable()).nullable(),
   })
-  .nullable();
+  .partial()
+  .nullish();
 
 const notifications = z
   .looseObject({
@@ -40,7 +41,8 @@ const notifications = z
     paymentReminders: z.boolean().nullable(),
     checkInReminders: z.boolean().nullable(),
   })
-  .nullable();
+  .partial()
+  .nullish();
 
 // Both apps serialize the same hydrated Settings data. Keep legacy omissions,
 // explicit nulls and additive fields without applying edit validation or defaults.

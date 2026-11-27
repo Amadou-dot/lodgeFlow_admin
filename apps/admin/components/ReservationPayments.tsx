@@ -1,17 +1,21 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+import type {
+  PaymentAttempt,
+  PaymentDraft,
+  useReservationPaymentAttempt,
+} from '@/hooks/useReservationPaymentAttempt';
 import { usePermission } from './AuthGuard';
 import { reservationReceiptSchema } from '@/lib/validations/reservation-payment';
 import {
   readReservationPayment,
   receiptConfirmation,
   type ReservationData,
-  ReservationRequestRejected,
-  type ReservationTransaction,
   type ReservationKind,
   type ReservationPaymentFields,
   type PaymentSummary,
 } from '@/lib/validations/reservation-operations-json';
+import { StaffRequestRejected } from '@/lib/validations/staff-request-rejected';
 import {
   cents,
   centsToMajor,
@@ -20,18 +24,6 @@ import {
   majorToCents,
   MoneyError,
 } from '@lodgeflow/database/money';
-type Draft = Pick<ReservationTransaction, 'type' | 'method' | 'reference'> & {
-  amount: string;
-};
-type Attempt = {
-  transaction: ReservationTransaction;
-  body: string;
-  draft: Draft;
-};
-type ActionState =
-  | { kind: 'idle' | 'busy' }
-  | { kind: 'error'; message: string }
-  | { kind: 'uncertain'; attempt: Attempt; message: string };
 export function ReservationPayments({
   kind,
   endpoint,
@@ -43,6 +35,7 @@ export function ReservationPayments({
   stripeRefund,
   status,
   reload,
+  submission,
 }: ReservationPaymentFields & {
   kind: ReservationKind;
   endpoint: string;
@@ -51,19 +44,20 @@ export function ReservationPayments({
   currency: string | null;
   status: string | null;
   reload: () => Promise<ReservationData | undefined>;
+  submission: ReturnType<typeof useReservationPaymentAttempt>;
 }) {
   const canManage = usePermission('bookings:manage');
   const canRefund = usePermission('refunds:issue');
-  const [draft, setDraft] = useState<Draft>({
+  const [draft, setDraft] = useState<PaymentDraft>({
     type: 'payment',
     method: 'cash',
     amount: '',
     reference: '',
   });
   const { type, method, amount, reference } = draft;
-  const [state, setState] = useState<ActionState>({ kind: 'idle' });
-  const request = useRef<Attempt>();
-  const sending = useRef(false);
+  const { state, setState, request, manualCorrection, sending } = submission;
+  const correction = manualCorrection.current;
+  const replay = state.kind === 'uncertain' ? state.attempt : correction;
   const currencyCode = currency || 'USD';
   function format(value: number) {
     const amount = cents(value);
@@ -88,7 +82,16 @@ export function ReservationPayments({
         }
       : undefined;
   async function submit(retry?: NonNullable<typeof retryDetails>) {
-    if (sending.current || state.kind === 'uncertain') return;
+    if (sending.current || state.kind === 'busy' || state.kind === 'uncertain')
+      return;
+    if (correction && !retry && method === 'stripe') {
+      setState({
+        kind: 'error',
+        message:
+          'Finish reconciling the manual receipt before issuing a Stripe refund.',
+      });
+      return;
+    }
     let transaction;
     try {
       if (!retry && !/^\d+(\.\d{1,2})?$/.test(amount)) {
@@ -126,6 +129,7 @@ export function ReservationPayments({
     const body = JSON.stringify(transaction);
     const id =
       retry?.token ??
+      correction?.transaction.id ??
       (request.current?.body === body
         ? request.current.transaction.id
         : crypto.randomUUID());
@@ -140,7 +144,7 @@ export function ReservationPayments({
     request.current = attempt;
     await send(attempt, 'submit');
   }
-  async function send(attempt: Attempt, action: 'submit' | 'replay') {
+  async function send(attempt: PaymentAttempt, action: 'submit' | 'replay') {
     if (sending.current) return;
     sending.current = true;
     setState({ kind: 'busy' });
@@ -162,52 +166,81 @@ export function ReservationPayments({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to record transaction';
-      if (!acknowledged && error instanceof ReservationRequestRejected) {
-        // Stripe settlement can report a rule error after the provider accepted
-        // the refund. Inspect the current detail before releasing a changed draft.
-        if (
-          attempt.transaction.method === 'stripe' &&
-          [400, 404, 409].includes(error.status)
-        ) {
-          const detail = await reload().catch(() => undefined);
-          if (detail) {
-            const reservation = detail.reservation;
-            const known = receiptConfirmation(
-              reservation.receipts,
-              attempt.transaction
-            );
-            if (known === 'confirmed') {
-              complete(attempt);
-              return;
-            }
-            const operation = reservation.stripeRefund;
-            if (
-              action === 'submit' &&
-              known === 'missing' &&
-              (operation?.token !== attempt.transaction.id ||
-                operation.status === 'failed')
-            ) {
-              setState({ kind: 'error', message });
-              return;
-            }
-          }
-        } else if (action === 'submit') {
-          setState({ kind: 'error', message });
-          return;
-        }
+      if (!acknowledged && error instanceof StaffRequestRejected) {
+        await handleRejection({ attempt, action, error });
+      } else {
+        setState({ kind: 'uncertain', attempt, message });
       }
-      setState({ kind: 'uncertain', attempt, message });
     } finally {
       sending.current = false;
     }
   }
-  function complete(attempt: Attempt) {
+  async function handleRejection({
+    attempt,
+    action,
+    error,
+  }: {
+    attempt: PaymentAttempt;
+    action: 'submit' | 'replay';
+    error: StaffRequestRejected;
+  }) {
+    const { transaction } = attempt;
+    const correcting =
+      transaction.method !== 'stripe' &&
+      manualCorrection.current?.transaction.id === transaction.id;
+    const firstSubmission = action === 'submit' && !correcting;
+    const rejected = { kind: 'error', message: error.message } as const;
+    const uncertain = {
+      kind: 'uncertain',
+      attempt,
+      message: error.message,
+    } as const;
+    const checkLedger =
+      transaction.method === 'stripe'
+        ? [400, 404, 409].includes(error.status)
+        : !firstSubmission && [400, 409].includes(error.status);
+    if (!checkLedger) return setState(firstSubmission ? rejected : uncertain);
+
+    const detail = await reload().catch(() => undefined);
+    if (!detail) return setState(uncertain);
+    const { receipts, stripeRefund } = detail.reservation;
+    const receipt = receiptConfirmation(receipts, transaction);
+    if (receipt.kind === 'confirmed') return complete(attempt);
+    if (receipt.kind === 'conflict') {
+      if (!correcting) return setState(uncertain);
+      // A delayed submission won the race with the correction.
+      request.current = undefined;
+      manualCorrection.current = undefined;
+      const { method, type, amountCents } = receipt.recorded;
+      return setState({
+        kind: 'error',
+        message: `This receipt already records a ${method} ${type} of ${format(amountCents)}. Review the updated balance.`,
+      });
+    }
+    if (transaction.method !== 'stripe') {
+      // An absent receipt permits an edit, but a delayed original write can
+      // still arrive. Keep every correction on the original manual receipt ID.
+      manualCorrection.current = attempt;
+      return setState(rejected);
+    }
+    if (
+      firstSubmission &&
+      (stripeRefund?.token !== transaction.id ||
+        stripeRefund.status === 'failed')
+    )
+      return setState(rejected);
+    setState(uncertain);
+  }
+  function complete(attempt: PaymentAttempt) {
     request.current = undefined;
-    setDraft(current =>
-      current === attempt.draft
-        ? { ...current, amount: '', reference: '' }
-        : current
-    );
+    if (attempt.transaction.method !== 'stripe')
+      manualCorrection.current = undefined;
+    if (!manualCorrection.current)
+      setDraft(current =>
+        current === attempt.draft
+          ? { ...current, amount: '', reference: '' }
+          : current
+      );
     setState({ kind: 'idle' });
   }
   const pending = checkout?.pending || stripeRefund?.status === 'pending';
@@ -261,18 +294,24 @@ export function ReservationPayments({
           {state.message}
         </p>
       )}
-      {state.kind === 'uncertain' &&
+      {replay &&
+        state.kind !== 'busy' &&
         canManage &&
-        (state.attempt.transaction.type === 'payment' || canRefund) && (
+        (replay.transaction.type === 'payment' || canRefund) && (
           <div>
             <p>
-              Retry the original transaction to confirm its outcome before
-              submitting another. Your edits will be kept.
+              {state.kind === 'uncertain'
+                ? 'Retry the original'
+                : 'Correct the amount or retry the original'}{' '}
+              {format(replay.transaction.amountCents)}{' '}
+              {replay.transaction.method.replace('_', ' ')}{' '}
+              {replay.transaction.type} to confirm its outcome. Your edits will
+              be kept.
             </p>
             <button
               type='button'
               className='underline'
-              onClick={() => void send(state.attempt, 'replay')}
+              onClick={() => void send(replay, 'replay')}
             >
               Retry original transaction
             </button>
@@ -325,7 +364,9 @@ export function ReservationPayments({
               <option value='bank_transfer'>Bank transfer</option>
               <option value='card'>External card terminal</option>
               {type === 'refund' && (
-                <option value='stripe'>Stripe online payment</option>
+                <option value='stripe' disabled={!!correction}>
+                  Stripe online payment
+                </option>
               )}
             </select>
           </label>
