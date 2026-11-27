@@ -10,30 +10,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Refactoring direction
 
-The workspace-root `AGENTS.md` governs code quality and the current refactoring
-freeze. Follow `docs/refactoring/plan.md`: complete the baseline, HTTP smoke harness
-and high-risk regression gates before substantive refactoring. Issues #136 and
-#139 remain excluded. Use intended behavior, not legacy casts or comments, as the
-contract when writing characterization tests.
+The [root agent guide](../../AGENTS.md) governs implementation. The Phase 0
+baseline and regression gates are in place. PRs #207 and #208 delivered the
+Phase 4 follow-up and Phase 6 response contracts. Use the [refactoring
+plan](../../docs/refactoring/plan.md) for the remaining acceptance work.
+Issues #136 and #139 are outside that effort.
 
-Production origins are `https://lodgeflow.app` for customers and
-`https://admin.lodgeflow.app` for staff. This app is the customer site.
-Resend is already configured for the `lodgeflow.app` domain; existing sender
-configuration cleanup is tracked separately in #132.
-
-### Shared database
-
-Models now live in `packages/database/src/models` at the workspace root. Import
-`@lodgeflow/database` or an exported model subpath; there is no app-local `models/`
-directory. Schema enums and connection/pricing helpers have shared implementations.
-The lock storage module is private; app routes use `withCabinBookingLock()`.
-See `docs/superpowers/plans/2026-09-14-shared-database.md` for remaining payment
-and capacity reconciliation work.
+The guest site is `https://lodgeflow.app` and the staff portal is
+`https://admin.lodgeflow.app`. Both apps use `@lodgeflow/email` for sender
+selection and `@lodgeflow/database` for models, pricing, receipts, capacity,
+and booking locks. Import models from that package or a declared subpath.
+Use `withCabinBookingLock` for overlapping cabin writes. [Shared models](../../packages/database/src/models) · [Payment workflow](../../docs/reservation-payments.md)
 
 ## Commands
 
 ```bash
-pnpm dev --port 3002  # Customer dev server; admin convention is port 3000
+pnpm dev --port 3001  # Matches the workspace dev:customer command
 pnpm build            # Production build
 pnpm lint             # ESLint with auto-fix
 pnpm test             # Run all tests
@@ -53,7 +45,7 @@ pnpm ci:check         # Full CI check (format + lint + test)
 - **HeroUI v2** component library with Tailwind CSS
 - **React Query** for server state management
 - **Resend** for transactional emails
-- **Stripe** for payments (`lib/stripe.ts`, webhook handler at `app/api/payments/`)
+- **Stripe** for payments (`lib/stripe.ts`, webhook handler at `app/api/payments/webhook/route.ts`)
 
 ### Data Flow Pattern
 
@@ -68,7 +60,7 @@ Custom hooks in `hooks/` use React Query to fetch from internal API routes. API 
 - `app/api/` - API routes: bookings, cabins, dining, dining-reservations, experiences, experience-bookings, payments, settings, send (email)
 - `packages/database/src/models/` (repo root) - Mongoose schemas: Booking, Cabin, Dining, DiningReservation, Experience, ExperienceBooking, ProcessedStripeEvent, Settings
 - `hooks/` - React Query hooks matching API resources (useCabins, useBooking, etc.)
-- `types/index.ts` - DTO aliases for migrated flows; remaining model aliases are refactoring debt
+- `types/index.ts` - serializable catalog, Settings, and reservation DTO aliases
 - `types/cabin-read.ts`, `types/booking-read.ts` - Explicit JSON read contracts for migrated cabin/booking flows
 - `components/ui/` - Reusable UI components
 - `lib/validations/` - Zod schemas validated at API boundaries (booking, dining-reservation, experience-booking)
@@ -90,8 +82,8 @@ When adding a new mutating API route, extend the `createRouteMatcher` list in `p
 ### Auth conventions inside route handlers
 
 - **Derive `customer` from `await auth().userId` server-side.** Never accept a customer / user id from the request body — bodies are attacker-controlled. Booking/reservation create endpoints all follow this.
-- **Mutations and reads scoped to a specific resource** (e.g. `GET|PATCH|DELETE /api/bookings/[id]`) must verify `resource.customer.toString() === userId` after `findById`. On mismatch, return **404 with a "not found" body** — 403 leaks the existence of the resource.
-- The proxy is the primary gate; in-handler `await auth()` checks remain as defense in depth for any route that could be hit if the matcher list ever drifts.
+- **Mutations and reads scoped to a specific resource** (e.g. `GET|PATCH|DELETE /api/bookings/[id]`) must enforce ownership using the authenticated Clerk user ID. Existing routes return 404 for a missing or foreign resource.
+- The proxy requires a session on protected API routes. The handler enforces customer ownership for each private read or write.
 - Stripe webhook handler must use `stripe.webhooks.constructEvent` and check `ProcessedStripeEvent` for idempotency _before_ mutating booking state.
 
 ### Model Relationships
@@ -105,11 +97,16 @@ When adding a new mutating API route, extend the `createRouteMatcher` list in `p
 
 ### API Response Format
 
-Most resource routes use the following legacy `ApiResponse<T>` shape. Webhook and some email responses differ; verify each route and its caller before normalizing contracts:
+Use the resource-specific readers in `lib/validations/` for catalog, availability,
+history, detail, write and checkout replies. Validate the returned customer,
+status, or resource ID against the originating request before caching the data.
+Keep the original JSON so additive fields and legacy nulls survive. Manual
+email sends return the provider object with a string `id`.
 
-```typescript
-{ success: boolean; data?: T; error?: string; message?: string }
-```
+Private history keys include the Clerk user and session. A queued write and its
+checkout redirect belong to the session and resource that initiated them. The
+signed webhook validates the fields each event consumes before settlement.
+[Response readers](lib/validations/read-response.ts) · [Webhook fields](lib/stripe-webhook-event.ts)
 
 ### Workspace verification
 

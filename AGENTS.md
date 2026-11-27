@@ -6,10 +6,14 @@ This project is in a refactoring phase. **Do not add new features until the
 refactoring is complete**, unless the user explicitly changes that direction.
 Make functions easy to use correctly and hard to use incorrectly.
 
-Complete the Phase 0 baseline, HTTP smoke harness and high-risk regression gates
-in `docs/refactoring/plan.md` before substantive refactoring. Add characterization
-tests for intended behavior before each later slice; do not preserve known bugs
-or chase a blanket coverage percentage.
+The Phase 0 baseline, HTTP smoke harness and high-risk regression gates are in
+place. The Phase 4 follow-up merged in [#207](https://github.com/Amadou-dot/lodgeFlow_admin/pull/207).
+The final Phase 6 response validation and receipt recovery work merged in
+[#208](https://github.com/Amadou-dot/lodgeFlow_admin/pull/208), closing tracker
+[#150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150). Use the
+[refactoring plan](docs/refactoring/plan.md) and the
+[remaining browser and payment checks](docs/refactoring/phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
+for acceptance. Add characterization tests for the behavior at risk in each new slice.
 
 - Work in small, reviewable slices. Follow the affected path from schema/model
   through service, route, hook, and UI before changing a contract.
@@ -176,8 +180,16 @@ already complies.
   those schemas. Successful Clerk lock/unlock operations invalidate the affected
   server-cached profile before returning, using the existing best-effort cache
   policy; failed provider operations leave cached profiles intact.
-  Other response type annotations are not runtime validators and still need
-  deliberate migration.
+  Reuse the resource readers in each app's `lib/validations/` before placing
+  responses into caches, calling success handlers, or following checkout links.
+  Validate the requested detail ID, customer, filters, or calendar window where
+  the producer returns them. Preserve additive fields and the producer's success
+  shape, including the bare sales array and manual email replies with a string
+  `id`. The [Phase 6 inventory](docs/refactoring/inventory.md) maps readers to producers.
+- Bind queued writes and checkout continuations to the session and resource that
+  initiated them. Retire unsent work when the owner changes. Check a transmitted
+  attempt against that same record before treating a retry as a new operation.
+  Keep Settings readers compatible with partial nested values after replacement.
 
 ### Money: preserve units and accounting
 
@@ -193,15 +205,7 @@ already complies.
   values. Do not feed cents directly into it. Stripe conversions belong at the
   provider boundary, not scattered throughout renders.
 
-**Refactoring target:** money carries its unit in its type. Introduce shared,
-validated branded types (for example `Cents` and `MajorCurrencyAmount`) and named
-conversion/formatting functions when taking on a money slice. Validate finite
-values, safe integer cents, supported precision, and the operation's sign rules.
-Reject sub-cent input where the contract requires exact cents; distinguish that
-from an explicit business rounding rule. Keep unit casts inside validated
-constructors. Use typed money errors and translate them at route boundaries.
-
-Phase 3 implements these boundaries in `@lodgeflow/database/money`, which is safe
+Use the Phase 3 constructors in `@lodgeflow/database/money`, which is safe
 to import from browser code. `majorAmount` requires an explicit `exact` or
 `preserve` precision policy; `cents` validates safe integers. Conversion and
 rounding policies are named explicitly. Keep legacy price precision and the
@@ -257,6 +261,11 @@ framework from the supplied philosophy; do not invent imports for those examples
   Use existing shared payment/settlement operations instead of direct flag writes.
   `ProcessedStripeEvent` is useful deduplication, not a substitute for idempotent
   settlement under concurrent events.
+- A lost manual payment reply leaves the outcome uncertain. In the mounted staff
+  workflow, replay the original receipt ID and payload. After a replay rejection,
+  reread the same booking or reservation. A matching receipt confirms the write,
+  an absent receipt permits a correction on the original ID, and an inconclusive
+  read retains the retry. See the [staff payment workflow](docs/reservation-payments.md).
 - Legacy paid reservations without receipts require reconciliation; do not invent
   refundable receipt history. Preserve pending-checkout/refund and cancellation
   guards when reorganizing reservation code.
@@ -266,7 +275,8 @@ framework from the supplied philosophy; do not invent imports for those examples
 
 ## Commands and validation
 
-Run workspace commands from the repo root. CI pins **Node 22 and pnpm 11.17.0**
+Run workspace commands from the repo root. The [contributor guide](CONTRIBUTING.md)
+covers local setup for both apps and the pull request workflow. CI pins **Node 22 and pnpm 11.17.0**
 (`.github/workflows/ci.yml`). Use pnpm and the committed `pnpm-lock.yaml`; preserve
 the `@internationalized/date` override in `pnpm-workspace.yaml`, which prevents
 incompatible duplicate date-picker types.
@@ -275,7 +285,7 @@ incompatible duplicate date-picker types.
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Install                                   | `pnpm install --frozen-lockfile`                                                                    |
 | Admin dev                                 | `pnpm dev:admin`                                                                                    |
-| Customer dev on a separate port           | `pnpm --filter @lodgeflow/customer dev --port 3002`                                                 |
+| Customer dev on port 3001                 | `pnpm dev:customer`                                                                                 |
 | Admin without MongoDB tests               | `pnpm --filter @lodgeflow/admin test:fast`                                                          |
 | Admin integration tests                   | `pnpm --filter @lodgeflow/admin test:integration`                                                   |
 | Customer tests                            | `pnpm --filter @lodgeflow/customer test`                                                            |
@@ -301,6 +311,10 @@ incompatible duplicate date-picker types.
   test identities, and controls external payment/email responses. See
   `docs/refactoring/http-smoke.md` for commands and limitations; this does not
   exercise hosted Clerk login or live provider delivery.
+- CI also builds the customer site against disposable data and checks that
+  replacing a cabin updates listing links and retires the old detail URL. Run
+  `pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/catalog-freshness.mjs`
+  for that production-rendering regression.
 - Admin Jest has unit, integration and jsdom projects. Integration uses
   `MongoMemoryReplSet` and one worker; preserve isolation/serialization. Customer
   uses Jest/jsdom. Database uses `tsx --test` with Node's test runner and real
@@ -319,7 +333,9 @@ incompatible duplicate date-picker types.
   Shared schema/domain changes require database tests and both app suites/builds.
   Cover invalid inputs, denied access, duplicate requests and concurrent writes
   when those contracts are affected. UI changes need relevant component and
-  interaction checks. Documentation-only changes need formatting and path checks.
+  interaction checks. For documentation edits, check relative links and image
+  paths. Markdown is ignored by the default format check, so run
+  `pnpm exec prettier --check --ignore-path /dev/null <edited-markdown-files>`.
 - Builds need a Clerk publishable key for prerendering. CI supplies a throwaway
   public key in its workflow; use that setup for credential-free build validation.
   Keep Stripe/Resend clients lazy so builds do not require their secrets.
@@ -380,19 +396,11 @@ Checked against source/configuration on 2026-09-15; reverify when touching an ar
 | Every route returns the same `ApiResponse<T>`                        | Response declarations differ, and webhook responses have their own contract. Inspect route and caller before normalization.               |
 | Seed the database to validate ordinary changes                       | Seeding resets data. Use isolated test infrastructure for routine verification.                                                           |
 
-## Suggested sequence for future refactoring slices
+## Selecting follow-up work
 
-1. Separate model/document types from API and UI DTOs; remove double casts in one
-   end-to-end flow at a time (`apps/customer/types/index.ts` is a starting point).
-2. Replace ambiguous helper signatures and boolean switches, including shared
-   payment/reservation helpers; update both apps' callers in the same slice.
-3. Consolidate payload validation and typed updates; keep database-dependent
-   business rules within their concurrency boundaries.
-4. Introduce explicit money units and conversion boundaries with accounting tests;
-   treat storage or rounding changes as distinct migrations.
-5. Simplify component state and cache synchronization, then consolidate duplicated
-   error/response contracts with compatibility tests.
-
-Choose a bounded slice based on risk and dependencies. Completion means preserved
-behavior, migrated callers, relevant passing checks, and no newly introduced type
-escapes—not merely fewer lines or a broad claim that the codebase is modernized.
+Consult the [reviewed boundary inventory](docs/refactoring/inventory.md) before
+changing a retained wire shape or type exception. The
+[acceptance matrix](docs/refactoring/phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
+names the outstanding hosted account switches, staff edits, native-device and
+print checks, and checkout journeys. Record the environment and the observed
+result with each check.

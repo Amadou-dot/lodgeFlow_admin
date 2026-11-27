@@ -25,8 +25,7 @@ pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/catalog-fres
 This separate gate builds and starts the real production customer app against
 disposable MongoDB. It verifies homepage and `/cabins` links, replaces the fixture
 cabin after the build and first requests, then requires both pages to render the
-replacement link. The current detail must load and the removed detail must return
-404. This catches build-time catalog snapshots that the development HTTP runner
+replacement link. The current detail must load and the removed detail must return 404. This catches build-time catalog snapshots that the development HTTP runner
 cannot reproduce. The pre-fix implementation failed this exact assertion.
 
 The runner excludes app environment files and uses an allowlisted child environment,
@@ -105,11 +104,10 @@ operations fail. These email/payment paths cannot make live sends or charges.
 
 Customer link assertions use `https://lodgeflow.app:443`; admin configuration uses
 `https://admin.lodgeflow.app`. HTTP requests themselves use local origins. Resend's
-already-configured production domain needs no setup for this test. Sender selection
-uses `@lodgeflow/email` and the approved payment/notification defaults. Live provider
-acceptance and inbox receipt remain separate Phase 5/#132 checks; local success is
-not evidence of delivery. See [the inventory](inventory.md#phase-5-implementation-existing-sender-repair-132)
-for the separately authorized live checks and their limits.
+sender selection uses `@lodgeflow/email` and the payment/notification defaults.
+The harness checks the chosen sender and rendered message. The [Phase 5 delivery
+record](delivery-history.md#phase-5-sender-repair-status--2026-09-20) covers the
+separate live provider and inbox checks.
 
 ## Failure detection and cleanup
 
@@ -155,4 +153,5 @@ between exact-cent validation and existing business rounding.
 database 25 and email 3. Separately authorized live welcome/payment-confirm route
 checks were accepted by Resend and reported `delivered`; those checks used
 synthetic identity/booking dependencies and do not prove the deployed application
-flow. User inbox confirmation and deployed-SHA verification remain pending.
+flow. The user subsequently confirmed both messages arrived. Both production
+deployments were verified at merge `9a9c296`. [Delivery record](delivery-history.md#phase-5-sender-repair-status--2026-09-20)

@@ -10,25 +10,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Refactoring direction
 
-The workspace-root `AGENTS.md` governs code quality and the current refactoring
-freeze. Follow `docs/refactoring/plan.md`: complete the baseline, HTTP smoke harness
-and high-risk regression gates before substantive refactoring. Issues #136 and
-#139 remain excluded. Use intended behavior, not legacy casts or comments, as the
-contract when writing characterization tests.
+The [root agent guide](../../AGENTS.md) governs implementation. The Phase 0
+baseline and regression gates are in place. PRs #207 and #208 delivered the
+Phase 4 follow-up and Phase 6 response contracts. Use the [refactoring
+plan](../../docs/refactoring/plan.md) for the remaining acceptance work.
+Issues #136 and #139 are outside that effort.
 
-Production origins are `https://lodgeflow.app` for customers and
-`https://admin.lodgeflow.app` for staff. This app is the admin portal.
-Resend is already configured for the `lodgeflow.app` domain; existing sender
-configuration cleanup is tracked separately in #132.
-
-### Shared database
-
-Models now live in `packages/database/src/models` at the workspace root. Import
-`@lodgeflow/database` or an exported model subpath; there is no app-local `models/`
-directory. Schema enums and connection/pricing helpers have shared implementations.
-The lock storage module is private; app routes use `withCabinBookingLock()`.
-See `docs/superpowers/plans/2026-09-14-shared-database.md` for remaining payment
-and capacity reconciliation work.
+The guest site is `https://lodgeflow.app` and the staff portal is
+`https://admin.lodgeflow.app`. Both apps use `@lodgeflow/email` for sender
+selection and `@lodgeflow/database` for models, pricing, receipts, capacity,
+and booking locks. Import models from that package or a declared subpath.
+Use `withCabinBookingLock` for overlapping cabin writes. [Shared models](../../packages/database/src/models) · [Payment workflow](../../docs/reservation-payments.md)
 
 ## Project Overview
 
@@ -40,7 +32,7 @@ LodgeFlow is a modern hotel management dashboard built with Next.js 16, featurin
 - Backend: MongoDB with Mongoose ODM
 - Auth: Clerk identity/organization membership plus MongoDB staff roles (`front_desk`, `manager`, `admin`)
 - Validation: Zod v4 (`lib/validations/`)
-- Data Fetching: SWR for client-side, TanStack Query for mutations
+- Data Fetching: SWR and TanStack Query for reads, TanStack Query for mutations
 - Email: Resend (booking confirmation & welcome emails)
 - Charts: Recharts
 
@@ -78,7 +70,7 @@ require database tests and both app suites/builds. See the root `AGENTS.md` and
 ### Testing
 
 ```bash
-pnpm test             # Run all Jest projects (unit, integration, jsdom)
+pnpm test             # Factory schema check, then Jest (unit, integration, jsdom)
 pnpm test:fast        # Unit + jsdom only (no MongoDB binary required)
 pnpm test:unit        # Pure-function unit tests only
 pnpm test:integration # MongoDB Memory Server integration tests only
@@ -89,7 +81,7 @@ pnpm test:coverage    # Generate coverage report
 ### Database & Seeding
 
 ```bash
-pnpm seed             # Destructive demo reset; only for an explicitly authorized target
+pnpm seed             # Prints the local seed-disabled notice and exits
 pnpm tsx scripts/test-connection.ts  # Test MongoDB connection
 
 # Data extraction (backup/migration)
@@ -109,7 +101,6 @@ pnpm clerk:users      # Create new Clerk test users
 ```bash
 pnpm verify:bookings           # Verify booking user IDs
 pnpm summary                 # Display data summary
-pnpm seed                    # Transactional demo reset; fetches Clerk users before replacing data
 ```
 
 ## Agent Workflow (Issues, PRs & CI)
@@ -153,6 +144,8 @@ pnpm seed                    # Transactional demo reset; fetches Clerk users bef
 app/
 ├── (auth)/              # Auth routes (sign-in, sign-up, unauthorized)
 ├── (dashboard)/         # Protected dashboard routes
+│   ├── reservations/   # Cross-product inbox and reservation details
+│   ├── calendar/       # Occupancy and capacity
 │   ├── bookings/       # Booking management (list, detail, edit, analytics)
 │   ├── cabins/         # Cabin management
 │   ├── dining/         # Restaurant/menu management
@@ -173,7 +166,7 @@ app/
 └── providers.tsx       # Global providers (HeroUI, Theme, Query)
 
 components/             # Reusable UI components
-hooks/                  # Custom React hooks (SWR-based)
+hooks/                  # SWR reads and TanStack queries/mutations
 ../../packages/database/src/models/ # Shared Mongoose schemas (MongoDB)
 types/                  # TypeScript type definitions
 utils/                  # Shared utility functions
@@ -231,36 +224,34 @@ const user = await getClerkUser(clerkUserId);
 2. Hooks call `/api/*` route handlers
 3. API routes connect to MongoDB via `connectDB()`
 4. API routes fetch Clerk user data when needed
-5. Responses follow consistent format:
+5. Validate the response with the reader for the requested resource before updating a cache. The contract determines which success shape to expect.
 
-```typescript
-{
-  success: boolean;
-  data?: T;
-  error?: string;
-  pagination?: { ... };
-}
-```
+Most resources return an envelope. Sales returns a bare array, manual email
+sends return the provider object with a string `id`, and a successful booking
+delete returns an acknowledgement with a message. Preserve resource-specific
+pagination and nested JSON. [Booking readers](lib/validations/booking-json.ts) · [Reporting readers](lib/validations/reporting-json.ts)
 
 **Key Data Fetching Hooks:**
 
 - `useBookings()` / `useBookingStats()` / `useBookingAnalytics()` — bookings (SWR)
 - `useCabins()` / `useCabinStats()` — cabins (SWR)
-- `useCustomers()` / `useInfiniteCustomers()` — Clerk users with customer stats (SWR)
+- `useCustomers()` / `useInfiniteCustomers()` — Clerk users with customer stats (SWR for lists, TanStack Query for infinite lists)
 - `useDining()` / `useDiningStats()` — dining items (SWR)
 - `useExperiences()` / `useExperienceStats()` — experiences (SWR)
 - `useSettings()` — app settings (SWR)
-- `useData()` — dashboard overview aggregates (SWR)
-- `useSendEmail()` / `usePrintBooking()` — mutations & PDF generation
+- `useOverview()`, `useActivities()`, `useDurationData()` and `useSalesData()` — dashboard and sales reads (TanStack Query)
+- `useSendEmail()` / `usePrintBooking()` — manual email sends and the print/PDF preview
 - Mutations use TanStack Query's `useMutation`
 
 ### Request Validation (Zod)
 
 Schemas live in `lib/validations/` and share enum constants from `lib/config.ts` (`BOOKING_STATUSES`, `PAYMENT_METHODS`, `REFUND_STATUSES`, `VALID_TRANSITIONS`).
 
-**Currently wired in API routes:** bookings (create/update/patch), cabins (create/update), dining (create/update), experiences (create/update), customers (create), settings (PUT).
-
-**Schemas exist but not yet wired to a route:** `updateCustomerSchema` (`lib/validations/customer.ts`) — customer updates go through Clerk helper functions (`updateCompleteCustomer`) instead. Delete/bulk endpoints (e.g. `app/api/cabins/bulk`) also use manual validation rather than Zod.
+Routes parse request JSON before applying updates. Customer edits use
+`updateCustomerSchema` before calling Clerk, and bulk cabin actions use
+`bulkCabinSchema` for delete and discount requests. Status transitions,
+permissions and current balances still require the server operation.
+[Customer schema](lib/validations/customer.ts) · [Bulk cabin schema](lib/validations/bulk-cabin.ts)
 
 **Pattern:**
 
@@ -497,16 +488,13 @@ which derives `numNights`, `cabinPrice`, each `extras.*Fee`, `extrasPrice`, and 
 from the `Cabin` and `Settings` documents — never from the request body. It throws
 `BookingPricingError` (caught and returned as HTTP 400) for invalid night counts or guest counts.
 
-- `POST /api/bookings` calls `calculateBookingPricing()` and overwrites the validated body's
-  pricing fields before `Booking.create()`.
-- `PUT /api/bookings` explicitly deletes any client-supplied `numNights`, `cabinPrice`,
-  `extrasPrice`, `totalPrice`, and `remainingAmount`, then recomputes them via
-  `calculateBookingPricing()` whenever a pricing-relevant field (`cabin`, `checkInDate`,
-  `checkOutDate`, `numGuests`, `extras`) changed.
-- The Zod schemas in `lib/validations/booking.ts` still type these fields for compatibility, but
-  they are always ignored/recomputed at the route layer — don't rely on client-submitted values.
+Both booking create and update use strict request schemas. Supplying
+`numNights`, `cabinPrice`, `extrasPrice`, `totalPrice`, `depositAmount`, or
+`remainingAmount` fails validation. Send the cabin, dates, guest count and
+selected extras. An eligible change to those inputs reprices the quote.
+[Booking schemas](lib/validations/booking.ts)
 
-**`depositAmount` is the amount due, not received money.**
+**Deposits and receipts**
 
 - Create derives the deposit requirement through `calculateDepositAmount` and
   starts with empty `payments`, zero `amountPaid`, and the full outstanding price.
@@ -549,13 +537,12 @@ MONGODB_URI=mongodb+srv://...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
 LODGEFLOW_STAFF_ORG_ID=org_... # Required for normal staff authorization
-RESEND_API_KEY=re_...          # Email sending (/api/send/*)
-SEED_SECRET=...                # Bearer token for /api/cron/seed
 ```
 
-`RESEND_API_KEY` is required only when sending email. `lib/resend.ts` constructs
-its client lazily inside the authenticated, rate-limited send handlers, so
-`next build` succeeds without a Resend credential. CI deliberately omits it.
+Email sends use `RESEND_API_KEY`. Dining and experience Stripe refunds use the
+same account and mode as the guest site (`STRIPE_SECRET_KEY`). The independently
+managed demo reset requires `SEED_SECRET`. CI builds the workspace with a
+throwaway Clerk publishable key.
 
 Optional:
 
@@ -586,12 +573,10 @@ flag. This disables:
 
 1. **Middleware** (`proxy.ts`) — skips Clerk session check and sign-in redirect
 2. **API routes** (`lib/api-utils.ts` `requireApiAuth()`) — returns `userId: 'test-user'`
-3. **Settings reset** (`app/api/settings/route.ts` `POST`) — skips the extra admin check
 
-**Client UX only (not a security boundary)** — set `NEXT_PUBLIC_TESTING=true` so
-`components/AuthGuard.tsx` renders the dashboard without a configured Clerk
-provider. This flag grants no access to protected data; the server gates above
-still apply.
+**Client UX only (not a security boundary)** — set `NEXT_PUBLIC_TESTING=true` for the local test UI in
+`components/AuthGuard.tsx`. The Clerk provider remains mounted, and both this
+flag and the server test switch are disabled in production.
 
 For a fully bypassed local session, set **both**. Never set `TESTING_AUTH_BYPASS`
 in any deployed (staging/production) environment. Requires a dev server restart
@@ -615,7 +600,7 @@ after changing either var.
 - Run `pnpm test` before committing, `pnpm test:coverage` for coverage report
 - `pnpm test:fast` runs unit + jsdom only (no MongoDB binary needed) — use this in sandboxed/offline environments
 - `pnpm test:unit` / `pnpm test:integration` select a single node project
-- CI (`.github/workflows/ci.yml`) runs on push to `main` and on all pull requests, matrixed over admin, customer, and database. It does not call `pnpm ci:check` directly — it runs the same checks as four discrete steps (`prettier --check`, `eslint` without `--fix`, `test`, then `build`), so a failure is attributed to the specific step rather than the combined script.
+- CI checks the admin, customer, database, and email packages. The admin job also runs the syntax guard and strict test/script type check. The HTTP job runs the isolated HTTP gate and the production cabin catalog regression. [CI workflow](../../.github/workflows/ci.yml)
 
 ### Test Structure
 

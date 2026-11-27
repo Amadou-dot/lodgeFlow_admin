@@ -1,5 +1,13 @@
 # LodgeFlow Phase 6 V03 and O01 Implementation Plan
 
+[PR #208](https://github.com/Amadou-dot/lodgeFlow_admin/pull/208) merged on
+2026-11-27 and closed [tracker #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150).
+[Main CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/46059517563)
+passed at `e4b20d6`. The task instructions below record the implementation
+sequence. See [branch verification](#branch-verification) for the local
+evidence and the [acceptance matrix](phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
+for the outstanding hosted and native checks.
+
 > **For agentic workers:** Use superpowers:subagent-driven-development to execute one numbered slice at a time. Each slice gets its own focused verification and review before the next slice. The controller runs the whole-change review and final gates.
 
 **Goal** Bring the remaining LodgeFlow JSON readers and admin test infrastructure up to the Phase 6 standards while preserving established route, accounting and UI behavior. First close the isolated optional-payment-method regression recorded by the completed Phase 4 review.

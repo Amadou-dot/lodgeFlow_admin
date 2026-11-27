@@ -78,7 +78,16 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-11-25): Phase 0 is complete. Remaining Phase 1–2
+On 2026-11-27 the remaining Phase 4 fixes merged in
+[PR #207](https://github.com/Amadou-dot/lodgeFlow_admin/pull/207) at `5aa48de`.
+[PR #208](https://github.com/Amadou-dot/lodgeFlow_admin/pull/208) delivered
+the remaining Phase 6 work and closed [tracker #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150).
+[Main CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/46059517563)
+passed at `e4b20d6`. [Milestone #2](https://github.com/Amadou-dot/lodgeFlow_admin/milestone/2)
+was still open with zero open issues. The outstanding hosted, native-device,
+print, and payment checks are listed in the [acceptance matrix](phase-4-browser-review.md#remaining-browser-and-payment-acceptance).
+
+At the 2026-11-25 checkpoint, Phase 0 was complete. Remaining Phase 1–2
 boundaries merged in [PR #190](https://github.com/Amadou-dot/lodgeFlow_admin/pull/190)
 at `b8eea6b`; review fixes followed in #191/#192. Phase 3 merged in
 [PR #194](https://github.com/Amadou-dot/lodgeFlow_admin/pull/194) at `9f8b1a8`.
@@ -124,7 +133,8 @@ read-only smoke checks passed. The [customer lock slice](phase-6-customer-lock-p
 merged in [PR #201](https://github.com/Amadou-dot/lodgeFlow_admin/pull/201) as
 `216970d`; it validates lock acknowledgements and corrects stale server-cached
 lock status.
-The remaining Phase 6 branch implements V03 and O01. Its local gates and outstanding hosted/browser acceptance are listed in the [execution evidence](phase-6-remaining-plan.md#branch-verification).
+PR #208 completed V03 and O01. Its [verification record](phase-6-remaining-plan.md#branch-verification)
+maps the local gates and receipt recovery to their source revisions.
 PRs #196/#197 remain separate demo-data/guest-identity fixes.
 
 Historical execution status (2026-10-07): Phase 0 is delivered in
@@ -411,7 +421,9 @@ preserves the existing wire behavior and is delivered in #199. The second slice
 validates customer list JSON through a shared read schema, preserving Date revival
 only in the server cache adapter, and is delivered in #200. The third bounded
 slice validates lock/unlock acknowledgements and invalidates stale server profiles
-after provider success. The remaining review branch now covers detail/create/update/delete, customer and webhook contracts, the strict admin test/script project and the targeted syntax guard. The [current inventory](inventory.md#phase-6-remaining-boundaries-on-the-review-branch-2026-11-26) identifies the retained compatibility endpoints and external acceptance.
+after provider success. PR #208 delivered the remaining detail/create/update/delete,
+customer and webhook contracts, the strict admin test/script project and the
+targeted syntax guard. The [current inventory](inventory.md#phase-6-remaining-boundaries-on-the-review-branch-2026-11-26) identifies the retained compatibility endpoints and external acceptance.
 
 The Phase 4 [checkout response reader](../../apps/customer/lib/validations/checkout-response.ts)
 already validates the shared cabin/dining/experience success boundary and controls
@@ -434,11 +446,11 @@ draft/calendar behavior when adding response readers to those flows.
 
 Acceptance:
 
-- [ ] Inventory has no unresolved applicable `AGENTS.md` violations; externally imposed signatures/boundaries have documented rationale.
-- [ ] All migrated callers and obsolete adapters are accounted for; no new unsafe casts or lint/type suppressions were used to pass checks.
-- [ ] Frozen install, formatting, read-only lint, tests, HTTP smoke checks and builds pass on the final commit.
+- [x] The [reviewed inventory](inventory.md#phase-6-remaining-boundaries-on-the-review-branch-2026-11-26) records a disposition for each remaining candidate and the rationale for compatibility exceptions.
+- [x] The inventory accounts for migrated callers, removed adapters, and the strict compiler and syntax gates for admin tests and scripts.
+- [x] Frozen install, formatting, read-only lint, tests, HTTP smoke checks and builds passed in [main CI at `e4b20d6`](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/46059517563).
 - [ ] Customer booking/checkout and authorized staff workflows have recorded smoke-test evidence; unavailable credentials are unresolved verification work.
-- [ ] Existing in-scope issues are closed with evidence, including #132's existing-flow delivery validation.
+- [x] The [milestone](https://github.com/Amadou-dot/lodgeFlow_admin/milestone/2) had zero open issues on 2026-11-27. The [delivery record](delivery-history.md#phase-5-sender-repair-status--2026-09-20) covers #132.
 - [ ] Documentation matches final contracts; #136 and #139 remain outside this milestone.
 
 ## Working and validation rules

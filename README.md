@@ -1,67 +1,56 @@
+<p align="center"><img src="apps/customer/public/logo.svg" alt="LodgeFlow" width="88"></p>
+
 # LodgeFlow
 
-> **Maintenance notice:** LodgeFlow is currently under maintenance and being
-> refactored. New features are paused while this work is completed. See the
-> [refactoring plan](docs/refactoring/plan.md) for progress.
+LodgeFlow runs the guest booking site and staff dashboard for a wilderness lodge. Guests can reserve a cabin, a dining experience, or a guided activity. At the front desk, those reservations appear in one inbox and one occupancy calendar.
 
-Hotel management platform: an admin dashboard and a customer-facing booking site
-sharing one MongoDB database and one Clerk tenant.
+**[Browse the guest site](https://lodgeflow.app)** · **[Open the staff dashboard](https://admin.lodgeflow.app)** (test account on the sign-in page)
 
-| App | Path | Production |
-| --- | --- | --- |
-| Admin dashboard | `apps/admin` | https://admin.lodgeflow.app |
-| Customer site | `apps/customer` | https://lodgeflow.app |
+![Guest cabin catalog with nightly rates, capacity filters, and links to book](docs/screenshots/guest-cabins.webp)
 
-## Getting started
+The screenshots show the local apps with sample reservations and fictional guests.
 
-```bash
-pnpm install
-pnpm dev:admin      # or: pnpm dev:customer
-```
+## Highlights
 
-Each app needs its own `.env.local`. `apps/admin/CLAUDE.md` documents its required
-variables under **Environment Variables Required**; `apps/customer/.env.example`
-documents its — copy it to `.env.local` and fill in real values.
+- **Availability.** A per-cabin lock prevents overlapping stays. Dining counts seats for each seating time on a given date. Experiences count participants across the whole day. [Cabin booking lock](packages/database/src/models/CabinBookingLock.ts) · [Reservation capacity](packages/database/src/reservation-capacity.ts)
+- **Pricing and payments.** The server prices a stay and calculates its required deposit from the cabin, selected extras, and property settings. Receipts determine how much the guest has paid and what staff can refund. Guests can pay through Stripe Checkout, and staff can record money received at the property. [Booking payments](packages/database/src/booking-payments.ts) · [Dining and experience payments](docs/reservation-payments.md)
+- **Staff permissions.** Front desk staff manage reservations and record payments. Managers can also issue refunds and review audit history. Administrators assign staff roles. Staff APIs verify Clerk organization membership and the application role stored in MongoDB. [Staff access](apps/admin/lib/staff-access.ts) · [Permissions](apps/admin/lib/permissions.ts)
 
-## Workspace scripts
+<details>
+<summary><strong>More screens</strong> · Guest booking and front desk operations</summary>
 
-| Command | Effect |
-| --- | --- |
-| `pnpm build` | Build both apps |
-| `pnpm test` | Test both apps and the shared database package |
-| `pnpm ci:check` | Format check, lint, and test everything |
-| `pnpm --filter @lodgeflow/admin <script>` | Run a script in one app |
+| Guest site                                                                                                                                             | Staff dashboard                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Pine Valley Cabin photo gallery](docs/screenshots/guest-cabin-detail.webp)](docs/screenshots/guest-cabin-detail.webp)                               | [![Staff overview with guest activity, stay durations, and sales trends](docs/screenshots/staff-dashboard.webp)](docs/screenshots/staff-dashboard.webp) |
+| [![Guest dining page with daily menus](docs/screenshots/guest-dining.webp)](docs/screenshots/guest-dining.webp)                                        | [![Reservation inbox with cabin, dining, and experience bookings](docs/screenshots/staff-reservations.webp)](docs/screenshots/staff-reservations.webp)  |
+| [![Guided experiences with prices, availability, and booking links](docs/screenshots/guest-experiences.webp)](docs/screenshots/guest-experiences.webp) | [![Monthly cabin occupancy calendar showing upcoming stays](docs/screenshots/staff-calendar.webp)](docs/screenshots/staff-calendar.webp)                |
 
-`pnpm build` requires `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` for both apps' ClerkProvider
-prerendering. Resend and Stripe credentials are needed only when their features run;
-SDK clients are constructed lazily. CI builds without those credentials.
+</details>
 
-## Structure
+## Tech stack
 
-- `apps/*` — the two Next.js applications, each self-contained
-- `packages/database` — shared models, schema enums, database connection, and booking safety helpers. Both apps consume `@lodgeflow/database`.
+| Layer                 | Technology                                                                |
+| --------------------- | ------------------------------------------------------------------------- |
+| Applications          | Next.js 16 App Router, React 18, TypeScript, HeroUI v2, Tailwind CSS v4   |
+| Data                  | MongoDB and Mongoose, shared through `@lodgeflow/database`                |
+| Client state          | SWR and TanStack Query                                                    |
+| Identity and payments | Clerk, Stripe Checkout and signed webhooks                                |
+| Email                 | Resend, React Email and shared sender configuration in `@lodgeflow/email` |
 
-Schema changes belong in `packages/database` and must pass its tests plus both app suites.
-Payment accounting and capacity hardening are shared by both apps. See the
-[database verification plan](docs/superpowers/plans/2026-09-14-shared-database.md).
+## Documentation
 
-## Staff operations
+| Guide                                                                   | Covers                                                                  |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [Contributing](CONTRIBUTING.md)                                         | Set up both apps, run checks, and open a pull request                   |
+| [Admin API](docs/api.md)                                                | Staff permissions, endpoints, and response formats                      |
+| [Reservation payments](docs/reservation-payments.md)                    | Collection, refunds, and recovery after an interrupted payment          |
+| [Stripe webhook diagnostics](docs/stripe-webhook-diagnostics.md)        | Investigating checkout and settlement                                   |
+| [Guest identity](docs/guest-identity.md)                                | Resolving Clerk identities for staff reservation views                  |
+| [HTTP smoke tests](docs/refactoring/http-smoke.md)                      | Running the isolated API and provider checks                            |
+| [Agent guide](AGENTS.md) · [Refactoring plan](docs/refactoring/plan.md) | Workspace conventions, delivered changes, and remaining acceptance work |
 
-The admin app uses Clerk for sign-in and organization membership, with application
-roles stored in MongoDB. Set `LODGEFLOW_STAFF_ORG_ID` in
-`apps/admin/.env.local` for local development (and in each deployed admin
-environment), using an organization from the same Clerk instance as the configured
-keys. Restart the development server after changing it. Then follow the
-[one-time administrator bootstrap](docs/superpowers/plans/2026-09-14-application-staff-roles.md).
-A Clerk organization administrator also needs a MongoDB staff assignment; the
-Clerk Admin badge alone does not grant application access. Clerk custom roles and
-a Clerk subscription upgrade are not required.
+## License
 
-- `/staff` — administrator-managed front desk, manager, and administrator assignments.
-- `/audit` — permission-scoped staff history with redacted changes.
-- `/reservations` — one paginated inbox for cabins, dining, and experiences.
-- `/calendar` — month occupancy, dining seats per seating, and daily experience capacity.
+[MIT](LICENSE) · Built by [Amadou](https://github.com/Amadou-dot)
 
-See [Admin API documentation](docs/api.md) for permissions and endpoint contracts.
-Dining/experience payment collection remains separate unfinished work; paid cancellations
-are blocked until their refund flow is implemented.
+<!-- Project README template: https://github.com/Amadou-dot/Amadou-dot/blob/main/templates/project/README.md -->

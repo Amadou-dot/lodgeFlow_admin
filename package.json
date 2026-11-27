@@ -4,7 +4,7 @@
   "packageManager": "pnpm@11.17.0",
   "scripts": {
     "dev:admin": "pnpm --filter @lodgeflow/admin dev",
-    "dev:customer": "pnpm --filter @lodgeflow/customer dev",
+    "dev:customer": "pnpm --filter @lodgeflow/customer dev --port 3001",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
