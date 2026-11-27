@@ -1,22 +1,14 @@
-import type { AppSettings } from '@/types';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
 import { Divider } from '@heroui/divider';
 import { Input } from '@heroui/input';
 import { Switch } from '@heroui/switch';
-
-interface SettingsPricingSectionProps {
-  formData: Partial<AppSettings>;
-  onInputChange: (
-    field: keyof AppSettings,
-    value: AppSettings[keyof AppSettings]
-  ) => void;
-}
+import type { SettingsSectionProps } from './types';
 
 export default function SettingsPricingSection({
   formData,
   onInputChange,
-}: SettingsPricingSectionProps) {
+}: SettingsSectionProps) {
   return (
     <Card>
       <CardHeader>
@@ -32,9 +24,13 @@ export default function SettingsPricingSection({
           <Input
             label='Breakfast Price'
             type='number'
+            step='any'
             value={formData.breakfastPrice?.toString() || ''}
             onChange={e =>
-              onInputChange('breakfastPrice', parseInt(e.target.value) || 0)
+              onInputChange({
+                field: 'breakfastPrice',
+                value: e.target.valueAsNumber || 0,
+              })
             }
             startContent='$'
             endContent='per person'
@@ -43,9 +39,13 @@ export default function SettingsPricingSection({
           <Input
             label='Pet Fee'
             type='number'
+            step='any'
             value={formData.petFee?.toString() || ''}
             onChange={e =>
-              onInputChange('petFee', parseInt(e.target.value) || 0)
+              onInputChange({
+                field: 'petFee',
+                value: e.target.valueAsNumber || 0,
+              })
             }
             startContent='$'
             endContent='per night'
@@ -65,7 +65,9 @@ export default function SettingsPricingSection({
             </div>
             <Switch
               isSelected={formData.requireDeposit || false}
-              onValueChange={value => onInputChange('requireDeposit', value)}
+              onValueChange={value =>
+                onInputChange({ field: 'requireDeposit', value })
+              }
             />
           </div>
 
@@ -73,12 +75,13 @@ export default function SettingsPricingSection({
             <Input
               label='Deposit Percentage'
               type='number'
+              step='any'
               value={formData.depositPercentage?.toString() || ''}
               onChange={e =>
-                onInputChange(
-                  'depositPercentage',
-                  parseInt(e.target.value) || 0
-                )
+                onInputChange({
+                  field: 'depositPercentage',
+                  value: e.target.valueAsNumber || 0,
+                })
               }
               endContent='%'
               min='0'

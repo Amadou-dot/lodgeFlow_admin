@@ -1,6 +1,11 @@
 import type { CabinDetailSource } from '@lodgeflow/database/cabin-json';
 import type { BookingReadSource } from '@lodgeflow/database/booking-json';
 import type { Customer } from '@/types/clerk';
+import {
+  buildBookingUpdateInput,
+  initializeBookingForm,
+} from '@/components/BookingForm/booking-form-data';
+import { serializeAdminBooking } from '@/lib/serializers/booking';
 import mongoose from 'mongoose';
 import { NextRequest } from 'next/server';
 
@@ -615,6 +620,247 @@ describe('Bookings API Routes', () => {
       expect(body.data.status).toBe('confirmed');
     });
 
+    const legacyStay = {
+      checkInDate: new Date('2040-01-07T12:34:56.789Z'),
+      checkOutDate: new Date('2040-01-10T13:57:24.680Z'),
+      specialRequests: ['Extra blankets'],
+      status: 'confirmed',
+    } satisfies Partial<BookingReadSource>;
+
+    const editorCustomer = customerFixture({
+      id: 'user_test123',
+      name: 'Test User',
+      email: 'test@example.com',
+    });
+
+    it('saves a paid legacy stay note from the editor while preserving stored dates and receipts', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id, {
+        ...legacyStay,
+        isPaid: true,
+        paymentMethod: 'cash',
+      });
+      const detail = serializeAdminBooking({
+        booking: { ...booking.toObject(), cabin },
+        customer: editorCustomer,
+      });
+      const initial = initializeBookingForm(detail);
+      const body = buildBookingUpdateInput({
+        booking: detail,
+        initial,
+        formData: {
+          ...initial,
+          specialRequests: ['Extra blankets', 'Extra towels'],
+        },
+      });
+      const before = await Booking.findById(booking._id).lean();
+      expect(before).toMatchObject({
+        numNights: 3,
+        amountPaid: 600,
+        remainingAmount: 0,
+      });
+      expect(before?.payments).toEqual([
+        expect.objectContaining({ amount: 600, method: 'cash' }),
+      ]);
+
+      const response = await PUT(
+        createRequest('/api/bookings', { method: 'PUT', body })
+      );
+
+      expect(response.status).toBe(200);
+      expect(body).not.toHaveProperty('checkInDate');
+      expect(body).not.toHaveProperty('checkOutDate');
+      const after = await Booking.findById(booking._id).lean();
+      expect(after).toMatchObject({
+        checkInDate: legacyStay.checkInDate,
+        checkOutDate: legacyStay.checkOutDate,
+        status: 'confirmed',
+        numNights: 3,
+        specialRequests: ['Extra blankets', 'Extra towels'],
+        totalPrice: 600,
+        amountPaid: 600,
+        remainingAmount: 0,
+        payments: before?.payments,
+      });
+    });
+
+    it('preserves a later staff guest/extras reprice when a stale draft submits a note', async () => {
+      const cabin = await createTestCabin({ price: 200, extraGuestFee: 20 });
+      const booking = await createTestBooking(cabin._id, {
+        ...legacyStay,
+        numGuests: 1,
+      });
+      const initial = initializeBookingForm(
+        serializeAdminBooking({
+          booking: { ...booking.toObject(), cabin },
+          customer: editorCustomer,
+        })
+      );
+      const updated = await PUT(
+        createRequest('/api/bookings', {
+          method: 'PUT',
+          body: {
+            _id: booking._id.toString(),
+            numGuests: 3,
+            extras: { hasBreakfast: true },
+          },
+        })
+      );
+      expect(updated.status).toBe(200);
+      const before = await Booking.findById(booking._id).orFail().lean();
+      const latest = serializeAdminBooking({
+        booking: { ...before, cabin },
+        customer: editorCustomer,
+      });
+      const body = buildBookingUpdateInput({
+        booking: latest,
+        initial,
+        formData: { ...initial, observations: 'Extra pillows' },
+      });
+      const response = await PUT(
+        createRequest('/api/bookings', { method: 'PUT', body })
+      );
+      expect(response.status).toBe(200);
+      expect(await Booking.findById(booking._id).lean()).toMatchObject({
+        observations: 'Extra pillows',
+        checkInDate: legacyStay.checkInDate,
+        checkOutDate: legacyStay.checkOutDate,
+        numGuests: 3,
+        extras: { hasBreakfast: true, breakfastPrice: 135 },
+        totalPrice: 855,
+        depositAmount: 214,
+        amountPaid: 0,
+        remainingAmount: 855,
+        payments: [],
+      });
+      expect(body).toEqual({ _id: latest._id, observations: 'Extra pillows' });
+    });
+
+    it('clears a note from a stale draft without changing a subsequently refunded booking', async () => {
+      const cabin = await createTestCabin();
+      const booking = await createTestBooking(cabin._id, {
+        ...legacyStay,
+        isPaid: true,
+        observations: 'Old note',
+      });
+      const initial = initializeBookingForm(
+        serializeAdminBooking({
+          booking: { ...booking.toObject(), cabin },
+          customer: editorCustomer,
+        })
+      );
+      const refundedAt = new Date('2040-01-04T11:12:13.000Z');
+      const cancellation = await PUT(
+        createRequest('/api/bookings', {
+          method: 'PUT',
+          body: {
+            _id: booking._id.toString(),
+            status: 'cancelled',
+            refundStatus: 'partial',
+            refundAmount: 100,
+            refundedAt: refundedAt.toISOString(),
+          },
+        })
+      );
+      expect(cancellation.status).toBe(200);
+      const before = await Booking.findById(booking._id).orFail().lean();
+      expect(before).toMatchObject({
+        status: 'cancelled',
+        refundStatus: 'partial',
+        refundAmount: 100,
+        refundedAt,
+        observations: 'Old note',
+      });
+      const detail = serializeAdminBooking({
+        booking: { ...before, cabin },
+        customer: editorCustomer,
+      });
+      const body = buildBookingUpdateInput({
+        booking: detail,
+        initial,
+        formData: { ...initial, observations: '' },
+      });
+      const response = await PUT(
+        createRequest('/api/bookings', { method: 'PUT', body })
+      );
+      expect(response.status).toBe(200);
+      const after = await Booking.findById(booking._id).orFail().lean();
+      expect(after).toMatchObject({
+        observations: '',
+        status: 'cancelled',
+        refundStatus: 'partial',
+        refundAmount: 100,
+        refundedAt,
+        cancelledAt: before.cancelledAt,
+        payments: before.payments,
+        amountPaid: before.amountPaid,
+        remainingAmount: before.remainingAmount,
+        totalPrice: before.totalPrice,
+        depositAmount: before.depositAmount,
+        numGuests: before.numGuests,
+        extras: before.extras,
+        checkInDate: legacyStay.checkInDate,
+        checkOutDate: legacyStay.checkOutDate,
+      });
+      expect(body).toEqual({ _id: detail._id, observations: '' });
+    });
+
+    it.each([
+      { state: 'a receipt', isPaid: true, checkoutPending: false },
+      { state: 'active checkout', isPaid: false, checkoutPending: true },
+    ])(
+      'blocks a real editor date move with $state and preserves the booking',
+      async ({ isPaid, checkoutPending }) => {
+        const cabin = await createTestCabin();
+        const booking = await createTestBooking(cabin._id, {
+          ...legacyStay,
+          isPaid,
+        });
+        if (checkoutPending) {
+          await Booking.updateOne(
+            { _id: booking._id },
+            {
+              $set: {
+                checkoutPending,
+                checkoutToken: 'test-quote',
+                checkoutAmount: 150,
+              },
+            }
+          );
+        }
+
+        const detail = serializeAdminBooking({
+          booking: { ...booking.toObject(), cabin },
+          customer: editorCustomer,
+        });
+        const initial = initializeBookingForm(detail);
+        const body = buildBookingUpdateInput({
+          booking: detail,
+          initial,
+          formData: { ...initial, checkOutDate: '2040-01-11' },
+        });
+        expect(body).toMatchObject({
+          checkInDate: '2040-01-07T00:00:00.000Z',
+          checkOutDate: '2040-01-11T00:00:00.000Z',
+        });
+        const before = await Booking.findById(booking._id).lean();
+        expect(before).toMatchObject({ checkoutPending });
+        expect(before?.payments).toHaveLength(isPaid ? 1 : 0);
+
+        const response = await PUT(
+          createRequest('/api/bookings', { method: 'PUT', body })
+        );
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toEqual({
+          success: false,
+          error:
+            'Price changes are unavailable after payment or while checkout is active',
+        });
+        expect(await Booking.findById(booking._id).lean()).toEqual(before);
+      }
+    );
+
     it('auto-sets cancelledAt and refundStatus when status is cancelled', async () => {
       const cabin = await createTestCabin();
       const booking = await createTestBooking(cabin._id);
@@ -938,37 +1184,51 @@ describe('Bookings API Routes', () => {
       );
     });
 
-    it('recomputes the required deposit when an unpaid booking price changes', async () => {
-      const cabin = await createTestCabin({
-        price: 200,
-        capacity: 4,
-        extraGuestFee: 20,
-      });
-      const booking = await createTestBooking(cabin._id, {
-        numGuests: 1,
-        cabinPrice: 200,
-        extrasPrice: 0,
-        totalPrice: 600, // 200 * 3 nights
-        depositAmount: 200,
-      });
+    it.each(['confirmed', 'unconfirmed'] as const)(
+      'reprices guest and breakfast edits for a %s unpaid booking without moving its stay',
+      async status => {
+        const cabin = await createTestCabin({ price: 200, extraGuestFee: 20 });
+        const booking = await createTestBooking(cabin._id, {
+          ...legacyStay,
+          status,
+          numGuests: 1,
+          cabinPrice: 200,
+          extrasPrice: 0,
+          totalPrice: 600,
+          depositAmount: 200,
+        });
+        const detail = serializeAdminBooking({
+          booking: { ...booking.toObject(), cabin },
+          customer: editorCustomer,
+        });
+        const initial = initializeBookingForm(detail);
+        const body = buildBookingUpdateInput({
+          booking: detail,
+          initial,
+          formData: { ...initial, numGuests: 3, hasBreakfast: true },
+        });
 
-      const request = createRequest('http://localhost:3000/api/bookings', {
-        method: 'PUT',
-        body: {
-          _id: booking._id.toString(),
+        const response = await PUT(
+          createRequest('/api/bookings', { method: 'PUT', body })
+        );
+
+        expect(response.status).toBe(200);
+        expect(await Booking.findById(booking._id).lean()).toMatchObject({
+          status,
+          checkInDate: legacyStay.checkInDate,
+          checkOutDate: legacyStay.checkOutDate,
+          numNights: 3,
           numGuests: 3,
-        },
-      });
-
-      const response = await PUT(request);
-      const body = await response.json();
-
-      expect(response.status).toBe(200);
-      // extraGuestFee: (3 - 1) * 20 * 3 nights = 120
-      expect(body.data.totalPrice).toBe(720);
-      expect(body.data.depositAmount).toBe(180);
-      expect(body.data.remainingAmount).toBe(720);
-    });
+          extras: { hasBreakfast: true, breakfastPrice: 135 },
+          // 600 cabin + 120 for two additional guests + 135 breakfast.
+          totalPrice: 855,
+          depositAmount: 214,
+          remainingAmount: 855,
+          amountPaid: 0,
+          payments: [],
+        });
+      }
+    );
 
     it('returns a 400 (not a 500) when only checkOutDate changes to the same calendar day as the existing checkInDate', async () => {
       const cabin = await createTestCabin({ price: 200 });

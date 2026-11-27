@@ -6,6 +6,7 @@ import type { SharedSelection } from '@heroui/system';
 import { formatMajorAmount, majorAmount } from '@lodgeflow/database/money';
 
 interface PaymentInformationProps extends BookingFormFieldProps {
+  isEditing?: boolean;
   settings?: Pick<Settings, 'requireDeposit' | 'currency'>;
   priceBreakdown: PriceBreakdown;
 }
@@ -14,6 +15,7 @@ export default function PaymentInformation({
   formData,
   onInputChange,
   settings,
+  isEditing = false,
   priceBreakdown,
 }: PaymentInformationProps) {
   return (
@@ -24,6 +26,7 @@ export default function PaymentInformation({
       <CardBody className='space-y-4'>
         <Select
           label='Payment Method'
+          disallowEmptySelection={isEditing}
           placeholder='Select payment method'
           selectedKeys={formData.paymentMethod ? [formData.paymentMethod] : []}
           onSelectionChange={(keys: SharedSelection) => {
@@ -35,7 +38,7 @@ export default function PaymentInformation({
               selected === 'online'
             ) {
               onInputChange('paymentMethod', selected);
-            } else if (selected === undefined) {
+            } else if (selected === undefined && !isEditing) {
               onInputChange('paymentMethod', '');
             }
           }}

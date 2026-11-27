@@ -2,7 +2,7 @@
 
 ## Status and provenance
 
-**Acceptance remains open: failures reported.** The user supplied
+**Phase 4 browser acceptance remains open.** The user supplied
 `phase4_browser_sign_off.md` on 2026-11-03 and confirmed that all checks used the
 production sites. Desktop checks used Zen on Linux, except the catalog pending-save
 check, which used Firefox. Mobile checks used an iPhone 15 Pro Max; its browser was
@@ -13,11 +13,12 @@ records its findings and subsequent triage against local commit `216970d`.
 User-observed browser results, source inspection, local probes and public HTTP
 checks are distinguished below. Triage made no runtime changes; the approved
 2026-11-05 follow-up is recorded below and in
-[the implementation plan](phase-4-browser-fixes-plan.md). No authenticated browser
-retest has been performed. These findings do not establish which defects were
-introduced by Phase 4.
+[the implementation plan](phase-4-browser-fixes-plan.md). The
+[delivery and acceptance record](#pr-202-delivery-and-user-retest) below includes
+the user's subsequent logout → Back retest. The original report does not identify
+which changes introduced the defects.
 
-## Checklist results
+## Original checklist results (2026-11-03)
 
 | Check                            | Recorded result                                                                                                                                                                                                                                                      | Follow-up                                                                                                                                                                                                                      |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -108,7 +109,7 @@ confirmed that opening Print Booking first allows PDF generation. Browser Print
 uses the whole page and needs separate pagination verification; its clipping
 cause has not been established.
 
-## Follow-up order and acceptance
+## Original follow-up order
 
 1. Private history isolation on sign-out/account switch and safe expired-session
    errors; include delayed responses, Back navigation and modal remounts.
@@ -157,18 +158,195 @@ builds. An independent review found no runtime defects; its pending-edit coverag
 gap is now covered by two tests that fail against the old page and pass with the
 fix. See [the implementation evidence](phase-4-browser-fixes-plan.md).
 
-These are local implementation results, not production browser acceptance. Retest:
+## PR #202 delivery and user retest
 
-1. Sign out from history and another page, then use Back; no old records or dialogs
-   should appear. Switch accounts, including while a read/edit is pending; only the
-   current account's records and dialogs should remain.
-2. Follow featured and catalog cabin links after a catalog refresh. Use an isolated
-   environment for deliberate record replacement; production checks are read-only.
-3. Open Print / Download, use Print and Download PDF, and close/reopen the preview.
-   Confirm desktop/mobile layout and multi-page output in the real browsers.
+On 2026-11-25, the user accepted [PR #202](https://github.com/Amadou-dot/lodgeFlow_admin/pull/202)
+and specifically confirmed that Back after logout prompts for sign-in. It merged as
+`28bedb6fa0f73df78ff3001d9e8d11ab728f8f18`. [PR CI run 45123844150, attempt 2](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/45123844150/attempts/2)
+and all five jobs in [post-merge CI run 45724753171](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/45724753171)
+passed. Both production apps were Ready at the merge SHA. Read-only smoke found
+3 current homepage cabin links and 13 current catalog links, zero stale links,
+a 200 current cabin detail and admin sign-in page, and a 307 from the protected
+admin bookings API to sign-in.
 
-Settings saves, admin stay-date display, mobile Dining/Calendar/toast findings and
-the incomplete booking/payment checks remain open. Test guest/extras edits on an
-unpaid record with no active checkout; preserve the accounting guard. The exact
-signed-out checkout response and generic non-JSON error handling also remain
-unverified outside this history fix. Phase 4 and the milestone stay open.
+That retest confirms the logout → Back outcome the user observed. The
+[remaining browser scenarios](#remaining-browser-and-payment-acceptance) cover
+the other sign-out paths, account switches during history reads and edits,
+and the desktop and phone print-preview workflows.
+Catalog replacement has the disposable production-build regression above and
+current links have read-only production coverage. Browser navigation after a
+catalog refresh remains a separate interaction check.
+
+## Remaining functional fixes and local evidence (2026-11-25)
+
+The [continuation](phase-4-remaining-plan.md) started at
+`b190f44f504db36c0b5a1d0666e366749391dd04`, which includes the merged browser
+follow-up and [safe Stripe webhook diagnostics](../stripe-webhook-diagnostics.md).
+The following slices have local implementation and review evidence.
+
+- **Settings:** The form sends only edited writable fields. The full server
+  response becomes the new baseline, preserving newer edits, pending reverts
+  and failure/retry behavior. The regression submits a sparse breakfast-price
+  edit through the real schema from a read DTO with metadata, computed fields
+  and untouched legacy null contact information. The final scoped run passed
+  70 tests across eight suites, including disposable route tests.
+  [Settings form regression](../../apps/admin/__tests__/components/SettingsForm.test.tsx)
+- **Stay labels:** Planned cabin dates render on their UTC calendar day in the
+  booking list, detail, guest recent bookings, preview/PDF template and the
+  canonical date branch of the staff confirmation email. Exact serialized and
+  stored instants, stay lengths and local actual arrival/departure times are
+  preserved. The email still renders accepted offset-free and non-ISO legacy
+  values with its native local formatting. The timezone regression ran in
+  Denver, UTC and Tokyo, with 69 tests per zone for the main slice and 23
+  confirmation route/render tests per zone at the final email correction.
+  [Stay-date formatter](../../apps/admin/lib/booking-stay-date.ts)
+- **Booking editor:** The matching loaded record initializes the draft. An
+  already selected customer survives pagination/search. An automatically
+  selected saved guest whose profile becomes unresolved cannot submit via a
+  cached option. Same-record refresh preserves the other draft fields, and
+  failure keeps the existing error presentation. The actual admin PUT
+  accepted a paid notes-only edit with untouched non-midnight stay instants
+  and preserved nights and receipts. A genuine date move still sends both
+  UTC-midnight fields and returns 409 after payment or while checkout is
+  active. The review correction passed 64 focused tests.
+  [Booking editor regression](../../apps/admin/__tests__/components/BookingEditPage.test.tsx)
+  [Admin PUT regression](../../apps/admin/__tests__/integration/api/bookings.test.ts)
+
+The final editor regressions exercise staff actions through the real form
+controls. A notes-only save works for a paid past stay and after guest or
+stay-length limits tighten. The picker exposes “Stay Duration” as its
+accessible name. A sparse update can clear an observation and preserves
+unedited refund details, receipts, dates and a later guest/extras reprice in
+the disposable PUT tests. An extras change preserves the latest unedited flags.
+
+The Settings page retains a newer draft through a transient GET failure in
+the same authorized session and hides the controls until recovery. A denied
+read or change of staff session discards the draft. Save and Reset serialize
+even with a previously opened confirmation. Keyboard entry and paste preserve
+fractional fees and deposit percentages.
+
+### Guest/extras edit and checkout outcomes
+
+The owner cabin PATCH permits `confirmed` and `unconfirmed` records. An actual
+guest/extras change can reprice while the record has zero receipts and no
+active checkout. The guard checks receipts and pending checkout even if `isPaid` is false.
+A deposit obligation by itself still permits repricing. Any receipt, including
+a partial payment, or a pending checkout independently blocks repricing. An eligible notes-only edit need not reprice. Customer history still
+offers Edit only for `unconfirmed` bookings and submits guest count only. The
+admin PUT evidence separately covers confirmed and unconfirmed unpaid edits.
+[Customer update operation](../../packages/database/src/customer-bookings.ts)
+[Customer history UI](../../apps/customer/app/bookings/page.tsx)
+
+The disposable customer PATCH probe returned 200 for both eligible statuses.
+The committed HTTP suite retains the unconfirmed owner-edit case and adds a
+confirmed fixture with exactly `2040-01-07T12:34:56.789Z` and
+`2040-01-10T12:34:56.789Z` in the response and database. Its guest/breakfast
+edit preserved confirmed status, three nights and zero receipts. Extras
+totaled $255, total and balance $855, deposit due $214 and received $0.
+Active checkout and partial receipt each returned HTTP 409 with the same
+JSON and left the full stored record intact without new provider calls.
+[Disposable HTTP scenarios](../../scripts/http-smoke/run.mjs)
+
+```json
+{
+  "success": false,
+  "error": "Price changes are unavailable after payment or while checkout is active"
+}
+```
+
+Controlled Fetch responses reproduced raw parser errors on text/HTML/empty
+responses, a null access error and a cabin checkout success with a missing URL.
+The shared reader now requires HTTP OK, literal success and a usable absolute
+HTTP(S) URL with an explicit authority before cabin cache refresh or reservation navigation. It preserves
+valid URL text and nonempty API error messages. Other failures display
+`Failed to create checkout session` for cabin or `Unable to start checkout`
+for dining/experience. The reservation creation forms still show
+`Payment still required` and continue to confirmation if checkout fails.
+The customer focused run passed 229 tests and the full customer suite passed
+1,052. Isolated HTTP also passed with signed local Clerk sessions, disposable
+MongoDB and controlled providers. The exact hosted expired/signed-out checkout
+response and its browser presentation remain unverified.
+[Checkout reader](../../apps/customer/lib/validations/checkout-response.ts)
+
+Cabin, dining and experience checkout expose three endpoints. The cabin
+route and the shared dining/experience handler return `Authentication required`
+in JSON if reached without a user. The isolated signed-out cabin HTTP check accepts either a
+Clerk-marked 404 rewrite or a configured 307 sign-in redirect before the
+route. The UI fallback was verified with controlled responses.
+[HTTP auth assertion](../../scripts/http-smoke/assert-http.mjs)
+
+### Responsive layout and notifications
+
+The reported missing toast occurred in Zen's responsive simulation at
+iPhone/Samsung sizes. The action is unknown. The original production report
+recorded a keyboard pass and separate mobile layout findings. The follow-up
+fixture passed normal Chromium visibility at desktop and 430px phone width,
+including a shorter 420px layout. Zen 1.24.2b / Gecko 160.0 passed all 40
+visibility cases after known success/error emissions at iPhone and Galaxy
+widths, including shortened viewports and modal open/closed. In a separate
+68-case input investigation, all 60 reached emitters rendered their toasts.
+The other eight cases were synthesized WebDriver mouse clicks under touch
+emulation that lacked the pointer sequence required by HeroUI `onPress`.
+Trusted touch, keyboard activation and the admin-style form submit reached
+their callbacks. The original app action remains unknown.
+
+Chromium pinch zoom separately placed an emitted toast below the visual
+viewport. This geometry observation remains open. The modal accessibility
+reproduction found that the first visible admin toast could sit under an
+`aria-hidden` ancestor. The admin provider now renders inline first and moves
+to a body portal after mount. Actual-provider fixtures verified Chromium
+accessibility-tree inclusion and Zen touch/keyboard actions while the
+background remained hidden, including access to the toast action during an
+open dialog. Controlled React server render/hydration kept theme/context and
+all three startup, portal-switch and post-mount emissions. The sampled
+immediate focus after dismissal at the simulated iPhone size was unchanged;
+closing the dialog restored its opener. The background Tab sample and mobile
+modal footer overlap were also observed with both provider versions.
+[Admin provider](../../apps/admin/app/providers.tsx)
+[Provider regression](../../apps/admin/__tests__/components/Providers.test.tsx)
+
+Dining add/edit/view now fits the available HeroUI wrapper with one body
+scroller. Calendar's Listing header and row headers scroll with the grid
+below 640px and both stay sticky at desktop widths. An actual-source fixture
+with newly compiled CSS reduced 69 geometry assertion failures to zero.
+At 430px width with a 420px visible wrapper the Dining dialog top moved from
+−422.8px to 4px and the first field became hit-testable. The body reached the
+final controls, and actual Calendar day/link targets were accessible after
+horizontal scroll. The full admin suite passed 1,751 tests at this slice.
+The CSS build logged Node's module-type warning, and both Zen fixtures
+logged browser-internal diagnostics. No page errors or Jest warnings were
+recorded in the final Task 4 evidence.
+[Dining modal](../../apps/admin/components/DiningModal.tsx)
+[Calendar styles](<../../apps/admin/app/(dashboard)/calendar/page.tsx>)
+
+## Remaining browser and payment acceptance
+
+- The user confirmed that Back after logout prompts for sign-in. Complete the
+  remaining hosted sequences by signing out from booking history and from
+  another page, then using Back, including a back/forward-cache restore, and
+  checking that previous records and dialogs stay cleared. Switch accounts while a history read is pending and while an
+  edit is pending, and check the new account's records and dialogs.
+- On desktop and phone, use both Print and Download PDF, inspect the visual
+  multi-page output, then close and reopen the preview.
+- Recheck Settings save/reset/retry, the booking editor and stay labels with an
+  authorized staff browser session. Exercise the customer history guest edit
+  on an eligible unconfirmed booking with no receipt or active checkout in an
+  isolated environment. Confirmed owner edits have API evidence.
+- Verify Dining and Calendar on the native device, including actual keyboard
+  behavior if exercised. Verify hosted Next.js dashboard hydration and
+  screen-reader announcements, and capture the original Zen notification
+  action if it recurs. The fixture's reduced wrapper height and the Chromium
+  pinch-zoom result describe different conditions. Broader Reservations and
+  Calendar redesigns remain outside the functional slice.
+- Verify the actual hosted expired/signed-out checkout response and safe UI
+  presentation. Complete cabin booking and dining/experience creation and
+  confirmation checks independently of test-mode settlement. The original
+  reported Zen handoff passed. Test-card use in live mode blocked settlement
+  verification. Use an isolated provider environment for payment
+  verification. The prior accepted #132 delivery covers its existing email
+  flows, as recorded in [Phase 5](plan.md#phase-5--provider-configuration-and-existing-email-repair).
+
+Phase 4, [issue #150](https://github.com/Amadou-dot/lodgeFlow_admin/issues/150)
+and [milestone #2](https://github.com/Amadou-dot/lodgeFlow_admin/milestone/2)
+remain open. Independent Phase 6 work follows the locally reviewed source
+continuation. [Remaining Phase 6 work](plan.md#phase-6--remaining-debt-and-milestone-verification)

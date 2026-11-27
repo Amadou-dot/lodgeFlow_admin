@@ -1,3 +1,4 @@
+import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import { getStatusColor, getStatusLabel } from '@/utils/bookingUtils';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import { Chip } from '@heroui/chip';
@@ -69,9 +70,9 @@ export default function BookingStatusDates({
           <div>
             <span className='text-default-500'>Check-in:</span>
             <p className='font-medium'>
-              {safeFormat({
-                dateValue: checkInDate,
-                formatString: 'EEEE, MMMM dd, yyyy',
+              {formatBookingStayDate({
+                date: checkInDate,
+                style: 'long-weekday-padded',
               })}
             </p>
             {checkInTime && (
@@ -84,9 +85,9 @@ export default function BookingStatusDates({
           <div>
             <span className='text-default-500'>Check-out:</span>
             <p className='font-medium'>
-              {safeFormat({
-                dateValue: checkOutDate,
-                formatString: 'EEEE, MMMM dd, yyyy',
+              {formatBookingStayDate({
+                date: checkOutDate,
+                style: 'long-weekday-padded',
               })}
             </p>
             {checkOutTime && (

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { ApiResponse } from '@/types';
+import { readCheckoutResponse } from '@/lib/validations/checkout-response';
 import type { CreateCheckoutInput } from '@/lib/validations/checkout';
 
 /**
@@ -18,13 +18,10 @@ export const useCreateCheckoutSession = () => {
         method: 'POST',
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create checkout session');
-      }
-
-      const data: ApiResponse<{ url: string }> = await response.json();
-      return data.data!;
+      return readCheckoutResponse({
+        response,
+        fallbackMessage: 'Failed to create checkout session',
+      });
     },
     onSuccess: (_, bookingId) => {
       queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });

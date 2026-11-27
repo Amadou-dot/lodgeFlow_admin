@@ -30,6 +30,10 @@ const customer: Customer = {
   loyaltyTier: 'Bronze',
   lastBookingDate: new Date('2030-06-01'),
 };
+const legacyStay = {
+  checkInDate: '2040-06-01T23:30:00.000Z',
+  checkOutDate: '2040-06-03T23:30:00.000Z',
+};
 const request = () => new NextRequest('https://admin.test/api/bookings');
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 function json(value: unknown): unknown {
@@ -48,8 +52,8 @@ async function fixture() {
   const booking = await Booking.create({
     cabin: cabin._id,
     customer: customer.id,
-    checkInDate: new Date('2040-06-01'),
-    checkOutDate: new Date('2040-06-03'),
+    checkInDate: new Date(legacyStay.checkInDate),
+    checkOutDate: new Date(legacyStay.checkOutDate),
     numNights: 2,
     numGuests: 2,
     cabinPrice: 400,
@@ -111,12 +115,16 @@ test('list preserves its cabin projection, complete receipt JSON, virtuals and c
   });
 });
 
-test('detail preserves full cabin and customer JSON', async () => {
+test('detail preserves full cabin and customer JSON including legacy stay instants', async () => {
   const { booking, cabin } = await fixture();
   const stored = await Booking.findById(booking._id).populate('cabin').orFail();
   const response = await getById(request(), params(String(booking._id)));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  const body: unknown = await response.json();
+  expect(body).toMatchObject({
+    data: { ...legacyStay, numNights: 2 },
+  });
+  expect(body).toEqual({
     success: true,
     data: json({
       ...stored.toObject(),

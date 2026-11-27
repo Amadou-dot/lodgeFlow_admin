@@ -1,8 +1,7 @@
-import type { CreateBookingInput } from '@/lib/validations/booking';
 import { useCabins } from '@/hooks/useCabins';
 import { useInfiniteCustomers } from '@/hooks/useInfiniteCustomers';
 import { useSettings } from '@/hooks/useSettings';
-import type { PopulatedBooking } from '@/types';
+import type { AdminBooking } from '@/types/booking-read';
 import {
   calcNumNights,
   formatCurrency as formatCurrencyAmount,
@@ -11,68 +10,105 @@ import { majorAmount, roundMajorAmount } from '@lodgeflow/database/money';
 import { useInfiniteScroll } from '@heroui/use-infinite-scroll';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  BookingCustomerOption,
   BookingFormData,
   PriceBreakdown,
 } from '@/components/BookingForm/types';
 
+import {
+  buildBookingCreateInput,
+  buildBookingUpdateInput,
+  initializeBookingForm,
+  pricingInputsChanged,
+} from '@/components/BookingForm/booking-form-data';
+
 export type { BookingFormData, PriceBreakdown };
 
-const getInitialFormData = (booking?: PopulatedBooking): BookingFormData => {
-  if (booking) {
-    return {
-      cabin: booking.cabin?._id ?? '',
-      customer: booking.customer?.id ?? '',
-      checkInDate: booking.checkInDate.split('T')[0],
-      checkOutDate: booking.checkOutDate.split('T')[0],
-      numGuests: booking.numGuests,
-      hasBreakfast: booking.extras?.hasBreakfast || false,
-      hasPets: booking.extras?.hasPets || false,
-      hasParking: booking.extras?.hasParking || false,
-      hasEarlyCheckIn: booking.extras?.hasEarlyCheckIn || false,
-      hasLateCheckOut: booking.extras?.hasLateCheckOut || false,
-      observations: booking.observations || '',
-      specialRequests: booking.specialRequests || [],
-      paymentMethod: booking.paymentMethod || '',
-      isPaid: booking.isPaid,
-      depositPaid: booking.depositPaid,
+type BookingCustomerSource =
+  | { kind: 'create' }
+  | {
+      kind: 'booking';
+      customer: BookingCustomerOption | null;
+      initial: BookingFormData;
     };
+
+function useBookingFormDraft({
+  initialize,
+  customerSource,
+}: {
+  initialize: () => BookingFormData;
+  customerSource: BookingCustomerSource;
+}) {
+  const [draftData, setFormData] = useState(initialize);
+  const [customerSelection, setCustomerSelection] = useState<'saved' | 'draft'>(
+    customerSource.kind === 'booking' ? 'saved' : 'draft'
+  );
+  const [retainedCustomer, setRetainedCustomer] =
+    useState<BookingCustomerOption>();
+  const savedCustomer =
+    customerSource.kind === 'booking' ? customerSource.customer : undefined;
+  const [lastSavedCustomerId, setLastSavedCustomerId] = useState(
+    savedCustomer?.id
+  );
+  if (savedCustomer && savedCustomer.id !== lastSavedCustomerId) {
+    setLastSavedCustomerId(savedCustomer.id);
   }
 
-  return {
-    cabin: '',
-    customer: '',
-    checkInDate: '',
-    checkOutDate: '',
-    numGuests: 1,
-    hasBreakfast: false,
-    hasPets: false,
-    hasParking: false,
-    hasEarlyCheckIn: false,
-    hasLateCheckOut: false,
-    observations: '',
-    specialRequests: [],
-    paymentMethod: '',
-    isPaid: false,
-    depositPaid: false,
-  };
-};
-
-export const useBookingForm = (initialBooking?: PopulatedBooking) => {
-  const [formData, setFormData] = useState<BookingFormData>(() =>
-    getInitialFormData(initialBooking)
+  // A null detail profile leaves its prior ID unresolved, even in cached results.
+  const unresolvedSavedCustomerId =
+    savedCustomer === null ? lastSavedCustomerId : undefined;
+  const selectedCustomerId =
+    customerSelection === 'saved'
+      ? (savedCustomer?.id ?? '')
+      : draftData.customer;
+  const customerId =
+    selectedCustomerId === unresolvedSavedCustomerId ? '' : selectedCustomerId;
+  const formData = useMemo(
+    () => ({ ...draftData, customer: customerId }),
+    [draftData, customerId]
   );
 
   const [specialRequestInput, setSpecialRequestInput] = useState('');
   // Data fetching hooks
   const { data: cabins } = useCabins();
   const {
-    customers,
+    customers: listedCustomers,
     hasMore,
     isLoading: customersLoading,
     onLoadMore,
     searchCustomers,
   } = useInfiniteCustomers();
   const { data: settings } = useSettings();
+
+  const listedCustomer = listedCustomers.find(
+    customer => customer.id === formData.customer
+  );
+  // A prefilled ID can resolve when its page first arrives.
+  if (
+    customerSelection === 'draft' &&
+    listedCustomer &&
+    listedCustomer !== retainedCustomer
+  ) {
+    setRetainedCustomer(listedCustomer);
+  }
+  const selectedProfile =
+    customerSelection === 'saved' ? savedCustomer : retainedCustomer;
+  const customers = useMemo(() => {
+    const options = unresolvedSavedCustomerId
+      ? listedCustomers.filter(
+          customer => customer.id !== unresolvedSavedCustomerId
+        )
+      : listedCustomers;
+    return !listedCustomer && selectedProfile?.id === formData.customer
+      ? [selectedProfile, ...options]
+      : options;
+  }, [
+    listedCustomer,
+    selectedProfile,
+    formData.customer,
+    listedCustomers,
+    unresolvedSavedCustomerId,
+  ]);
 
   // Customer selection state
   const [isCustomerOpen, setIsCustomerOpen] = useState(false);
@@ -220,6 +256,15 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     []
   );
 
+  const handleCustomerSelection = useCallback(
+    (customer: BookingCustomerOption | undefined) => {
+      setCustomerSelection('draft');
+      setRetainedCustomer(customer);
+      handleInputChange('customer', customer?.id ?? '');
+    },
+    [handleInputChange]
+  );
+
   const addSpecialRequest = useCallback(() => {
     if (specialRequestInput.trim()) {
       setFormData(prev => ({
@@ -236,6 +281,10 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
       specialRequests: prev.specialRequests.filter((_, i) => i !== index),
     }));
   }, []);
+
+  const preserveExistingPricing =
+    customerSource.kind === 'booking' &&
+    !pricingInputsChanged({ formData, initial: customerSource.initial });
 
   // Validation - memoized with dependencies
   const validateForm = useCallback((): string[] => {
@@ -254,6 +303,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     }
     if (formData.numGuests < 1)
       errors.push('Number of guests must be at least 1');
+    if (preserveExistingPricing) return errors;
     if (selectedCabin) {
       const maxGuests = settings
         ? Math.min(selectedCabin.capacity, settings.maxGuestsPerBooking)
@@ -278,7 +328,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     }
 
     return errors;
-  }, [formData, selectedCabin, settings, numNights]);
+  }, [formData, selectedCabin, settings, numNights, preserveExistingPricing]);
 
   // Utility functions - memoized
   const formatCurrency = useCallback(
@@ -288,34 +338,13 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     [settings?.currency]
   );
 
-  // Build booking data for API - memoized
-  const buildBookingData = useCallback(
-    (): CreateBookingInput => ({
-      cabin: formData.cabin,
-      customer: formData.customer,
-      checkInDate: new Date(formData.checkInDate).toISOString(),
-      checkOutDate: new Date(formData.checkOutDate).toISOString(),
-      numGuests: formData.numGuests,
-      status: 'unconfirmed',
-      paymentMethod: formData.paymentMethod || undefined,
-      extras: {
-        hasBreakfast: formData.hasBreakfast,
-        hasPets: formData.hasPets,
-        hasParking: formData.hasParking,
-        hasEarlyCheckIn: formData.hasEarlyCheckIn,
-        hasLateCheckOut: formData.hasLateCheckOut,
-      },
-      observations: formData.observations || undefined,
-      specialRequests: formData.specialRequests,
-    }),
-    [formData]
-  );
-
   return {
     // State
     formData,
     specialRequestInput,
     priceBreakdown,
+
+    preserveExistingPricing,
 
     // Derived values
     selectedCabin,
@@ -335,6 +364,7 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     // Handlers
     handleInputChange,
     handleCustomerSearch,
+    handleCustomerSelection,
     addSpecialRequest,
     removeSpecialRequest,
     setSpecialRequestInput,
@@ -342,6 +372,38 @@ export const useBookingForm = (initialBooking?: PopulatedBooking) => {
     // Utilities
     validateForm,
     formatCurrency,
-    buildBookingData,
   };
-};
+}
+
+export function useBookingForm() {
+  const draft = useBookingFormDraft({
+    initialize: initializeBookingForm,
+    customerSource: { kind: 'create' },
+  });
+  return {
+    ...draft,
+    buildBookingData: () => buildBookingCreateInput(draft.formData),
+  };
+}
+
+export function useBookingEditForm(booking: AdminBooking) {
+  const [initialFormData] = useState(() => initializeBookingForm(booking));
+  const draft = useBookingFormDraft({
+    initialize: () => initialFormData,
+    customerSource: {
+      kind: 'booking',
+      customer: booking.customer,
+      initial: initialFormData,
+    },
+  });
+
+  return {
+    ...draft,
+    buildBookingData: () =>
+      buildBookingUpdateInput({
+        booking,
+        formData: draft.formData,
+        initial: initialFormData,
+      }),
+  };
+}

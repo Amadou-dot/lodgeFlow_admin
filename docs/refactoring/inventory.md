@@ -5,12 +5,16 @@ This inventory assigns work; it does not authorize skipping the Phase 0B/0C gate
 All confirmed items below remain open unless their status explicitly says otherwise.
 The owning phase is an execution dependency, not an assigned person.
 
-## Current execution status (2026-11-01)
+## Current execution status (2026-11-25)
 
 Phase 1–2 completion merged in #190 (`b8eea6b`); Phase 3 merged in #194
 (`9f8b1a8`); Phase 4 merged in #195 (`d0870e1`). Phase 4's final corrections have
-2,524 passing package tests and successful post-merge CI. Its browser checklist
-conflicts with its notes, so full-browser acceptance remains unresolved.
+2,524 passing package tests and successful post-merge CI. The follow-up #202
+merged at `28bedb6` after the user confirmed that Back after logout prompts for
+sign-in. The [Phase 4 continuation](phase-4-remaining-plan.md) starts from
+`b190f44f504db36c0b5a1d0666e366749391dd04`. Its source fixes and isolated
+validation are recorded below. Full hosted, native-device, visual print and
+payment acceptance remain open.
 
 The remaining [Phase 5 origins and provider contracts](phase-5-provider-origins.md)
 merged in #198 as `79ecabc`. The reviewed head passed 2,610 package tests, type
@@ -24,6 +28,8 @@ passed. The second [customer list slice](phase-6-customer-list-plan.md) merged i
 passed. The third [customer lock slice](phase-6-customer-lock-plan.md) validates
 lock acknowledgements and corrects stale server-cached lock status. Detail and
 other mutation/response validation, O01 and final browser acceptance remain open.
+Phase 4 delivers the shared checkout response validation portion of V03.
+[Remaining Phase 6 work](plan.md#phase-6--remaining-debt-and-milestone-verification)
 
 ## Historical Phase 4 review handoff (2026-10-09)
 
@@ -184,7 +190,7 @@ rather than treating counts as the completion gate.
 | F09 | Admin `lib/validations/cabin.ts`: `isDiscountValid` | Discount and price numbers can be swapped. | 2 | Completed alongside Phase 1 slice 12: named inputs at both routes and all three test calls, with unchanged comparison and stored-price validation. |
 | V01 | Admin `app/api/bookings/route.ts` and `app/api/bookings/[id]/route.ts`: `cancellationFields`                     | Cast-based field indexing erases typed update keys.                                          | 2        | Implemented in Phase 2 slice 13: checked literal field keys replace the two Record casts, with exact denial order, falsy value presence and no-write characterization.                                                                   |
 | V02 | `apps/admin/lib/validations/booking.ts` and corresponding booking routes                                         | Payload rules and database-dependent rules span layers.                                      | 2        | Complete locally in slice 24: payload-only date/refund/payment rules live in schemas; IDs/JSON/unknown fields validate before writes. Existing lock, Settings, receipts, refund authorization and stored-state rules remain server-side. |
-| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. Phase 6 delivers static admin envelopes in #199, list validation in #200 and lock/unlock response validation plus server-cache coherence in slice 3. Remaining detail/other mutation, customer-app/resource/webhook runtime contracts stay open. |
+| V03 | Admin `lib/api-utils.ts` vs customer `types/index.ts`, resource/email/webhook routes                             | Response envelopes and error contracts differ.                                               | 2        | Complete for Phase 1–2 resource/email/refund boundaries. Preserve existing envelopes and signed webhook acknowledgements; known errors narrow by class and unexpected errors log safely. Phase 6 delivers static admin envelopes in #199, list validation in #200 and lock/unlock response validation plus server-cache coherence in slice 3. Phase 4 validates checkout responses. Other mutation, resource and webhook work stays open. |
 | V04 | Customer `app/api/experiences/route.ts` and `hooks/useExperiences.ts` | Untyped catalog query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed filters, explicit zero bounds and shared experience JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V05 | Customer `app/api/dining/route.ts` and `hooks/useDining.ts` | Untyped available-only query and truthy price checks drop explicit zero bounds. | 2 | Complete locally: typed available-only queries, explicit zero bounds and shared dining JSON; route/hook/HTTP regressions preserve query/cache behavior. |
 | V06 | Admin `lib/api-utils.ts`: `ApiAuthResult`, route/audit consumers and auth fixtures | Boolean plus optional identity, role and error permits invalid result states. | 2 | Implemented in Phase 2 slice 21: discriminated success/denial result, checked auth fixtures and narrowed consumers. Characterization protects the full permission matrix/default admin-only policy, exact errors, bypass protection and audit attribution/failure policy; no HTTP or authorization behavior change. |
@@ -2015,9 +2021,40 @@ HTTP, the production catalog gate, frozen install and all clean builds pass.
 Independent review found no runtime defect; its pending-edit coverage gap was
 closed with failing-before/passing-after resolve and reject cases.
 
-Hosted sign-out/account switching, native Back/bfcache, visual PDF pagination and
-responsive layout still require the [browser retest](phase-4-browser-review.md).
-Settings payloads, admin stay-date display, mobile Dining/Calendar/toasts and
-incomplete booking/payment acceptance remain open. The payment/active-checkout
-repricing guard is preserved. This slice does not change V03/O01 status or complete
-Phase 4 acceptance. The original user notes and browser report remain uncommitted.
+The user accepted #202 after verifying logout → Back and it merged as
+`28bedb6fa0f73df78ff3001d9e8d11ab728f8f18`. PR CI run 45123844150 attempt 2 and
+post-merge CI run 45724753171 passed. Both exact-SHA production apps were Ready
+and read-only smoke passed. Original user notes and browser report remain
+outside the tracked evidence. [Delivery and acceptance scope](phase-4-browser-fixes-plan.md#delivery-and-browser-scope-2026-11-25)
+
+## Phase 4 continuation: remaining functional fixes (2026-11-25)
+
+- **Settings and booking drafts (S01):** The sparse Settings write excludes
+  read-only and untouched fields. The booking form initializes from the matching
+  detail and retains known selected customers across search. Missing automatic
+  selections require resolution. Unchanged selected stay dates are omitted
+  together, preserving legacy stored instants during notes-only edits. A genuine
+  stay change still submits both dates and respects existing price-change guards.
+- **Stay-date presentation (S01):** Admin absolute stay labels use UTC calendar
+  days while actual timestamps stay local. Legacy confirmation email inputs
+  keep their prior local formatting outside the canonical ISO branch.
+- **Reachability and accessibility (S01):** Dining uses one scroll owner within
+  the visible wrapper, and the Calendar Listing headers scroll together on
+  mobile. The inline-first admin toast provider moves to a body portal to expose
+  modal-open notifications to assistive technology. Component tests, actual-source
+  browser geometry, Chromium accessibility-tree and Zen RDM interaction fixtures,
+  and controlled React hydration support these changes.
+- **Checkout response validation (V03):** Cabin, dining and experience checkout
+  share one runtime response reader. The continuation covers controlled malformed
+  responses and success-only client effects. Disposable HTTP confirms permitted
+  owner guest/extras edits and exact 409/no-write outcomes for active checkout and
+  partial receipt. Plan the Phase 6 checkout task around the delivered reader.
+  [Reader](../../apps/customer/lib/validations/checkout-response.ts)
+  [HTTP coverage](../../scripts/http-smoke/run.mjs)
+
+The [browser review](phase-4-browser-review.md#remaining-functional-fixes-and-local-evidence-2026-11-25)
+records the exact edit and checkout outcomes, toast fixture observations and
+manual gaps. [Continuation validation](phase-4-remaining-plan.md#recorded-validation)
+records the local gate results per slice. Remaining response families and O01
+stay in Phase 6. The accepted #132 existing-flow delivery remains recorded in
+Phase 5. Issues #136 and #139 remain excluded.

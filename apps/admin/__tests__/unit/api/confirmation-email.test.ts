@@ -42,8 +42,8 @@ const payload = {
   email: 'UPPER@Example.invalid',
   bookingData: {
     _id: '507f1f77bcf86cd799439011',
-    checkInDate: '2040-01-01',
-    checkOutDate: '2040-01-03',
+    checkInDate: '2040-01-01T00:00:00.000Z',
+    checkOutDate: '2040-01-03T00:00:00.000Z',
     numNights: 2,
     numGuests: 2,
     cabinPrice: 200,
@@ -98,7 +98,104 @@ test('retains staff authorization, rate key, sender, recipient, rendered fields 
   expect(html).toContain('Lake &amp; Pine');
   expect(html).toContain('$400.00');
   expect(html).toContain('WiFi');
+  expect(html).toContain('Sunday, January 1, 2040');
+  expect(html).toContain('Tuesday, January 3, 2040');
 });
+async function renderConfirmation({
+  checkInDate,
+  checkOutDate,
+}: Pick<typeof payload.bookingData, 'checkInDate' | 'checkOutDate'>) {
+  const response = await POST(
+    request({
+      ...payload,
+      bookingData: { ...payload.bookingData, checkInDate, checkOutDate },
+    })
+  );
+  expect(response.status).toBe(200);
+  return renderToStaticMarkup(mockSend.mock.calls[0][0].react);
+}
+
+test.each([
+  {
+    form: 'offset-free ISO date-times',
+    checkInDate: '2027-03-20T23:30:00',
+    checkOutDate: '2027-03-23T00:30:00',
+  },
+  {
+    form: 'legacy numeric and written date-times',
+    checkInDate: '03/20/2027 23:30:00',
+    checkOutDate: 'March 23, 2027 00:30:00',
+  },
+  {
+    form: 'ISO and legacy date-only strings',
+    checkInDate: '2027-03-20',
+    checkOutDate: '03-23-2027',
+  },
+  {
+    form: 'legacy date-times with comments',
+    checkInDate: 'March 20, 2027 23:30:00 ((local) UTC)',
+    checkOutDate: 'March 23, 2027 00:30:00 (local time)',
+  },
+  {
+    form: 'written dates with hyphen separators',
+    checkInDate: 'March -20 2027 23:30:00',
+    checkOutDate: 'March -23 2027 00:30:00',
+  },
+  {
+    form: 'legacy dates with an ignored leading zone name',
+    checkInDate: 'UTC Mar 20 2027 23:30',
+    checkOutDate: 'UTC Mar 23 2027 00:30',
+  },
+])(
+  'preserves the stated calendar days for $form',
+  async ({ checkInDate, checkOutDate }) => {
+    const html = await renderConfirmation({ checkInDate, checkOutDate });
+    expect(html).toContain('Saturday, March 20, 2027');
+    expect(html).toContain('Tuesday, March 23, 2027');
+  }
+);
+
+test('renders ISO date-times with numeric offsets on their UTC calendar days', async () => {
+  const html = await renderConfirmation({
+    checkInDate: '2027-03-20T23:30:00-06:00',
+    checkOutDate: '2027-03-23T00:30:00+0900',
+  });
+  expect(html).toContain('Sunday, March 21, 2027');
+  expect(html).toContain('Monday, March 22, 2027');
+});
+
+test.each([
+  {
+    form: 'legacy named zones',
+    checkInDate: 'Sat, 20 Mar 2027 23:30:00 MST',
+    checkOutDate: 'Tue Mar 23 2027 00:30:00 GMT+0900 (Japan Standard Time)',
+  },
+  {
+    form: 'legacy numeric offsets',
+    checkInDate: 'Mar 20 2027 11:30 pm-0600',
+    checkOutDate: '00:30:00 03-23-2027 +0900',
+  },
+  {
+    form: 'legacy negative-zero year',
+    checkInDate: '-000000-03-20',
+    checkOutDate: '-000000-03-23',
+  },
+])(
+  'preserves the original local-calendar presentation for $form',
+  async ({ checkInDate, checkOutDate }) => {
+    const html = await renderConfirmation({ checkInDate, checkOutDate });
+    const legacyCalendarLabel = (date: string) =>
+      new Date(date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    expect(html).toContain(legacyCalendarLabel(checkInDate));
+    expect(html).toContain(legacyCalendarLabel(checkOutDate));
+  }
+);
+
 test('auth and rate denials precede parsing and sending', async () => {
   mockAuth.mockResolvedValueOnce({
     authenticated: false,

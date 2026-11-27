@@ -78,7 +78,7 @@ Phase 0's implementation is documented in [baseline.md](baseline.md),
 [inventory.md](inventory.md), [http-smoke.md](http-smoke.md) and
 [priority-api-matrix.md](priority-api-matrix.md).
 
-Current execution status (2026-11-03): Phase 0 is complete. Remaining Phase 1–2
+Current execution status (2026-11-25): Phase 0 is complete. Remaining Phase 1–2
 boundaries merged in [PR #190](https://github.com/Amadou-dot/lodgeFlow_admin/pull/190)
 at `b8eea6b`; review fixes followed in #191/#192. Phase 3 merged in
 [PR #194](https://github.com/Amadou-dot/lodgeFlow_admin/pull/194) at `9f8b1a8`.
@@ -87,16 +87,25 @@ at `d0870e1`; its final review corrections brought the package total to 2,524
 passing tests. [Post-merge CI](https://github.com/Amadou-dot/lodgeFlow_admin/actions/runs/37979772079)
 passed at that commit. The [UI state/cache evidence](phase-4-ui-state.md) records
 the browser boundary. The user's 2026-11-03 production review reports mixed
-results and unresolved failures; [browser findings and triage](phase-4-browser-review.md)
-record the evidence, passed checks and follow-up order. Keep that acceptance item
-open pending fixes and retesting.
+results and failures. [Browser findings and triage](phase-4-browser-review.md)
+preserves that evidence and records subsequent fixes, retests and open checks.
 
 The approved [2026-11-05 browser fixes](phase-4-browser-fixes-plan.md) implement one
 print/download preview entry point, private history isolation across user/session
 changes, and request-time cabin listings. Local validation passes 2,743 package
 tests, type/lint/format checks, isolated HTTP, a production catalog regression and
-clean builds. Review and production browser retesting are separate delivery gates;
-Settings, admin stay dates and mobile findings remain for subsequent slices.
+clean builds. The user confirmed that Back after logout prompts for sign-in and
+accepted [PR #202](https://github.com/Amadou-dot/lodgeFlow_admin/pull/202), merged
+as `28bedb6fa0f73df78ff3001d9e8d11ab728f8f18`. PR CI run 45123844150 attempt 2,
+post-merge CI run 45724753171, both exact-SHA production deployments and
+read-only smoke passed. [Delivery evidence](phase-4-browser-fixes-plan.md#delivery-and-browser-scope-2026-11-25)
+
+From `b190f44f504db36c0b5a1d0666e366749391dd04`, the reviewed
+[Phase 4 continuation](phase-4-remaining-plan.md) implements the Settings save,
+stay-label, booking editor, mobile Dining/Calendar, modal toast accessibility
+and controlled checkout response corrections. Remaining representative hosted,
+native-device, visual print and payment checks keep Phase 4 acceptance open.
+[Remaining acceptance](phase-4-browser-review.md#remaining-browser-and-payment-acceptance)
 
 The remaining [Phase 5 origin/configuration slice](phase-5-provider-origins.md)
 merged in [PR #198](https://github.com/Amadou-dot/lodgeFlow_admin/pull/198) as
@@ -325,9 +334,10 @@ Acceptance:
 - [ ] Representative customer/staff interactions are checked in-browser where credentials permit; blockers remain explicit.
 
 Implementation, regression evidence and the browser verification limits are
-recorded in [phase-4-ui-state.md](phase-4-ui-state.md). PR #195 is merged. The
-[2026-11-03 production browser review](phase-4-browser-review.md) records failures
-and incomplete checks; acceptance remains open pending fixes and retesting.
+recorded in [phase-4-ui-state.md](phase-4-ui-state.md). PRs #195 and #202 are
+merged. The [production browser review](phase-4-browser-review.md) records the
+original failures, the accepted logout → Back retest, actual-source responsive
+fixtures and the remaining manual acceptance checks.
 
 ### Phase 5 — Provider configuration and existing email repair
 
@@ -361,8 +371,9 @@ This phase can proceed independently of unrelated UI refactors.
   Resend. Both sends were accepted; provider readback reported `delivered` for both.
   The user confirmed both messages arrived and the welcome email rendered correctly.
   Both production deployments were Ready at merge `9a9c296` with the correct app
-  roots and domains. Issue #132 is closed; Phase 5 remains active for the separate
-  origin/contract review. The approved private test recipient is not recorded here.
+  roots and domains. Issue #132 is closed with existing-flow delivery accepted.
+  The separate origin/contract work subsequently merged in #198. The approved
+  private test recipient is not recorded here.
 - Preserve existing templates, recipients, send triggers, and retry semantics.
 
 The 2026-10-31 [origin/configuration slice](phase-5-provider-origins.md) audits all
@@ -403,6 +414,16 @@ only in the server cache adapter, and is delivered in #200. The third bounded
 slice validates lock/unlock acknowledgements and invalidates stale server profiles
 after provider success. Detail/create/update/delete and other response parsing,
 customer-app/webhook contracts, O01 and final browser acceptance remain.
+
+The Phase 4 [checkout response reader](../../apps/customer/lib/validations/checkout-response.ts)
+already validates the shared cabin/dining/experience success boundary and controls
+fallbacks before navigation or cache invalidation. The follow-on Phase 6 checkout
+task should consume that implementation, run its focused route/consumer regressions
+and the isolated HTTP gate, and address only a demonstrated remaining gap.
+Keep hosted signed-out/browser behavior and provider settlement in their
+respective acceptance checks. Reuse Phase 4's sparse Settings write and booking
+draft/calendar behavior when adding response readers to those flows.
+[Checkout evidence](phase-4-browser-review.md#guestextras-edit-and-checkout-outcomes)
 
 - Resolve the remaining inventory across routes, components, hooks, utilities,
   scripts, tests and shared models. Do not define completion as finishing only the

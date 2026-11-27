@@ -2,8 +2,9 @@
 
 import BookingFormFields from '@/components/BookingFormFields';
 import { ArrowLeftIcon } from '@/components/icons';
-import { useBookingForm } from '@/hooks/useBookingForm';
+import { useBookingEditForm } from '@/hooks/useBookingForm';
 import { useBooking, useUpdateBooking } from '@/hooks/useBookings';
+import type { AdminBooking } from '@/types/booking-read';
 import { Button } from '@heroui/button';
 import { Card, CardBody } from '@heroui/card';
 import { Spinner } from '@heroui/spinner';
@@ -18,19 +19,67 @@ interface EditBookingPageProps {
 }
 
 export default function EditBookingPage({ params }: EditBookingPageProps) {
-  const router = useRouter();
-  const resolvedParams = use(params);
-  const { data: booking, isLoading, error } = useBooking(resolvedParams.id);
-  const updateBooking = useUpdateBooking();
+  const { id } = use(params);
+  const { data: booking, isLoading, error } = useBooking(id);
 
-  // Use the booking form hook with initial booking data
-  const bookingFormHook = useBookingForm(booking);
+  // SWR can retain the previous route's booking while the next request loads.
+  if (booking?._id === id.toLowerCase()) {
+    return (
+      <BookingEditor
+        key={booking._id}
+        booking={booking}
+        hasLoadError={Boolean(error)}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className='flex justify-center items-center min-h-[400px]'>
+        <Spinner size='lg' />
+      </div>
+    );
+  }
+
+  return (
+    <BookingLoadError
+      message={error ? 'Failed to load booking data.' : 'Booking not found.'}
+    />
+  );
+}
+
+function BookingLoadError({ message }: { message: string }) {
+  const router = useRouter();
+
+  return (
+    <div className='container mx-auto px-4 py-8 max-w-7xl'>
+      <div className='text-center'>
+        <h1 className='text-2xl font-bold text-danger mb-4'>Error</h1>
+        <p className='text-default-600 mb-4'>{message}</p>
+        <Button color='primary' onPress={() => router.back()}>
+          Go Back
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function BookingEditor({
+  booking,
+  hasLoadError,
+}: {
+  booking: AdminBooking;
+  hasLoadError: boolean;
+}) {
+  const router = useRouter();
+  const updateBooking = useUpdateBooking();
+  const bookingFormHook = useBookingEditForm(booking);
   const { validateForm, buildBookingData } = bookingFormHook;
 
-  const handleSuccess = () => {
-    // Navigate back to booking details with success message
-    router.push(`/bookings/${resolvedParams.id}?updated=true`);
-  };
+  // Keep the same-record draft mounted during a failed refresh.
+  if (hasLoadError) {
+    return <BookingLoadError message='Failed to load booking data.' />;
+  }
 
   const handleCancel = () => {
     router.back();
@@ -50,43 +99,13 @@ export default function EditBookingPage({ params }: EditBookingPageProps) {
     }
 
     try {
-      const bookingData = {
-        ...buildBookingData(),
-        _id: booking!._id.toString(),
-        status: booking!.status, // Preserve existing status
-      };
-
-      await updateBooking.mutateAsync(bookingData);
-      handleSuccess();
+      await updateBooking.mutateAsync(buildBookingData());
+      router.push(`/bookings/${booking._id}?updated=true`);
     } catch (error) {
       // Toast is shown by the mutation's onError callback
       console.error('Error updating booking:', error);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className='flex justify-center items-center min-h-[400px]'>
-        <Spinner size='lg' />
-      </div>
-    );
-  }
-
-  if (error || !booking) {
-    return (
-      <div className='container mx-auto px-4 py-8 max-w-7xl'>
-        <div className='text-center'>
-          <h1 className='text-2xl font-bold text-danger mb-4'>Error</h1>
-          <p className='text-default-600 mb-4'>
-            {error ? 'Failed to load booking data.' : 'Booking not found.'}
-          </p>
-          <Button color='primary' onPress={() => router.back()}>
-            Go Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className='container mx-auto px-4 py-8 max-w-7xl'>
@@ -104,9 +123,7 @@ export default function EditBookingPage({ params }: EditBookingPageProps) {
           <h1 className='text-3xl font-bold'>Edit Booking</h1>
           <p className='text-default-600 mt-1'>
             Update booking details for{' '}
-            {typeof booking.customer === 'string'
-              ? booking.customer
-              : (booking.customer?.name ?? 'Unknown Guest')}
+            {booking.customer?.name ?? 'Unknown Guest'}
           </p>
         </div>
       </div>
@@ -133,6 +150,7 @@ export default function EditBookingPage({ params }: EditBookingPageProps) {
                   setIsCustomerOpen={bookingFormHook.setIsCustomerOpen}
                   handleInputChange={bookingFormHook.handleInputChange}
                   handleCustomerSearch={bookingFormHook.handleCustomerSearch}
+                  onCustomerSelection={bookingFormHook.handleCustomerSelection}
                   addSpecialRequest={bookingFormHook.addSpecialRequest}
                   removeSpecialRequest={bookingFormHook.removeSpecialRequest}
                   setSpecialRequestInput={
@@ -141,7 +159,10 @@ export default function EditBookingPage({ params }: EditBookingPageProps) {
                   formatCurrency={bookingFormHook.formatCurrency}
                   showPayment={true}
                   showPricing={true}
-                  excludeBookingId={booking._id.toString()}
+                  excludeBookingId={booking._id}
+                  preserveExistingPricing={
+                    bookingFormHook.preserveExistingPricing
+                  }
                 />
 
                 {/* Form Actions */}

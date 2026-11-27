@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@/__tests__/shared/test-utils';
+import { FetchResponse } from '@/__tests__/shared/checkout-failure-fixtures';
+import { fireEvent, render, screen } from '@/__tests__/shared/test-utils';
 import DiningConfirmation from '@/app/dining/confirmation/[id]/page';
 import ExperienceConfirmation from '@/app/experiences/confirmation/[id]/page';
 jest.mock('@clerk/nextjs', () => ({
@@ -27,7 +28,7 @@ beforeEach(() => {
   global.fetch = jest.fn();
 });
 for (const kind of ['dining', 'experience'] as const) {
-  it(`offers checkout on the authorized ${kind} confirmation`, async () => {
+  it(`shows a safe checkout error on the authorized ${kind} confirmation`, async () => {
     const data =
       kind === 'dining'
         ? {
@@ -59,9 +60,15 @@ for (const kind of ['dining', 'experience'] as const) {
     const Component =
       kind === 'dining' ? DiningConfirmation : ExperienceConfirmation;
     render(<Component params={Promise.resolve({ id: 'reservation' })} />);
-    expect(
-      await screen.findByRole('button', { name: 'Pay outstanding balance' })
-    ).toBeInTheDocument();
+    const payment = await screen.findByRole('button', {
+      name: 'Pay outstanding balance',
+    });
+    jest.mocked(fetch).mockResolvedValueOnce(FetchResponse.json(null));
+    fireEvent.click(payment);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /^Unable to start checkout$/
+    );
+    expect(payment).toBeEnabled();
   });
 }
 

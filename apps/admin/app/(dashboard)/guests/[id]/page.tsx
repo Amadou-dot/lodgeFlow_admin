@@ -27,9 +27,13 @@ import {
   useUnlockCustomer,
 } from '@/hooks/useCustomers';
 import { useDetailPageMemory } from '@/hooks/useDetailPageMemory';
+import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import { getInitials, getLoyaltyTier } from '@/utils/utilityFunctions';
 import { getStatusColor } from '@/utils/bookingUtils';
 import { addToast } from '@heroui/toast';
+
+const formatStayDate = (date: string) =>
+  formatBookingStayDate({ date, style: 'short' });
 
 export default function GuestDetailPage() {
   const router = useRouter();
@@ -40,15 +44,6 @@ export default function GuestDetailPage() {
   const deleteCustomerMutation = useDeleteCustomer();
   const lockCustomerMutation = useLockCustomer();
   const unlockCustomerMutation = useUnlockCustomer();
-
-  const formatDate = (dateInput: string) => {
-    const date = new Date(dateInput);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
 
   const handleLockCustomer = async () => {
     try {
@@ -434,9 +429,9 @@ export default function GuestDetailPage() {
                             </TableCell>
                             <TableCell>
                               <div className='text-sm'>
-                                <p>{formatDate(booking.checkInDate)}</p>
+                                <p>{formatStayDate(booking.checkInDate)}</p>
                                 <p className='text-default-600'>
-                                  to {formatDate(booking.checkOutDate)}
+                                  to {formatStayDate(booking.checkOutDate)}
                                 </p>
                               </div>
                             </TableCell>
@@ -463,7 +458,7 @@ export default function GuestDetailPage() {
                   <div className='block md:hidden'>
                     <GuestRecentBookingsMobile
                       recentBookings={customer.recentBookings}
-                      formatDate={formatDate}
+                      formatDate={formatStayDate}
                       onNewBooking={handleNewBooking}
                     />
                   </div>

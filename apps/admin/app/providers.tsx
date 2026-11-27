@@ -9,6 +9,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -21,6 +22,19 @@ declare module '@react-types/shared' {
       Parameters<ReturnType<typeof useRouter>['push']>[1]
     >;
   }
+}
+
+function AdminToasts() {
+  const [target, setTarget] = React.useState<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    setTarget(document.body);
+  }, []);
+
+  // Initialize the toast queue on the first render, then keep the region
+  // outside the app subtree that an open modal hides from assistive technology.
+  const provider = <ToastProvider placement='bottom-center' />;
+  return target ? createPortal(provider, target) : provider;
 }
 
 export function Providers({ children, themeProps }: ProvidersProps) {
@@ -45,7 +59,7 @@ export function Providers({ children, themeProps }: ProvidersProps) {
     <QueryClientProvider client={queryClient}>
       <HeroUIProvider navigate={router.push}>
         <NextThemesProvider {...themeProps}>
-          <ToastProvider placement='bottom-center' />
+          <AdminToasts />
           {children}
           <ReactQueryDevtools initialIsOpen={false} />
         </NextThemesProvider>

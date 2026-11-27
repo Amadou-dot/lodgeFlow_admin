@@ -4,7 +4,8 @@ import type {
   BookingFormData,
   PriceBreakdown as PriceBreakdownType,
 } from '@/hooks/useBookingForm';
-import type { Cabin, Customer, AppSettings } from '@/types';
+import type { Cabin, AppSettings } from '@/types';
+import type { BookingCustomerOption } from './BookingForm/types';
 import { Card, CardBody, CardHeader } from '@heroui/card';
 import {
   BookingDatesGuests,
@@ -54,7 +55,7 @@ interface BookingFormFieldsProps {
 
   // Data Sources
   cabins: Cabin[];
-  customers: Customer[];
+  customers: BookingCustomerOption[];
   customersLoading: boolean;
   settings: AppSettings | undefined;
 
@@ -63,6 +64,7 @@ interface BookingFormFieldsProps {
   isCustomerOpen: boolean;
   setIsCustomerOpen: (open: boolean) => void;
   handleCustomerSearch: (searchValue: string) => void;
+  onCustomerSelection: (customer: BookingCustomerOption | undefined) => void;
 
   // Form Handlers
   handleInputChange: <K extends keyof BookingFormData>(
@@ -82,6 +84,7 @@ interface BookingFormFieldsProps {
 
   // Edit mode
   excludeBookingId?: string;
+  preserveExistingPricing?: boolean;
 }
 
 export default function BookingFormFields({
@@ -98,6 +101,7 @@ export default function BookingFormFields({
   setIsCustomerOpen,
   handleInputChange,
   handleCustomerSearch,
+  onCustomerSelection,
   addSpecialRequest,
   removeSpecialRequest,
   setSpecialRequestInput,
@@ -105,6 +109,7 @@ export default function BookingFormFields({
   showPayment = true,
   showPricing = true,
   excludeBookingId,
+  preserveExistingPricing,
 }: BookingFormFieldsProps) {
   return (
     <div className='space-y-6'>
@@ -130,8 +135,8 @@ export default function BookingFormFields({
         </CardHeader>
         <CardBody>
           <CustomerSelection
-            formData={formData}
-            onInputChange={handleInputChange}
+            selectedCustomerId={formData.customer}
+            onCustomerSelection={onCustomerSelection}
             customers={customers}
             customersLoading={customersLoading}
             scrollerRef={scrollerRef}
@@ -153,6 +158,7 @@ export default function BookingFormFields({
             selectedCabin={selectedCabin}
             numNights={numNights}
             excludeBookingId={excludeBookingId}
+            preserveExistingPricing={preserveExistingPricing}
             maxGuestsPerBooking={settings?.maxGuestsPerBooking}
           />
         </CardBody>
@@ -180,6 +186,7 @@ export default function BookingFormFields({
       {/* Payment Information */}
       {showPayment && (
         <PaymentInformation
+          isEditing={Boolean(excludeBookingId)}
           formData={formData}
           onInputChange={handleInputChange}
           settings={settings}

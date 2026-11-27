@@ -74,6 +74,7 @@ export default function BookingForm({
         setIsCustomerOpen={bookingFormHook.setIsCustomerOpen}
         handleInputChange={bookingFormHook.handleInputChange}
         handleCustomerSearch={bookingFormHook.handleCustomerSearch}
+        onCustomerSelection={bookingFormHook.handleCustomerSelection}
         addSpecialRequest={bookingFormHook.addSpecialRequest}
         removeSpecialRequest={bookingFormHook.removeSpecialRequest}
         setSpecialRequestInput={bookingFormHook.setSpecialRequestInput}

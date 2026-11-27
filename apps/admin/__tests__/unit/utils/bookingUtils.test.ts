@@ -1,8 +1,18 @@
+import { formatBookingStayDate } from '@/lib/booking-stay-date';
 import {
   formatBookingDates,
   getStatusColor,
   getStatusLabel,
 } from '@/utils/bookingUtils';
+
+test.each(['short', 'long-weekday'] as const)(
+  'the %s stay-date style retains the capitalized malformed-date fallback',
+  style => {
+    expect(formatBookingStayDate({ date: 'bad-date', style })).toBe(
+      'Invalid Date'
+    );
+  }
+);
 
 describe('bookingUtils', () => {
   describe('getStatusColor', () => {
@@ -38,12 +48,49 @@ describe('bookingUtils', () => {
   });
 
   describe('formatBookingDates', () => {
-    beforeAll(() => {
+    beforeEach(() => {
       jest.useFakeTimers().setSystemTime(new Date('2026-07-03T12:00:00Z'));
     });
 
-    afterAll(() => {
+    afterEach(() => {
       jest.useRealTimers();
+    });
+
+    it('renders UTC-midnight labels with the existing relative wording and night count', () => {
+      jest.setSystemTime(new Date('2027-03-19T12:00:00.000Z'));
+      expect(
+        formatBookingDates({
+          checkIn: '2027-03-20T00:00:00.000Z',
+          checkOut: '2027-03-23T00:00:00.000Z',
+          numNights: 3,
+          status: 'confirmed',
+        })
+      ).toEqual({
+        dateRange: 'Mar 20, 2027 — Mar 23, 2027',
+        timeInfo: 'about 12 hours → 3 nights stay',
+        showTimeInfo: true,
+      });
+    });
+
+    it('renders non-midnight legacy instants on their UTC days across a year boundary', () => {
+      const { dateRange } = formatBookingDates({
+        checkIn: '2026-12-31T23:30:00.000Z',
+        checkOut: '2027-01-01T23:30:00.000Z',
+        numNights: 1,
+        status: 'cancelled',
+      });
+      expect(dateRange).toBe('Dec 31, 2026 — Jan 01, 2027');
+    });
+
+    it('preserves the list formatter error for malformed stay dates', () => {
+      expect(() =>
+        formatBookingDates({
+          checkIn: 'bad-date',
+          checkOut: '2027-03-23T00:00:00.000Z',
+          numNights: 3,
+          status: 'cancelled',
+        })
+      ).toThrow(RangeError);
     });
 
     it('formats the date range', () => {

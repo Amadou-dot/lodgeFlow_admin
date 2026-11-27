@@ -1,3 +1,10 @@
+import type { BookingCustomer } from '@/types/booking-read';
+
+export type BookingCustomerOption = Pick<
+  BookingCustomer,
+  'id' | 'name' | 'email' | 'image_url'
+>;
+
 export interface BookingFormData {
   cabin: string;
   customer: string;

@@ -254,7 +254,7 @@ export default function CalendarPage() {
             >
               <thead className='bg-default-100 text-default-600'>
                 <tr>
-                  <th className='sticky left-0 z-10 w-44 bg-content1 p-3'>
+                  <th className='sm:sticky sm:left-0 sm:z-10 w-44 bg-content1 p-3'>
                     Listing
                   </th>
                   {days.map(day => (
@@ -270,7 +270,7 @@ export default function CalendarPage() {
               <tbody>
                 {data.resources.map(resource => (
                   <tr key={resource._id}>
-                    <th className='sticky left-0 z-10 bg-content1 border border-default-200 p-3 text-sm'>
+                    <th className='sm:sticky sm:left-0 sm:z-10 bg-content1 border border-default-200 p-3 text-sm'>
                       {resource.name}
                       {kind === 'dining' && (
                         <div className='font-normal text-xs'>

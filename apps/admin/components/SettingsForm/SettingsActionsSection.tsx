@@ -6,6 +6,7 @@ interface SettingsActionsSectionProps {
   onSave: () => void;
   onDiscard: () => void;
   onReset: () => void;
+  isWriting: boolean;
   isSaving: boolean;
   isResetting: boolean;
 }
@@ -15,6 +16,7 @@ export default function SettingsActionsSection({
   onSave,
   onDiscard,
   onReset,
+  isWriting,
   isSaving,
   isResetting,
 }: SettingsActionsSectionProps) {
@@ -27,7 +29,7 @@ export default function SettingsActionsSection({
               color='primary'
               onPress={onSave}
               isLoading={isSaving}
-              isDisabled={!hasChanges}
+              isDisabled={!hasChanges || isWriting}
             >
               Save Changes
             </Button>
@@ -43,6 +45,7 @@ export default function SettingsActionsSection({
             variant='bordered'
             onPress={onReset}
             isLoading={isResetting}
+            isDisabled={isWriting}
           >
             Reset to Defaults
           </Button>

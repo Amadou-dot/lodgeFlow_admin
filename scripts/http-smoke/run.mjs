@@ -1602,6 +1602,93 @@ try {
     'PASS booking detail ownership and allowlisted update persistence'
   );
 
+  const legacyDates = {
+    checkInDate: '2040-01-07T12:34:56.789Z',
+    checkOutDate: '2040-01-10T12:34:56.789Z',
+  };
+  const ownerEditCabin = await Cabin.create({
+    name: 'Owner edit cabin',
+    description: 'Isolated confirmed booking edit fixture',
+    image: 'https://example.invalid/owner-edit.jpg',
+    status: 'active',
+    capacity: 4,
+    price: 200,
+    extraGuestFee: 20,
+  });
+  const ownerEditBooking = await Booking.create({
+    cabin: ownerEditCabin._id,
+    customer: 'smoke_customer',
+    checkInDate: new Date(legacyDates.checkInDate),
+    checkOutDate: new Date(legacyDates.checkOutDate),
+    numGuests: 1,
+    cabinPrice: 200,
+    totalPrice: 600,
+    depositAmount: 150,
+    status: 'confirmed',
+  });
+  const ownerReprice = { numGuests: 3, extras: { hasBreakfast: true } };
+  const callsBeforeConfirmedEdit = calls.length;
+  const confirmedEdit = await request({
+    origin: customer,
+    route: `/api/bookings/${ownerEditBooking._id}`,
+    identity: 'customer',
+    method: 'PATCH',
+    body: ownerReprice,
+    status: 200,
+  });
+  const confirmedAfter = await Booking.findById(ownerEditBooking._id)
+    .lean()
+    .orFail();
+  assert.equal(confirmedEdit.success, true);
+  assert.equal(confirmedEdit.message, 'Booking updated successfully');
+  const expectedConfirmedEdit = {
+    ...legacyDates,
+    status: 'confirmed',
+    numNights: 3,
+    numGuests: 3,
+    extrasPrice: 255,
+    totalPrice: 855,
+    depositAmount: 214,
+    remainingAmount: 855,
+    amountPaid: 0,
+    isPaid: false,
+    depositPaid: false,
+    payments: [],
+  };
+  for (const record of [
+    confirmedEdit.data,
+    JSON.parse(JSON.stringify(confirmedAfter)),
+  ]) {
+    for (const [field, expected] of Object.entries(expectedConfirmedEdit))
+      assert.deepEqual(record[field], expected, field);
+    assert.equal(record.extras.hasBreakfast, true);
+  }
+  assert.equal(calls.length, callsBeforeConfirmedEdit);
+  console.log(
+    'PASS confirmed unpaid owner edit preserves legacy dates and reprices without receipts'
+  );
+
+  async function assertOwnerRepriceDenied(before) {
+    const callsBefore = calls.length;
+    assert.deepEqual(
+      await request({
+        origin: customer,
+        route: detailRoute,
+        identity: 'customer',
+        method: 'PATCH',
+        body: { numGuests: 2, extras: { hasBreakfast: true } },
+        status: 409,
+      }),
+      {
+        success: false,
+        error:
+          'Price changes are unavailable after payment or while checkout is active',
+      }
+    );
+    assert.deepEqual(await Booking.findById(bookingId).lean().orFail(), before);
+    assert.equal(calls.length, callsBefore);
+  }
+
   const beforePaymentStatus = JSON.stringify(
     await Booking.find().sort({ _id: 1 }).lean()
   );
@@ -1862,6 +1949,10 @@ try {
   assert.equal(persisted.checkoutToken, quoteToken);
   assert.equal(persisted.payments.length, 0);
   assert.equal(sessions.size, 1);
+  assert.equal(persisted.checkoutPending, true);
+  assert.equal(typeof persisted.stripeSessionId, 'string');
+  await assertOwnerRepriceDenied(persisted);
+  console.log('PASS active checkout blocks owner repricing without writes');
   const beforePendingEstimate = JSON.stringify(persisted);
   const callsBeforePendingEstimate = calls.length;
   const pendingEstimate = await request({
@@ -1997,6 +2088,9 @@ try {
   assert.equal(persisted.depositPaid, true);
   assert.equal(persisted.paymentConfirmationSentAt, undefined);
   assert.equal(persisted.checkoutPending, false);
+  assert.equal(persisted.isPaid, false);
+  await assertOwnerRepriceDenied(persisted);
+  console.log('PASS partial receipt blocks owner repricing without writes');
   const beforePaidStatus = JSON.stringify(persisted);
   const callsBeforePaidStatus = calls.length;
   assert.deepEqual(

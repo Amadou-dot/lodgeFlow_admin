@@ -2,12 +2,22 @@
 
 import useSWR, { useSWRConfig } from 'swr';
 import { useMutation } from '@tanstack/react-query';
-import { AppSettings } from '@/types';
+import type { AppSettings } from '@/types';
+import type { UpdateSettingsInput } from '@/lib/validations/settings';
+
+export class SettingsAccessError extends Error {
+  constructor() {
+    super('Failed to fetch settings');
+    Object.setPrototypeOf(this, SettingsAccessError.prototype);
+  }
+}
 
 // Fetcher function for SWR
 const fetcher = (url: string) =>
   fetch(url)
     .then(res => {
+      if (res.status === 401 || res.status === 403)
+        throw new SettingsAccessError();
       if (!res.ok) {
         throw new Error('Failed to fetch settings');
       }
@@ -44,11 +54,11 @@ export const useSettings = () => {
 export const useUpdateSettings = () => {
   const { mutate } = useSWRConfig();
   return useMutation({
-    mutationFn: async (settings: Partial<AppSettings>) => {
+    mutationFn: async (changes: UpdateSettingsInput): Promise<AppSettings> => {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(changes),
       });
 
       if (!response.ok) {

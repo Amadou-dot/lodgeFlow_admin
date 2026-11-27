@@ -18,6 +18,7 @@ interface BookingDatesGuestsProps extends BookingFormFieldProps {
   numNights: number;
   excludeBookingId?: string;
   maxGuestsPerBooking?: number;
+  preserveExistingPricing?: boolean;
 }
 
 const fetcher = async (url: string) => {
@@ -34,6 +35,7 @@ export default function BookingDatesGuests({
   numNights,
   excludeBookingId,
   maxGuestsPerBooking,
+  preserveExistingPricing = false,
 }: BookingDatesGuestsProps) {
   // Fetch unavailable dates for the selected cabin
   // When editing, exclude the current booking's dates from the unavailable list
@@ -67,6 +69,17 @@ export default function BookingDatesGuests({
 
   // Get today's date to prevent past date selection
   const todayDate = today(getLocalTimeZone());
+
+  const earliestStart =
+    preserveExistingPricing &&
+    dateRange &&
+    dateRange.start.compare(todayDate) < 0
+      ? dateRange.start
+      : todayDate;
+  const currentGuestLimit = Math.min(
+    selectedCabin?.capacity || 10,
+    maxGuestsPerBooking || 50
+  );
 
   // Create a function to check if a date is unavailable
   const isDateUnavailable = (date: DateValue) => {
@@ -111,9 +124,10 @@ export default function BookingDatesGuests({
       >
         <DateRangePicker
           label='Stay Duration'
+          aria-label='Stay Duration'
           value={dateRange}
           onChange={handleDateRangeChange}
-          minValue={todayDate}
+          minValue={earliestStart}
           showMonthAndYearPickers
           visibleMonths={2}
           calendarWidth={400}
@@ -144,7 +158,11 @@ export default function BookingDatesGuests({
           onInputChange('numGuests', parseInt(e.target.value) || 1)
         }
         min={1}
-        max={Math.min(selectedCabin?.capacity || 10, maxGuestsPerBooking || 50)}
+        max={
+          preserveExistingPricing
+            ? Math.max(currentGuestLimit, formData.numGuests)
+            : currentGuestLimit
+        }
         isRequired
       />
 
