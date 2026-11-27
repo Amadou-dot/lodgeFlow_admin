@@ -7,6 +7,8 @@ import {
 } from '@/lib/validations/reservation-operations-json';
 import Link from 'next/link';
 import { useResourceLoad } from '@/hooks/useResourceLoad';
+import { useReservationPaymentAttempt } from '@/hooks/useReservationPaymentAttempt';
+import { useAuth } from '@clerk/nextjs';
 import { useCallback, useEffect, useState } from 'react';
 import { usePermission } from './AuthGuard';
 import { utcDate } from '@/lib/reservation-options';
@@ -33,12 +35,17 @@ function isStatusAllowed({
   );
 }
 export function ReservationDetail(props: ReservationDetailProps) {
+  const { userId, sessionId, orgId } = useAuth();
   return (
-    <ReservationDetailContent key={`${props.kind}:${props.id}`} {...props} />
+    <ReservationDetailContent
+      key={JSON.stringify([userId, sessionId, orgId, props.kind, props.id])}
+      {...props}
+    />
   );
 }
 function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
   const canManage = usePermission('bookings:manage');
+  const submission = useReservationPaymentAttempt();
   const endpoint = `/api/${kind === 'dining' ? 'dining-reservations' : 'experience-bookings'}/${id}`;
   const [nextStatus, setNextStatus] = useState('');
   const [action, setAction] = useState<
@@ -172,7 +179,7 @@ function ReservationDetailContent({ kind, id }: ReservationDetailProps) {
           )}
           {experience?.observations && <p>Notes: {experience?.observations}</p>}
           <ReservationPayments
-            key={endpoint}
+            submission={submission}
             kind={kind}
             reservationId={id}
             endpoint={endpoint}

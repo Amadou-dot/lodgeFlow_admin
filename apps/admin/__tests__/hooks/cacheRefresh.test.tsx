@@ -785,6 +785,30 @@ test('settings update and reset refresh the mounted read; failed update does not
   );
 });
 
+test('a sparse Settings PUT returns its wire values and revalidates the mounted read', async () => {
+  const changes = {
+    notifications: { emailEnabled: false },
+    businessHours: { open: '08:00' },
+  };
+  const sparse = { ...settings, ...changes };
+  fetchMock
+    .mockResolvedValueOnce(response({ success: true, data: settings }))
+    .mockResolvedValueOnce(response({ success: true, data: sparse }))
+    .mockResolvedValueOnce(response({ success: true, data: settings }));
+  const { result } = renderHook(
+    () => ({ read: useSettings(), update: useUpdateSettings() }),
+    { wrapper }
+  );
+  await waitFor(() => expect(result.current.read.data).toEqual(settings));
+  await act(async () => {
+    await expect(result.current.update.mutateAsync(changes)).resolves.toEqual(
+      sparse
+    );
+  });
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/settings');
+});
+
 test.each(['PUT', 'POST'])(
   'invalid %s Settings JSON does not invalidate the mounted read',
   async method => {

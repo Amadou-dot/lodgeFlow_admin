@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { StaffRequestRejected } from './staff-request-rejected';
 import {
   diningJsonSchema,
   experienceJsonSchema,
@@ -73,16 +74,6 @@ export type ReservationTransaction = Pick<
   'id' | 'type' | 'method' | 'amountCents'
 > & { reference: string };
 
-export class ReservationRequestRejected extends Error {
-  constructor(
-    message: string,
-    readonly status: number
-  ) {
-    super(message);
-    Object.setPrototypeOf(this, ReservationRequestRejected.prototype);
-  }
-}
-
 function matchesReservation(row: { _id: string; id?: string }, id: string) {
   return (
     row._id.toLowerCase() === id.toLowerCase() &&
@@ -118,7 +109,7 @@ async function read<T>(
       result.data.success === false &&
       [400, 401, 403, 404, 409].includes(response.status)
     )
-      throw new ReservationRequestRejected(result.data.error, response.status);
+      throw new StaffRequestRejected(result.data.error, response.status);
     throw new Error(result.success ? result.data.error : fallback);
   }
   const envelope = success.safeParse(body);
@@ -153,13 +144,13 @@ export function receiptConfirmation(
   transaction: ReservationTransaction
 ) {
   const saved = receipts?.find(row => row.id === transaction.id);
-  if (!saved) return 'missing';
+  if (!saved) return { kind: 'missing' } as const;
   return saved.type === transaction.type &&
     saved.method === transaction.method &&
     saved.amountCents === transaction.amountCents &&
     saved.reference === transaction.reference.trim()
-    ? 'confirmed'
-    : 'conflict';
+    ? ({ kind: 'confirmed' } as const)
+    : ({ kind: 'conflict', recorded: saved } as const);
 }
 
 export async function readReservationPayment(
@@ -179,7 +170,7 @@ export async function readReservationPayment(
   const row = await read<WriteResult>(response, writes[kind], fallback);
   if (
     !matchesReservation(row, reservationId) ||
-    receiptConfirmation(row.receipts, transaction) !== 'confirmed'
+    receiptConfirmation(row.receipts, transaction).kind !== 'confirmed'
   )
     throw new Error(fallback);
   return row;

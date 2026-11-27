@@ -177,6 +177,32 @@ test('partial update preserves nested replacement semantics and full response fi
   expect(stored.breakfastPrice).toBe(23);
 });
 
+test.each([
+  { notifications: { emailEnabled: false }, businessHours: { open: '08:00' } },
+  { notifications: {}, businessHours: {} },
+])(
+  'PUT returns readable nested replacements without supplying omitted defaults: %p',
+  async changes => {
+    await Settings.create({});
+    const response = await PUT(
+      new NextRequest('https://admin.test/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify(changes),
+      })
+    );
+    expect(response.status).toBe(200);
+    const body: unknown = await response.json();
+    const { data } = settingsSuccessResponseSchema.parse(body);
+    if ('emailEnabled' in changes.notifications) {
+      expect(data.notifications).toEqual(changes.notifications);
+      expect(data.businessHours).toEqual(changes.businessHours);
+    } else {
+      expect(data).not.toHaveProperty('notifications');
+      expect(data).not.toHaveProperty('businessHours');
+    }
+  }
+);
+
 test('reset returns the newly created defaults with virtuals and timestamps', async () => {
   const old = await Settings.create({ breakfastPrice: 99 });
   const response = await POST();
