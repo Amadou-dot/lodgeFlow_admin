@@ -1,3 +1,4 @@
+import { bookingNotesSchema } from './booking-notes';
 import { receiptAmountSchema } from './money';
 import { objectRequestSchema } from './object-request';
 import {
@@ -53,7 +54,7 @@ const createFieldsSchema = z
     paymentMethod: paymentMethodSchema.optional(),
     extras: bookingExtrasSchema.optional(),
     observations: z.string().max(1000).optional(),
-    specialRequests: z.array(z.string()).optional().default([]),
+    specialRequests: bookingNotesSchema.optional().default([]),
   })
   .refine(data => data.checkOutDate > data.checkInDate, {
     message: 'Check-out date must be after check-in date',
@@ -80,7 +81,7 @@ const updateFieldsSchema = z
     refundedAt: requestDateSchema.optional(),
     extras: bookingExtrasSchema.optional(),
     observations: z.string().max(1000).optional(),
-    specialRequests: z.array(z.string()).optional(),
+    specialRequests: bookingNotesSchema.optional(),
   })
   .refine(
     data => {
