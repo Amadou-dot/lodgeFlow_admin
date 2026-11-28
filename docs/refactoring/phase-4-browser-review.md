@@ -319,6 +319,26 @@ recorded in the final Task 4 evidence.
 [Dining modal](../../apps/admin/components/DiningModal.tsx)
 [Calendar styles](<../../apps/admin/app/(dashboard)/calendar/page.tsx>)
 
+### Staff booking keyboard navigation
+
+On 2026-11-27, headless Chromium 159.0.8154.6 at 1440 × 900 reproduced the
+row activation failure on the local staff `/bookings` page. Tab focused a row,
+Arrow Down focused the next booking, and Enter left the list open. On a booking
+detail page, Print / Download initially focused Print Preview. Tabbing past
+Download PDF reached a background control, where Escape left the dialog open.
+The original sign-off did not identify its dialog. [Issue #209](https://github.com/Amadou-dot/LodgeFlow/issues/209)
+
+The regression uses two disposable bookings. Enter on the focused row opens
+that booking. Arrow Right reaches its named actions button. Enter opens the
+menu, where View Details works with either the keyboard or the pointer.
+Chromium exposes the Print Preview title as the dialog's accessible name. Tab
+and Shift+Tab cycle through Close, Print and Download PDF, and Escape returns
+focus to Print / Download. In Record Payment, the expanded Payment Method
+listbox is visible in the accessibility tree. One Escape returns focus to the
+selector and a second returns it to Record Payment. The last option was also
+clickable at 1440 × 900 and at an emulated 430 × 700.
+[Repeat the browser check](http-smoke.md#staff-booking-keyboard-regression)
+
 ## Remaining browser and payment acceptance
 
 - The user confirmed that Back after logout prompts for sign-in. Complete the

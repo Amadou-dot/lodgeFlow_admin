@@ -32,7 +32,7 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
 
   if (onViewDetails) {
     menuItems.push(
-      <DropdownItem key='view' onPress={() => onViewDetails(booking)}>
+      <DropdownItem key='view' onAction={() => onViewDetails(booking)}>
         View Details
       </DropdownItem>
     );
@@ -40,7 +40,7 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
 
   if (onEdit && booking.status === 'unconfirmed') {
     menuItems.push(
-      <DropdownItem key='edit' onPress={() => onEdit(booking)}>
+      <DropdownItem key='edit' onAction={() => onEdit(booking)}>
         Edit Booking
       </DropdownItem>
     );
@@ -50,7 +50,7 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
     menuItems.push(
       <DropdownItem
         key='checkin'
-        onPress={() =>
+        onAction={() =>
           onStatusChange({ bookingId: booking._id, status: 'checked-in' })
         }
       >
@@ -63,7 +63,7 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
     menuItems.push(
       <DropdownItem
         key='checkout'
-        onPress={() =>
+        onAction={() =>
           onStatusChange({ bookingId: booking._id, status: 'checked-out' })
         }
       >
@@ -78,7 +78,7 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
         key='cancel'
         className='text-danger'
         color='danger'
-        onPress={() =>
+        onAction={() =>
           onStatusChange({ bookingId: booking._id, status: 'cancelled' })
         }
       >
@@ -93,7 +93,7 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
         key='delete'
         className='text-danger'
         color='danger'
-        onPress={() => onDelete(booking)}
+        onAction={() => onDelete(booking)}
       >
         Delete Booking
       </DropdownItem>
@@ -103,11 +103,16 @@ export default function BookingActionsMenu<TBooking extends BookingActionData>({
   return (
     <Dropdown>
       <DropdownTrigger>
-        <Button isIconOnly variant='light' size='sm'>
+        <Button
+          isIconOnly
+          variant='light'
+          size='sm'
+          aria-label='Booking actions'
+        >
           <MoreVertical className='w-4 h-4' />
         </Button>
       </DropdownTrigger>
-      <DropdownMenu>{menuItems}</DropdownMenu>
+      <DropdownMenu aria-label='Booking actions'>{menuItems}</DropdownMenu>
     </Dropdown>
   );
 }

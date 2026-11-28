@@ -5,7 +5,7 @@ import { useSendConfirmationEmail } from '@/hooks/useSendEmail';
 import type { PopulatedBooking } from '@/types';
 import { Button } from '@heroui/button';
 import { Card, CardBody, CardHeader } from '@heroui/card';
-import { Modal, ModalBody, ModalContent } from '@heroui/modal';
+import { Modal, ModalBody, ModalContent, ModalHeader } from '@heroui/modal';
 import { addToast } from '@heroui/toast';
 import { useAuth } from '@clerk/nextjs';
 import { useLayoutEffect, useRef, useState } from 'react';
@@ -286,7 +286,9 @@ function QuickActionsContent({
         <ModalContent>
           <ModalBody className='p-0'>
             <div className='p-4 border-b border-default-200 flex justify-between items-center'>
-              <h3 className='text-lg font-semibold'>Print Preview</h3>
+              <ModalHeader as='h3' className='p-0 text-lg font-semibold'>
+                Print Preview
+              </ModalHeader>
               <div className='flex gap-2'>
                 <Button
                   size='sm'

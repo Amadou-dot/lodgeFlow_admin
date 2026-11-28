@@ -46,6 +46,13 @@ export default function BookingTableDesktop({
     <Table
       aria-label='Bookings table'
       removeWrapper
+      onRowAction={
+        onViewDetails &&
+        (key => {
+          const booking = bookings.find(row => row._id === key);
+          if (booking) onViewDetails(booking);
+        })
+      }
       classNames={{
         base: 'max-h-[600px] overflow-auto',
         table: 'min-h-[400px] table-fixed w-full',

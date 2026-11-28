@@ -82,7 +82,9 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Exercise isolated HTTP contracts and gate failure detection
-        run: pnpm test:http
+      - name: Install Chromium for the staff booking keyboard check
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Exercise isolated HTTP contracts and staff booking keyboard navigation
+        run: pnpm test:http --booking-keyboard
       - name: Verify production cabin listing freshness
         run: pnpm --filter @lodgeflow/database exec tsx ../../scripts/http-smoke/catalog-freshness.mjs
