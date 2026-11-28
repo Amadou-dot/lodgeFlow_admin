@@ -10,9 +10,25 @@ pnpm test:http
 The command first verifies that the HTTP assertions reject injected errors,
 redirects, HTML, malformed JSON and timeouts. It then starts a disposable MongoDB
 replica set, local provider fixtures, and both actual Next.js applications. The
-`http-smoke` CI job runs the same command alongside the existing tests/builds.
+`http-smoke` CI job also enables the staff booking keyboard check.
 Local execution needs permission to open listeners and may need the MongoDB
 Memory Server binary download. No application credentials are required.
+
+## Staff booking keyboard regression
+
+To include the desktop Chromium check in the HTTP run, use
+
+```sh
+pnpm exec playwright install --only-shell chromium
+pnpm test:http --booking-keyboard
+```
+
+CI passes `--with-deps` to the install command on Ubuntu. The browser opens
+the staff Bookings page with records from the disposable database. The admin
+server verifies a locally signed staff identity. The browser uses the staff
+test UI and a stub for the hosted Clerk script. The check exercises the real
+table, actions menu and booking detail dialogs with keyboard and pointer input.
+[Browser regression](../../scripts/http-smoke/booking-keyboard.mjs)
 
 ## Production cabin catalog regression
 

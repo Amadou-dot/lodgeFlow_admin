@@ -102,6 +102,9 @@ export default function RecordPaymentModal({
   bookingId,
   guestName,
 }: RecordPaymentModalProps) {
+  // A popup portalled to the body is hidden by the open modal.
+  const [popoverContainer, setPopoverContainer] =
+    useState<HTMLDivElement | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -169,7 +172,7 @@ export default function RecordPaymentModal({
           </p>
         </ModalHeader>
         <ModalBody>
-          <div className='space-y-4'>
+          <div ref={setPopoverContainer} className='space-y-4'>
             {/* Payment Summary */}
             <div className='bg-default-50 p-4 rounded-lg'>
               <div className='flex justify-between items-center mb-2'>
@@ -259,6 +262,7 @@ export default function RecordPaymentModal({
             <Select
               label='Payment Method'
               placeholder='Select payment method'
+              popoverProps={{ portalContainer: popoverContainer ?? undefined }}
               selectedKeys={paymentMethod ? [paymentMethod] : []}
               onSelectionChange={keys => {
                 const selected = Array.from(keys)[0] as string;

@@ -57,6 +57,7 @@ const { settingsData } =
 const { calculateRefund, getCancellationDeadlines, formatCancellationPolicy } =
   await import('../../apps/customer/lib/cancellation.ts');
 const workspace = await mkdtemp(path.join(tmpdir(), 'lodgeflow-http-smoke-'));
+const checkBookingKeyboard = process.argv.includes('--booking-keyboard');
 const secret = randomUUID();
 const clerk = createClerkFixture({
   organizationId: 'smoke_org',
@@ -180,6 +181,8 @@ async function startApp({ app, mongoUri, providerUrl }) {
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: clerk.publishableKey,
         CLERK_SECRET_KEY: clerk.secretKey,
         CLERK_API_URL: providerUrl,
+        ...(app === 'admin' &&
+          checkBookingKeyboard && { NEXT_PUBLIC_TESTING: 'true' }),
         STRIPE_SECRET_KEY: 'sk_test_smoke_only',
         STRIPE_WEBHOOK_SECRET: webhookSecret,
         RESEND_API_KEY: 're_smoke_only',
@@ -2556,6 +2559,10 @@ try {
   console.log(
     'PASS admin booking list/detail JSON preserves projections, receipts, virtuals and customer dates without writes'
   );
+  if (checkBookingKeyboard) {
+    const { verifyBookingKeyboard } = await import('./booking-keyboard.mjs');
+    await verifyBookingKeyboard({ origin: admin, headers: identity('admin') });
+  }
 
   const customerReadSnapshot = JSON.stringify(
     await Booking.find().sort({ _id: 1 }).lean()

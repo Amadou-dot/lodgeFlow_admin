@@ -12,12 +12,12 @@ jest.mock('@heroui/dropdown', () => ({
   ),
   DropdownItem: ({
     children,
-    onPress,
+    onAction,
   }: {
     children: ReactNode;
-    onPress?: () => void;
+    onAction?: () => void;
   }) => (
-    <button role='menuitem' onClick={onPress}>
+    <button role='menuitem' onClick={onAction}>
       {children}
     </button>
   ),

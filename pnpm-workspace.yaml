@@ -26,6 +26,9 @@ packages:
 # time.
 overrides:
   '@internationalized/date': 3.12.2
+  # HeroUI Modal renders its focus scope with overlays 3.31.2. Its dialog hook
+  # must read the same React context for Tab to stay inside the active modal.
+  '@react-aria/dialog@3.5.34>@react-aria/overlays': 3.31.2
   postcss: ^8.5.32
   # Target only vulnerable ranges; preserve each transitive dependency's major.
   'browserslist@<4.28.7': 4.28.7
