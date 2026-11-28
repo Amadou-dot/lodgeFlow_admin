@@ -1,4 +1,5 @@
 import { CABIN_STATUSES } from '../config';
+import { findBundledCabinPhoto } from '../cabin-photos';
 import mongoose, { Schema } from 'mongoose';
 import type { Document, Model, Types } from 'mongoose';
 
@@ -23,6 +24,10 @@ export interface ICabin extends Document {
   updatedAt: Date;
 }
 
+function isCabinImageUrl(value: string): boolean {
+  return /^https?:\/\/.+\..+/.test(value) || !!findBundledCabinPhoto(value);
+}
+
 const CabinSchema: Schema = new Schema(
   {
     name: {
@@ -35,9 +40,7 @@ const CabinSchema: Schema = new Schema(
       type: String,
       required: [true, 'Cabin image is required'],
       validate: {
-        validator: function (v: string) {
-          return /^https?:\/\/.+\..+/.test(v);
-        },
+        validator: isCabinImageUrl,
         message: 'Please provide a valid image URL',
       },
     },
@@ -92,9 +95,7 @@ const CabinSchema: Schema = new Schema(
       {
         type: String,
         validate: {
-          validator: function (v: string) {
-            return /^https?:\/\/.+\..+/.test(v);
-          },
+          validator: isCabinImageUrl,
           message: 'Please provide a valid image URL',
         },
       },

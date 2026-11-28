@@ -3,6 +3,9 @@ import {
   isDiscountValid,
   updateCabinSchema,
 } from '@/lib/validations/cabin';
+import { cabinData } from '@/lib/data/seed-data';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 describe('Cabin Validation Schemas', () => {
   describe('createCabinSchema', () => {
@@ -146,6 +149,53 @@ describe('Cabin Validation Schemas', () => {
       const result = createCabinSchema.safeParse(cabin);
       expect(result.success).toBe(false);
     });
+
+    it('accepts the Lakeside seed gallery on create and edit, with a WebP in both apps for every image', () => {
+      const cabin = createCabinSchema.parse(
+        cabinData.find(row => row.name === 'Lakeside Haven')
+      );
+      const photos = [cabin.image, ...cabin.images];
+      expect(photos).toHaveLength(8);
+      expect(new Set(photos).size).toBe(photos.length);
+      const patch = {
+        _id: '60a000000000000000000001',
+        image: cabin.image,
+        images: cabin.images,
+      };
+      expect(updateCabinSchema.parse(patch)).toEqual(patch);
+      for (const photo of photos) {
+        for (const app of ['admin', 'customer']) {
+          const file = resolve(
+            __dirname,
+            '../../..',
+            app,
+            'public',
+            '.' + photo
+          );
+          expect(readFileSync(file).toString('ascii', 8, 12)).toBe('WEBP');
+        }
+      }
+    });
+
+    it.each(['/logo.svg', '/cabin-photos/lakeside-haven/missing.webp'])(
+      'rejects unlisted local image %s for both the cover and gallery',
+      image => {
+        const result = createCabinSchema.safeParse({
+          ...validCabin,
+          image,
+          images: [image],
+        });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(
+            result.error.issues.map(issue => [issue.path, issue.message])
+          ).toEqual([
+            [['image'], 'Invalid image URL'],
+            [['images', 0], 'Invalid image URL'],
+          ]);
+        }
+      }
+    );
 
     it('accepts amenities string array', () => {
       const cabin = {

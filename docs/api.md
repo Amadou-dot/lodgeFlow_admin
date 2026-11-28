@@ -669,8 +669,10 @@ Creates a new cabin.
 | `amenities`   | string[] | No       | Amenity names, such as `["WiFi", "Fireplace"]`   |
 | `status`      | string   | No       | `active` (default), `maintenance`, or `inactive` |
 
-The cabin schema also accepts gallery URLs, bedrooms, bathrooms, floor area,
-minimum nights, and the extra guest fee. [Cabin schema](../apps/admin/lib/validations/cabin.ts)
+The `image` and `images` fields accept external image URLs and the root-relative
+paths in the [bundled cabin photo gallery](../packages/database/src/cabin-photos.ts).
+Both apps serve these paths. The schema also accepts bedrooms, bathrooms, floor
+area, minimum nights, and the extra guest fee. [Cabin schema](../apps/admin/lib/validations/cabin.ts)
 
 **Success Response:** `201 Created`
 

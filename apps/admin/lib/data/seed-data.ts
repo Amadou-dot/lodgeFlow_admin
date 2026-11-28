@@ -1,3 +1,5 @@
+import { lakesideHavenPhotos } from '@lodgeflow/database/cabin-photos';
+
 export { settingsData } from '@lodgeflow/database/settings-defaults';
 
 export const cabinData = [
@@ -31,24 +33,23 @@ export const cabinData = [
   },
   {
     name: 'Lakeside Haven',
-    image:
-      'https://images.unsplash.com/photo-1697689841030-000d3594c104?w=400&h=300&auto=format&fit=crop',
-    images: [
-      'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=400&h=300&auto=format&fit=crop',
-    ],
+    image: lakesideHavenPhotos[0].src,
+    images: lakesideHavenPhotos.slice(1).map(photo => photo.src),
     status: 'active' as const,
     capacity: 6,
     price: 350,
     discount: 0,
     description:
-      'Waterfront cabin with private dock, perfect for fishing and water activities.',
+      'Walk from the deck of this three-bedroom timber cabin straight down to your private dock. Two kayaks sit by the water for a morning paddle around the pine-lined cove. Back inside, the great room looks out over the lake, with a fieldstone fireplace and a kitchen table that seats six. Choose between the lake-facing queen room, a second queen tucked toward the woods, and a twin room. The cabin has two bathrooms.',
     amenities: [
-      'WiFi',
-      'Kitchen',
       'Private Dock',
       'Kayaks',
-      'Fire Pit',
       'Lake View',
+      'Lakefront Deck',
+      'Fireplace',
+      'Kitchen',
+      'Fire Pit',
+      'WiFi',
     ],
     bedrooms: 3,
     bathrooms: 2,

@@ -1,4 +1,5 @@
 import { siteConfig } from '@/config/site';
+import { findBundledCabinPhoto } from '@lodgeflow/database/cabin-photos';
 import type { Cabin } from '@/types';
 
 const base = () => siteConfig.url.replace(/\/$/, '');
@@ -30,7 +31,9 @@ export function cabinToLodgingBusiness(cabin: Cabin): Record<string, unknown> {
     '@id': url,
     name: cabin.name,
     description: cabin.description,
-    image: [cabin.image, ...(cabin.images ?? [])].filter(Boolean),
+    image: [cabin.image, ...(cabin.images ?? [])]
+      .filter(Boolean)
+      .map(src => (findBundledCabinPhoto(src) ? `${base()}${src}` : src)),
     url,
     priceRange: `$${effectivePrice} per night`,
     maximumAttendeeCapacity: cabin.capacity,

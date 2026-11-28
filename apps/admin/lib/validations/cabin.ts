@@ -1,12 +1,20 @@
 import { priceAmountSchema } from './money';
 import { objectRequestSchema } from './object-request';
 import { CABIN_STATUSES } from '@/lib/config';
+import { lakesideHavenPhotos } from '@lodgeflow/database/cabin-photos';
 import { z } from 'zod';
 
 /**
  * Status enum — matches the Cabin Mongoose model
  */
 const cabinStatusSchema = z.enum(CABIN_STATUSES);
+const imageUrl = z
+  .string()
+  .pipe(
+    z
+      .url('Invalid image URL')
+      .or(z.literal(lakesideHavenPhotos.map(photo => photo.src)))
+  );
 
 /**
  * Description length bounds — kept as constants so create/update can't
@@ -22,8 +30,8 @@ const CABIN_DESCRIPTION_MAX = 1000;
 const createFieldsSchema = z
   .strictObject({
     name: z.string().min(1, 'Name is required').max(100),
-    image: z.string().url('Invalid image URL'),
-    images: z.array(z.string().url('Invalid image URL')).optional().default([]),
+    image: imageUrl,
+    images: z.array(imageUrl).optional().default([]),
     status: cabinStatusSchema.optional().default('active'),
     capacity: z.number().int().min(1, 'Capacity must be at least 1').max(20),
     price: z
@@ -65,8 +73,8 @@ const updateFieldsSchema = z
       .min(1, 'Cabin ID is required')
       .regex(/^[a-f\d]{24}$/i, 'Invalid catalog ID'),
     name: z.string().min(1).max(100).optional(),
-    image: z.string().url('Invalid image URL').optional(),
-    images: z.array(z.string().url('Invalid image URL')).optional(),
+    image: imageUrl.optional(),
+    images: z.array(imageUrl).optional(),
     status: cabinStatusSchema.optional(),
     capacity: z.number().int().min(1).max(20).optional(),
     price: z.number().positive().pipe(priceAmountSchema).optional(),

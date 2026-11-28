@@ -18,6 +18,7 @@ import { Select, SelectItem } from '@heroui/select';
 import type { SharedSelection } from '@heroui/system';
 import { addToast } from '@heroui/toast';
 import Image from 'next/image';
+import { findBundledCabinPhoto } from '@lodgeflow/database/cabin-photos';
 import { useEffect, useState } from 'react';
 
 interface CabinModalProps {
@@ -124,7 +125,9 @@ export default function CabinModal({
     const validateImage = async () => {
       if (formData.image.trim()) {
         try {
-          const isValid = await isImageUrl(formData.image);
+          const isValid =
+            !!findBundledCabinPhoto(formData.image) ||
+            (await isImageUrl(formData.image));
           if (active)
             setImageValidation({ url: formData.image, valid: isValid });
         } catch {
@@ -433,7 +436,8 @@ export default function CabinModal({
                   </div>
                 )}
                 <Input
-                  type='url'
+                  type='text'
+                  inputMode='url'
                   placeholder='Enter image URL'
                   value={formData.image}
                   onChange={e =>

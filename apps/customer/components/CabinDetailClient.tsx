@@ -79,6 +79,7 @@ export default function CabinDetailClient({ cabin }: CabinDetailClientProps) {
       {/* Main Content */}
       <div className='space-y-8'>
         <CabinGallery
+          key={cabinId}
           images={[cabin.image, ...(cabin.images || [])].filter(Boolean)}
         />
 

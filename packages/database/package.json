@@ -26,6 +26,7 @@
     "./reservation-read-fields": "./src/reservation-read-fields.ts",
     "./catalog-json-schema": "./src/catalog-json-schema.ts",
     "./cabin-json": "./src/cabin-json.ts",
+    "./cabin-photos": "./src/cabin-photos.ts",
     "./dining-json": "./src/dining-json.ts",
     "./experience-json": "./src/experience-json.ts",
     "./booking-json": "./src/booking-json.ts",

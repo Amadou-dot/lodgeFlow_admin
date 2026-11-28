@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Expand, X } from 'lucide-react';
 import Image from 'next/image';
+import { findBundledCabinPhoto } from '@lodgeflow/database/cabin-photos';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -62,6 +63,10 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
 
   if (!images || images.length === 0) return null;
 
+  const activeAlt =
+    findBundledCabinPhoto(images[activeIndex])?.alt ??
+    `Gallery image ${activeIndex + 1}`;
+
   const slideVariants = {
     enter: (dir: number) => ({
       x: dir > 0 ? 80 : -80,
@@ -78,7 +83,7 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
   };
 
   return (
-    <>
+    <section aria-label='Cabin photo gallery'>
       {/* Main Gallery */}
       <div className='w-full'>
         {/* Hero Image */}
@@ -105,7 +110,7 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
               variants={slideVariants}
             >
               <Image
-                alt={`Gallery image ${activeIndex + 1}`}
+                alt={activeAlt}
                 className='object-cover'
                 fill
                 priority={activeIndex === 0}
@@ -163,8 +168,11 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
             {images.map((src, idx) => (
               <button
                 key={idx}
-                aria-label={`View image ${idx + 1}`}
+                aria-pressed={idx === activeIndex}
                 style={{ width: '88px', height: '60px' }}
+                aria-label={
+                  findBundledCabinPhoto(src)?.alt ?? `View image ${idx + 1}`
+                }
                 className={`relative flex-none rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${
                   idx === activeIndex
                     ? 'ring-2 ring-primary ring-offset-2 ring-offset-background opacity-100 scale-[1.02]'
@@ -173,7 +181,7 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
                 onClick={() => goTo(idx)}
               >
                 <Image
-                  alt={`Thumbnail ${idx + 1}`}
+                  alt=''
                   className='object-cover'
                   fill
                   sizes='88px'
@@ -231,7 +239,7 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
                   variants={slideVariants}
                 >
                   <Image
-                    alt={`Gallery image ${activeIndex + 1}`}
+                    alt={activeAlt}
                     className='object-contain'
                     fill
                     sizes='90vw'
@@ -263,12 +271,15 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
 
             {/* Lightbox thumbnails */}
             {hasMultiple && (
-              <div className='absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-black/40 backdrop-blur-sm rounded-2xl p-2'>
+              <div className='absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex max-w-[90vw] gap-2 overflow-x-auto bg-black/40 backdrop-blur-sm rounded-2xl p-2'>
                 {images.map((src, idx) => (
                   <button
                     key={idx}
-                    aria-label={`View image ${idx + 1}`}
+                    aria-pressed={idx === activeIndex}
                     style={{ width: '64px', height: '44px' }}
+                    aria-label={
+                      findBundledCabinPhoto(src)?.alt ?? `View image ${idx + 1}`
+                    }
                     className={`relative flex-none rounded-lg overflow-hidden transition-all duration-300 cursor-pointer ${
                       idx === activeIndex
                         ? 'ring-2 ring-white opacity-100'
@@ -277,7 +288,7 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
                     onClick={() => goTo(idx)}
                   >
                     <Image
-                      alt={`Thumbnail ${idx + 1}`}
+                      alt=''
                       className='object-cover'
                       fill
                       sizes='64px'
@@ -290,6 +301,6 @@ export default function CabinGallery({ images }: CabinGalleryProps) {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </section>
   );
 }

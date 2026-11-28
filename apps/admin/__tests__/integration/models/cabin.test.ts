@@ -116,6 +116,19 @@ describe('Cabin Model', () => {
 
       expect(cabin.images).toHaveLength(2);
     });
+
+    it('persists bundled images alongside external URLs and rejects other local paths', async () => {
+      const image = '/cabin-photos/lakeside-haven/exterior.webp';
+      const images = [
+        '/cabin-photos/lakeside-haven/private-dock.webp',
+        'https://example.com/room.jpg',
+      ];
+      const cabin = await Cabin.create(createCabinData({ image, images }));
+      const stored = await Cabin.findById(cabin._id).lean();
+      expect(stored).toMatchObject({ image, images });
+      cabin.images = ['/logo.svg'];
+      await expect(cabin.validate()).rejects.toThrow(/valid image URL/);
+    });
   });
 
   describe('CRUD Operations', () => {
